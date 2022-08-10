@@ -3,52 +3,96 @@ import logging
 import dask.dataframe as dd
 from dask.callbacks import Callback
 
-class ProgressCallback(Callback):
-
-    def __init__(self, progress_callback):
-        self.progress_callback = progress_callback
-
-    def _start_state(self, dsk, state):
-        self.total_tasks = len(state["ready"]) + len(state["waiting"])
-
-    def _posttask(self, key, result, dsk, state, worker_id):
-        self.progress_callback(len(state["finished"]), self.total_tasks)
-
-    def _finish(self, dsk, state, failed):
-        # XXX do something with "failed"
-        self.progress_callback(self.total_tasks, self.total_tasks)
 
 
 class BasePlugin:
+    """Base class for all plugins.  Plugins exist as entrypoints, but also 
+    PluginManager check that they subclass this class before accepting them."""
+  
+    @classmethod
+    def accepts_none(cls):
+        """Can this plugin be run as an input plugin, taking no input?"""
+        return type(None) in cls.input_classes
+
+    @classmethod
+    def accepts_class(cls, output_class):
+        """Can this plugin accept input from any of the `output_classes`?"""
+        return any(issubclass(output_class,ic) for ic in cls.input_classes)
+
+    @classmethod
+    def accepts_plugin(cls, previous_plugin):
+        """Can this plugin accept input from this previous plugin?"""
+        return cls.accepts_class(previous_plugin.output_class)
+
+    @classmethod
+    def returns_none(cls):
+        return cls.output_class == type(None)
+
+    def run_with_progress_callback(self, obj, callback):
+        """Not every plugin is going to support progress callbacks, plugins
+        which do should override this method to call `callback` sporadically
+        with two numbers estimating a fraction of the work completed."""
+        return self.run(obj)
+
+    def run(self, obj):
+        """Override this method"""
+        raise NotImplementedError(f"{self.__class__}.run()")
+
+
+class DaskBasePlugin(BasePlugin):
+    """Base class for plugins which accept and return dask DataFrames"""
 
     def run_with_progress_callback(self, ddf, callback):
-        with ProgressCallback(callback):
+
+        # XXX there's a slight disconnect here: is this plugin indicating that the
+        # input and output format are dask dataframes or that the computing done by
+        # this plugin is in Dask?  I mean, if one then probably the other, but it's
+        # possible we'll want to develop a plugin which takes some arbitrary file,
+        # does computation is Dask and then returns a pandas dataframe, at which
+        # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
+
+        class DaskProgressCallback(Callback):
+
+            def __init__(self, progress_callback):
+                self.progress_callback = progress_callback
+
+            def _start_state(self, dsk, state):
+                self.total_tasks = len(state["ready"]) + len(state["waiting"])
+
+            def _posttask(self, key, result, dsk, state, worker_id):
+                self.progress_callback(len(state["finished"]), self.total_tasks)
+
+            def _finish(self, dsk, state, failed):
+                # XXX do something with "failed"
+                self.progress_callback(self.total_tasks, self.total_tasks)
+
+        with DaskProgressCallback(callback):
             return self.run(ddf)
 
-    def run(self, ddf):
-        return ddf.compute()
+# XXX Potentially there's a PandasBasePlugin which can use a technique much like
+# tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and provide
+# progress feedback.
 
+class DaskTransformPlugin(DaskBasePlugin):
 
-class TransformPlugin(BasePlugin):
-
-    input_class = dd.DataFrame
+    input_classes = [ dd.DataFrame ]
     output_class = dd.DataFrame
 
 
-class InputPlugin(BasePlugin):
+class DaskInputPlugin(DaskBasePlugin):
 
-    input_class = None
+    input_classes = [ type(None) ]
     output_class = dd.DataFrame
 
 
-class OutputPlugin(BasePlugin):
+class DaskOutputPlugin(DaskBasePlugin):
 
-    input_class = dd.DataFrame
-    output_class = None
+    input_classes = [ dd.DataFrame ]
+    output_class = type(None)
+
 
 
 class PluginManager:
-
     
     def __init__(self):
 
@@ -62,19 +106,20 @@ class PluginManager:
 
 
     def get_input_plugins(self):
-        return [ pp for pp in self.plugins if pp.input_class is None ]
+        return [ pp for pp in self.plugins if pp.accepts_none() ]
 
     def get_transform_plugins(self):
-        return [ pp for pp in self.plugins if pp.input_class is not None and pp.output_class is not None ]
+        return [ pp for pp in self.plugins if not pp.accepts_none() and not pp.returns_none() ]
 
     def get_output_plugins(self):
-        return [ pp for pp in self.plugins if pp.output_class is None ]
+        return [ pp for pp in self.plugins if pp.returns_none() ]
 
 
-    def get_plugin_chain(self, prev_plugin=None, next_plugin=None):
-
-        for pp in self.plugins:
+    def get_plugins_between(self, prev_plugin=None, next_plugin=None):
+        return [
+            pp for pp in self.plugins
             if (
-                (pp.input_class is None if prev_plugin is None else issubclass(pp.input_class, prev_plugin.output_class)) and
-                (pp.output_class is None if next_plugin is None else issubclass(next_plugin.input_class, pp.output_class))
-                ): yield pp
+                self.accepts_plugin(prev_plugin) and
+                (next_plugin is None or next_plugin.accepts_plugin(self))
+            )
+        ]

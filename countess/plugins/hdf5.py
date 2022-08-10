@@ -1,8 +1,8 @@
 import dask.dataframe as dd
 
-from countess.core.plugins import InputPlugin, OutputPlugin
+from countess.core.plugins import DaskInputPlugin, DaskOutputPlugin
 
-class LoadHdfPlugin(InputPlugin):
+class LoadHdfPlugin(DaskInputPlugin):
 
     name = 'HDF5 Load'
     title = 'Load from HDF5'
@@ -21,7 +21,7 @@ class LoadHdfPlugin(InputPlugin):
         return dd.read_hdf(self.pattern, self.key)
 
 
-class StoreHdfPlugin(OutputPlugin):
+class StoreHdfPlugin(DaskOutputPlugin):
 
     name = 'HDF Writer'
     title = 'HDF Writer'

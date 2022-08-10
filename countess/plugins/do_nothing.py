@@ -1,8 +1,8 @@
 import dask.dataframe as dd
 
-from countess.core.plugins import TransformPlugin
+from countess.core.plugins import DaskTransformPlugin
 
-class DoNothingPlugin(TransformPlugin):
+class DoNothingPlugin(DaskTransformPlugin):
 
     name = 'Do Nothing'
     title = 'Do Nothing Plugin'
