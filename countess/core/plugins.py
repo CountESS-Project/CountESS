@@ -6,10 +6,7 @@ from dask.callbacks import Callback
 from typing import Optional, Any, Type
 from collections.abc import Iterable, Callable, Mapping
 
-
-class BasePlugin:
-    """Base class for all plugins.  Plugins exist as entrypoints, but also 
-    PluginManager check that they subclass this class before accepting them."""
+class _BasePlugin:
 
     name: str = ''
     title: str = ''
@@ -19,9 +16,15 @@ class BasePlugin:
     input_classes:Iterable[Type[Any]] = [ type(None) ]
     output_class: Type[Any] = type(None)
 
+class BasePlugin(_BasePlugin):
+    """Base class for all plugins.  Plugins exist as entrypoints, but also 
+    PluginManager check that they subclass this class before accepting them."""
+
+
     @classmethod
     def accepts_none(cls):
-        """Can this plugin be run as an input plugin, taking no input?"""
+        """Can this plugin be run as an input plugin, taking its input
+        from a file or whatever rather than from the pipeline?"""
         return type(None) in cls.input_classes
 
     @classmethod
@@ -30,7 +33,7 @@ class BasePlugin:
         return any(issubclass(output_class,ic) for ic in cls.input_classes)
 
     @classmethod
-    def accepts_plugin(cls, previous_plugin: BasePlugin):
+    def accepts_plugin(cls, previous_plugin: _BasePlugin):
         """Can this plugin accept input from this previous plugin?"""
         return cls.accepts_class(previous_plugin.output_class)
 
@@ -58,7 +61,7 @@ class DaskBasePlugin(BasePlugin):
         # input and output format are dask dataframes or that the computing done by
         # this plugin is in Dask?  I mean, if one then probably the other, but it's
         # possible we'll want to develop a plugin which takes some arbitrary file,
-        # does computation is Dask and then returns a pandas dataframe, at which
+        # does computation in Dask and then returns a pandas dataframe, at which
         # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
 
         class DaskProgressCallback(Callback):

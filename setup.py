@@ -10,8 +10,8 @@ setup(
                 'do_nothing = countess.plugins.do_nothing:DoNothingPlugin',
                 'store_hdf = countess.plugins.hdf5:StoreHdfPlugin',
             ],
-            'gui_scripts': ['countess_gui = countess.gui:main'],
-            'console_scripts': [ 'countess_cmd = countess.cmd:main'],
+            'gui_scripts': ['countess_gui = countess.core.gui:main'],
+            'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
         },
         install_requires = [
             'dask',

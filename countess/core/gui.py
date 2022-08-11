@@ -9,13 +9,16 @@ from collections.abc import Iterable, Sequence
 
 from tkinter.scrolledtext import ScrolledText
 
-from .core.plugins import BasePlugin, PluginManager
+from .plugins import BasePlugin, PluginManager
 
 plugin_manager = PluginManager()
 
-class PluginFrameWrapper:
+class _PluginFrameWrapper:
+    pass
 
-    def __init__(self, previous_pfw: PluginFrameWrapper, plugin_choices: Sequence[BasePlugin]):
+class PluginFrameWrapper(_PluginFrameWrapper):
+
+    def __init__(self, previous_pfw: _PluginFrameWrapper, plugin_choices: Sequence[BasePlugin]):
         self.previous_pfw = previous_pfw
         self.plugin_choices = plugin_choices
         self.dataframe = None
