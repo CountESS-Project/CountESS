@@ -19,6 +19,7 @@ setup(
             'pandas',
             'tables',
             'pyarrow',
+            'ttkthemes',
         ]
 )
 
