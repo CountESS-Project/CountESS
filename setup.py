@@ -1,11 +1,11 @@
-from distutils.core import setup
+from setuptools import setup
 
 setup(
         name = 'countess',
         version = '0.0.1',
-        packages = [ 'countess' ],
+        packages = [ 'countess', 'countess.plugins', 'countess.core' ],
         entry_points = {
-            'countess.plugins': [
+            'countess_plugins': [
                 'load_hdf = countess.plugins.hdf5:LoadHdfPlugin',
                 'do_nothing = countess.plugins.do_nothing:DoNothingPlugin',
                 'store_hdf = countess.plugins.hdf5:StoreHdfPlugin',
@@ -15,6 +15,7 @@ setup(
         },
         install_requires = [
             'dask',
+            'distributed',
             'numpy',
             'pandas',
             'tables',

@@ -110,7 +110,7 @@ class PluginManager:
     def __init__(self):
 
         self.plugins = []
-        for ep in entry_points(group='countess.plugins'):
+        for ep in entry_points(group='countess_plugins'):
             plugin = ep.load()
             if issubclass(plugin, BasePlugin):
                 self.plugins.append(plugin)
