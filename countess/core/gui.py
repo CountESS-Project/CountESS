@@ -16,6 +16,8 @@ from .plugins import BasePlugin, PluginManager
 
 plugin_manager = PluginManager()
 
+import dask.dataframe as dd
+
 class _PluginFrameWrapper:
     pass
 
@@ -290,34 +292,58 @@ class PipelineBuilder(ttk.Notebook):
         self.forget(plugin_wrapper.tab_id)
         self.select(self.index('end')-1)
 
+
 class DataFramePreview(ttk.Frame):
-    def __init__(self, master, ddf):
+    def __init__(self, master, ddf: dd.DataFrame):
         super().__init__(master)
         self.ddf = ddf
-        self.height = 10
-        self.index_values = list(ddf.index)[0:1000]
+        self.offset = 0
+        self.height = 20
+        self.index_values = list(ddf.index)
+        self.preview_length = len(self.index_values)
 
-        self.treeview = ttk.Treeview(self, columns=list(ddf.columns), displaycolumns='#all', height=self.height, selectmode='none')
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.scroll_to)
+        self.treeview = ttk.Treeview(self, height=self.height, selectmode=tk.NONE)
+        self.treeview['columns'] = list(ddf.columns)
+        for n, c in enumerate(ddf.columns):
+            self.treeview.heading(n, text=c)
+        self.treeview.bind('<MouseWheel>', self.scroll_event)
+        self.treeview.bind('<Button-4>', self.scroll_event)
+        self.treeview.bind('<Button-5>', self.scroll_event)
 
-        self.treeview.pack(side="left")
+        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.yview)
+
+        self.treeview.pack(side="left", fill="x", expand=1)
         self.scrollbar.pack(side="right", fill="y")
 
         self.set_offset(0)
+   
+    def scroll_event(self, event):
+        if event.num == 4 or event.delta == -120:
+            self.set_offset(self.offset-self.height//2)
+        elif event.num == 5 or event.delta == +120:
+            self.set_offset(self.offset+self.height//2)
 
-    def scroll_to(self, _, x):
-        x = float(x)
-        if x<=0: x = 0
-        if x>=1: x = 1
-        self.set_offset(int((len(self.index_values)-self.height) * x))
+    def yview(self, action: str, number: str, unit=None):
+        # https://tkdocs.com/shipman/scrollbar-callback.html
+        number = float(number)
+        if action == tk.MOVETO:
+            # the useful range is 0..1 but you can scroll beyond that.
+            x = max(0,min(1,number))
+            self.set_offset(int((self.preview_length-self.height) * x))
+        elif action == tk.SCROLL:
+            scale = self.height if unit == tk.PAGES else 1
+            self.set_offset(self.offset + int(number * scale))
 
-    def set_offset(self, offset):
+    def set_offset(self, offset: int):
         # XXX horribly inefficient PoC
+        offset = max(0,min(self.preview_length-self.height, offset))
         for n in range(0, self.height):
             if self.treeview.exists(n): self.treeview.delete(n)
         indices = self.index_values[offset:offset+self.height]
         for n, (index, *values) in enumerate(self.ddf.loc[indices[0]:indices[-1]].itertuples()):
             self.treeview.insert('', 'end', iid=n, text=index, values=values)
+        self.offset = offset
+        self.scrollbar.set(offset/self.preview_length, (offset+self.height)/self.preview_length)
 
 
 
