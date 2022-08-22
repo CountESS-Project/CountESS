@@ -225,8 +225,10 @@ class DataFramePreview(ttk.Frame):
         self.ddf = ddf
         self.offset = 0
         self.height = 20
-        self.index_values = list(ddf.index)
-        self.preview_length = len(self.index_values)
+
+        self.index_length = len(ddf.index)
+        self.index_skip_list_stride = 10000 if self.index_length > 1000000 else 1000
+        self.index_skip_list = list(islice(ddf.index,0,None,self.index_skip_list_stride))
 
         self.treeview = ttk.Treeview(self, height=self.height, selectmode=tk.NONE)
         self.treeview['columns'] = list(ddf.columns)
@@ -255,44 +257,35 @@ class DataFramePreview(ttk.Frame):
         if action == tk.MOVETO:
             # the useful range is 0..1 but you can scroll beyond that.
             x = max(0,min(1,number))
-            self.set_offset(int((self.preview_length-self.height) * x))
+            self.set_offset(int((self.index_length-self.height) * x))
         elif action == tk.SCROLL:
             scale = self.height if unit == tk.PAGES else 1
             self.set_offset(self.offset + int(number * scale))
 
+    @lru_cache(maxsize=2000)
+    def get_index_from_offset(self, offset: int):
+        """this doesn't seem like it'd do much, but actually the scrollbar returns a limited number
+        of discrete floating point values (one per pixel height of scrollbar) so it can be memoized"""
+        # The "skip list" is used to fast-forward to a more helpful place in the index before we start
+        # iterating through records one at a time. It is a horrible work-around for the lack of a useful
+        # ddf.iloc[] but it seems to work
+
+        stride = self.index_skip_list_stride
+        base_index = self.index_skip_list[offset // stride]
+        return next(islice(self.ddf.loc[base_index:].index, offset % stride, offset % stride + 1))
+ 
+        # XXX remove indirection and just use islice(ddf.loc[index:].itertuples(),0,length)?
+
     def set_offset(self, offset: int):
         # XXX horribly inefficient PoC
-        offset = max(0,min(self.preview_length-self.height, offset))
-        for n in range(0, self.height):
+        offset = max(0,min(self.index_length-self.height, offset))
+        index = self.get_index_from_offset(offset)
+        value_tuples = islice(self.ddf.loc[index:].itertuples(),0,self.height)
+        for n, (index, *values) in enumerate(value_tuples):
             if self.treeview.exists(n): self.treeview.delete(n)
-        indices = self.index_values[offset:offset+self.height]
-        for n, (index, *values) in enumerate(self.ddf.loc[indices[0]:indices[-1]].itertuples()):
             self.treeview.insert('', 'end', iid=n, text=index, values=values)
         self.offset = offset
-        self.scrollbar.set(offset/self.preview_length, (offset+self.height)/self.preview_length)
-
-
-
-
-class MainWindow:
-    """The main plugin selection window.  This should be building a "chain" of plugins
-    but for now it just has three tabs, for Input, Transform and Output plugins"""
-
-    def __init__(self, parent):
-        self.parent = parent
-        notebook = ttk.Notebook(parent)
-
-        ifw = PluginFrameWrapper(None, plugin_manager.get_input_plugins())
-        tfw = PluginFrameWrapper(ifw, plugin_manager.get_transform_plugins())
-        ofw = PluginFrameWrapper(tfw, plugin_manager.get_output_plugins())
-
-        notebook.add(ifw.frame, text="Input Plugin")
-        notebook.add(tfw.frame, text="Transform Plugin")
-        notebook.add(ofw.frame, text="Output Plugin")
-        notebook.pack(expand=True, fill=tk.BOTH)
-
-    def quit(self):
-        self.parent.destroy()
+        self.scrollbar.set(offset/self.index_length, (offset+self.height)/self.index_length)
 
 
 def main():
