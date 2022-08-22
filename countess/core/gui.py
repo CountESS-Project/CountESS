@@ -37,8 +37,13 @@ class PluginWrapper(ttk.Frame):
         #ttk.Separator(self, orient="horizontal").pack(fill='x')
         self.header = PluginHeader(self, plugin)
         self.config = PluginConfigurator(self, plugin)
+        if hasattr(self.plugin, 'file_params'):
+            self.file_config = PluginFileConfigurator(self, plugin)
+        else:
+            self.file_config = None
         self.footer = PluginFooter(self, plugin)
-        for w in self.winfo_children(): w.pack(fill=tk.X)
+        for w in self.winfo_children(): w.grid(sticky="ew")
+        self.columnconfigure(0,weight=1)
         CancelButton(self, command=self.delete).place(anchor=tk.NE, relx=1, rely=0)
 
     def delete(self):
@@ -46,6 +51,12 @@ class PluginWrapper(ttk.Frame):
 
     def run(self):
         self.footer.set_progress(42,107,"WOO")
+
+    def get_params(self):
+        return self.config.get_params()
+
+    def get_file_params(self):
+        return self.file_config.get_file_params() if self.file_config else None
 
 class PluginHeader(ttk.Frame):
     def __init__(self, master, plugin):
@@ -60,13 +71,71 @@ class PluginConfigurator(ttk.Frame):
         super().__init__(master)
         self.plugin = plugin
 
-        self.param_entries = {}
+        self.param_entries = []
         if self.plugin.params is not None:
             for n, (k, v) in enumerate(self.plugin.params.items()):
                 ttk.Label(self, text=v['label']).grid(row=n, column=0)
                 ee = tk.Entry(self)
-                self.param_entries[k] = ee
+                self.param_entries.append(k, ee)
                 ee.grid(row=n, column=1, sticky="ew")
+
+    def get_params(self):
+        return dict([
+            (k, v.get()) for k,v in self.param_entries
+        ])
+
+class PluginFileConfigurator(ttk.Frame):
+    def __init__(self, master, plugin):
+        super().__init__(master)
+        self.plugin = plugin
+        self.labels_shown = False
+
+        # XXX needs some trickery to make this scrollable
+        #self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.subframe = ttk.Frame(self)
+        self.subframe.columnconfigure(0,weight=1)
+        self.add_file_button = ttk.Button(self, text="+ Add Files", command=self.add_file)
+
+        self.table_rows = []
+
+        self.add_file_button.pack(side="bottom")
+        self.subframe.pack(side="left", fill="x", expand=1)
+        #self.scrollbar.pack(side="right", fill="y")
+
+    def add_file(self):
+        filenames = filedialog.askopenfilenames()
+
+        if not self.labels_shown and self.plugin.file_params is not None:
+            for n, fp in enumerate(self.plugin.file_params.values()):
+                ttk.Label(self.subframe, text=fp['label']).grid(row=0, column=n+1)
+            self.labels_shown = True
+
+        for rn, filename in enumerate(filenames, len(self.table_rows)):
+            fn_entry = ttk.Entry(self.subframe)
+            fn_entry.insert(0, filename);
+            fn_entry.grid(row=rn+1, column=0, sticky="ew")
+            fn_entry.state(['readonly'])
+            self.table_rows.append([fn_entry])
+            if self.plugin.file_params is not None:
+                for cn, (k, v) in enumerate(self.plugin.file_params.items()):
+                    ee = ttk.Entry(self.subframe)
+                    self.table_rows[-1].append(ee)
+                    ee.grid(row=rn+1, column=cn+1)
+            cb = CancelButton(self.subframe, command=lambda n=rn: self.remove_file(n))
+            cb.grid(row=rn+1, column=107)
+            self.table_rows[-1].append(cb)
+
+    def remove_file(self, rn):
+        for w in self.table_rows[rn]:
+            w.destroy()
+        self.table_rows[rn] = []
+
+    def get_file_params(self):
+        return [ 
+            [ e.get() for e in ee ]
+            for ee in self.table_rows
+        ]
+
 
 
 class LabeledProgressbar(ttk.Progressbar):
@@ -134,14 +203,14 @@ class PipelineBuilder(ttk.Notebook):
         super().__init__(master)
         self.enable_traversal()
 
-        self.add(PluginChooser(self), text="+ Add +")
+        self.add(PluginChooser(self), text="+ Add Plugin")
         self.pack()
 
     def add_plugin(self, plugin):
         plugin_wrapper = PluginWrapper(self, plugin)
 
         index = self.index('end')-1
-        self.insert(index, plugin_wrapper, text=plugin.name, sticky="ew")
+        self.insert(index, plugin_wrapper, text=plugin.name, sticky="nsew")
         self.select(index)
         plugin_wrapper.tab_id = self.select()
 
@@ -237,8 +306,9 @@ def main():
             root.set_theme(t)
             break
 
-    PipelineBuilder(root)
-    #MainWindow(root)
+    PipelineBuilder(root).grid(sticky="nsew")
+    root.rowconfigure(0, weight=1)
+    root.columnconfigure(0, weight=1)
     root.mainloop()
 
 if __name__ == '__main__':
