@@ -6,11 +6,16 @@ class LoadHdfPlugin(DaskInputPlugin):
 
     name = 'HDF5 Load'
     title = 'Load from HDF5'
-    description = "Loads from HDF5 file"
+    description = "Loads counts from HDF5 files"
 
-    params = {
-        "pattern": { "label": "Filename Pattern", "type": str, "text": "Filename pattern" },
-        "key": { "label": "HDF key", "type": str, "text": "hdf key" },
+    file_types = [('HDF5 File', '*.hdf5')]
+
+    params = {}
+
+    file_params = {
+        "key": { "label": "HDF key", "type": str },
+        "index_prefix": { "label": "Index Prefix", "type": str },
+        "column_suffix": { "label": "Column Suffix", "type": str },
     }
 
     def __init__(self, pattern, key):

@@ -41,16 +41,12 @@ class PluginWrapper(ttk.Frame):
             self.file_config = PluginFileConfigurator(self, plugin)
         else:
             self.file_config = None
-        self.footer = PluginFooter(self, plugin)
         for w in self.winfo_children(): w.grid(sticky="ew")
         self.columnconfigure(0,weight=1)
         CancelButton(self, command=self.delete).place(anchor=tk.NE, relx=1, rely=0)
 
     def delete(self):
         self.master.del_plugin(self)
-
-    def run(self):
-        self.footer.set_progress(42,107,"WOO")
 
     def get_params(self):
         return self.config.get_params()
@@ -65,23 +61,39 @@ class PluginHeader(ttk.Frame):
         ttk.Label(self, text=self.plugin.name).pack()
         ttk.Label(self, text=self.plugin.description).pack()
         ttk.Separator(self, orient="horizontal").pack()
+
+def variable_for_param(master, param, entry_row, entry_column):
+    if param['type'] == bool:
+        var = tk.BooleanVar(master, value=param.get('default', 0))
+        ent = tk.Checkbutton(master, variable=var)
+    else:
+        if param['type'] == float:
+            var = tk.DoubleVar(master, value=param.get('default', 0.0))
+        elif param['type'] == int:
+            var = tk.IntVar(master, value=param.get('default', 0))
+        else:
+            var = tk.StringVar(master, value=param.get('default', ''))
+        ent = tk.Entry(master, textvariable=var)
+
+    ent.grid(row=entry_row, column=entry_column, sticky="ew")
+
+    return var
     
 class PluginConfigurator(ttk.Frame):
     def __init__(self, master, plugin):
         super().__init__(master)
         self.plugin = plugin
 
-        self.param_entries = []
+        self.param_vars = []
         if self.plugin.params is not None:
             for n, (k, v) in enumerate(self.plugin.params.items()):
                 ttk.Label(self, text=v['label']).grid(row=n, column=0)
-                ee = tk.Entry(self)
-                self.param_entries.append(k, ee)
-                ee.grid(row=n, column=1, sticky="ew")
+                var = variable_for_param(self, v, n, 1)
+                self.param_vars.append((k, var))
 
     def get_params(self):
         return dict([
-            (k, v.get()) for k,v in self.param_entries
+            (k, v.get()) for k,v in self.param_vars
         ])
 
 class PluginFileConfigurator(ttk.Frame):
@@ -96,44 +108,49 @@ class PluginFileConfigurator(ttk.Frame):
         self.subframe.columnconfigure(0,weight=1)
         self.add_file_button = ttk.Button(self, text="+ Add Files", command=self.add_file)
 
-        self.table_rows = []
+        # XXX awful stuff
+        self.filenames = []
+        self.file_param_vars = []
 
         self.add_file_button.pack(side="bottom")
         self.subframe.pack(side="left", fill="x", expand=1)
         #self.scrollbar.pack(side="right", fill="y")
 
     def add_file(self):
-        filenames = filedialog.askopenfilenames()
+        if hasattr(self.plugin, 'file_types'):
+            filenames = filedialog.askopenfilenames(filetypes=self.plugin.file_types)
+        else:
+            filenames = filedialog.askopenfilenames()
 
         if not self.labels_shown and self.plugin.file_params is not None:
             for n, fp in enumerate(self.plugin.file_params.values()):
                 ttk.Label(self.subframe, text=fp['label']).grid(row=0, column=n+1)
             self.labels_shown = True
 
-        for rn, filename in enumerate(filenames, len(self.table_rows)):
-            fn_entry = ttk.Entry(self.subframe)
-            fn_entry.insert(0, filename);
-            fn_entry.grid(row=rn+1, column=0, sticky="ew")
-            fn_entry.state(['readonly'])
-            self.table_rows.append([fn_entry])
+        for rn, filename in enumerate(filenames, len(self.file_param_vars)):
+            filename_var = tk.StringVar(self.subframe, value=filename)
+            filename_label = str(pathlib.Path(filename).relative_to(pathlib.Path.cwd()))
+            tk.Label(self.subframe, text=str(filename_label)).grid(row=rn+1,column=0,sticky="ew")
+            file_param_vars = { "_filename": filename_var }
             if self.plugin.file_params is not None:
                 for cn, (k, v) in enumerate(self.plugin.file_params.items()):
-                    ee = ttk.Entry(self.subframe)
-                    self.table_rows[-1].append(ee)
-                    ee.grid(row=rn+1, column=cn+1)
-            cb = CancelButton(self.subframe, command=lambda n=rn: self.remove_file(n))
-            cb.grid(row=rn+1, column=107)
-            self.table_rows[-1].append(cb)
+                    var = variable_for_param(self.subframe, v, rn+1, cn+1)
+                    file_param_vars[k] = var
+            self.file_param_vars.append(file_param_vars)
+            CancelButton(self.subframe, command=lambda n=rn: self.remove_file(n)).grid(row=rn+1,column=1007)
 
     def remove_file(self, rn):
-        for w in self.table_rows[rn]:
+        # when deleting rows, we just throw away their variables and widgets and their row collapses
+        self.file_param_vars[rn] = None
+        for w in self.subframe.grid_slaves(row=rn+1):
             w.destroy()
-        self.table_rows[rn] = []
 
     def get_file_params(self):
+        # skips deleted rows
         return [ 
-            [ e.get() for e in ee ]
-            for ee in self.table_rows
+            dict( (k, v.get()) for k, v in fpv.items() )
+            for fpv in self.file_param_vars
+            if fpv is not None
         ]
 
 
@@ -165,17 +182,63 @@ class LabeledProgressbar(ttk.Progressbar):
         self.style.configure(self.style_name, text=s)
 
 
-class PluginFooter(ttk.Frame):
-    def __init__(self, master, plugin):
+class PluginChooser(ttk.Frame):
+    def __init__(self, master, callback):
         super().__init__(master)
-        self.plugin = plugin
+        for n, p in enumerate(plugin_manager.plugins):
+            ttk.Button(self, text=p.name, command=partial(callback, p)).grid(row=n, column=0)
+            ttk.Label(self, text=p.description).grid(row=n, column=1)
 
-        ttk.Separator(self, orient="horizontal").pack(fill='x')
-        tk.Button(self, text="RUN", fg="green", command=master.run).pack()
+        
+class PipelineBuilder(ttk.Frame):
+    # XXX TODO allow tabs to get dragged and dropped to reorder
+
+    def __init__(self, master):
+        super().__init__(master)
+        self.notebook = ttk.Notebook(self)
+        self.button = tk.Button(self, text="RUN", fg="green", command=self.run)
         self.pbar = LabeledProgressbar(self, length=500)
+        self.plugin_wrappers = []
+
+        self.notebook.pack()
+        self.button.pack()
         self.pbar.pack()
 
-    def set_progress(self, a,b,s="Running"):
+        self.notebook.add(PluginChooser(self.notebook, self.add_plugin), text="+ Add Plugin")
+
+    def add_plugin(self, plugin):
+        plugin_wrapper = PluginWrapper(self, plugin)
+        self.plugin_wrappers.append(plugin_wrapper)
+        index = self.notebook.index('end')-1
+        self.notebook.insert(index, plugin_wrapper, text=plugin.name, sticky="nsew")
+        self.notebook.select(index)
+        plugin_wrapper.tab_id = self.notebook.select()
+
+    def del_plugin(self, plugin_wrapper):
+        self.notebook.forget(plugin_wrapper.tab_id)
+        self.notebook.select(self.notebook.index('end')-1)
+        self.plugin_wrappers.remove(plugin_wrapper)
+
+    def run(self):
+        self.pbar['mode'] = 'indeterminate'
+        self.pbar.start()
+
+        value = None
+        for pw in self.plugin_wrappers:
+            plugin = pw.plugin(pw.get_params(), pw.get_file_params())
+            value = plugin.run_with_progress_callback(value, callback=self.progress_callback)
+
+        self.pbar.stop()
+        self.pbar['mode'] = 'determinate'
+        self.pbar['value'] = 100
+        self.pbar.update_label("Finished")
+    
+        # XXX temporary
+        self.preview_window = tk.Toplevel()
+        DataFramePreview(self.preview_window, value).pack()
+
+
+    def progress_callback(self, a, b, s="Running"):
         if b:
             self.pbar.stop()
             self.pbar['mode'] = 'determinate'
@@ -185,38 +248,6 @@ class PluginFooter(ttk.Frame):
             self.pbar['mode'] = 'indeterminate'
             self.pbar.start()
             self.pbar.update_label(f"{s} : {a}" if a is not None else s)
-                
-class PluginChooser(ttk.Frame):
-    def __init__(self, master):
-        super().__init__(master)
-        for n, p in enumerate(plugin_manager.plugins):
-            ttk.Button(self, text=p.name, command=partial(self.choose, p)).grid(row=n, column=0)
-            ttk.Label(self, text=p.description).grid(row=n, column=1)
-
-    def choose(self, plugin):
-        self.master.add_plugin(plugin)
-
-        
-
-class PipelineBuilder(ttk.Notebook):
-    def __init__(self, master):
-        super().__init__(master)
-        self.enable_traversal()
-
-        self.add(PluginChooser(self), text="+ Add Plugin")
-        self.pack()
-
-    def add_plugin(self, plugin):
-        plugin_wrapper = PluginWrapper(self, plugin)
-
-        index = self.index('end')-1
-        self.insert(index, plugin_wrapper, text=plugin.name, sticky="nsew")
-        self.select(index)
-        plugin_wrapper.tab_id = self.select()
-
-    def del_plugin(self, plugin_wrapper):
-        self.forget(plugin_wrapper.tab_id)
-        self.select(self.index('end')-1)
 
 
 class DataFramePreview(ttk.Frame):
@@ -265,17 +296,18 @@ class DataFramePreview(ttk.Frame):
     @lru_cache(maxsize=2000)
     def get_index_from_offset(self, offset: int):
         """this doesn't seem like it'd do much, but actually the scrollbar returns a limited number
-        of discrete floating point values (one per pixel height of scrollbar) so it can be memoized"""
+        of discrete floating point values (one per pixel height of scrollbar) and page up / page 
+        down have fixed offsets too so while it's not easy to predict it can be memoized"""
         # The "skip list" is used to fast-forward to a more helpful place in the index before we start
         # iterating through records one at a time. It is a horrible work-around for the lack of a useful
-        # ddf.iloc[] but it seems to work
+        # ddf.iloc[n:m] but it seems to work. This function just returns the index value to keep
+        # the lru cache small, the caller can then use ddf.loc[index:] to make a slice from that
+        # index forward.
 
         stride = self.index_skip_list_stride
         base_index = self.index_skip_list[offset // stride]
         return next(islice(self.ddf.loc[base_index:].index, offset % stride, offset % stride + 1))
  
-        # XXX remove indirection and just use islice(ddf.loc[index:].itertuples(),0,length)?
-
     def set_offset(self, offset: int):
         # XXX horribly inefficient PoC
         offset = max(0,min(self.index_length-self.height, offset))

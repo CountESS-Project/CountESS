@@ -12,6 +12,7 @@ class _BasePlugin:
     title: str = ''
     description: str = ''
     params: Mapping[Any, Any] = {}
+    files: list[Mapping[Any, Any]] = {}
 
     input_classes:Iterable[Type[Any]] = [ type(None) ]
     output_class: Type[Any] = type(None)
@@ -102,7 +103,6 @@ class DaskOutputPlugin(DaskBasePlugin):
 
     input_classes = [ dd.DataFrame ]
     output_class = type(None)
-
 
 
 class PluginManager:
