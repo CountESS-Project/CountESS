@@ -36,7 +36,7 @@ z = DataFramePreview(root, ddf)
 
 root.rowconfigure(0,weight=1)
 root.columnconfigure(0,weight=1)
-z.grid(sticky="nsew")
+z.frame.grid(sticky="nsew")
 
 
 root.mainloop()

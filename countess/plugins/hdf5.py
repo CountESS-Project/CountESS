@@ -1,6 +1,8 @@
 import dask.dataframe as dd
+import pandas as pd
+from collections import defaultdict
 
-from countess.core.plugins import DaskInputPlugin, DaskOutputPlugin
+from countess.core.plugins import DaskInputPlugin, DaskBasePlugin, PluginParam
 
 class LoadHdfPlugin(DaskInputPlugin):
 
@@ -10,23 +12,30 @@ class LoadHdfPlugin(DaskInputPlugin):
 
     file_types = [('HDF5 File', '*.hdf5')]
 
-    params = {}
+    file_params = [ 
+        PluginParam('key', 'HDF Key', str),
+        PluginParam('prefix', 'Index Prefix', str),
+        PluginParam('suffix', 'Column Suffix', str),
+    ]
 
-    file_params = {
-        "key": { "label": "HDF key", "type": str },
-        "index_prefix": { "label": "Index Prefix", "type": str },
-        "column_suffix": { "label": "Column Suffix", "type": str },
-    }
+    def add_file_params(self, filename, file_number):
+        # Open the file and read out the keys and the columns for each key.
+        file_params = super().add_file_params(filename, file_number)
 
-    def __init__(self, pattern, key):
-        self.pattern = pattern
-        self.key = key
+        hs = pd.HDFStore(filename)
+        
+        #for key in hs.keys():            
+        #    self.file_keys[filename][key] = list(hs.select(key, start=0, stop=0).columns())
 
+        hdf_keys = list(hs.keys())
+        file_params['key'].choices = hdf_keys
+        if len(hdf_keys) == 1: file_params['key'].value = hdf_keys[0]
+         
     def run(self, _):
         return dd.read_hdf(self.pattern, self.key)
 
 
-class StoreHdfPlugin(DaskOutputPlugin):
+class StoreHdfPlugin(DaskBasePlugin):
 
     name = 'HDF Writer'
     title = 'HDF Writer'
@@ -37,9 +46,9 @@ class StoreHdfPlugin(DaskOutputPlugin):
         "key": { "label": "HDF key", "type": str, "text": "hdf key" },
     }
 
-    def __init__(self, pattern, key):
-        self.pattern = pattern
-        self.key = key
+    def __init__(self, params, file_params):
+        self.pattern = params['pattern']
+        self.key = params['key']
 
     def run(self, ddf):
         return ddf.to_hdf(self.pattern, self.key, 'w')

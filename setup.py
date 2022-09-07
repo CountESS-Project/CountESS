@@ -8,8 +8,8 @@ setup(
             'countess_plugins': [
                 'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
                 'load_hdf = countess.plugins.hdf5:LoadHdfPlugin',
-                'do_nothing = countess.plugins.do_nothing:DoNothingPlugin',
-                'store_hdf = countess.plugins.hdf5:StoreHdfPlugin',
+                #'store_hdf = countess.plugins.hdf5:StoreHdfPlugin',
+                'log_score = countess.plugins.log_score:LogScorePlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],

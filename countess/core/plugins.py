@@ -1,71 +1,152 @@
+from typing import Optional, Any, Type, NamedTuple
+from collections import namedtuple, defaultdict
+from collections.abc import Iterable, Callable, Mapping
+
 from importlib.metadata import entry_points
 import logging
 import dask.dataframe as dd
 from dask.callbacks import Callback
+import pandas as pd
 
-from typing import Optional, Any, Type
-from collections.abc import Iterable, Callable, Mapping
+"""
+Plugin lifecycle:
+* Selector of plugins calls cls.follows_plugin(previous_plugin_instance)
+  which returns True if a plugin of this class can follow that one
+  (or None if this is the first plugin)
+* When plugin is selected, it gets __init__ed.
+* plugin.parameters gets read to get the name of configuration fields.
+* plugin.configure(name, value) gets called, potentially a lot of times.
+* plugin.parameters gets checked again whenever the gui displays a configuration
+  screen, in case options affect each other.
+* For a Dask plugin, plugin.get_columns() may get called
 
-class _BasePlugin:
+
+"""
+
+class PluginParam:
+    """Wraps up a parameter value for a plugin"""
+    # XXX this should probably be a separate thing in .core.params with subclassing to make it
+    # easier to inherit and to have ChoiceParam and so on.
+
+    def __init__(self, name: str, label: str, var_type: type, default=None, readonly: bool=False):
+    
+        if default is None:
+            if var_type is bool:
+                default = False
+            elif var_type is int:
+                default = 0
+            elif var_type is float:
+                default = 0.0
+            elif var_type is str:
+                default = ''
+            
+        self.name = name
+        self.label = label
+        self.var_type = var_type
+        self.default = default
+        self.readonly = readonly
+
+        self.value = default
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        self._value = self.var_type(value) if value is not None else None
+
+    @value.deleter
+    def value(self):
+        self.value = self.default
+
+
+class BasePlugin:
+    """Base class for all plugins.  Plugins exist as entrypoints, but also
+    PluginManager check that plugins subclass this class before accepting them
+    as plugins."""
 
     name: str = ''
-    title: str = ''
     description: str = ''
-    params: Mapping[Any, Any] = {}
-    files: list[Mapping[Any, Any]] = {}
-
-    input_classes:Iterable[Type[Any]] = [ type(None) ]
-    output_class: Type[Any] = type(None)
-
-class BasePlugin(_BasePlugin):
-    """Base class for all plugins.  Plugins exist as entrypoints, but also 
-    PluginManager check that they subclass this class before accepting them."""
-
+    parameters: Mapping[str,PluginParam] = None
 
     @classmethod
-    def accepts_none(cls):
-        """Can this plugin be run as an input plugin, taking its input
-        from a file or whatever rather than from the pipeline?"""
-        return type(None) in cls.input_classes
+    def can_follow_plugin(cls, previous_plugin: 'BasePlugin'):
+        """Can this plugin class be used to follow 'previous_plugin'? """
+        return isinstance(previous_plugin, BasePlugin)
 
-    @classmethod
-    def accepts_class(cls, output_class: Any):
-        """Can this plugin accept input from any of the `output_classes`?"""
-        return any(issubclass(output_class,ic) for ic in cls.input_classes)
-
-    @classmethod
-    def accepts_plugin(cls, previous_plugin: _BasePlugin):
-        """Can this plugin accept input from this previous plugin?"""
-        return cls.accepts_class(previous_plugin.output_class)
-
-    @classmethod
-    def returns_none(cls):
-        return cls.output_class == type(None)
+    def __init__(self, previous_plugin: 'BasePlugin'):
+        self.previous_plugin = previous_plugin
 
     def run_with_progress_callback(self, obj: Any, callback: Callable[[int, int, Optional[str]], None]):
         """Not every plugin is going to support progress callbacks, plugins
         which do should override this method to call `callback` sporadically
-        with two numbers estimating a fraction of the work completed."""
+        with two numbers estimating a fraction of the work completed, and an
+        optional string describing what they're up to, eg:
+            callback(42, 107, 'Thinking hard about stuff')
+        the user interface code will display this in some way or another."""
         return self.run(obj)
 
     def run(self, obj: Any):
         """Override this method"""
         raise NotImplementedError(f"{self.__class__}.run()")
 
+    def add_parameter(self, name: str, *args, **kwargs):
+        if self.parameters is None: self.parameters = dict()
+        plugin_param = PluginParam(name, *args, **kwargs)
+        self.parameters[name] = plugin_param
+        return plugin_param
+
+
+class FileInputMixin:
+    """Mixin class to indicate that this plugin can read files from local storage"""
+    file_number = 0
+    
+    file_types = [ ('Any', '*') ]
+
+    file_params: Iterable[PluginParam] = []
+
+    def add_file(self, filename):
+        self.file_number += 1
+        self.add_parameter(f'file.{self.file_number}.filename', "Filename", str, filename, readonly=True)
+        self.add_file_params(filename, self.file_number)
+    
+    def add_file_params(self, filename, file_number):
+        return dict([
+            (fp.name, self.add_parameter(f'file.{file_number}.{fp.name}', fp.label, fp.var_type, fp.default, fp.readonly))
+            for fp in self.file_params
+        ])
+    
+    def remove_file(self, filenumber):
+        for k in self.parameters.keys():
+            if k.startswith(f'file.{filenumber}.'):
+                del self.parameters[k]
+
 
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
 
+    # XXX there's a slight disconnect here: is this plugin indicating that the
+    # input and output format are dask dataframes or that the computing done by
+    # this plugin is in Dask?  I mean, if one then probably the other, but it's
+    # possible we'll want to develop a plugin which takes some arbitrary file,
+    # does computation in Dask and then returns a pandas dataframe, at which
+    # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
+
+    _output_columns = set()
+        
+    @classmethod
+    def can_follow_plugin(cls, previous_plugin: BasePlugin):
+        return isinstance(previous_plugin, DaskBasePlugin)
+    
+    #def output_columns(self) -> Iterable[str]:
+    #    return self._output_columns
+    
     def run_with_progress_callback(self, ddf, callback: Callable[[int, int, Optional[str]], None]):
-
-        # XXX there's a slight disconnect here: is this plugin indicating that the
-        # input and output format are dask dataframes or that the computing done by
-        # this plugin is in Dask?  I mean, if one then probably the other, but it's
-        # possible we'll want to develop a plugin which takes some arbitrary file,
-        # does computation in Dask and then returns a pandas dataframe, at which
-        # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
-
+        
         class DaskProgressCallback(Callback):
+            """Matches Dask's idea of a progress callback to ours."""
+            # XXX there's probably neater ways, like just passing some lambdas to Callback
 
             def __init__(self, progress_callback: Callable[[int, int, Optional[str]], None]):
                 self.progress_callback = progress_callback
@@ -87,22 +168,61 @@ class DaskBasePlugin(BasePlugin):
 # tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and provide
 # progress feedback.
 
+class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
+    """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first.
+    DaskInputPlugins don't care about existing columns because they're adding their own records anyway."""
+    
+    @classmethod
+    def can_follow_plugin(cls, previous_plugin: Optional[BasePlugin]):
+        """An input plugin can follow None (to allow it to be the first plugin"""
+        return previous_plugin is None or super().can_follow_plugin(previous_plugin)
+    
+
 class DaskTransformPlugin(DaskBasePlugin):
+    """a Transform plugin takes columns from the input data frame."""
+    
+    @classmethod
+    def can_follow_plugin(cls, previous_plugin: BasePlugin):
+        return isinstance(previous_plugin, DaskBasePlugin)
+        
+    #def output_columns(self) -> Iterable[str]:
+    #    return []
+    
 
-    input_classes = [ dd.DataFrame ]
-    output_class = dd.DataFrame
+class DaskScoringPlugin(DaskTransformPlugin):
+    """Specific kind of tranform which turns counts into scores"""
+   
+    # XXX TODO come back to this later
+    #@classmethod
+    #def can_follow_plugin(cls, previous_plugin: BasePlugin):
+    #    if not super().can_follow_plugin(previous_plugin): return False
+    #    previous_output_columns = previous_plugin.output_columns()
+    #    return 'count_0' in previous_output_columns() and \
+    #           any(col != 'count_0' and col.startswith('count_') for col in previous_plugin.output_columns())
+    #    
+    #def find_count_and_score_columns(self) -> Iterable[tuple[str,str]]:
+    #    # XXX this isn't as flexible as it should be.
+    #    return [
+    #        (x, "count_0", f"score_{x[6:]}")
+    #        for x in self.previous_plugin.output_columns()
+    #        if x.startswith("count_") and x != 'count_0'
+    #    ]
+   # 
+   # def output_columns(self) -> Iterable[str]:
+   #     return [ x[1] for x in self.find_count_and_score_columns() ]
 
-
-class DaskInputPlugin(DaskBasePlugin):
-
-    input_classes = [ type(None) ]
-    output_class = dd.DataFrame
-
-
-class DaskOutputPlugin(DaskBasePlugin):
-
-    input_classes = [ dd.DataFrame ]
-    output_class = type(None)
+    def run(self, ddf_in: dd.DataFrame):
+        # XXX count_0 is not universally applicable
+        ddf = ddf_in.copy()
+        for col in ddf_in.columns:
+            if col.startswith('count_'):
+                score_col = 'score_' + col[6:]
+                ddf[score_col] = self.score(ddf[count_col], ddf['count_0'])
+    
+        return ddf.replace([np.inf, -np.inf], np.nan).dropna()
+            
+    def score(self, col1, col0):
+        return NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
 
 
 class PluginManager:
@@ -117,22 +237,7 @@ class PluginManager:
             else:
                 logging.warning(f"{plugin} is not a valid CountESS plugin")
 
-
-    def get_input_plugins(self) -> Iterable[BasePlugin]:
-        return [ pp for pp in self.plugins if pp.accepts_none() ]
-
-    def get_transform_plugins(self) -> Iterable[BasePlugin]:
-        return [ pp for pp in self.plugins if not pp.accepts_none() and not pp.returns_none() ]
-
-    def get_output_plugins(self) -> Iterable[BasePlugin]:
-        return [ pp for pp in self.plugins if pp.returns_none() ]
-
-
-    def get_plugins_between(self, prev_plugin: Optional[BasePlugin]=None, next_plugin: Optional[BasePlugin]=None):
-        return [
-            pp for pp in self.plugins
-            if (
-                pp.accepts_plugin(prev_plugin) and
-                (next_plugin is None or next_plugin.accepts_plugin(pp))
-            )
-        ]
+    def plugin_classes_following(self, previous_plugin):
+        for plugin in self.plugins:
+            if plugin.can_follow_plugin(previous_plugin):
+                yield plugin

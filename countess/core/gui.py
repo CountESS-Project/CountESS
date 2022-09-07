@@ -6,13 +6,13 @@ import ttkthemes # type:ignore
 from tkinter import filedialog
 import pathlib
 
-from typing import Optional
+from typing import Optional, NamedTuple
 from collections.abc import Iterable, Sequence
 from functools import partial
 
 from tkinter.scrolledtext import ScrolledText
 
-from .plugins import BasePlugin, PluginManager
+from .plugins import BasePlugin, PluginManager, FileInputMixin, PluginParam
 from functools import lru_cache
 from itertools import islice
 
@@ -27,133 +27,6 @@ import dask.dataframe as dd
 class CancelButton(tk.Button):
     def __init__(self, master, **kwargs):
         super().__init__(master, text="\u274c", width=1, highlightthickness=0, bd=0, fg="red", **kwargs)
-
-class PluginWrapper(ttk.Frame):
-    def __init__(self, master, plugin):
-        super().__init__(master)
-        self.plugin = plugin
-
-        #ttk.Label(self, text=self.plugin.description).pack()
-        #ttk.Separator(self, orient="horizontal").pack(fill='x')
-        self.header = PluginHeader(self, plugin)
-        self.config = PluginConfigurator(self, plugin)
-        if hasattr(self.plugin, 'file_params'):
-            self.file_config = PluginFileConfigurator(self, plugin)
-        else:
-            self.file_config = None
-        for w in self.winfo_children(): w.grid(sticky="ew")
-        self.columnconfigure(0,weight=1)
-        CancelButton(self, command=self.delete).place(anchor=tk.NE, relx=1, rely=0)
-
-    def delete(self):
-        self.master.del_plugin(self)
-
-    def get_params(self):
-        return self.config.get_params()
-
-    def get_file_params(self):
-        return self.file_config.get_file_params() if self.file_config else None
-
-class PluginHeader(ttk.Frame):
-    def __init__(self, master, plugin):
-        super().__init__(master)
-        self.plugin = plugin
-        ttk.Label(self, text=self.plugin.name).pack()
-        ttk.Label(self, text=self.plugin.description).pack()
-        ttk.Separator(self, orient="horizontal").pack()
-
-def variable_for_param(master, param, entry_row, entry_column):
-    if param['type'] == bool:
-        var = tk.BooleanVar(master, value=param.get('default', 0))
-        ent = tk.Checkbutton(master, variable=var)
-    else:
-        if param['type'] == float:
-            var = tk.DoubleVar(master, value=param.get('default', 0.0))
-        elif param['type'] == int:
-            var = tk.IntVar(master, value=param.get('default', 0))
-        else:
-            var = tk.StringVar(master, value=param.get('default', ''))
-        ent = tk.Entry(master, textvariable=var)
-
-    ent.grid(row=entry_row, column=entry_column, sticky="ew")
-
-    return var
-    
-class PluginConfigurator(ttk.Frame):
-    def __init__(self, master, plugin):
-        super().__init__(master)
-        self.plugin = plugin
-
-        self.param_vars = []
-        if self.plugin.params is not None:
-            for n, (k, v) in enumerate(self.plugin.params.items()):
-                ttk.Label(self, text=v['label']).grid(row=n, column=0)
-                var = variable_for_param(self, v, n, 1)
-                self.param_vars.append((k, var))
-
-    def get_params(self):
-        return dict([
-            (k, v.get()) for k,v in self.param_vars
-        ])
-
-class PluginFileConfigurator(ttk.Frame):
-    def __init__(self, master, plugin):
-        super().__init__(master)
-        self.plugin = plugin
-        self.labels_shown = False
-
-        # XXX needs some trickery to make this scrollable
-        #self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
-        self.subframe = ttk.Frame(self)
-        self.subframe.columnconfigure(0,weight=1)
-        self.add_file_button = ttk.Button(self, text="+ Add Files", command=self.add_file)
-
-        # XXX awful stuff
-        self.filenames = []
-        self.file_param_vars = []
-
-        self.add_file_button.pack(side="bottom")
-        self.subframe.pack(side="left", fill="x", expand=1)
-        #self.scrollbar.pack(side="right", fill="y")
-
-    def add_file(self):
-        if hasattr(self.plugin, 'file_types'):
-            filenames = filedialog.askopenfilenames(filetypes=self.plugin.file_types)
-        else:
-            filenames = filedialog.askopenfilenames()
-
-        if not self.labels_shown and self.plugin.file_params is not None:
-            for n, fp in enumerate(self.plugin.file_params.values()):
-                ttk.Label(self.subframe, text=fp['label']).grid(row=0, column=n+1)
-            self.labels_shown = True
-
-        for rn, filename in enumerate(filenames, len(self.file_param_vars)):
-            filename_var = tk.StringVar(self.subframe, value=filename)
-            filename_label = str(pathlib.Path(filename).relative_to(pathlib.Path.cwd()))
-            tk.Label(self.subframe, text=str(filename_label)).grid(row=rn+1,column=0,sticky="ew")
-            file_param_vars = { "_filename": filename_var }
-            if self.plugin.file_params is not None:
-                for cn, (k, v) in enumerate(self.plugin.file_params.items()):
-                    var = variable_for_param(self.subframe, v, rn+1, cn+1)
-                    file_param_vars[k] = var
-            self.file_param_vars.append(file_param_vars)
-            CancelButton(self.subframe, command=lambda n=rn: self.remove_file(n)).grid(row=rn+1,column=1007)
-
-    def remove_file(self, rn):
-        # when deleting rows, we just throw away their variables and widgets and their row collapses
-        self.file_param_vars[rn] = None
-        for w in self.subframe.grid_slaves(row=rn+1):
-            w.destroy()
-
-    def get_file_params(self):
-        # skips deleted rows
-        return [ 
-            dict( (k, v.get()) for k, v in fpv.items() )
-            for fpv in self.file_param_vars
-            if fpv is not None
-        ]
-
-
 
 class LabeledProgressbar(ttk.Progressbar):
 
@@ -182,78 +55,124 @@ class LabeledProgressbar(ttk.Progressbar):
         self.style.configure(self.style_name, text=s)
 
 
-class PluginChooser(ttk.Frame):
-    def __init__(self, master, callback):
-        super().__init__(master)
-        for n, p in enumerate(plugin_manager.plugins):
-            ttk.Button(self, text=p.name, command=partial(callback, p)).grid(row=n, column=0)
-            ttk.Label(self, text=p.description).grid(row=n, column=1)
+class ParameterWidgets(NamedTuple):
+    label: tk.Widget
+    entry: tk.Widget
+    var: tk.Variable
 
+def widgets_for_parameter(tk_parent: tk.Widget, parameter: PluginParam) -> ParameterWidgets:
+    label = ttk.Label(tk_parent, text=parameter.label)
+
+    if parameter.var_type == bool:
+        var = tk.BooleanVar(tk_parent, value=parameter.value)
+    elif parameter.var_type == float:
+        var = tk.DoubleVar(tk_parent, value=parameter.value)
+    elif parameter.var_type == int:
+        var = tk.IntVar(tk_parent, value=parameter.value)
+    else:
+        var = tk.StringVar(tk_parent, value=parameter.value)
+    
+    if parameter.readonly:
+        # XXX gross
+        entry = tk.Label(tk_parent, text=parameter.value)
+    elif parameter.var_type == bool:
+        entry = tk.Checkbutton(tk_parent, variable=var)
+    else:
+        entry = tk.Entry(tk_parent, textvariable=var)
+
+    return ParameterWidgets(label, entry, var)
+    
+
+class PipelineManager:
+    # XXX allow some way to drag and drop tabs
+    
+    def __init__(self, tk_parent):
+        self.frame = ttk.Frame(tk_parent)
+        self.frame.grid(sticky=tk.NSEW)
+        self.notebook = ttk.Notebook(self.frame)
+        self.button = tk.Button(self.frame, text="RUN", fg="green", command=self.run)
+        #self.pbar = LabeledProgressbar(self.frame, length=500)
+        self.plugins = []
         
-class PipelineBuilder(ttk.Frame):
-    # XXX TODO allow tabs to get dragged and dropped to reorder
-
-    def __init__(self, master):
-        super().__init__(master)
-        self.notebook = ttk.Notebook(self)
-        self.button = tk.Button(self, text="RUN", fg="green", command=self.run)
-        self.pbar = LabeledProgressbar(self, length=500)
-        self.plugin_wrappers = []
-
+        self.plugin_chooser_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.plugin_chooser_frame, text="+")
+        self.update_plugin_chooser_frame()
+        
         self.notebook.pack()
         self.button.pack()
-        self.pbar.pack()
+        #self.pbar.pack()
+        
+        self.parameter_cache = dict()
+        
+    def update_plugin_chooser_frame(self):
+        last_plugin = self.plugins[-1] if len(self.plugins) else None
+        for w in self.plugin_chooser_frame.winfo_children(): w.destroy()
+        plugin_classes =  plugin_manager.plugin_classes_following(last_plugin)
+        for n, plugin_class in enumerate(plugin_classes):
+            add_callback = partial(self.add_plugin, plugin_class, last_plugin)
+            ttk.Button(self.plugin_chooser_frame, text=plugin_class.name, command=add_callback).grid(row=n, column=0)
+            ttk.Label(self.plugin_chooser_frame, text=plugin_class.description).grid(row=n, column=1)
 
-        self.notebook.add(PluginChooser(self.notebook, self.add_plugin), text="+ Add Plugin")
-
-    def add_plugin(self, plugin):
-        plugin_wrapper = PluginWrapper(self, plugin)
-        self.plugin_wrappers.append(plugin_wrapper)
+    def add_plugin(self, plugin_class, previous_plugin):
+        plugin = plugin_class(previous_plugin)
+        self.plugins.append(plugin)
+        
+        frame = ttk.Frame(self.notebook)
         index = self.notebook.index('end')-1
-        self.notebook.insert(index, plugin_wrapper, text=plugin.name, sticky="nsew")
+        self.notebook.insert(index, frame, text=plugin.name, sticky=tk.NSEW)
         self.notebook.select(index)
-        plugin_wrapper.tab_id = self.notebook.select()
+        
+        tk.Label(frame, text=plugin.description).grid(row=0, columnspan=2, sticky=tk.EW)
+        frame.columnconfigure(0,weight=1)
+        frame.columnconfigure(1,weight=2)
+        
+        self.display_plugin_configuration(frame, plugin)
+        self.update_plugin_chooser_frame()
 
-    def del_plugin(self, plugin_wrapper):
-        self.notebook.forget(plugin_wrapper.tab_id)
-        self.notebook.select(self.notebook.index('end')-1)
-        self.plugin_wrappers.remove(plugin_wrapper)
+    def display_plugin_configuration(self, frame, plugin):
+        
+        if plugin.parameters:
+            for n, (name, parameter) in enumerate(plugin.parameters.items()):
+                # XXX make this cache stuff nicerer
+                try:
+                    widgets = self.parameter_cache[parameter.name]
+                except KeyError:
+                    widgets = self.parameter_cache[parameter.name] = widgets_for_parameter(frame, parameter)
+                    change_callback = partial(self.plugin_change_parameter, frame, plugin, parameter, widgets.var)
+                    widgets.var.trace("w", change_callback)
+                
+                widgets.label.grid(row=n+1, column=0, sticky=tk.EW)
+                widgets.entry.grid(row=n+1, column=1, sticky=tk.EW)
+                                    
+        # XXX handle disappearing parameters by hiding or destroying label and entry.
+                
+        if isinstance(plugin, FileInputMixin):
+            tk.Button(frame, text="+ Add File", command=partial(self.add_file, frame, plugin)).grid(row=1000,column=0)
+            
+    def add_file(self, frame, plugin):
+        filenames = filedialog.askopenfilenames(filetypes=plugin.file_types)
+        for filename in filenames:
+            plugin.add_file(filename)
+        self.display_plugin_configuration(frame, plugin)    
+
+    def plugin_change_parameter(self, frame: tk.Frame, plugin: BasePlugin, parameter: PluginParam, var: tk.Variable, *_):
+        parameter.value = var.get()
+        self.display_plugin_configuration(frame, plugin)
 
     def run(self):
-        self.pbar['mode'] = 'indeterminate'
-        self.pbar.start()
+        for num, plugin in enumerate(self.plugins):
+           if plugin.parameters:
+               for name, parameter in plugin.parameters.items():
+                   print(f'{num} {plugin.name} {name} {parameter.value}')
+           else:
+               print('f{num} {plugin.name}')
+        
 
-        value = None
-        for pw in self.plugin_wrappers:
-            plugin = pw.plugin(pw.get_params(), pw.get_file_params())
-            value = plugin.run_with_progress_callback(value, callback=self.progress_callback)
-
-        self.pbar.stop()
-        self.pbar['mode'] = 'determinate'
-        self.pbar['value'] = 100
-        self.pbar.update_label("Finished")
-    
-        # XXX temporary
-        self.preview_window = tk.Toplevel()
-        DataFramePreview(self.preview_window, value).pack()
-
-
-    def progress_callback(self, a, b, s="Running"):
-        if b:
-            self.pbar.stop()
-            self.pbar['mode'] = 'determinate'
-            self.pbar['value'] = (100 * a / b)
-            self.pbar.update_label(f"{s} : {a} / {b}")
-        else:
-            self.pbar['mode'] = 'indeterminate'
-            self.pbar.start()
-            self.pbar.update_label(f"{s} : {a}" if a is not None else s)
-
-
-class DataFramePreview(ttk.Frame):
-    def __init__(self, master, ddf: dd.DataFrame):
-        super().__init__(master)
-        self.ddf = ddf
+class DataFramePreview:
+    """Provides a visual preview of a Dask dataframe arranged as a table."""
+    def __init__(self, tk_parent, ddf: dd.DataFrame):
+        self.frame = ttk.Frame(tk_parent)
+        self.ddf = ddf.compute()
         self.offset = 0
         self.height = 20
 
@@ -261,15 +180,15 @@ class DataFramePreview(ttk.Frame):
         self.index_skip_list_stride = 10000 if self.index_length > 1000000 else 1000
         self.index_skip_list = list(islice(ddf.index,0,None,self.index_skip_list_stride))
 
-        self.treeview = ttk.Treeview(self, height=self.height, selectmode=tk.NONE)
+        self.treeview = ttk.Treeview(self.frame, height=self.height, selectmode=tk.NONE)
         self.treeview['columns'] = list(ddf.columns)
         for n, c in enumerate(ddf.columns):
             self.treeview.heading(n, text=c)
         self.treeview.bind('<MouseWheel>', self.scroll_event)
         self.treeview.bind('<Button-4>', self.scroll_event)
         self.treeview.bind('<Button-5>', self.scroll_event)
-
-        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.yview)
+        
+        self.scrollbar = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.scroll_command)
 
         self.treeview.pack(side="left", fill="x", expand=1)
         self.scrollbar.pack(side="right", fill="y")
@@ -277,12 +196,14 @@ class DataFramePreview(ttk.Frame):
         self.set_offset(0)
    
     def scroll_event(self, event):
+        """Called when mousewheeling on the treeview"""
         if event.num == 4 or event.delta == -120:
             self.set_offset(self.offset-self.height//2)
         elif event.num == 5 or event.delta == +120:
             self.set_offset(self.offset+self.height//2)
 
-    def yview(self, action: str, number: str, unit=None):
+    def scroll_command(self, action: str, number: str, unit=None):
+        """Called when scrolling the scrollbar"""
         # https://tkdocs.com/shipman/scrollbar-callback.html
         number = float(number)
         if action == tk.MOVETO:
@@ -301,8 +222,8 @@ class DataFramePreview(ttk.Frame):
         # The "skip list" is used to fast-forward to a more helpful place in the index before we start
         # iterating through records one at a time. It is a horrible work-around for the lack of a useful
         # ddf.iloc[n:m] but it seems to work. This function just returns the index value to keep
-        # the lru cache small, the caller can then use ddf.loc[index:] to make a slice from that
-        # index forward.
+        # the lru cache small, the caller can then use `islice(ddf.loc[index:], 0, n)`
+        # to efficiently fetch `n` records starting at `index`.
 
         stride = self.index_skip_list_stride
         base_index = self.index_skip_list[offset // stride]
@@ -314,8 +235,9 @@ class DataFramePreview(ttk.Frame):
         index = self.get_index_from_offset(offset)
         value_tuples = islice(self.ddf.loc[index:].itertuples(),0,self.height)
         for n, (index, *values) in enumerate(value_tuples):
-            if self.treeview.exists(n): self.treeview.delete(n)
-            self.treeview.insert('', 'end', iid=n, text=index, values=values)
+            row_id = str(n)
+            if self.treeview.exists(row_id): self.treeview.delete(row_id)
+            self.treeview.insert('', 'end', iid=row_id, text=index, values=values)
         self.offset = offset
         self.scrollbar.set(offset/self.index_length, (offset+self.height)/self.index_length)
 
@@ -331,7 +253,8 @@ def main():
             root.set_theme(t)
             break
 
-    PipelineBuilder(root).grid(sticky="nsew")
+    #PipelineBuilder(root).grid(sticky="nsew")
+    PipelineManager(root)
     root.rowconfigure(0, weight=1)
     root.columnconfigure(0, weight=1)
     root.mainloop()
