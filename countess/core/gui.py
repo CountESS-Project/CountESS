@@ -63,6 +63,9 @@ class ParameterWidgets(NamedTuple):
 def widgets_for_parameter(tk_parent: tk.Widget, parameter: PluginParam) -> ParameterWidgets:
     label = ttk.Label(tk_parent, text=parameter.label)
 
+    var: tk.Variable
+    entry: tk.Widget
+    
     if parameter.var_type == bool:
         var = tk.BooleanVar(tk_parent, value=parameter.value)
     elif parameter.var_type == float:
@@ -121,14 +124,24 @@ class PipelineManager:
         index = self.notebook.index('end')-1
         self.notebook.insert(index, frame, text=plugin.name, sticky=tk.NSEW)
         self.notebook.select(index)
+        tab_id = self.notebook.select()
         
         tk.Label(frame, text=plugin.description).grid(row=0, columnspan=2, sticky=tk.EW)
+        
+        cancel_command = lambda: self.delete_plugin_frame(plugin, frame)
+        CancelButton(frame, command=cancel_command).place(anchor=tk.NE, relx=1, rely=0)
+        
         frame.columnconfigure(0,weight=1)
         frame.columnconfigure(1,weight=2)
         
         self.display_plugin_configuration(frame, plugin)
         self.update_plugin_chooser_frame()
 
+    def delete_plugin_frame(self, plugin, frame):
+        self.notebook.forget(frame)
+        self.notebook.select(self.notebook.index('end')-1)
+        self.plugins.remove(plugin)
+        
     def display_plugin_configuration(self, frame, plugin):
         
         if plugin.parameters:
@@ -160,12 +173,56 @@ class PipelineManager:
         self.display_plugin_configuration(frame, plugin)
 
     def run(self):
+        
         for num, plugin in enumerate(self.plugins):
            if plugin.parameters:
                for name, parameter in plugin.parameters.items():
                    print(f'{num} {plugin.name} {name} {parameter.value}')
            else:
-               print('f{num} {plugin.name}')
+               print(f'{num} {plugin.name}')
+        
+        run_window = PipelineRunner(self.plugins)
+        run_window.run()
+        
+class PipelineRunner:
+    def __init__(self, plugins):
+        self.plugins = plugins
+        self.pbars = []
+        
+        self.frame = tk.Frame(tk.Toplevel())
+        self.frame.pack()
+        
+        for num, plugin in enumerate(self.plugins):
+            ttk.Label(self.frame, text=plugin.title).pack()
+            pbar = LabeledProgressbar(self.frame)
+            self.pbars.append(pbar) 
+            pbar.pack()
+        
+    def run(self):
+        value = None
+        
+        for num, plugin in enumerate(self.plugins):
+            pbar = self.pbars[num]
+            
+            def progress_callback(a, b, s="Running"):
+                if b:
+                    pbar.stop()
+                    pbar['mode'] = 'determinate'
+                    pbar['value'] = (100 * a / b)
+                    pbar.update_label(f"{s} : {a} / {b}" if b > 1 else s)
+                else:
+                    pbar['mode'] = 'indeterminate'
+                    pbar.start()
+                    pbar.update_label(f"{s} : {a}" if a is not None else s)
+                
+            progress_callback(0,0,"Running")
+            
+            value = plugin.run_with_progress_callback(value, callback=progress_callback)
+        
+            progress_callback(1,1,"Finished")
+            
+        if isinstance(value, dd.DataFrame):
+            DataFramePreview(self.frame, value)
         
 
 class DataFramePreview:

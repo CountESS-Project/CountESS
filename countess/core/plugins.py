@@ -100,6 +100,10 @@ class BasePlugin:
 
 class FileInputMixin:
     """Mixin class to indicate that this plugin can read files from local storage"""
+    
+    # XXX clumsy ... maybe store file params separately instead of encoding them into
+    # self.parameters which isn't working nicely
+    
     file_number = 0
     
     file_types = [ ('Any', '*') ]
@@ -122,7 +126,17 @@ class FileInputMixin:
             if k.startswith(f'file.{filenumber}.'):
                 del self.parameters[k]
 
-
+    def get_file_params(self):
+        for n in range(1, self.file_number+1):
+            if f'file.{n}.filename' in self.parameters:
+                yield dict(
+                    [ ('filename', self.parameters[f'file.{n}.filename']) ] + 
+                    [
+                        ( k.name, self.parameters[f'file.{n}.{k.name}'])
+                        for k in self.file_params
+                    ]
+                )
+        
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
 

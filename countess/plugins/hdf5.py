@@ -30,9 +30,26 @@ class LoadHdfPlugin(DaskInputPlugin):
         hdf_keys = list(hs.keys())
         file_params['key'].choices = hdf_keys
         if len(hdf_keys) == 1: file_params['key'].value = hdf_keys[0]
+
+        hs.close()
          
-    def run(self, _):
-        return dd.read_hdf(self.pattern, self.key)
+    def run_with_progress_callback(self, ddf, callback):
+        
+        file_params = list(self.get_file_params())
+
+        ddfs = []
+        if ddf is not None: ddfs.append(ddf.copy())
+
+        for num, fp in enumerate(file_params):
+            callback(num, len(file_params)+1, "Loading")
+            df = pd.read_hdf(fp['filename'].value, fp['key'].value)
+
+            # XXX rename columns, add prefix to indices
+            ddfs.append(dd.from_pandas(df, npartitions=5))
+
+        callback(len(file_params), len(file_params)+1, "Merging")
+
+        return dd.concat(ddfs)
 
 
 class StoreHdfPlugin(DaskBasePlugin):
