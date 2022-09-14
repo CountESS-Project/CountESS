@@ -42,8 +42,13 @@ class BasePlugin:
 
     def __init__(self, previous_plugin: 'BasePlugin'):
         self.previous_plugin = previous_plugin
-        if self.parameters:
-            self.parameters = dict([ (k, v.copy()) for k, v in self.parameters.items() ])
+
+    @property
+    def parameters(self):
+        self._parameters = {}
+        if self.__class__.parameters:
+            self._parameters = dict([ (k, v.copy()) for k, v in self.parameters.items() ])
+        return self._parameters
 
     def run_with_progress_callback(self, obj: Any, callback: Callable[[int, int, Optional[str]], None]):
         """Not every plugin is going to support progress callbacks, plugins
@@ -195,48 +200,42 @@ class DaskTransformPlugin(DaskBasePlugin):
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of tranform which turns counts into scores"""
  
+    _parameters = None
+
     @property
     def parameters(self):
         if self._parameters is None: self._parameters = {}
+
         columns = self.previous_plugin.get_columns()
+
+        r = {}
         for col in columns:
-            if col not in self._parameters:
-                self._parameters[col]
+            if col.startswith('count_'):
+                scol = "score_" + col[6:]
+                if scol not in self._parameters:
+                    self._parameters[scol] = StringParam(f"{scol} compares {col} and ...")
+                self._parameters[scol].choices = ["NONE"] + list(columns)
+                r[scol] = self._parameters[scol]
 
-
-        return []
-    # XXX TODO come back to this later
-    #@classmethod
-    #def can_follow_plugin(cls, previous_plugin: BasePlugin):
-    #    if not super().can_follow_plugin(previous_plugin): return False
-    #    previous_output_columns = previous_plugin.output_columns()
-    #    return 'count_0' in previous_output_columns() and \
-    #           any(col != 'count_0' and col.startswith('count_') for col in previous_plugin.output_columns())
-    #    
-    #def find_count_and_score_columns(self) -> Iterable[tuple[str,str]]:
-    #    # XXX this isn't as flexible as it should be.
-    #    return [
-    #        (x, "count_0", f"score_{x[6:]}")
-    #        for x in self.previous_plugin.output_columns()
-    #        if x.startswith("count_") and x != 'count_0'
-    #    ]
-   # 
-   # def output_columns(self) -> Iterable[str]:
-   #     return [ x[1] for x in self.find_count_and_score_columns() ]
+        return r
 
     def run(self, ddf_in: dd.DataFrame):
         # XXX count_0 is not universally applicable
         ddf = ddf_in.copy()
-        for col in ddf_in.columns:
-            if type(col) is str and col.startswith('count_') and col != 'count_0':
-                score_col = 'score_' + col[6:]
-                ddf[score_col] = self.score(ddf[col], ddf['count_0'])
+
+        for scol, param in self.parameters.items():
+            if param.value != 'NONE':
+                ccol = "count_" + scol[6:]
+                ddf[scol] = self.score(ddf[ccol], ddf[param.value])
    
         score_cols = [ c for c in ddf.columns if c.startswith("score_") ]
         return ddf.replace([np.inf, -np.inf], np.nan).dropna(how="all", subset=score_cols)
             
     def score(self, col1, col0):
         return NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
+
+    def output_columns(self) -> Iterable[str]:
+        return self.parameters.keys()
 
 
 class PluginManager:
