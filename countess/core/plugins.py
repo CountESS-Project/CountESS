@@ -2,11 +2,14 @@ from typing import Optional, Any, Type, NamedTuple
 from collections import namedtuple, defaultdict
 from collections.abc import Iterable, Callable, Mapping
 
+from countess.core.parameters import BaseParam, BooleanParam, IntegerParam, FloatParam, StringParam, FileParam
+
 from importlib.metadata import entry_points
 import logging
 import dask.dataframe as dd
 from dask.callbacks import Callback
 import pandas as pd
+import numpy as np
 
 """
 Plugin lifecycle:
@@ -23,44 +26,6 @@ Plugin lifecycle:
 
 """
 
-class PluginParam:
-    """Wraps up a parameter value for a plugin"""
-    # XXX this should probably be a separate thing in .core.params with subclassing to make it
-    # easier to inherit and to have ChoiceParam and so on.
-
-    def __init__(self, name: str, label: str, var_type: type, default=None, readonly: bool=False):
-    
-        if default is None:
-            if var_type is bool:
-                default = False
-            elif var_type is int:
-                default = 0
-            elif var_type is float:
-                default = 0.0
-            elif var_type is str:
-                default = ''
-            
-        self.name = name
-        self.label = label
-        self.var_type = var_type
-        self.default = default
-        self.readonly = readonly
-
-        self.value = default
-
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, value):
-        self._value = self.var_type(value) if value is not None else None
-
-    @value.deleter
-    def value(self):
-        self.value = self.default
-
-
 class BasePlugin:
     """Base class for all plugins.  Plugins exist as entrypoints, but also
     PluginManager check that plugins subclass this class before accepting them
@@ -68,7 +33,7 @@ class BasePlugin:
 
     name: str = ''
     description: str = ''
-    parameters: Mapping[str,PluginParam] = None
+    parameters: Mapping[str,BaseParam] = None
 
     @classmethod
     def can_follow_plugin(cls, previous_plugin: 'BasePlugin'):
@@ -77,6 +42,8 @@ class BasePlugin:
 
     def __init__(self, previous_plugin: 'BasePlugin'):
         self.previous_plugin = previous_plugin
+        if self.parameters:
+            self.parameters = dict([ (k, v.copy()) for k, v in self.parameters.items() ])
 
     def run_with_progress_callback(self, obj: Any, callback: Callable[[int, int, Optional[str]], None]):
         """Not every plugin is going to support progress callbacks, plugins
@@ -91,12 +58,10 @@ class BasePlugin:
         """Override this method"""
         raise NotImplementedError(f"{self.__class__}.run()")
 
-    def add_parameter(self, name: str, *args, **kwargs):
-        if self.parameters is None: self.parameters = dict()
-        plugin_param = PluginParam(name, *args, **kwargs)
-        self.parameters[name] = plugin_param
-        return plugin_param
-
+    def add_parameter(self, name: str, param: BaseParam):
+        if self.parameters is None: self.parameters = {}
+        self.parameters[name] = param.copy()
+        return self.parameters[name]
 
 class FileInputMixin:
     """Mixin class to indicate that this plugin can read files from local storage"""
@@ -105,20 +70,21 @@ class FileInputMixin:
     # self.parameters which isn't working nicely
     
     file_number = 0
-    
+   
+    # used by the GUI file dialog
     file_types = [ ('Any', '*') ]
 
-    file_params: Iterable[PluginParam] = []
+    file_params: Iterable[BaseParam] = []
 
     def add_file(self, filename):
         self.file_number += 1
-        self.add_parameter(f'file.{self.file_number}.filename', "Filename", str, filename, readonly=True)
+        self.add_parameter(f'file.{self.file_number}.filename', FileParam("Filename", filename))
         self.add_file_params(filename, self.file_number)
     
     def add_file_params(self, filename, file_number):
         return dict([
-            (fp.name, self.add_parameter(f'file.{file_number}.{fp.name}', fp.label, fp.var_type, fp.default, fp.readonly))
-            for fp in self.file_params
+            (key, self.add_parameter(f'file.{file_number}.{key}', param))
+            for key, param in self.file_params.items()
         ])
     
     def remove_file(self, filenumber):
@@ -132,10 +98,33 @@ class FileInputMixin:
                 yield dict(
                     [ ('filename', self.parameters[f'file.{n}.filename']) ] + 
                     [
-                        ( k.name, self.parameters[f'file.{n}.{k.name}'])
-                        for k in self.file_params
+                        ( key, self.parameters[f'file.{n}.{key}'])
+                        for key, param in self.file_params.items()
                     ]
                 )
+
+    def run_with_progress_callback(self, ddf: Optional[dd.DataFrame], callback) -> dd.DataFrame:
+        file_params = list(self.get_file_params())
+
+        dfs = [] if ddf is None else [ddf]
+
+        n_files = len(file_params)
+        for num, fp in enumerate(file_params):
+            callback(num, n_files, "Loading")
+            df = self.read_file_to_dataframe(**fp)
+            if isinstance(df, pd.DataFrame):
+                df = dd.from_pandas(df, chunksize=100_000_000)
+            dfs.append(df)
+
+        if len(dfs) > 0:
+            return dd.concat(dfs)
+        else:
+            # completely empty dataframe!
+            return dd.from_pandas(pd.DataFrame.from_records([]), npartitions=1)
+
+    def read_file_to_dataframe(self, **kwargs) -> dd.DataFrame|pd.DataFrame:
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.read_file_to_dataframe")
+
         
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
@@ -205,7 +194,17 @@ class DaskTransformPlugin(DaskBasePlugin):
 
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of tranform which turns counts into scores"""
-   
+ 
+    @property
+    def parameters(self):
+        if self._parameters is None: self._parameters = {}
+        columns = self.previous_plugin.get_columns()
+        for col in columns:
+            if col not in self._parameters:
+                self._parameters[col]
+
+
+        return []
     # XXX TODO come back to this later
     #@classmethod
     #def can_follow_plugin(cls, previous_plugin: BasePlugin):
@@ -229,11 +228,12 @@ class DaskScoringPlugin(DaskTransformPlugin):
         # XXX count_0 is not universally applicable
         ddf = ddf_in.copy()
         for col in ddf_in.columns:
-            if col.startswith('count_'):
+            if type(col) is str and col.startswith('count_') and col != 'count_0':
                 score_col = 'score_' + col[6:]
-                ddf[score_col] = self.score(ddf[count_col], ddf['count_0'])
-    
-        return ddf.replace([np.inf, -np.inf], np.nan).dropna()
+                ddf[score_col] = self.score(ddf[col], ddf['count_0'])
+   
+        score_cols = [ c for c in ddf.columns if c.startswith("score_") ]
+        return ddf.replace([np.inf, -np.inf], np.nan).dropna(how="all", subset=score_cols)
             
     def score(self, col1, col0):
         return NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
