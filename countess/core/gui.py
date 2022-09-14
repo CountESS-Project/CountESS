@@ -111,16 +111,16 @@ class PipelineManager:
         self.frame.grid(sticky=tk.NSEW)
         self.notebook = ttk.Notebook(self.frame)
         self.button = tk.Button(self.frame, text="RUN", fg="green", command=self.run)
-        #self.pbar = LabeledProgressbar(self.frame, length=500)
         self.plugins = []
         
         self.plugin_chooser_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.plugin_chooser_frame, text="+")
         self.update_plugin_chooser_frame()
         
-        self.notebook.pack()
-        self.button.pack()
-        #self.pbar.pack()
+        self.notebook.grid(row=0, sticky=tk.NSEW)
+        self.button.grid(row=1,sticky=tk.EW)
+        self.frame.columnconfigure(0,weight=1)
+        self.frame.rowconfigure(0,weight=1)
         
         self.parameter_cache = dict()
         
@@ -237,16 +237,24 @@ class PipelineRunner:
             progress_callback(1,1,"Finished")
             
         if isinstance(value, dd.DataFrame):
-            DataFramePreview(self.frame, value)
+            preview = DataFramePreview(self.frame, value)
+            preview.frame.grid(row=1000,sticky=tk.NSEW)
+            self.frame.rowconfigure(1000,weight=1)
+            self.frame.columnconfigure(0,weight=1)
         
 
 class DataFramePreview:
     """Provides a visual preview of a Dask dataframe arranged as a table."""
+    # XXX uses a treeview, which seemed like a good match but actually a grid-layout
+    # of custom styled labels might work better.
+
     def __init__(self, tk_parent, ddf: dd.DataFrame):
         self.frame = ttk.Frame(tk_parent)
         self.ddf = ddf.compute()
         self.offset = 0
-        self.height = 20
+        self.height = 50
+
+        self.label = ttk.Label(self.frame, text="DataFrame Preview")
 
         self.index_length = len(ddf.index)
         self.index_skip_list_stride = 10000 if self.index_length > 1000000 else 1000
@@ -256,16 +264,31 @@ class DataFramePreview:
         self.treeview['columns'] = list(ddf.columns)
         for n, c in enumerate(ddf.columns):
             self.treeview.heading(n, text=c)
-        self.treeview.bind('<MouseWheel>', self.scroll_event)
-        self.treeview.bind('<Button-4>', self.scroll_event)
-        self.treeview.bind('<Button-5>', self.scroll_event)
-        
-        self.scrollbar = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.scroll_command)
+            self.treeview.column(n, width=50)
+       
+        self.scrollbar_x = ttk.Scrollbar(self.frame, orient=tk.HORIZONTAL)
+        self.scrollbar_x.configure(command=self.treeview.xview)
+        self.treeview.configure(xscrollcommand=self.scrollbar_x.set)
 
-        self.treeview.pack(side="left", fill="x", expand=1)
-        self.scrollbar.pack(side="right", fill="y")
+        self.frame.grid(sticky=tk.NSEW)
 
+        self.frame.columnconfigure(0,weight=1)
+        self.frame.rowconfigure(1,weight=1)
+        self.label.grid(row=0,columnspan=2)
+        self.treeview.grid(row=1,column=0,sticky=tk.NSEW)
+        self.scrollbar_x.grid(row=2,column=0,sticky=tk.EW)
+
+        if self.index_length > self.height:
+            self.scrollbar_y = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.scroll_command)
+            self.treeview.bind('<MouseWheel>', self.scroll_event)
+            self.treeview.bind('<Button-4>', self.scroll_event)
+            self.treeview.bind('<Button-5>', self.scroll_event)
+            self.scrollbar_y.grid(row=1,column=1,sticky=tk.NS)
+
+
+        # XXX check for empty dataframe
         self.set_offset(0)
+
    
     def scroll_event(self, event):
         """Called when mousewheeling on the treeview"""
@@ -275,7 +298,7 @@ class DataFramePreview:
             self.set_offset(self.offset+self.height//2)
 
     def scroll_command(self, action: str, number: str, unit=None):
-        """Called when scrolling the scrollbar"""
+        """Called when scrolling the vertical scrollbar"""
         # https://tkdocs.com/shipman/scrollbar-callback.html
         number = float(number)
         if action == tk.MOVETO:
@@ -291,6 +314,7 @@ class DataFramePreview:
         """this doesn't seem like it'd do much, but actually the scrollbar returns a limited number
         of discrete floating point values (one per pixel height of scrollbar) and page up / page 
         down have fixed offsets too so while it's not easy to predict it can be memoized"""
+        # This could be made a lot more sophisticated but it works.
         # The "skip list" is used to fast-forward to a more helpful place in the index before we start
         # iterating through records one at a time. It is a horrible work-around for the lack of a useful
         # ddf.iloc[n:m] but it seems to work. This function just returns the index value to keep
@@ -309,9 +333,13 @@ class DataFramePreview:
         for n, (index, *values) in enumerate(value_tuples):
             row_id = str(n)
             if self.treeview.exists(row_id): self.treeview.delete(row_id)
+            # XXX display NaNs more nicely
             self.treeview.insert('', 'end', iid=row_id, text=index, values=values)
         self.offset = offset
-        self.scrollbar.set(offset/self.index_length, (offset+self.height)/self.index_length)
+
+        if self.index_length > self.height:
+            self.scrollbar_y.set(offset/self.index_length, (offset+self.height)/self.index_length)
+            self.label['text'] = f'Rows {self.offset} - {self.offset+self.height} / {self.index_length}'
 
 
 def main():
