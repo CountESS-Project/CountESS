@@ -9,10 +9,13 @@ import pathlib
 from typing import Optional, NamedTuple
 from collections.abc import Iterable, Sequence
 from functools import partial
+from threading import Thread
 
 from tkinter.scrolledtext import ScrolledText
 
-from .plugins import BasePlugin, PluginManager, FileInputMixin, PluginParam
+from .plugins import BasePlugin, PluginManager, FileInputMixin
+from .parameters import BaseParam, BooleanParam, IntegerParam, FloatParam, StringParam, FileParam
+
 from functools import lru_cache
 from itertools import islice
 
@@ -60,29 +63,43 @@ class ParameterWidgets(NamedTuple):
     entry: tk.Widget
     var: tk.Variable
 
-def widgets_for_parameter(tk_parent: tk.Widget, parameter: PluginParam) -> ParameterWidgets:
+def widgets_for_parameter(tk_parent: tk.Widget, parameter: BaseParam) -> ParameterWidgets:
     label = ttk.Label(tk_parent, text=parameter.label)
 
     var: tk.Variable
     entry: tk.Widget
-    
-    if parameter.var_type == bool:
+   
+    if isinstance(parameter, BooleanParam):
         var = tk.BooleanVar(tk_parent, value=parameter.value)
-    elif parameter.var_type == float:
+    elif isinstance(parameter, FloatParam):
         var = tk.DoubleVar(tk_parent, value=parameter.value)
-    elif parameter.var_type == int:
+    elif isinstance(parameter, IntegerParam):
         var = tk.IntVar(tk_parent, value=parameter.value)
-    else:
+    elif isinstance(parameter, StringParam):
         var = tk.StringVar(tk_parent, value=parameter.value)
-    
-    if parameter.readonly:
+
+    if isinstance(parameter, FileParam):
+        entry = tk.Frame(tk_parent)
+        tk.Label(entry, text=parameter.value).grid(row=0,column=0)
+
+        def cancel_command(): var['value'] = ''
+
+        CancelButton(entry, command=cancel_command).grid(row=0,column=1)
+        entry.columnconfigure(0, weight=1)
+
+    if parameter.read_only:
         # XXX gross
         entry = tk.Label(tk_parent, text=parameter.value)
-    elif parameter.var_type == bool:
+    elif isinstance(parameter, BooleanParam):
         entry = tk.Checkbutton(tk_parent, variable=var)
+    elif parameter.choices:
+        entry = ttk.Combobox(tk_parent, textvariable=var)
+        entry['values'] = parameter.choices
+        entry.state(["readonly"])
     else:
         entry = tk.Entry(tk_parent, textvariable=var)
 
+    print((parameter, label, entry, var))
     return ParameterWidgets(label, entry, var)
     
 
@@ -145,12 +162,12 @@ class PipelineManager:
     def display_plugin_configuration(self, frame, plugin):
         
         if plugin.parameters:
-            for n, (name, parameter) in enumerate(plugin.parameters.items()):
+            for n, (key, parameter) in enumerate(plugin.parameters.items()):
                 # XXX make this cache stuff nicerer
                 try:
-                    widgets = self.parameter_cache[parameter.name]
+                    widgets = self.parameter_cache[key]
                 except KeyError:
-                    widgets = self.parameter_cache[parameter.name] = widgets_for_parameter(frame, parameter)
+                    widgets = self.parameter_cache[key] = widgets_for_parameter(frame, parameter)
                     change_callback = partial(self.plugin_change_parameter, frame, plugin, parameter, widgets.var)
                     widgets.var.trace("w", change_callback)
                 
@@ -168,35 +185,33 @@ class PipelineManager:
             plugin.add_file(filename)
         self.display_plugin_configuration(frame, plugin)    
 
-    def plugin_change_parameter(self, frame: tk.Frame, plugin: BasePlugin, parameter: PluginParam, var: tk.Variable, *_):
+    def plugin_change_parameter(self, frame: tk.Frame, plugin: BasePlugin, parameter: BaseParam, var: tk.Variable, *_):
         parameter.value = var.get()
         self.display_plugin_configuration(frame, plugin)
 
     def run(self):
         
-        for num, plugin in enumerate(self.plugins):
-           if plugin.parameters:
-               for name, parameter in plugin.parameters.items():
-                   print(f'{num} {plugin.name} {name} {parameter.value}')
-           else:
-               print(f'{num} {plugin.name}')
-        
         run_window = PipelineRunner(self.plugins)
-        run_window.run()
+        Thread(target=run_window.run).start()
         
 class PipelineRunner:
     def __init__(self, plugins):
         self.plugins = plugins
         self.pbars = []
-        
-        self.frame = tk.Frame(tk.Toplevel())
-        self.frame.pack()
+       
+        toplevel = tk.Toplevel()
+        self.frame = tk.Frame(toplevel)
+        self.frame.grid(sticky=tk.NSEW)
+        toplevel.rowconfigure(0,weight=1)
+        toplevel.columnconfigure(0,weight=1)
         
         for num, plugin in enumerate(self.plugins):
-            ttk.Label(self.frame, text=plugin.title).pack()
-            pbar = LabeledProgressbar(self.frame)
+            ttk.Label(self.frame, text=plugin.title).grid(row=num*2, sticky=tk.EW)
+            pbar = LabeledProgressbar(self.frame, length=500)
             self.pbars.append(pbar) 
-            pbar.pack()
+            pbar.grid(row=num*2+1, sticky=tk.EW)
+           
+        self.frame.columnconfigure(0,weight=1)
         
     def run(self):
         value = None

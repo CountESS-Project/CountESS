@@ -2,7 +2,8 @@ import dask.dataframe as dd
 import pandas as pd
 from collections import defaultdict
 
-from countess.core.plugins import DaskInputPlugin, DaskBasePlugin, PluginParam
+from countess.core.parameters import StringParam
+from countess.core.plugins import DaskInputPlugin, DaskBasePlugin
 
 class LoadHdfPlugin(DaskInputPlugin):
 
@@ -12,11 +13,13 @@ class LoadHdfPlugin(DaskInputPlugin):
 
     file_types = [('HDF5 File', '*.hdf5')]
 
-    file_params = [ 
-        PluginParam('key', 'HDF Key', str),
-        PluginParam('prefix', 'Index Prefix', str),
-        PluginParam('suffix', 'Column Suffix', str),
-    ]
+    file_params = {
+            'key': StringParam('HDF Key'),
+            'prefix': StringParam('Index Prefix'),
+            'suffix': StringParam('Column Suffix'),
+            }
+
+    key_columns = {}
 
     def add_file_params(self, filename, file_number):
         # Open the file and read out the keys and the columns for each key.
@@ -24,32 +27,31 @@ class LoadHdfPlugin(DaskInputPlugin):
 
         hs = pd.HDFStore(filename)
         
-        #for key in hs.keys():            
-        #    self.file_keys[filename][key] = list(hs.select(key, start=0, stop=0).columns())
+        for key in hs.keys():            
+            self.key_columns[filename][key] = list(hs.select(key, start=0, stop=0).columns())
 
+        print(file_params)
         hdf_keys = list(hs.keys())
         file_params['key'].choices = hdf_keys
         if len(hdf_keys) == 1: file_params['key'].value = hdf_keys[0]
 
+        print(file_params['key'])
         hs.close()
-         
-    def run_with_progress_callback(self, ddf, callback):
-        
-        file_params = list(self.get_file_params())
 
-        ddfs = []
-        if ddf is not None: ddfs.append(ddf.copy())
+    def read_file_to_dataframe(self, filename, key, prefix, suffix):
+        df = pd.read_hdf(filename.value, key.value)
+        if prefix:
+            df.set_index((prefix + str(i) for i in df.index))
+        if suffix:
+            df.columns = ((str(c) + suffix for c in df.columns))
+        return df
 
-        for num, fp in enumerate(file_params):
-            callback(num, len(file_params)+1, "Loading")
-            df = pd.read_hdf(fp['filename'].value, fp['key'].value)
-
-            # XXX rename columns, add prefix to indices
-            ddfs.append(dd.from_pandas(df, npartitions=5))
-
-        callback(len(file_params), len(file_params)+1, "Merging")
-
-        return dd.concat(ddfs)
+    def get_columns(self):
+        columns = set()
+        for file_params in self.get_file_params():
+            for col in key_columns[file_params['filename'].value][file_params['key'].value]:
+                columns.add(str(col) + file_parmas['suffix'].value)
+        return columns
 
 
 class StoreHdfPlugin(DaskBasePlugin):
