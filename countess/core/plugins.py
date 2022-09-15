@@ -36,19 +36,16 @@ class BasePlugin:
     parameters: Mapping[str,BaseParam] = None
 
     @classmethod
+    def can_follow(cls, plugin_class: type):
+        return issubclass(plugin_class, BasePlugin)
+
+    @classmethod
     def can_follow_plugin(cls, previous_plugin: 'BasePlugin'):
         """Can this plugin class be used to follow 'previous_plugin'? """
         return isinstance(previous_plugin, BasePlugin)
 
-    def __init__(self, previous_plugin: 'BasePlugin'):
+    def set_previous_plugin(self, previous_plugin: 'BasePlugin'):
         self.previous_plugin = previous_plugin
-
-    @property
-    def parameters(self):
-        self._parameters = {}
-        if self.__class__.parameters:
-            self._parameters = dict([ (k, v.copy()) for k, v in self.parameters.items() ])
-        return self._parameters
 
     def run_with_progress_callback(self, obj: Any, callback: Callable[[int, int, Optional[str]], None]):
         """Not every plugin is going to support progress callbacks, plugins
@@ -80,6 +77,11 @@ class FileInputMixin:
     file_types = [ ('Any', '*') ]
 
     file_params: Iterable[BaseParam] = []
+
+    @classmethod
+    def can_follow(self, plugin_class):
+        if plugin_class is None: return true
+        return super().can_follow(plugin_class)
 
     def add_file(self, filename):
         self.file_number += 1
@@ -141,14 +143,17 @@ class DaskBasePlugin(BasePlugin):
     # does computation in Dask and then returns a pandas dataframe, at which
     # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
 
-    _output_columns = set()
-        
+    
+    @classmethod
+    def can_follow(cls, plugin_class: type):
+        return issubclass(plugin_class, DaskBasePlugin)
+    
     @classmethod
     def can_follow_plugin(cls, previous_plugin: BasePlugin):
         return isinstance(previous_plugin, DaskBasePlugin)
     
-    #def output_columns(self) -> Iterable[str]:
-    #    return self._output_columns
+    def output_columns(self) -> Iterable[str]:
+        return []
     
     def run_with_progress_callback(self, ddf, callback: Callable[[int, int, Optional[str]], None]):
         
@@ -188,36 +193,43 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
 class DaskTransformPlugin(DaskBasePlugin):
     """a Transform plugin takes columns from the input data frame."""
-    
+   
+    _output_columns = []
+
     @classmethod
     def can_follow_plugin(cls, previous_plugin: BasePlugin):
         return isinstance(previous_plugin, DaskBasePlugin)
-        
-    #def output_columns(self) -> Iterable[str]:
-    #    return []
-    
+
+    def set_previous_plugin(self, previous_plugin):
+        assert isinstance(previous_plugin, DaskBasePlugin)
+        self._output_columns = previous_plugin.output_columns()
+
+    def output_columns(self):
+        return self._output_columns
 
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of tranform which turns counts into scores"""
- 
-    _parameters = None
 
-    @property
-    def parameters(self):
-        if self._parameters is None: self._parameters = {}
+    def set_previous_plugin(self, previous_plugin):
+        super().set_previous_plugin(previous_plugin)
+        if self.parameters is None: self.parameters = {}
 
-        columns = self.previous_plugin.get_columns()
+        input_columns = sorted((c for c in previous_plugin.output_columns() if c.startswith('count')))
 
-        r = {}
-        for col in columns:
-            if col.startswith('count_'):
-                scol = "score_" + col[6:]
-                if scol not in self._parameters:
-                    self._parameters[scol] = StringParam(f"{scol} compares {col} and ...")
-                self._parameters[scol].choices = ["NONE"] + list(columns)
-                r[scol] = self._parameters[scol]
+        print(f"OH HAI {previous_plugin} FROM {self} {previous_plugin.output_columns()}")
+        for col in input_columns:
+            scol = "score_" + col[6:]
+            print((scol, col))
+            if scol not in self.parameters:
+                self.parameters[scol] = StringParam(f"{scol} compares {col} and ...")
+            self.parameters[scol].choices = ["NONE"] + input_columns
 
-        return r
+        # XXX delete ones which have gone
+
+    def output_columns(self):
+        if self.parameters is None: self.parameters = {}
+        return self._output_columns + [ k for k, v in self.parameters.items() if v.value != 'NONE' ]
+
 
     def run(self, ddf_in: dd.DataFrame):
         # XXX count_0 is not universally applicable

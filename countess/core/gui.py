@@ -103,6 +103,10 @@ def widgets_for_parameter(tk_parent: tk.Widget, parameter: BaseParam) -> Paramet
     return ParameterWidgets(label, entry, var)
     
 
+class PluginAndFrame(NamedTuple):
+    plugin: BasePlugin
+    frame: tk.Frame
+
 class PipelineManager:
     # XXX allow some way to drag and drop tabs
     
@@ -112,10 +116,12 @@ class PipelineManager:
         self.notebook = ttk.Notebook(self.frame)
         self.button = tk.Button(self.frame, text="RUN", fg="green", command=self.run)
         self.plugins = []
+        self.tabs: Mapping[str,PluginAndFrame] = {}
         
         self.plugin_chooser_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.plugin_chooser_frame, text="+")
         self.update_plugin_chooser_frame()
+        self.notebook.bind("<<NotebookTabChanged>>", self.notebook_tab_changed)
         
         self.notebook.grid(row=0, sticky=tk.NSEW)
         self.button.grid(row=1,sticky=tk.EW)
@@ -123,7 +129,19 @@ class PipelineManager:
         self.frame.rowconfigure(0,weight=1)
         
         self.parameter_cache = dict()
-        
+    
+    def notebook_tab_changed(self, event):
+        tab = self.tabs.get(self.notebook.select())
+        if tab:
+            plugin_number = self.plugins.index(tab.plugin)
+            previous_plugin = self.plugins[plugin_number-1] if plugin_number>0 else None
+            print(f"notebook_tab_changed {tab} {plugin_number} {previous_plugin}")
+            self.display_plugin_configuration(tab.frame, tab.plugin, previous_plugin)
+        else:
+            print(f"notebook_tab_changed to chooser {self.notebook.select()}")
+            self.update_plugin_chooser_frame()
+            return
+
     def update_plugin_chooser_frame(self):
         last_plugin = self.plugins[-1] if len(self.plugins) else None
         for w in self.plugin_chooser_frame.winfo_children(): w.destroy()
@@ -134,7 +152,7 @@ class PipelineManager:
             ttk.Label(self.plugin_chooser_frame, text=plugin_class.description).grid(row=n, column=1)
 
     def add_plugin(self, plugin_class, previous_plugin):
-        plugin = plugin_class(previous_plugin)
+        plugin = plugin_class()
         self.plugins.append(plugin)
         
         frame = ttk.Frame(self.notebook)
@@ -142,24 +160,31 @@ class PipelineManager:
         self.notebook.insert(index, frame, text=plugin.name, sticky=tk.NSEW)
         self.notebook.select(index)
         tab_id = self.notebook.select()
+        self.tabs[tab_id] = PluginAndFrame(plugin, frame)
+
+        print(f"added {tab_id} {plugin} {frame}")
         
         tk.Label(frame, text=plugin.description).grid(row=0, columnspan=2, sticky=tk.EW)
         
-        cancel_command = lambda: self.delete_plugin_frame(plugin, frame)
+        cancel_command = lambda: self.delete_plugin_frame(tab_id)
         CancelButton(frame, command=cancel_command).place(anchor=tk.NE, relx=1, rely=0)
         
         frame.columnconfigure(0,weight=1)
         frame.columnconfigure(1,weight=2)
         
-        self.display_plugin_configuration(frame, plugin)
+        self.display_plugin_configuration(frame, plugin, previous_plugin)
         self.update_plugin_chooser_frame()
 
-    def delete_plugin_frame(self, plugin, frame):
-        self.notebook.forget(frame)
+    def delete_plugin_frame(self, tab_id):
+        tab = self.tabs.pop(tab_id)
+        self.notebook.forget(tab.frame)
         self.notebook.select(self.notebook.index('end')-1)
-        self.plugins.remove(plugin)
         
-    def display_plugin_configuration(self, frame, plugin):
+    def display_plugin_configuration(self, frame, plugin, previous_plugin=None):
+        if previous_plugin:
+            plugin.set_previous_plugin(previous_plugin)
+
+        print(f"display_plugin_configuration {plugin.parameters}")
         
         if plugin.parameters:
             for n, (key, parameter) in enumerate(plugin.parameters.items()):
@@ -193,7 +218,7 @@ class PipelineManager:
         
         run_window = PipelineRunner(self.plugins)
         Thread(target=run_window.run).start()
-        
+
 class PipelineRunner:
     def __init__(self, plugins):
         self.plugins = plugins

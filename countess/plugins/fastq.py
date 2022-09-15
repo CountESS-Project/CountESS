@@ -49,7 +49,7 @@ class LoadFastqPlugin(DaskInputPlugin):
         
         return ddf
 
-    def get_columns(self):
+    def output_columns(self):
         return set((
             fp['count_column'].value
             for fp in self.get_file_params()
