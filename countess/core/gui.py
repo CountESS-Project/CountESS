@@ -13,13 +13,11 @@ from threading import Thread
 
 from tkinter.scrolledtext import ScrolledText
 
-from .plugins import BasePlugin, PluginManager, FileInputMixin
+from .plugins import Pipeline, BasePlugin, FileInputMixin
 from .parameters import BaseParam, BooleanParam, IntegerParam, FloatParam, StringParam, FileParam
 
 from functools import lru_cache
 from itertools import islice
-
-plugin_manager = PluginManager()
 
 import dask.dataframe as dd
 
@@ -103,121 +101,124 @@ def widgets_for_parameter(tk_parent: tk.Widget, parameter: BaseParam) -> Paramet
     return ParameterWidgets(label, entry, var)
     
 
-class PluginAndFrame(NamedTuple):
-    plugin: BasePlugin
-    frame: tk.Frame
+class PluginConfigurator:
+    def __init__(self, tk_parent, plugin):
+        self.plugin = plugin
 
+        self.frame = ttk.Frame(tk_parent)
+        self.frame.grid(sticky=tk.NSEW)
+
+        self.widget_cache = {}
+
+        tk.Label(self.frame, text=plugin.description).grid(row=0, columnspan=2, sticky=tk.EW)
+        
+        self.frame.columnconfigure(0,weight=1)
+        self.frame.columnconfigure(1,weight=2)
+
+        if isinstance(self.plugin, FileInputMixin):
+            self.add_file_button = tk.Button(self.frame, text="+ Add File", command=self.add_file)
+
+        self.update()
+
+    def add_file(self):
+        filenames = filedialog.askopenfilenames(filetypes=self.plugin.file_types)
+        for filename in filenames:
+            self.plugin.add_file(filename)
+        self.update()
+
+    def update(self):
+   
+        row = 1
+        if self.plugin.parameters:
+            for key, parameter in self.plugin.parameters.items():
+                if key not in self.widget_cache:
+                    widgets = self.widget_cache[key] = widgets_for_parameter(self.frame, parameter)
+                    change_callback = partial(self.change_callback, parameter, widgets.var)
+                    widgets.var.trace("w", change_callback)
+                else:
+                    widgets = self.widget_cache[key]
+
+                widgets.label.grid(row=row, column=0, sticky=tk.EW)
+                widgets.entry.grid(row=row, column=1, sticky=tk.EW)
+                row += 1
+
+        if isinstance(self.plugin, FileInputMixin):
+            self.add_file_button.grid(row=row,column=0)
+
+    def change_callback(self, parameter, variable, *_):
+        parameter.value = variable.get()
+
+
+    
 class PipelineManager:
     # XXX allow some way to drag and drop tabs
     
     def __init__(self, tk_parent):
+        self.pipeline = Pipeline()
+        self.configurators = []
+
         self.frame = ttk.Frame(tk_parent)
         self.frame.grid(sticky=tk.NSEW)
         self.notebook = ttk.Notebook(self.frame)
-        self.button = tk.Button(self.frame, text="RUN", fg="green", command=self.run)
-        self.plugins = []
-        self.tabs: Mapping[str,PluginAndFrame] = {}
-        
+
         self.plugin_chooser_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.plugin_chooser_frame, text="+")
         self.update_plugin_chooser_frame()
         self.notebook.bind("<<NotebookTabChanged>>", self.notebook_tab_changed)
         
+        self.run_button = tk.Button(self.frame, text="RUN", fg="green", command=self.run_pipeline)
+
         self.notebook.grid(row=0, sticky=tk.NSEW)
-        self.button.grid(row=1,sticky=tk.EW)
+        self.run_button.grid(row=1,sticky=tk.EW)
         self.frame.columnconfigure(0,weight=1)
         self.frame.rowconfigure(0,weight=1)
-        
-        self.parameter_cache = dict()
     
     def notebook_tab_changed(self, event):
-        tab = self.tabs.get(self.notebook.select())
-        if tab:
-            plugin_number = self.plugins.index(tab.plugin)
-            previous_plugin = self.plugins[plugin_number-1] if plugin_number>0 else None
-            print(f"notebook_tab_changed {tab} {plugin_number} {previous_plugin}")
-            self.display_plugin_configuration(tab.frame, tab.plugin, previous_plugin)
+        """Triggered when the notebook tab is changed, refresh the displayed tab to 
+        make sure parameters are updated"""
+        position = self.notebook.index(self.notebook.select())
+        if position < len(self.configurators):
+            self.configurators[position].update()
         else:
-            print(f"notebook_tab_changed to chooser {self.notebook.select()}")
             self.update_plugin_chooser_frame()
-            return
 
     def update_plugin_chooser_frame(self):
-        last_plugin = self.plugins[-1] if len(self.plugins) else None
         for w in self.plugin_chooser_frame.winfo_children(): w.destroy()
-        plugin_classes =  plugin_manager.plugin_classes_following(last_plugin)
+
+        position = len(self.configurators)
+
+        plugin_classes =  self.pipeline.choose_plugin_classes(position)
         for n, plugin_class in enumerate(plugin_classes):
-            add_callback = partial(self.add_plugin, plugin_class, last_plugin)
+            add_callback = partial(self.add_plugin, plugin_class, position)
             ttk.Button(self.plugin_chooser_frame, text=plugin_class.name, command=add_callback).grid(row=n, column=0)
             ttk.Label(self.plugin_chooser_frame, text=plugin_class.description).grid(row=n, column=1)
 
-    def add_plugin(self, plugin_class, previous_plugin):
+    def add_plugin(self, plugin_class, position=None):
+        if position is None: position = len(self.configurators)
+
         plugin = plugin_class()
-        self.plugins.append(plugin)
-        
-        frame = ttk.Frame(self.notebook)
-        index = self.notebook.index('end')-1
-        self.notebook.insert(index, frame, text=plugin.name, sticky=tk.NSEW)
-        self.notebook.select(index)
-        tab_id = self.notebook.select()
-        self.tabs[tab_id] = PluginAndFrame(plugin, frame)
+        self.pipeline.add_plugin(plugin, position)
+       
+        configurator = PluginConfigurator(self.notebook, plugin)
+        self.configurators.insert(position, configurator)
+        self.notebook.insert(position, configurator.frame, text=plugin.name, sticky=tk.NSEW)
 
-        print(f"added {tab_id} {plugin} {frame}")
-        
-        tk.Label(frame, text=plugin.description).grid(row=0, columnspan=2, sticky=tk.EW)
-        
-        cancel_command = lambda: self.delete_plugin_frame(tab_id)
-        CancelButton(frame, command=cancel_command).place(anchor=tk.NE, relx=1, rely=0)
-        
-        frame.columnconfigure(0,weight=1)
-        frame.columnconfigure(1,weight=2)
-        
-        self.display_plugin_configuration(frame, plugin, previous_plugin)
-        self.update_plugin_chooser_frame()
+        cancel_command = lambda: self.del_plugin(position)
+        CancelButton(configurator.frame, command=cancel_command).place(anchor=tk.NE, relx=1, rely=0)
 
-    def delete_plugin_frame(self, tab_id):
-        tab = self.tabs.pop(tab_id)
-        self.notebook.forget(tab.frame)
-        self.notebook.select(self.notebook.index('end')-1)
+        self.notebook.select(position)
         
-    def display_plugin_configuration(self, frame, plugin, previous_plugin=None):
-        if previous_plugin:
-            plugin.set_previous_plugin(previous_plugin)
+    def del_plugin(self, position):
+        assert 0 <= position < len(self.configurators)
 
-        print(f"display_plugin_configuration {plugin.parameters}")
-        
-        if plugin.parameters:
-            for n, (key, parameter) in enumerate(plugin.parameters.items()):
-                # XXX make this cache stuff nicerer
-                try:
-                    widgets = self.parameter_cache[key]
-                except KeyError:
-                    widgets = self.parameter_cache[key] = widgets_for_parameter(frame, parameter)
-                    change_callback = partial(self.plugin_change_parameter, frame, plugin, parameter, widgets.var)
-                    widgets.var.trace("w", change_callback)
-                
-                widgets.label.grid(row=n+1, column=0, sticky=tk.EW)
-                widgets.entry.grid(row=n+1, column=1, sticky=tk.EW)
-                                    
-        # XXX handle disappearing parameters by hiding or destroying label and entry.
-                
-        if isinstance(plugin, FileInputMixin):
-            tk.Button(frame, text="+ Add File", command=partial(self.add_file, frame, plugin)).grid(row=1000,column=0)
-            
-    def add_file(self, frame, plugin):
-        filenames = filedialog.askopenfilenames(filetypes=plugin.file_types)
-        for filename in filenames:
-            plugin.add_file(filename)
-        self.display_plugin_configuration(frame, plugin)    
+        self.pipeline.del_plugin(position)
+        self.configurators.pop(position)
+        self.notebook.forget(position)
 
-    def plugin_change_parameter(self, frame: tk.Frame, plugin: BasePlugin, parameter: BaseParam, var: tk.Variable, *_):
-        parameter.value = var.get()
-        self.display_plugin_configuration(frame, plugin)
-
-    def run(self):
-        
-        run_window = PipelineRunner(self.plugins)
+    def run_pipeline(self):
+        run_window = PipelineRunner(self.pipeline)
         Thread(target=run_window.run).start()
+
 
 class PipelineRunner:
     def __init__(self, plugins):

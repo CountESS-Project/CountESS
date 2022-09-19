@@ -80,7 +80,7 @@ class FileInputMixin:
 
     @classmethod
     def can_follow(self, plugin_class):
-        if plugin_class is None: return true
+        if plugin_class is None: return True
         return super().can_follow(plugin_class)
 
     def add_file(self, filename):
@@ -146,7 +146,7 @@ class DaskBasePlugin(BasePlugin):
     
     @classmethod
     def can_follow(cls, plugin_class: type):
-        return issubclass(plugin_class, DaskBasePlugin)
+        return type(plugin_class) is type and issubclass(plugin_class, DaskBasePlugin)
     
     @classmethod
     def can_follow_plugin(cls, previous_plugin: BasePlugin):
@@ -246,23 +246,87 @@ class DaskScoringPlugin(DaskTransformPlugin):
     def score(self, col1, col0):
         return NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
 
-    def output_columns(self) -> Iterable[str]:
-        return self.parameters.keys()
 
+class Pipeline:
+    """Represents a series of plugins linked up to each other.  Plugins can be added 
+    and removed from the pipeline if they are able to deal with each other's input"""
 
-class PluginManager:
-    
     def __init__(self):
+        self.plugins: Iterable[BasePlugin] = []
+        self.plugin_classes: Iterable[type] = []
 
-        self.plugins = []
         for ep in entry_points(group='countess_plugins'):
-            plugin = ep.load()
-            if issubclass(plugin, BasePlugin):
-                self.plugins.append(plugin)
+            plugin_class = ep.load()
+            if issubclass(plugin_class, BasePlugin):
+                self.plugin_classes.append(plugin_class)
             else:
-                logging.warning(f"{plugin} is not a valid CountESS plugin")
+                logging.warning(f"{plugin_class} is not a valid CountESS plugin")
 
-    def plugin_classes_following(self, previous_plugin):
-        for plugin in self.plugins:
-            if plugin.can_follow_plugin(previous_plugin):
-                yield plugin
+    def add_plugin(self, plugin: BasePlugin, position: int=None):
+        if position is None: position = len(self.plugins)
+        assert 0 <= position <= len(self.plugins)
+        if position > 0:
+            previous_plugin = self.plugins[position-1]
+            assert plugin.__class__.can_follow(previous_plugin.__class__)
+        else:
+            previous_plugin = None
+
+        if position < len(self.plugins):
+            next_plugin = self.plugins[position]
+            assert next_plugin.__class__.can_follow(plugin.__class__)
+        else:
+            next_plugin = None
+
+        self.plugins.insert(position, plugin)
+
+        if previous_plugin: plugin.set_previous_plugin(previous_plugin)
+        if next_plugin: next_plugin.set_previous_plugin(plugin)
+
+    def del_plugin(self, position: int):
+        assert 0 <= position < len(self.plugins)
+        if position > 0:
+            previous_plugin = self.plugins[position-1]
+            previous_plugin_class = previous_plugin.__class__
+        else:
+            previous_plugin = None
+            previous_plugin_class = None
+
+        if position < len(self.plugins)-1:
+            next_plugin = self.plugins[position+1]
+            assert next_plugin.__class__.can_follow(previous_plugin_class)
+        else:
+            next_plugin = None
+
+        self.plugins.pop(position)
+
+        if next_plugin:
+            next_plugin.set_previous_plugin(previous_plugin)
+
+    def choose_plugin_classes(self, position: int):
+        if position is None: position = len(self.plugins)
+
+        previous_plugin_class = self.plugins[position-1].__class__ if position > 0 else None
+        next_plugin_class = self.plugins[position].__class__ if position < len(self.plugins) else None
+
+        for plugin_class in self.plugin_classes:
+            if plugin_class.can_follow(previous_plugin_class):
+                if next_plugin_class is None or next_plugin_class.can_follow(plugin_class):
+                    yield plugin_class
+
+
+#class PluginManager:
+#    
+#    def __init__(self):
+#
+#        self.plugins = []
+#        for ep in entry_points(group='countess_plugins'):
+#            plugin = ep.load()
+#            if issubclass(plugin, BasePlugin):
+#                self.plugins.append(plugin)
+#            else:
+#                logging.warning(f"{plugin} is not a valid CountESS plugin")
+#
+#    def plugin_classes_following(self, previous_plugin):
+#        for plugin in self.plugins:
+#            if plugin.can_follow_plugin(previous_plugin):
+#                yield plugin
