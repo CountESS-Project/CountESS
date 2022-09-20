@@ -29,6 +29,7 @@ from itertools import islice
 import dask.dataframe as dd
 import os.path
 
+
 class CancelButton(tk.Button):
     def __init__(self, master, **kwargs):
         super().__init__(
@@ -178,9 +179,11 @@ class PluginConfigurator:
             if key in self.wrapper_cache:
                 self.wrapper_cache[key].update()
             else:
-                self.wrapper_cache[key] = ParameterWrapper(self.frame, parameter, self.change_parameter)
+                self.wrapper_cache[key] = ParameterWrapper(
+                    self.frame, parameter, self.change_parameter
+                )
 
-            self.wrapper_cache[key].set_row(n+1)
+            self.wrapper_cache[key].set_row(n + 1)
 
         # Remove any parameter wrappers no longer needed
         for key, wrapper in list(self.wrapper_cache.items()):
@@ -189,16 +192,15 @@ class PluginConfigurator:
                 del self.wrapper_cache[key]
 
         if isinstance(self.plugin, FileInputMixin):
-            self.add_file_button.grid(row=len(self.plugin.parameters)+1, column=0)
+            self.add_file_button.grid(row=len(self.plugin.parameters) + 1, column=0)
 
     def change_parameter(self, parameter):
         # called when a parameter gets changed.
         # XXX kinda gross, but the whole "file number" thing just is.
 
-        if isinstance(parameter, FileParam) and parameter.value == '':
+        if isinstance(parameter, FileParam) and parameter.value == "":
             self.plugin.remove_file_by_parameter(parameter)
             self.update()
-
 
 
 class PipelineManager:
@@ -285,10 +287,10 @@ class PipelineManager:
         Thread(target=self.run_pipeline_thread).start()
 
     def run_pipeline_thread(self):
-        self.run_button['state'] = tk.DISABLED
+        self.run_button["state"] = tk.DISABLED
         run_window = PipelineRunner(self.pipeline)
         run_window.run()
-        self.run_button['state'] = tk.NORMAL
+        self.run_button["state"] = tk.NORMAL
 
 
 class PipelineRunner:
@@ -338,6 +340,7 @@ class PipelineRunner:
             preview.frame.grid(row=1000, sticky=tk.NSEW)
             self.frame.rowconfigure(1000, weight=1)
             self.frame.columnconfigure(0, weight=1)
+
 
 class DataFramePreview:
     """Provides a visual preview of a Dask dataframe arranged as a table."""
@@ -396,10 +399,10 @@ class DataFramePreview:
         elif event.num == 5 or event.delta == +120:
             self.set_offset(self.offset + self.height // 2)
 
-    def scroll_command(self, action: str, number: str, unit=None):
+    def scroll_command(self, action: str, number_str: str, unit=None):
         """Called when scrolling the vertical scrollbar"""
         # https://tkdocs.com/shipman/scrollbar-callback.html
-        number = float(number)
+        number = float(number_str)
         if action == tk.MOVETO:
             # the useful range is 0..1 but you can scroll beyond that.
             x = max(0, min(1, number))

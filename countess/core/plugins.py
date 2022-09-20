@@ -1,6 +1,6 @@
 from typing import Optional, Any, Type, NamedTuple
 from collections import namedtuple, defaultdict
-from collections.abc import Iterable, Callable, Mapping
+from collections.abc import Iterable, Callable, Mapping, MutableMapping
 
 from countess.core.parameters import (
     BaseParam,
@@ -42,23 +42,22 @@ class BasePlugin:
     as plugins."""
 
     name: str = ""
+    title: str = ""
     description: str = ""
-    parameters: Mapping[str, BaseParam] = {}
+    parameters: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(cls, plugin_class: type):
-        return issubclass(plugin_class, BasePlugin)
-
-    @classmethod
-    def can_follow_plugin(cls, previous_plugin: "BasePlugin"):
-        """Can this plugin class be used to follow 'previous_plugin'?"""
-        return isinstance(previous_plugin, BasePlugin)
+    def can_follow(cls, plugin_class: Optional[Type[BasePlugin]]):
+        return plugin_class is not None and issubclass(plugin_class, BasePlugin)
 
     def __init__(self):
         self.parameters = self.parameters.copy()
 
-    def set_previous_plugin(self, previous_plugin: "BasePlugin"):
+    def set_previous_plugin(self, previous_plugin: Optional["BasePlugin"]):
         self.previous_plugin = previous_plugin
+
+    def update(self):
+        pass
 
     def run_with_progress_callback(
         self, obj: Any, callback: Callable[[int, int, Optional[str]], None]
@@ -76,8 +75,6 @@ class BasePlugin:
         raise NotImplementedError(f"{self.__class__}.run()")
 
     def add_parameter(self, name: str, param: BaseParam):
-        if self.parameters is None:
-            self.parameters = {}
         self.parameters[name] = param.copy()
         return self.parameters[name]
 
@@ -93,13 +90,11 @@ class FileInputMixin:
     # used by the GUI file dialog
     file_types = [("Any", "*")]
 
-    file_params: Iterable[BaseParam] = []
+    file_params: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(self, plugin_class):
-        if plugin_class is None:
-            return True
-        return super().can_follow(plugin_class)
+    def can_follow(self, plugin_class: Optional[Type[BasePlugin]]):
+        return plugin_class is None or issubclass(plugin_class, BasePlugin)
 
     def add_file(self, filename):
         self.file_number += 1
@@ -124,7 +119,7 @@ class FileInputMixin:
     def remove_file_by_parameter(self, parameter):
         for k, v in list(self.parameters.items()):
             if v == parameter:
-                if m := re.match(r'file\.(\d+)\.', k):
+                if m := re.match(r"file\.(\d+)\.", k):
                     self.remove_file(m.group(1))
 
     def get_file_params(self):
@@ -142,7 +137,7 @@ class FileInputMixin:
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
 
-    # XXX there's a slight disconnect here: is this plugin indicating that the
+    # XXX there's a slight disconnect here: is this plugin class indicating that the
     # input and output format are dask dataframes or that the computing done by
     # this plugin is in Dask?  I mean, if one then probably the other, but it's
     # possible we'll want to develop a plugin which takes some arbitrary file,
@@ -150,12 +145,8 @@ class DaskBasePlugin(BasePlugin):
     # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
 
     @classmethod
-    def can_follow(cls, plugin_class: type):
+    def can_follow(cls, plugin_class: Optional[Type[BasePlugin]]):
         return type(plugin_class) is type and issubclass(plugin_class, DaskBasePlugin)
-
-    @classmethod
-    def can_follow_plugin(cls, previous_plugin: BasePlugin):
-        return isinstance(previous_plugin, DaskBasePlugin)
 
     def output_columns(self) -> Iterable[str]:
         return []
@@ -196,10 +187,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first.
     DaskInputPlugins don't care about existing columns because they're adding their own records anyway."""
 
-    @classmethod
-    def can_follow_plugin(cls, previous_plugin: Optional[BasePlugin]):
-        """An input plugin can follow None (to allow it to be the first plugin"""
-        return previous_plugin is None or super().can_follow_plugin(previous_plugin)
+    file_params: MutableMapping[str, BaseParam]
 
     def run_with_progress_callback(
         self, ddf: Optional[dd.DataFrame], callback
@@ -226,7 +214,9 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             return dd.concat(dfs)
         else:
             # completely empty dataframe!
-            return dd.from_pandas(pd.DataFrame.from_records([]), npartitions=1)
+            empty_ddf = dd.from_pandas(pd.DataFrame.from_records([]), npartitions=1)
+            assert isinstance(empty_ddf, dd.DataFrame)
+            return empty_ddf
 
     def read_file_to_dataframe(self, **kwargs) -> dd.DataFrame | pd.DataFrame:
         raise NotImplementedError(
@@ -237,15 +227,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 class DaskTransformPlugin(DaskBasePlugin):
     """a Transform plugin takes columns from the input data frame."""
 
-    _output_columns = []
-
-    @classmethod
-    def can_follow_plugin(cls, previous_plugin: BasePlugin):
-        return isinstance(previous_plugin, DaskBasePlugin)
-
-    def set_previous_plugin(self, previous_plugin):
-        assert isinstance(previous_plugin, DaskBasePlugin)
-        self._output_columns = previous_plugin.output_columns()
+    _output_columns: Iterable[str] = []
 
     def output_columns(self):
         return self._output_columns
@@ -254,19 +236,18 @@ class DaskTransformPlugin(DaskBasePlugin):
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of tranform which turns counts into scores"""
 
-    def set_previous_plugin(self, previous_plugin: BasePlugin):
-        # XXX rename?
-        super().set_previous_plugin(previous_plugin)
-
+    def update(self):
         input_columns = sorted(
-            (c for c in previous_plugin.output_columns() if c.startswith("count"))
+            (c for c in self.previous_plugin.output_columns() if c.startswith("count"))
         )
 
         # XXX Allow to set names of score columns?  The whole [5:] thing is clumsy
         for col in input_columns:
             scol = "score" + col[5:]
             if scol not in self.parameters:
-                self.parameters[scol] = StringParam(f"{scol} compares {col} and ...", default="NONE")
+                self.parameters[scol] = StringParam(
+                    f"{scol} compares {col} and ...", default="NONE"
+                )
             self.parameters[scol].choices = ["NONE"] + [
                 x for x in input_columns if x != col
             ]
@@ -307,8 +288,8 @@ class Pipeline:
     and removed from the pipeline if they are able to deal with each other's input"""
 
     def __init__(self):
-        self.plugins: Iterable[BasePlugin] = []
-        self.plugin_classes: Iterable[type] = []
+        self.plugins: list[BasePlugin] = []
+        self.plugin_classes: list[Type[BasePlugin]] = []
 
         for ep in entry_points(group="countess_plugins"):
             plugin_class = ep.load()
@@ -338,6 +319,7 @@ class Pipeline:
 
         if previous_plugin:
             plugin.set_previous_plugin(previous_plugin)
+            plugin.update()
         if next_plugin:
             next_plugin.set_previous_plugin(plugin)
 
@@ -361,12 +343,13 @@ class Pipeline:
 
         if next_plugin:
             next_plugin.set_previous_plugin(previous_plugin)
+            next_plugin.update()
 
     def update_plugin(self, position: int):
         assert 0 <= position < len(self.plugins)
 
         previous_plugin = self.plugins[position - 1] if position > 0 else None
-        self.plugins[position].set_previous_plugin(previous_plugin)
+        self.plugins[position].update()
 
     def choose_plugin_classes(self, position: int):
         if position is None:
