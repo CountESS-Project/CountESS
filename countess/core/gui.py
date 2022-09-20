@@ -28,7 +28,6 @@ from itertools import islice
 
 import dask.dataframe as dd
 
-
 class CancelButton(tk.Button):
     def __init__(self, master, **kwargs):
         super().__init__(
@@ -127,12 +126,12 @@ class ParameterWrapper:
     def clear_value_callback(self, *_):
         self.parameter.value = ""
         if self.callback is not None:
-            self.callback()
+            self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
         self.parameter.value = self.var.get()
         if self.callback is not None:
-            self.callback()
+            self.callback(self.parameter)
 
     def destroy(self):
         self.label.destroy()
@@ -172,29 +171,32 @@ class PluginConfigurator:
 
     def update(self):
 
-        parameters = self.plugin.parameters or {}
-
-        # Create any new parameter wrappers needed
-        for key, parameter in parameters.items():
-            if key not in self.wrapper_cache:
-                self.wrapper_cache[key] = ParameterWrapper(self.frame, parameter)
-
-        # Update wrapper state, Remove any parameter wrappers no longer needed
-        for key, wrapper in list(self.wrapper_cache.items()):
-            if key in parameters:
-                wrapper.update()
+        # Create any new parameter wrappers needed & update existing ones
+        for n, (key, parameter) in enumerate(self.plugin.parameters.items()):
+            if key in self.wrapper_cache:
+                self.wrapper_cache[key].update()
             else:
+                self.wrapper_cache[key] = ParameterWrapper(self.frame, parameter, self.change_parameter)
+
+            self.wrapper_cache[key].set_row(n+1)
+
+        # Remove any parameter wrappers no longer needed
+        for key, wrapper in list(self.wrapper_cache.items()):
+            if key not in self.plugin.parameters:
                 wrapper.destroy()
                 del self.wrapper_cache[key]
 
-        # Set rows correctly
-        row = 1
-        for key in parameters.keys():
-            self.wrapper_cache[key].set_row(row)
-            row += 1
-
         if isinstance(self.plugin, FileInputMixin):
-            self.add_file_button.grid(row=row, column=0)
+            self.add_file_button.grid(row=len(self.plugin.parameters)+1, column=0)
+
+    def change_parameter(self, parameter):
+        # called when a parameter gets changed.
+        # XXX kinda gross, but the whole "file number" thing just is.
+
+        if isinstance(parameter, FileParam) and parameter.value == '':
+            self.plugin.remove_file_by_parameter(parameter)
+            self.update()
+
 
 
 class PipelineManager:
@@ -278,8 +280,13 @@ class PipelineManager:
         self.notebook.forget(position)
 
     def run_pipeline(self):
+        Thread(target=self.run_pipeline_thread).start()
+
+    def run_pipeline_thread(self):
+        self.run_button['state'] = tk.DISABLED
         run_window = PipelineRunner(self.pipeline)
-        Thread(target=run_window.run).start()
+        run_window.run()
+        self.run_button['state'] = tk.NORMAL
 
 
 class PipelineRunner:
@@ -329,7 +336,6 @@ class PipelineRunner:
             preview.frame.grid(row=1000, sticky=tk.NSEW)
             self.frame.rowconfigure(1000, weight=1)
             self.frame.columnconfigure(0, weight=1)
-
 
 class DataFramePreview:
     """Provides a visual preview of a Dask dataframe arranged as a table."""

@@ -18,6 +18,8 @@ from dask.callbacks import Callback
 import pandas as pd
 import numpy as np
 
+import re
+
 """
 Plugin lifecycle:
 * Selector of plugins calls cls.follows_plugin(previous_plugin_instance)
@@ -41,7 +43,7 @@ class BasePlugin:
 
     name: str = ""
     description: str = ""
-    parameters: Mapping[str, BaseParam] = None
+    parameters: Mapping[str, BaseParam] = {}
 
     @classmethod
     def can_follow(cls, plugin_class: type):
@@ -51,6 +53,9 @@ class BasePlugin:
     def can_follow_plugin(cls, previous_plugin: "BasePlugin"):
         """Can this plugin class be used to follow 'previous_plugin'?"""
         return isinstance(previous_plugin, BasePlugin)
+
+    def __init__(self):
+        self.parameters = self.parameters.copy()
 
     def set_previous_plugin(self, previous_plugin: "BasePlugin"):
         self.previous_plugin = previous_plugin
@@ -112,9 +117,15 @@ class FileInputMixin:
         )
 
     def remove_file(self, filenumber):
-        for k in self.parameters.keys():
+        for k in list(self.parameters.keys()):
             if k.startswith(f"file.{filenumber}."):
                 del self.parameters[k]
+
+    def remove_file_by_parameter(self, parameter):
+        for k, v in list(self.parameters.items()):
+            if v == parameter:
+                if m := re.match(r'file\.(\d+)\.', k):
+                    self.remove_file(m.group(1))
 
     def get_file_params(self):
         for n in range(1, self.file_number + 1):
@@ -246,8 +257,6 @@ class DaskScoringPlugin(DaskTransformPlugin):
     def set_previous_plugin(self, previous_plugin: BasePlugin):
         # XXX rename?
         super().set_previous_plugin(previous_plugin)
-        if self.parameters is None:
-            self.parameters = {}
 
         input_columns = sorted(
             (c for c in previous_plugin.output_columns() if c.startswith("count"))
@@ -257,21 +266,19 @@ class DaskScoringPlugin(DaskTransformPlugin):
         for col in input_columns:
             scol = "score" + col[5:]
             if scol not in self.parameters:
-                self.parameters[scol] = StringParam(f"{scol} compares {col} and ...")
+                self.parameters[scol] = StringParam(f"{scol} compares {col} and ...", default="NONE")
             self.parameters[scol].choices = ["NONE"] + [
                 x for x in input_columns if x != col
             ]
 
-        scols = [k for k in self.parameters.keys() if k.startswith("score_")]
+        scols = [k for k in self.parameters.keys() if k.startswith("score")]
         for scol in scols:
             col = "count" + scol[5:]
             if col not in input_columns:
                 del self.parameters[scol]
 
     def output_columns(self):
-        if self.parameters is None:
-            self.parameters = {}
-        return self._output_columns + [
+        return list(self._output_columns) + [
             k for k, v in self.parameters.items() if v.value != "NONE"
         ]
 
