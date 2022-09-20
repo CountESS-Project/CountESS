@@ -27,6 +27,7 @@ from functools import lru_cache
 from itertools import islice
 
 import dask.dataframe as dd
+import os.path
 
 class CancelButton(tk.Button):
     def __init__(self, master, **kwargs):
@@ -96,7 +97,8 @@ class ParameterWrapper:
         # XXX filenames shouldn't be full paths, its ugly :-)
 
         if isinstance(parameter, FileParam):
-            self.entry = tk.Label(tk_parent, text=parameter.value)
+            filename = os.path.relpath(parameter.value)
+            self.entry = tk.Label(tk_parent, text=filename)
             self.button = CancelButton(tk_parent, command=self.clear_value_callback)
         elif parameter.read_only:
             self.entry = tk.Label(tk_parent, text=parameter.value)
