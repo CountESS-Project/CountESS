@@ -65,7 +65,7 @@ class ChoiceParam(BaseParam):
         self.choices = choices or []
 
     def set_value(self, value):
-        assert value is None or value in choices
+        assert value is None or value in self.choices
         self.value = value
 
 
