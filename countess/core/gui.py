@@ -17,6 +17,7 @@ from .plugins import Pipeline, BasePlugin, FileInputMixin
 from .parameters import (
     BaseParam,
     BooleanParam,
+    ChoiceParam,
     IntegerParam,
     FloatParam,
     StringParam,
@@ -85,7 +86,7 @@ class ParameterWrapper:
             self.var = tk.DoubleVar(tk_parent, value=parameter.value)
         elif isinstance(parameter, IntegerParam):
             self.var = tk.IntVar(tk_parent, value=parameter.value)
-        elif isinstance(parameter, StringParam):
+        elif isinstance(parameter, StringParam) or isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
         else:
             raise NotImplementedError("Unknown parameter type")
@@ -101,23 +102,21 @@ class ParameterWrapper:
             filename = os.path.relpath(parameter.value)
             self.entry = tk.Label(tk_parent, text=filename)
             self.button = CancelButton(tk_parent, command=self.clear_value_callback)
-        elif parameter.read_only:
-            self.entry = tk.Label(tk_parent, text=parameter.value)
-        elif isinstance(parameter, BooleanParam):
-            self.entry = tk.Checkbutton(tk_parent, variable=self.var)
-        elif parameter.choices:
+        elif isinstance(parameter, ChoiceParam):
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices
             self.entry.state(["readonly"])
+        elif isinstance(parameter, SimpleParam) and parameter.read_only:
+            self.entry = tk.Label(tk_parent, text=parameter.value)
+        elif isinstance(parameter, BooleanParam):
+            self.entry = tk.Checkbutton(tk_parent, variable=self.var)
         else:
             self.entry = tk.Entry(tk_parent, textvariable=self.var)
 
         self.entry.grid(sticky=tk.EW)
 
     def update(self):
-        # XXX what if it didn't have choices before and now it does or vice versa?
-        # XXX should ChoiceParam be a difference Parameter class.
-        if self.parameter.choices and isinstance(self.entry, ttk.Combobox):
+        if isinstance(self.parameter, ChoiceParam):
             self.entry["values"] = self.parameter.choices
 
     def set_row(self, row):
@@ -363,13 +362,14 @@ class DataFramePreview:
         )
 
         self.treeview = ttk.Treeview(self.frame, height=self.height, selectmode=tk.NONE)
-        self.treeview["columns"] = list(ddf.columns)
-        for n, c in enumerate(ddf.columns):
-            # XXX could handle multiindex columns more elegantly than this
-            # (but maybe not in a ttk.Treeview)
-            if type(c) is tuple: c = '.'.join(c)
 
-            self.treeview.heading(n, text=c)
+        # XXX could handle multiindex columns more elegantly than this
+        # (but maybe not in a ttk.Treeview)
+        column_names = [".".join(c) if type(c) is tuple else c for c in ddf.columns]
+
+        self.treeview["columns"] = column_names
+        for n, cn in enumerate(column_names):
+            self.treeview.heading(n, text=cn)
             self.treeview.column(n, width=50)
 
         self.scrollbar_x = ttk.Scrollbar(self.frame, orient=tk.HORIZONTAL)

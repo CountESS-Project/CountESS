@@ -2,7 +2,7 @@ from typing import Generator, Optional
 from collections.abc import Iterable, Mapping
 
 import dask.dataframe as dd
-import fqfa
+import fqfa  # type:ignore
 import numpy as np
 from countess.core.parameters import BooleanParam, FloatParam, StringParam
 from countess.core.plugins import DaskInputPlugin

@@ -5,6 +5,7 @@ from collections.abc import Iterable, Callable, Mapping, MutableMapping
 from countess.core.parameters import (
     BaseParam,
     BooleanParam,
+    ChoiceParam,
     IntegerParam,
     FloatParam,
     StringParam,
@@ -47,19 +48,19 @@ class BasePlugin:
     parameters: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(cls, plugin: Optional[Type['BasePlugin']]|Optional['BasePlugin']):
+    def can_follow(cls, plugin: Optional[Type["BasePlugin"]] | Optional["BasePlugin"]):
         """returns True if this plugin/plugin class can follow the plugin/plugin class
         `plugin` ... the class hierarchy enforces what methods must be present, eg:
         `DaskBasePlugin` has `output_columns` which identifies what will be passed."""
         return plugin is not None and (
-                isinstance(plugin, BasePlugin) or
-                (type(plugin) is type and issubclass(plugin, BasePlugin))
+            isinstance(plugin, BasePlugin)
+            or (type(plugin) is type and issubclass(plugin, BasePlugin))
         )
 
     def __init__(self):
         # Parameters store the actual values they are set to, so we copy them so that
         # if the same plugin is used twice in a pipeline it will have its own parameters.
-        self.parameters = dict( ( (k, v.copy()) for k, v in self.parameters.items() ) )
+        self.parameters = dict(((k, v.copy()) for k, v in self.parameters.items()))
 
     def set_previous_plugin(self, previous_plugin: Optional["BasePlugin"]):
         self.previous_plugin = previous_plugin
@@ -78,9 +79,12 @@ class BasePlugin:
         the user interface code will display this in some way or another."""
         return self.run(obj)
 
-    def run(self, obj: Any):
+    def run(self, obj: Any) -> Any:
         """Override this method"""
         raise NotImplementedError(f"{self.__class__}.run()")
+
+    def prerun(self, obj: Any) -> Any:
+        return self.run(obj)
 
     def add_parameter(self, name: str, param: BaseParam):
         self.parameters[name] = param.copy()
@@ -101,7 +105,7 @@ class FileInputMixin:
     file_params: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(cls, plugin: Optional[Type[BasePlugin]]|Optional[BasePlugin]):
+    def can_follow(cls, plugin: Optional[Type[BasePlugin]] | Optional[BasePlugin]):
         # the `not TYPE_CHECKING` clause is a workaround for mypy not really understanding
         # mixin classes.
         return plugin is None or (not TYPE_CHECKING and super().can_follow(plugin))
@@ -155,10 +159,10 @@ class DaskBasePlugin(BasePlugin):
     # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
 
     @classmethod
-    def can_follow(cls, plugin: Optional[Type[BasePlugin]]|Optional[BasePlugin]):
+    def can_follow(cls, plugin: Optional[Type[BasePlugin]] | Optional[BasePlugin]):
         return plugin is not None and (
-                isinstance(plugin, DaskBasePlugin) or
-                (type(plugin) is type and issubclass(plugin, DaskBasePlugin))
+            isinstance(plugin, DaskBasePlugin)
+            or (type(plugin) is type and issubclass(plugin, DaskBasePlugin))
         )
 
     def output_columns(self) -> Iterable[str]:
@@ -199,8 +203,6 @@ class DaskBasePlugin(BasePlugin):
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first.
     DaskInputPlugins don't care about existing columns because they're adding their own records anyway."""
-
-    file_params: MutableMapping[str, BaseParam]
 
     def run_with_progress_callback(
         self, ddf: Optional[dd.DataFrame], callback
@@ -258,8 +260,8 @@ class DaskScoringPlugin(DaskTransformPlugin):
         for col in input_columns:
             scol = "score" + col[5:]
             if scol not in self.parameters:
-                self.parameters[scol] = StringParam(
-                    f"{scol} compares {col} and ...", default="NONE"
+                self.parameters[scol] = ChoiceParam(
+                    f"{scol} compares {col} and ...", "NONE", ["NONE"]
                 )
             self.parameters[scol].choices = ["NONE"] + [
                 x for x in input_columns if x != col
@@ -281,7 +283,7 @@ class DaskScoringPlugin(DaskTransformPlugin):
         ddf = ddf_in.copy()
 
         for scol, param in self.parameters.items():
-            if param.value != "NONE":
+            if isinstance(param, ChoiceParam) and param.value != "NONE":
                 ccol = "count_" + scol[6:]
                 ddf[scol] = self.score(ddf[ccol], ddf[param.value])
 
@@ -368,7 +370,6 @@ class Pipeline:
 
         # XXX TODO
         raise NotImplementedError("surprisingly involved")
-
 
     def update_plugin(self, position: int):
         """Updates the plugin at `position` and then all the subsequent plugins,
