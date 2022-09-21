@@ -30,7 +30,7 @@ class GroupByPlugin(DaskTransformPlugin):
         input_columns = sorted(self.previous_plugin.output_columns())
         self.parameters["column"].choices = ["Index"] + input_columns
 
-    def run(self, ddf_in: dd.DataFrame):
+    def run_dask(self, ddf_in: dd.DataFrame) -> dd.DataFrame:
         col_name = self.parameters["column"].value
         oper = self.parameters["operation"].value
         col = ddf_in.index if col_name == "Index" else ddf_in[col_name]

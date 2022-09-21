@@ -3,6 +3,7 @@ import re
 from collections import defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from importlib.metadata import entry_points
+from itertools import islice
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Type
 
 import dask.dataframe as dd
@@ -22,18 +23,38 @@ from countess.core.parameters import (
 
 """
 Plugin lifecycle:
-* Selector of plugins calls cls.follows_plugin(previous_plugin_instance)
+* Selector of plugins calls cls.can_follow(previous_class_or_instance)
   which returns True if a plugin of this class can follow that one
-  (or None if this is the first plugin)
+  (or None if this is the first plugin).  This lets the interface present
+  a list of plausible plugins you might want to use in the pipeline.
 * When plugin is selected, it gets __init__ed.
 * plugin.parameters gets read to get the name of configuration fields.
-* plugin.configure(name, value) gets called, potentially a lot of times.
-* plugin.parameters gets checked again whenever the gui displays a configuration
-  screen, in case options affect each other.
 * For a Dask plugin, plugin.get_columns() may get called
 
 
 """
+
+PRERUN_ROW_LIMIT = 100
+
+# XXX sadly this doesn't work
+# ProgressCallbackType = NewType('ProgressCallbackType', Callable[[int, int, Optional[str]], None])
+
+
+class DaskProgressCallback(Callback):
+    """Matches Dask's idea of a progress callback to ours."""
+
+    def __init__(self, progress_callback: Callable[[int, int, Optional[str]], None]):
+        self.progress_callback = progress_callback
+
+    def _start_state(self, dsk, state):
+        self.total_tasks = len(state["ready"]) + len(state["waiting"])
+
+    def _posttask(self, key, result, dsk, state, worker_id):
+        self.progress_callback(len(state["finished"]), self.total_tasks)
+
+    def _finish(self, dsk, state, failed):
+        # XXX do something with "failed"
+        self.progress_callback(self.total_tasks, self.total_tasks)
 
 
 class BasePlugin:
@@ -67,8 +88,10 @@ class BasePlugin:
     def update(self):
         pass
 
-    def run_with_progress_callback(
-        self, obj: Any, callback: Callable[[int, int, Optional[str]], None]
+    def run(
+        self,
+        obj: Any,
+        callback: Optional[Callable[[int, int, Optional[str]], None]] = None,
     ):
         """Not every plugin is going to support progress callbacks, plugins
         which do should override this method to call `callback` sporadically
@@ -76,10 +99,6 @@ class BasePlugin:
         optional string describing what they're up to, eg:
             callback(42, 107, 'Thinking hard about stuff')
         the user interface code will display this in some way or another."""
-        return self.run(obj)
-
-    def run(self, obj: Any) -> Any:
-        """Override this method"""
         raise NotImplementedError(f"{self.__class__}.run()")
 
     def prerun(self, obj: Any) -> Any:
@@ -147,6 +166,16 @@ class FileInputMixin:
                 )
 
 
+def crop_dataframe(
+    ddf: dd.DataFrame, row_limit: int = PRERUN_ROW_LIMIT
+) -> dd.DataFrame:
+    """Takes a dask dataframe `ddf` and returns a frame with at most `limit` rows"""
+    if len(ddf) > row_limit:
+        x, y = islice(ddf.index, 0, row_limit, row_limit - 1)
+        ddf = ddf[x:y]
+    return ddf
+
+
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
 
@@ -167,31 +196,22 @@ class DaskBasePlugin(BasePlugin):
     def output_columns(self) -> Iterable[str]:
         return []
 
-    def run_with_progress_callback(
-        self, ddf, callback: Callable[[int, int, Optional[str]], None]
+    def run(
+        self,
+        ddf: dd.DataFrame,
+        callback: Optional[Callable[[int, int, Optional[str]], None]] = None,
     ):
-        class DaskProgressCallback(Callback):
-            """Matches Dask's idea of a progress callback to ours."""
-
-            # XXX there's probably neater ways, like just passing some lambdas to Callback
-
-            def __init__(
-                self, progress_callback: Callable[[int, int, Optional[str]], None]
-            ):
-                self.progress_callback = progress_callback
-
-            def _start_state(self, dsk, state):
-                self.total_tasks = len(state["ready"]) + len(state["waiting"])
-
-            def _posttask(self, key, result, dsk, state, worker_id):
-                self.progress_callback(len(state["finished"]), self.total_tasks)
-
-            def _finish(self, dsk, state, failed):
-                # XXX do something with "failed"
-                self.progress_callback(self.total_tasks, self.total_tasks)
+        if not callback:
+            return self.run_dask(ddf)
 
         with DaskProgressCallback(callback):
-            return self.run(ddf)
+            return self.run_dask(ddf)
+
+    def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        return crop_dataframe(self.run_dask(crop_dataframe(ddf)))
+
+    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
 
 
 # XXX Potentially there's a PandasBasePlugin which can use a technique much like
@@ -203,28 +223,17 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first.
     DaskInputPlugins don't care about existing columns because they're adding their own records anyway."""
 
-    def run_with_progress_callback(
-        self, ddf: Optional[dd.DataFrame], callback
-    ) -> dd.DataFrame:
-        """Input plugins are likely I/O bound so instead of using the Dask progress callback
-        mechanism this uses a simple count of files read."""
-
-        file_params = list(self.get_file_params())
-
-        dfs = [] if ddf is None else [ddf]
-
-        n_files = len(file_params)
-        for num, fp in enumerate(file_params):
-            callback(num, n_files, "Loading")
-            df = self.read_file_to_dataframe(**fp)
+    def load_files(self, row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
+        for fp in self.get_file_params():
+            df = self.read_file_to_dataframe(fp, row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
-            dfs.append(df)
+            yield df
 
-        # XXX what actually is the logical operation here a) between files in one load
-        # and b) between existing dataframe and the new ones.
-
+    def combine_dfs(self, dfs: list[dd.DataFrame]) -> dd.DataFrame:
         if len(dfs) > 0:
+            # XXX what actually is the logical operation here a) between files in one load
+            # and b) between existing dataframe and the new ones.
             return dd.concat(dfs)
         else:
             # completely empty dataframe!
@@ -232,7 +241,37 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             assert isinstance(empty_ddf, dd.DataFrame)
             return empty_ddf
 
-    def read_file_to_dataframe(self, **kwargs) -> dd.DataFrame | pd.DataFrame:
+    def run(
+        self,
+        ddf: Optional[dd.DataFrame],
+        callback: Optional[Callable[..., None]] = None,
+    ) -> dd.DataFrame:
+        """Input plugins are likely I/O bound so instead of using the Dask progress callback
+        mechanism this uses a simple count of files read."""
+
+        dfs = [] if ddf is None else [ddf]
+        num_files = len(list(self.get_file_params()))
+        if callback:
+            callback(0, num_files + 1, "Loading")
+        for num, df in enumerate(self.load_files()):
+            if callback:
+                callback(num, num_files, "Loading")
+            dfs.append(df)
+        if callback:
+            callback(num_files, num_files)
+
+        return self.combine_dfs(dfs)
+
+    def prerun(self, ddf: Optional[dd.DataFrame]) -> dd.DataFrame:
+
+        dfs: list[dd.DataFrame] = [] if ddf is None else [ddf]
+        for df in self.load_files(row_limit=PRERUN_ROW_LIMIT):
+            dfs.append(df)
+        return crop_dataframe(self.combine_dfs(dfs))
+
+    def read_file_to_dataframe(
+        self, file_params: Mapping[str, BaseParam], row_limit: Optional[int] = None
+    ) -> dd.DataFrame | pd.DataFrame:
         raise NotImplementedError(
             f"Implement {self.__class__.__name__}.read_file_to_dataframe"
         )
@@ -248,7 +287,7 @@ class DaskTransformPlugin(DaskBasePlugin):
 
 
 class DaskScoringPlugin(DaskTransformPlugin):
-    """Specific kind of tranform which turns counts into scores"""
+    """Specific kind of transform which turns counts into scores"""
 
     def update(self):
         input_columns = sorted(
@@ -256,6 +295,8 @@ class DaskScoringPlugin(DaskTransformPlugin):
         )
 
         # XXX Allow to set names of score columns?  The whole [5:] thing is clumsy
+        # and horrible but doing this properly maybe needs ArrayParams
+
         for col in input_columns:
             scol = "score" + col[5:]
             if scol not in self.parameters:
@@ -277,9 +318,7 @@ class DaskScoringPlugin(DaskTransformPlugin):
             k for k, v in self.parameters.items() if v.value != "NONE"
         ]
 
-    def run(self, ddf_in: dd.DataFrame):
-        # XXX count_0 is not universally applicable
-        ddf = ddf_in.copy()
+    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
 
         for scol, param in self.parameters.items():
             if isinstance(param, ChoiceParam) and param.value != "NONE":

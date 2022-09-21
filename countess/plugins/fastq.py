@@ -3,10 +3,9 @@ from itertools import islice
 from typing import Generator, Optional
 
 import dask.dataframe as dd
-import fqfa  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
-from fqfa.fastq.fastq import parse_fastq_reads
+from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
 from countess.core.parameters import BooleanParam, FloatParam, StringParam
@@ -30,27 +29,23 @@ class LoadFastqPlugin(DaskInputPlugin):
 
     file_params = {"count_column": StringParam("Count Column Name", "count")}
 
-    def read_file_to_dataframe(self, filename, count_column):
+    def read_file_to_dataframe(self, params, row_limit=None):
         records = []
-        with open(filename.value, "r") as fh:
-            for fastq_read in parse_fastq_reads(fh):
+        with open(params["filename"].value, "r") as fh:
+            for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
                 if (
                     fastq_read.average_quality()
                     >= self.parameters["min_avg_quality"].value
                 ):
                     records.append((fastq_read.sequence, 1))
         return pd.DataFrame.from_records(
-            records, columns=("sequence", count_column.value)
+            records, columns=("sequence", params["count_column"].value)
         )
 
-    def run_with_progress_callback(self, ddf, callback):
-        ddf = super().run_with_progress_callback(ddf, callback)
-        n_files = len(list(self.get_file_params()))
-
-        if self.parameters["group"]:
-            callback(n_files, n_files + 1, "Grouping")
-            return ddf.groupby("sequence").sum()
-
+    def combine_dfs(self, dfs):
+        ddf = dd.concat(dfs)
+        if self.parameters["group"].value:
+            ddf = ddf.groupby("sequence").sum()
         return ddf
 
     def output_columns(self):

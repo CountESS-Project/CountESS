@@ -46,7 +46,7 @@ def process_ini(config_filenames):
             else:
                 plugin.parameters[k].set_value(v)
 
-        obj = plugin.run_with_progress_callback(obj, progress_callback)
+        obj = plugin.run(obj, progress_callback)
 
         print()
         print()
