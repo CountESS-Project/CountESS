@@ -10,7 +10,7 @@ from countess.core.plugins import DaskInputPlugin
 from fqfa.fastq.fastq import parse_fastq_reads
 from itertools import islice
 from more_itertools import ichunked
-import pandas as pd
+import pandas as pd  # type: ignore
 
 
 class LoadFastqPlugin(DaskInputPlugin):

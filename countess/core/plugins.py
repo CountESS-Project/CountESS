@@ -15,7 +15,7 @@ from importlib.metadata import entry_points
 import logging
 import dask.dataframe as dd
 from dask.callbacks import Callback
-import pandas as pd
+import pandas as pd  # type: ignore
 import numpy as np
 
 import re
@@ -59,7 +59,7 @@ class BasePlugin:
     def __init__(self):
         # Parameters store the actual values they are set to, so we copy them so that
         # if the same plugin is used twice in a pipeline it will have its own parameters.
-        self.parameters = dict( ( (k, v.copy() for k, v in self.parameters.items() ) )
+        self.parameters = dict( ( (k, v.copy()) for k, v in self.parameters.items() ) )
 
     def set_previous_plugin(self, previous_plugin: Optional["BasePlugin"]):
         self.previous_plugin = previous_plugin

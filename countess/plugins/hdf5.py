@@ -1,5 +1,5 @@
 import dask.dataframe as dd
-import pandas as pd
+import pandas as pd  # type: ignore
 from collections import defaultdict
 
 from countess.core.parameters import StringParam
