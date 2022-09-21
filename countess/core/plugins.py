@@ -1,4 +1,4 @@
-from typing import Optional, Any, Type, NamedTuple
+from typing import Optional, Any, Type, NamedTuple, TYPE_CHECKING
 from collections import namedtuple, defaultdict
 from collections.abc import Iterable, Callable, Mapping, MutableMapping
 
@@ -47,11 +47,19 @@ class BasePlugin:
     parameters: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(cls, plugin_class: Optional[Type[BasePlugin]]):
-        return plugin_class is not None and issubclass(plugin_class, BasePlugin)
+    def can_follow(cls, plugin: Optional[Type[BasePlugin]]|Optional[BasePlugin]):
+        """returns True if this plugin/plugin class can follow the plugin/plugin class
+        `plugin` ... the class hierarchy enforces what methods must be present, eg:
+        `DaskBasePlugin` has `output_columns` which identifies what will be passed."""
+        return plugin is not None and (
+                isinstance(plugin, BasePlugin) or
+                (type(plugin) is type and issubclass(plugin, BasePlugin))
+        )
 
     def __init__(self):
-        self.parameters = self.parameters.copy()
+        # Parameters store the actual values they are set to, so we copy them so that
+        # if the same plugin is used twice in a pipeline it will have its own parameters.
+        self.parameters = dict( ( (k, v.copy() for k, v in self.parameters.items() ) )
 
     def set_previous_plugin(self, previous_plugin: Optional["BasePlugin"]):
         self.previous_plugin = previous_plugin
@@ -93,8 +101,10 @@ class FileInputMixin:
     file_params: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(self, plugin_class: Optional[Type[BasePlugin]]):
-        return plugin_class is None or issubclass(plugin_class, BasePlugin)
+    def can_follow(cls, plugin: Optional[Type[BasePlugin]]|Optional[BasePlugin]):
+        # the `not TYPE_CHECKING` clause is a workaround for mypy not really understanding
+        # mixin classes.
+        return plugin is None or (not TYPE_CHECKING and super().can_follow(plugin))
 
     def add_file(self, filename):
         self.file_number += 1
@@ -145,8 +155,11 @@ class DaskBasePlugin(BasePlugin):
     # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
 
     @classmethod
-    def can_follow(cls, plugin_class: Optional[Type[BasePlugin]]):
-        return type(plugin_class) is type and issubclass(plugin_class, DaskBasePlugin)
+    def can_follow(cls, plugin: Optional[Type[BasePlugin]]|Optional[BasePlugin]):
+        return plugin is not None and (
+                isinstance(plugin, DaskBasePlugin) or
+                (type(plugin) is type and issubclass(plugin, DaskBasePlugin))
+        )
 
     def output_columns(self) -> Iterable[str]:
         return []
@@ -299,19 +312,23 @@ class Pipeline:
                 logging.warning(f"{plugin_class} is not a valid CountESS plugin")
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
+        """Adds a plugin at `position`, if that's possible.
+        It might not be possible if the plugin chain would not be compatible,
+        in which case we throw an assertion error"""
         # XXX would it be easier to pass an "after: Plugin" instead of position?
+
         if position is None:
             position = len(self.plugins)
         assert 0 <= position <= len(self.plugins)
         if position > 0:
             previous_plugin = self.plugins[position - 1]
-            assert plugin.__class__.can_follow(previous_plugin.__class__)
+            assert plugin.can_follow(previous_plugin)
         else:
             previous_plugin = None
 
         if position < len(self.plugins):
             next_plugin = self.plugins[position]
-            assert next_plugin.__class__.can_follow(plugin.__class__)
+            assert next_plugin.can_follow(plugin)
         else:
             next_plugin = None
 
@@ -324,18 +341,18 @@ class Pipeline:
             next_plugin.set_previous_plugin(plugin)
 
     def del_plugin(self, position: int):
+        """Deletes the plugin at `position` if that's possible.
+        It might not be possible if the plugins before and after the deletion aren't compatible,
+        in which case we throw an assertion error"""
         # XXX would it be easier to pass "plugin: Plugin" instead of position?
+
         assert 0 <= position < len(self.plugins)
-        if position > 0:
-            previous_plugin = self.plugins[position - 1]
-            previous_plugin_class = previous_plugin.__class__
-        else:
-            previous_plugin = None
-            previous_plugin_class = None
+
+        previous_plugin = self.plugins[position - 1] if position > 0 else None
 
         if position < len(self.plugins) - 1:
             next_plugin = self.plugins[position + 1]
-            assert next_plugin.__class__.can_follow(previous_plugin_class)
+            assert next_plugin.can_follow(previous_plugin)
         else:
             next_plugin = None
 
@@ -345,11 +362,20 @@ class Pipeline:
             next_plugin.set_previous_plugin(previous_plugin)
             next_plugin.update()
 
-    def update_plugin(self, position: int):
+    def move_plugin(self, position: int, new_position: int):
         assert 0 <= position < len(self.plugins)
+        assert 0 <= new_position < len(self.plugins)
 
-        previous_plugin = self.plugins[position - 1] if position > 0 else None
-        self.plugins[position].update()
+        # XXX TODO
+        raise NotImplementedError("surprisingly involved")
+
+
+    def update_plugin(self, position: int):
+        """Updates the plugin at `position` and then all the subsequent plugins,
+        to allow changes to carry through the pipeline"""
+        assert 0 <= position < len(self.plugins)
+        for plugin in self.plugins[position:]:
+            plugin.update()
 
     def choose_plugin_classes(self, position: int):
         if position is None:
