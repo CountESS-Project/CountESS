@@ -47,7 +47,7 @@ class BasePlugin:
     parameters: MutableMapping[str, BaseParam] = {}
 
     @classmethod
-    def can_follow(cls, plugin: Optional[Type[BasePlugin]]|Optional[BasePlugin]):
+    def can_follow(cls, plugin: Optional[Type['BasePlugin']]|Optional['BasePlugin']):
         """returns True if this plugin/plugin class can follow the plugin/plugin class
         `plugin` ... the class hierarchy enforces what methods must be present, eg:
         `DaskBasePlugin` has `output_columns` which identifies what will be passed."""

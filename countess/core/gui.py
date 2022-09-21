@@ -365,6 +365,10 @@ class DataFramePreview:
         self.treeview = ttk.Treeview(self.frame, height=self.height, selectmode=tk.NONE)
         self.treeview["columns"] = list(ddf.columns)
         for n, c in enumerate(ddf.columns):
+            # XXX could handle multiindex columns more elegantly than this
+            # (but maybe not in a ttk.Treeview)
+            if type(c) is tuple: c = '.'.join(c)
+
             self.treeview.heading(n, text=c)
             self.treeview.column(n, width=50)
 

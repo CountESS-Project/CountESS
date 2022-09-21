@@ -10,6 +10,7 @@ setup(
                 'load_hdf = countess.plugins.hdf5:LoadHdfPlugin',
                 #'store_hdf = countess.plugins.hdf5:StoreHdfPlugin',
                 'log_score = countess.plugins.log_score:LogScorePlugin',
+                'group_by = countess.plugins.group_by:GroupByPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
