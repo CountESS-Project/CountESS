@@ -1,8 +1,9 @@
-from typing import Generator, Optional
 from collections.abc import Iterable, Mapping
+from typing import Generator, Optional
 
 import dask.dataframe as dd
 import numpy as np
+
 from countess.core.plugins import DaskScoringPlugin
 
 

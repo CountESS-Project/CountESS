@@ -1,25 +1,24 @@
-from typing import Optional, Any, Type, NamedTuple, TYPE_CHECKING
-from collections import namedtuple, defaultdict
-from collections.abc import Iterable, Callable, Mapping, MutableMapping
+import logging
+import re
+from collections import defaultdict, namedtuple
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
+from importlib.metadata import entry_points
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Type
+
+import dask.dataframe as dd
+import numpy as np
+import pandas as pd  # type: ignore
+from dask.callbacks import Callback
 
 from countess.core.parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
-    IntegerParam,
-    FloatParam,
-    StringParam,
     FileParam,
+    FloatParam,
+    IntegerParam,
+    StringParam,
 )
-
-from importlib.metadata import entry_points
-import logging
-import dask.dataframe as dd
-from dask.callbacks import Callback
-import pandas as pd  # type: ignore
-import numpy as np
-
-import re
 
 """
 Plugin lifecycle:

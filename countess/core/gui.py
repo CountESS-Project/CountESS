@@ -1,34 +1,31 @@
 # TK based GUI for CountESS
+import os.path
+import pathlib
 import threading
 import tkinter as tk
 import tkinter.ttk as ttk
-import ttkthemes  # type:ignore
-from tkinter import filedialog
-import pathlib
-
-from typing import Optional, NamedTuple
 from collections.abc import Iterable, Sequence
-from functools import partial
+from functools import lru_cache, partial
+from itertools import islice
 from threading import Thread
-
+from tkinter import filedialog
 from tkinter.scrolledtext import ScrolledText
+from typing import NamedTuple, Optional
 
-from .plugins import Pipeline, BasePlugin, FileInputMixin
+import dask.dataframe as dd
+import ttkthemes  # type:ignore
+
 from .parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
-    IntegerParam,
-    FloatParam,
-    StringParam,
     FileParam,
+    FloatParam,
+    IntegerParam,
+    SimpleParam,
+    StringParam,
 )
-
-from functools import lru_cache
-from itertools import islice
-
-import dask.dataframe as dd
-import os.path
+from .plugins import BasePlugin, FileInputMixin, Pipeline
 
 
 class CancelButton(tk.Button):

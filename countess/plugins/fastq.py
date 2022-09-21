@@ -1,16 +1,16 @@
-from typing import Generator, Optional
 from collections.abc import Iterable, Mapping
+from itertools import islice
+from typing import Generator, Optional
 
 import dask.dataframe as dd
-import fqfa  # type:ignore
+import fqfa  # type: ignore
 import numpy as np
+import pandas as pd  # type: ignore
+from fqfa.fastq.fastq import parse_fastq_reads
+from more_itertools import ichunked
+
 from countess.core.parameters import BooleanParam, FloatParam, StringParam
 from countess.core.plugins import DaskInputPlugin
-
-from fqfa.fastq.fastq import parse_fastq_reads
-from itertools import islice
-from more_itertools import ichunked
-import pandas as pd  # type: ignore
 
 
 class LoadFastqPlugin(DaskInputPlugin):

@@ -1,9 +1,10 @@
-import dask.dataframe as dd
-import pandas as pd  # type: ignore
 from collections import defaultdict
 
+import dask.dataframe as dd
+import pandas as pd  # type: ignore
+
 from countess.core.parameters import StringParam
-from countess.core.plugins import DaskInputPlugin, DaskBasePlugin
+from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 
 
 class LoadHdfPlugin(DaskInputPlugin):
