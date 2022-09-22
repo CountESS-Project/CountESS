@@ -25,7 +25,8 @@ from .parameters import (
     SimpleParam,
     StringParam,
 )
-from .plugins import BasePlugin, FileInputMixin, Pipeline
+from .pipeline import Pipeline
+from .plugins import BasePlugin, FileInputMixin
 
 
 class CancelButton(tk.Button):
