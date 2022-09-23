@@ -14,6 +14,7 @@ from typing import NamedTuple, Optional
 
 import dask.dataframe as dd
 import ttkthemes  # type:ignore
+import re
 
 from .parameters import (
     BaseParam,
@@ -93,23 +94,21 @@ class ParameterWrapper:
 
         self.label = ttk.Label(tk_parent, text=parameter.label)
 
-        # XXX filenames and readonly fields probably shouldn't be labels
-        # XXX filenames shouldn't be full paths, its ugly :-)
-
-        if isinstance(parameter, FileParam):
-            filename = os.path.relpath(parameter.value)
-            self.entry = tk.Label(tk_parent, text=filename)
-            self.button = CancelButton(tk_parent, command=self.clear_value_callback)
-        elif isinstance(parameter, ChoiceParam):
+        if isinstance(parameter, ChoiceParam):
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices
             self.entry.state(["readonly"])
-        elif isinstance(parameter, SimpleParam) and parameter.read_only:
-            self.entry = tk.Label(tk_parent, text=parameter.value)
         elif isinstance(parameter, BooleanParam):
-            self.entry = tk.Checkbutton(tk_parent, variable=self.var)
+            self.entry = ttk.Checkbutton(tk_parent, variable=self.var)
+        elif isinstance(parameter, FileParam):
+            self.entry = ttk.Entry(tk_parent, textvariable=self.var)
+            self.button = CancelButton(tk_parent, command=self.clear_value_callback)
+            self.entry.state(['readonly'])
         else:
-            self.entry = tk.Entry(tk_parent, textvariable=self.var)
+            self.entry = ttk.Entry(tk_parent, textvariable=self.var)
+
+        if parameter.read_only:
+            self.entry.state(['readonly'])
 
         self.entry.grid(sticky=tk.EW)
 
@@ -119,9 +118,11 @@ class ParameterWrapper:
 
     def set_row(self, row):
         self.label.grid(row=row, column=0)
-        self.entry.grid(row=row, column=1)
         if self.button:
+            self.entry.grid(row=row, column=1)
             self.button.grid(row=row, column=2)
+        else:
+            self.entry.grid(row=row, column=1, columnspan=2)
 
     def clear_value_callback(self, *_):
         self.parameter.value = ""
@@ -166,6 +167,8 @@ class PluginConfigurator:
     def add_file(self):
         filenames = filedialog.askopenfilenames(filetypes=self.plugin.file_types)
         for filename in filenames:
+            # XXX is this safe cross-os?
+            filename = os.path.relpath(filename)
             self.plugin.add_file(filename)
         self.update()
 
