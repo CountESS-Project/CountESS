@@ -1,7 +1,9 @@
 import logging
-from importlib.metadata import entry_points
-from typing import Type
+import importlib
 
+from importlib.metadata import entry_points
+from typing import Type, Mapping, Iterable, Tuple
+from functools import partial
 from countess.core.plugins import BasePlugin
 
 
@@ -19,6 +21,26 @@ class Pipeline:
                 self.plugin_classes.append(plugin_class)
             else:
                 logging.warning(f"{plugin_class} is not a valid CountESS plugin")
+
+    def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]):
+        module_name, class_name = plugin_name.split(":")
+        plugin_class = getattr(importlib.import_module(module_name), class_name)
+        assert issubclass(plugin_class, BasePlugin)
+
+        plugin = plugin_class()
+        self.add_plugin(plugin)
+
+        for k, v in config.items():
+            # XXX cheesy but this way of handling files will be replaced soon
+            if k.startswith("file.") and k.endswith(".filename"):
+                plugin.add_file(v)
+            else:
+                plugin.parameters[k].set_value(v)
+
+    def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
+        for plugin in self.plugins:
+            config = dict(((k, p.value) for k, p in plugin.parameters))
+            yield f"{plugin.__module__}:{plugin.__name__}", config
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
         """Adds a plugin at `position`, if that's possible.
@@ -102,3 +124,10 @@ class Pipeline:
                     plugin_class
                 ):
                     yield plugin_class
+
+    def run(self, progress_callback):
+        obj = None
+        for num, plugin in enumerate(self.plugins):
+            cb = partial(progress_callback, num)
+            obj = plugin.run(obj, cb)
+        return obj

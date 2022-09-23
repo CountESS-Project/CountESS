@@ -312,25 +312,20 @@ class PipelineRunner:
     def run(self):
         value = None
 
-        for num, plugin in enumerate(self.pipeline.plugins):
-            pbar = self.pbars[num]
 
-            def progress_callback(a, b, s="Running"):
-                if b:
-                    pbar.stop()
-                    pbar["mode"] = "determinate"
-                    pbar["value"] = 100 * a / b
-                    pbar.update_label(f"{s} : {a} / {b}" if b > 1 else s)
-                else:
-                    pbar["mode"] = "indeterminate"
-                    pbar.start()
-                    pbar.update_label(f"{s} : {a}" if a is not None else s)
+    def progress_callback(self, n, a, b, s="Running"):
+        if b:
+            self.pbars[n].stop()
+            self.pbars[n]["mode"] = "determinate"
+            self.pbars[n]["value"] = 100 * a / b
+            self.pbars[n].update_label(f"{s} : {a} / {b}" if b > 1 else s)
+        else:
+            self.pbars[n]["mode"] = "indeterminate"
+            self.pbars[n].start()
+            self.pbars[n].update_label(f"{s} : {a}" if a is not None else s)
 
-            progress_callback(0, 0, "Running")
-
-            value = plugin.run_with_progress_callback(value, callback=progress_callback)
-
-            progress_callback(1, 1, "Finished")
+    def run(self):
+        value = pipeline.run(self.progress_callback)
 
         if isinstance(value, dd.DataFrame):
             preview = DataFramePreview(self.frame, value)
