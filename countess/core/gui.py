@@ -151,11 +151,12 @@ class PluginConfigurator:
         self.wrapper_cache = {}
 
         tk.Label(self.frame, text=plugin.description).grid(
-            row=0, columnspan=2, sticky=tk.EW
+            row=0, columnspan=3, sticky=tk.EW
         )
 
         self.frame.columnconfigure(0, weight=1)
         self.frame.columnconfigure(1, weight=2)
+        self.frame.columnconfigure(2, weight=0)
 
         if isinstance(self.plugin, FileInputMixin):
             self.add_file_button = tk.Button(
