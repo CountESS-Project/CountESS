@@ -173,17 +173,6 @@ class FileInputMixin:
                 )
 
 
-def crop_dataframe(
-    ddf: dd.DataFrame, row_limit: int = PRERUN_ROW_LIMIT
-) -> dd.DataFrame:
-    """Takes a dask dataframe `ddf` and returns a frame with at most `limit` rows"""
-    if len(ddf) > row_limit:
-        x, y = islice(ddf.index, 0, row_limit, row_limit - 1)
-        print(f"crop_dataframe {ddf} {len(ddf)} {x} {y}")
-        ddf = ddf[x:y]
-    return ddf
-
-
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
 
@@ -216,7 +205,7 @@ class DaskBasePlugin(BasePlugin):
             return self.run_dask(ddf)
 
     def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        self.prerun_cache = self.run_dask(crop_dataframe(ddf) if ddf is not None else None)
+        self.prerun_cache = self.run_dask(crop_dask_dataframe(ddf, PRERUN_ROW_LIMIT) if ddf is not None else None)
         return self.prerun_cache
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
@@ -226,13 +215,6 @@ class DaskBasePlugin(BasePlugin):
 # XXX Potentially there's a PandasBasePlugin which can use a technique much like
 # tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and provide
 # progress feedback.
-
-
-def empty_dask_dataframe() -> dd.DataFrame:
-    """Returns an empty dask DataFrame for consistency"""
-    edf = dd.from_pandas(pd.DataFrame([]), npartitions=1)
-    assert isinstance(edf, dd.DataFrame)  # reassure mypy
-    return edf
 
 
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
@@ -255,12 +237,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         # XXX what actually is the logical operation here a) between files in one load
         # and b) between existing dataframe and the new ones.
 
-        if len(dfs) == 0:
-            return empty_dask_dataframe()
-        elif len(dfs) == 1:
-            return dfs[0].copy()
-        else:
-            return dd.concat(dfs)
+        return combine_dask_dataframes(dfs)
 
     def run(
         self,
@@ -281,17 +258,14 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         if callback:
             callback(num_files, num_files)
 
-        if len(dfs) == 0:
-            return empty_dask_dataframe()
-        else:
-            return self.combine_dfs(dfs)
+        return self.combine_dfs(dfs)
 
     def prerun(self, ddf: Optional[dd.DataFrame]) -> dd.DataFrame:
 
         dfs: list[dd.DataFrame] = [] if ddf is None else [ddf]
         for df in self.load_files(row_limit=PRERUN_ROW_LIMIT):
             dfs.append(df)
-        self.prerun_cache = crop_dataframe(self.combine_dfs(dfs))
+        self.prerun_cache = crop_dask_dataframe(self.combine_dfs(dfs), PRERUN_ROW_LIMIT)
         return self.prerun_cache
 
     def read_file_to_dataframe(

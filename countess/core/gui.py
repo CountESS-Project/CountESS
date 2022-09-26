@@ -28,7 +28,8 @@ from .parameters import (
     StringParam,
 )
 from .pipeline import Pipeline
-from .plugins import BasePlugin, FileInputMixin, crop_dataframe
+from .plugins import BasePlugin, FileInputMixin
+from ..utils.dask import crop_dask_dataframe
 
 
 class CancelButton(tk.Button):
@@ -449,8 +450,8 @@ class DataFramePreview:
     def update(self, ddf: dd.DataFrame):
 
         if len(ddf) > 1000:
-            self.label['text'] = f"DataFrame Preview (1000 rows out of {len(ddf)}"
-            ddf = crop_dataframe(ddf, 1000)
+            self.label['text'] = f"DataFrame Preview (1000 rows out of {len(ddf)})"
+            ddf = crop_dask_dataframe(ddf, 1000)
         else:
             self.label['text'] = f"DataFrame Preview {len(ddf)} rows"
 
