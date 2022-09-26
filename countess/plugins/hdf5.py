@@ -6,12 +6,14 @@ import pandas as pd  # type: ignore
 from countess.core.parameters import StringParam
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 
+VERSION="0.0.1"
 
 class LoadHdfPlugin(DaskInputPlugin):
 
     name = "HDF5 Load"
     title = "Load from HDF5"
     description = "Loads counts from HDF5 files"
+    version = VERSION
 
     file_types = [("HDF5 File", "*.hdf5")]
 

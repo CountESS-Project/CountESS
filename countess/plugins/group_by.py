@@ -7,6 +7,7 @@ import numpy as np
 from countess.core.parameters import ChoiceParam
 from countess.core.plugins import DaskTransformPlugin
 
+VERSION="0.0.1"
 
 class GroupByPlugin(DaskTransformPlugin):
     """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
@@ -16,6 +17,7 @@ class GroupByPlugin(DaskTransformPlugin):
     name = "Group By"
     title = "Groups records by a column"
     description = "XXX"
+    version = VERSION
 
     parameters = {
         "column": ChoiceParam("Group By", "Index", choices=[]),

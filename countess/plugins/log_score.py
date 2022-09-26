@@ -6,6 +6,7 @@ import numpy as np
 
 from countess.core.plugins import DaskScoringPlugin
 
+VERSION = "0.0.1"
 
 class LogScorePlugin(DaskScoringPlugin):
     """Load counts from a FASTQ file, by first building a dask dataframe of raw sequences
@@ -15,6 +16,7 @@ class LogScorePlugin(DaskScoringPlugin):
     name = "Log Scorer"
     title = "Log Scores from Counts"
     description = "calculates log score from counts"
+    version = VERSION
 
     def score(self, col1, col0):
         return np.log(col1 / col0)

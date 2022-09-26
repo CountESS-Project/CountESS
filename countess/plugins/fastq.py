@@ -11,6 +11,7 @@ from more_itertools import ichunked
 from countess.core.parameters import BooleanParam, FloatParam, StringParam
 from countess.core.plugins import DaskInputPlugin
 
+VERSION="0.0.1"
 
 class LoadFastqPlugin(DaskInputPlugin):
     """Load counts from a FASTQ file, by first building a dask dataframe of raw sequences
@@ -20,6 +21,7 @@ class LoadFastqPlugin(DaskInputPlugin):
     name = "FASTQ Load"
     title = "Load from FastQ"
     description = "Loads counts from FASTQ files containing either variant or barcodes"
+    version = VERSION
 
     file_types = [("FASTQ", "*.fastq"), ("FASTQ (gzipped)", "*.fastq.gz")]
     parameters = {
@@ -43,8 +45,8 @@ class LoadFastqPlugin(DaskInputPlugin):
         )
 
     def combine_dfs(self, dfs):
-        ddf = dd.concat(dfs)
-        if self.parameters["group"].value:
+        ddf = super().combine_dfs(dfs)
+        if len(ddf) > 0 and self.parameters["group"].value:
             ddf = ddf.groupby("sequence").sum()
         return ddf
 

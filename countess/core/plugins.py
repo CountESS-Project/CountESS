@@ -3,6 +3,7 @@ from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from importlib.metadata import entry_points
 from itertools import islice
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Type
+import re
 
 import dask.dataframe as dd
 import numpy as np
@@ -21,10 +22,10 @@ from countess.core.parameters import (
 
 """
 Plugin lifecycle:
-* Selector of plugins calls cls.can_follow(previous_class_or_instance)
-  which returns True if a plugin of this class can follow that one
-  (or None if this is the first plugin).  This lets the interface present
-  a list of plausible plugins you might want to use in the pipeline.
+* Selector of plugins calls cls.can_follow(previous_class_or_instance_or_none)
+  with either a preceding plugin class or instance (or none if this is the first plugin)
+  which returns True if a plugin of this class can follow that one (or come first)
+  This lets the interface present a list of plausible plugins you might want to use in the pipeline.
 * When plugin is selected, it gets __init__ed.
 * plugin.parameters gets read to get the name of configuration fields.
 * For a Dask plugin, plugin.get_columns() may get called
@@ -63,7 +64,11 @@ class BasePlugin:
     name: str = ""
     title: str = ""
     description: str = ""
+    version: str = "0.0.0"
+
     parameters: MutableMapping[str, BaseParam] = {}
+
+    prerun_cache: Any=None
 
     @classmethod
     def can_follow(cls, plugin: Optional[Type["BasePlugin"]] | Optional["BasePlugin"]):
@@ -91,15 +96,19 @@ class BasePlugin:
         obj: Any,
         callback: Optional[Callable[[int, int, Optional[str]], None]] = None,
     ):
-        """Not every plugin is going to support progress callbacks, plugins
-        which do should override this method to call `callback` sporadically
-        with two numbers estimating a fraction of the work completed, and an
-        optional string describing what they're up to, eg:
+        """Plugins which support progress monitoring should override this method
+        to call `callback` sporadically with two numbers estimating a fraction of
+        the work completed, and an optional string describing what they're doing:
             callback(42, 107, 'Thinking hard about stuff')
-        the user interface code will display this in some way or another."""
+        The user interface code will then display this to the user while the 
+        pipeline is running."""
         raise NotImplementedError(f"{self.__class__}.run()")
 
     def prerun(self, obj: Any) -> Any:
+        """Plugins can detect their input using "prerun", which will be called with
+        a small number of rows while the plugins are being configured.  This lets each
+        plugin detect its input and offer specific configuration and/or throw exceptions
+        which will be displayed to the user"""
         return self.run(obj)
 
     def add_parameter(self, name: str, param: BaseParam):
@@ -170,6 +179,7 @@ def crop_dataframe(
     """Takes a dask dataframe `ddf` and returns a frame with at most `limit` rows"""
     if len(ddf) > row_limit:
         x, y = islice(ddf.index, 0, row_limit, row_limit - 1)
+        print(f"crop_dataframe {ddf} {len(ddf)} {x} {y}")
         ddf = ddf[x:y]
     return ddf
 
@@ -206,7 +216,8 @@ class DaskBasePlugin(BasePlugin):
             return self.run_dask(ddf)
 
     def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        return crop_dataframe(self.run_dask(crop_dataframe(ddf)))
+        self.prerun_cache = self.run_dask(crop_dataframe(ddf) if ddf is not None else None)
+        return self.prerun_cache
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
@@ -217,27 +228,39 @@ class DaskBasePlugin(BasePlugin):
 # progress feedback.
 
 
+def empty_dask_dataframe() -> dd.DataFrame:
+    """Returns an empty dask DataFrame for consistency"""
+    edf = dd.from_pandas(pd.DataFrame([]), npartitions=1)
+    assert isinstance(edf, dd.DataFrame)  # reassure mypy
+    return edf
+
+
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first.
     DaskInputPlugins don't care about existing columns because they're adding their own records anyway."""
 
     def load_files(self, row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
-        for fp in self.get_file_params():
-            df = self.read_file_to_dataframe(fp, row_limit)
+        fps = list(self.get_file_params())
+        if not fps: return
+
+        per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
+        for fp in fps:
+            df = self.read_file_to_dataframe(fp, per_file_row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
             yield df
 
     def combine_dfs(self, dfs: list[dd.DataFrame]) -> dd.DataFrame:
-        if len(dfs) > 0:
-            # XXX what actually is the logical operation here a) between files in one load
-            # and b) between existing dataframe and the new ones.
-            return dd.concat(dfs)
+        """Consistently handles cases for zero and one input dataframe"""
+        # XXX what actually is the logical operation here a) between files in one load
+        # and b) between existing dataframe and the new ones.
+
+        if len(dfs) == 0:
+            return empty_dask_dataframe()
+        elif len(dfs) == 1:
+            return dfs[0].copy()
         else:
-            # completely empty dataframe!
-            empty_ddf = dd.from_pandas(pd.DataFrame.from_records([]), npartitions=1)
-            assert isinstance(empty_ddf, dd.DataFrame)
-            return empty_ddf
+            return dd.concat(dfs)
 
     def run(
         self,
@@ -258,14 +281,18 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         if callback:
             callback(num_files, num_files)
 
-        return self.combine_dfs(dfs)
+        if len(dfs) == 0:
+            return empty_dask_dataframe()
+        else:
+            return self.combine_dfs(dfs)
 
     def prerun(self, ddf: Optional[dd.DataFrame]) -> dd.DataFrame:
 
         dfs: list[dd.DataFrame] = [] if ddf is None else [ddf]
         for df in self.load_files(row_limit=PRERUN_ROW_LIMIT):
             dfs.append(df)
-        return crop_dataframe(self.combine_dfs(dfs))
+        self.prerun_cache = crop_dataframe(self.combine_dfs(dfs))
+        return self.prerun_cache
 
     def read_file_to_dataframe(
         self, file_params: Mapping[str, BaseParam], row_limit: Optional[int] = None
@@ -320,10 +347,10 @@ class DaskScoringPlugin(DaskTransformPlugin):
 
         for scol, param in self.parameters.items():
             if isinstance(param, ChoiceParam) and param.value != "NONE":
-                ccol = "count_" + scol[6:]
+                ccol = "count" + scol[5:]
                 ddf[scol] = self.score(ddf[ccol], ddf[param.value])
 
-        score_cols = [c for c in ddf.columns if c.startswith("score_")]
+        score_cols = [c for c in ddf.columns if c.startswith("score")]
         return ddf.replace([np.inf, -np.inf], np.nan).dropna(
             how="all", subset=score_cols
         )

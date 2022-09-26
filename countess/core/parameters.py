@@ -1,12 +1,13 @@
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Any
 
 
 class BaseParam:
 
     label: str = ""
+    value: Any=None
 
     def copy(self, suffix: str = ""):
-        return BaseParam()
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.copy()")
 
 
 class SimpleParam(BaseParam):
@@ -67,6 +68,9 @@ class ChoiceParam(BaseParam):
     def set_value(self, value):
         assert value is None or value in self.choices
         self.value = value
+
+    def copy(self, suffix: str = ""):
+        return ChoiceParam(self.label + suffix, self.value, self.choices)
 
 
 # XXX not in use yet

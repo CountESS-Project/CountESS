@@ -2,7 +2,7 @@ import logging
 import importlib
 
 from importlib.metadata import entry_points
-from typing import Type, Mapping, Iterable, Tuple
+from typing import Type, Mapping, Iterable, Tuple, Optional
 from functools import partial
 from countess.core.plugins import BasePlugin
 
@@ -22,7 +22,8 @@ class Pipeline:
             else:
                 logging.warning(f"{plugin_class} is not a valid CountESS plugin")
 
-    def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]):
+    def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]) -> BasePlugin:
+        """Loads plugin config from a `plugin_name` and a `config` dictionary"""
         module_name, class_name = plugin_name.split(":")
         plugin_class = getattr(importlib.import_module(module_name), class_name)
         assert issubclass(plugin_class, BasePlugin)
@@ -37,10 +38,13 @@ class Pipeline:
             else:
                 plugin.parameters[k].set_value(v)
 
+        return plugin
+
     def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
+        """Writes plugin configs as a series of names and dictionaries"""
         for plugin in self.plugins:
-            config = dict(((k, p.value) for k, p in plugin.parameters))
-            yield f"{plugin.__module__}:{plugin.__name__}", config
+            config = dict(((k, p.value) for k, p in plugin.parameters.items()))
+            yield f"{plugin.__class__.__module__}:{plugin.__class__.__name__}", config
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
         """Adds a plugin at `position`, if that's possible.
@@ -104,10 +108,11 @@ class Pipeline:
         """Updates the plugin at `position` and then all the subsequent plugins,
         to allow changes to carry through the pipeline"""
         assert 0 <= position < len(self.plugins)
+        
         for plugin in self.plugins[position:]:
             plugin.update()
 
-    def choose_plugin_classes(self, position: int):
+    def choose_plugin_classes(self, position: Optional[int]=None):
         if position is None:
             position = len(self.plugins)
 
@@ -125,6 +130,13 @@ class Pipeline:
                 ):
                     yield plugin_class
 
+    def prerun(self, position: int=0):
+        assert 0 <= position < len(self.plugins)
+        print(f"PIPELINE {self} PRERUN {position}")
+        obj = self.plugins[position-1].prerun_cache if position > 0 else None
+        for plugin in self.plugins[position:]:
+            obj = plugin.prerun(obj)
+        
     def run(self, progress_callback):
         obj = None
         for num, plugin in enumerate(self.plugins):
