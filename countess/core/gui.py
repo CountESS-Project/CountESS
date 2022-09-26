@@ -28,7 +28,7 @@ from .parameters import (
     StringParam,
 )
 from .pipeline import Pipeline
-from .plugins import BasePlugin, FileInputMixin
+from .plugins import BasePlugin, FileInputMixin, crop_dataframe
 
 
 class CancelButton(tk.Button):
@@ -157,22 +157,23 @@ class PluginConfigurator:
         self.change_callback = change_callback
 
         self.frame = ttk.Frame(tk_parent)
+        self.frame.columnconfigure(0, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
         self.wrapper_cache = {}
 
-        tk.Label(self.frame, text=plugin.description).grid(
-            row=0, columnspan=3, sticky=tk.EW
-        )
+        tk.Label(self.frame, text=plugin.description).grid(row=0, sticky=tk.EW)
 
-        self.frame.columnconfigure(0, weight=1)
-        self.frame.columnconfigure(1, weight=2)
-        self.frame.columnconfigure(2, weight=0)
+        self.subframe = ttk.Frame(self.frame)
+        self.subframe.columnconfigure(0, weight=1)
+        self.subframe.columnconfigure(1, weight=2)
+        self.subframe.columnconfigure(2, weight=0)
+        self.subframe.grid(row=1, sticky=tk.NSEW)
 
         if isinstance(self.plugin, FileInputMixin):
-            self.add_file_button = tk.Button(
+            tk.Button(
                 self.frame, text="+ Add File", command=self.add_file
-            )
+            ).grid(row=2)
 
         self.update()
 
@@ -201,7 +202,7 @@ class PluginConfigurator:
                 self.wrapper_cache[key].update()
             else:
                 self.wrapper_cache[key] = ParameterWrapper(
-                    self.frame, parameter, self.change_parameter
+                    self.subframe, parameter, self.change_parameter
                 )
 
             self.wrapper_cache[key].set_row(n + 1)
@@ -212,19 +213,16 @@ class PluginConfigurator:
                 wrapper.destroy()
                 del self.wrapper_cache[key]
 
-        if isinstance(self.plugin, FileInputMixin):
-            self.add_file_button.grid(row=len(self.plugin.parameters) + 1, column=0)
-
         if self.change_callback:
             self.change_callback(self)
 
         if isinstance(self.plugin.prerun_cache, dd.DataFrame):
             if self.preview:
-                print("updating preview")
                 self.preview.update(self.plugin.prerun_cache)
             else:
                 self.preview = DataFramePreview(self.frame, self.plugin.prerun_cache)
-            self.preview.frame.grid(row=len(self.plugin.parameters) + 2, columnspan=3)
+            self.preview.frame.grid(row=3)
+            self.frame.rowconfigure(3, weight=1)
 
 
 
@@ -264,7 +262,7 @@ class PipelineManager:
         self.notebook.grid(row=1, sticky=tk.NSEW)
         self.run_button.grid(row=2, sticky=tk.EW)
         self.frame.columnconfigure(0, weight=1)
-        self.frame.rowconfigure(0, weight=1)
+        self.frame.rowconfigure(1, weight=1)
 
     def clear(self):
         for position in range(0, len(self.configurators)):
@@ -302,9 +300,7 @@ class PipelineManager:
         """Triggered whenever `plugin` has a change of parameters"""
         try:
             position = self.configurators.index(plugin_configurator)
-            print(f"WOOT {position} {plugin_configurator}")
         except ValueError:
-            print(f"WOOT {plugin_configurator} NOT FOUND")
             return
 
         self.pipeline.update_plugin(position)
@@ -431,16 +427,13 @@ class DataFramePreview:
 
     def __init__(self, tk_parent, ddf: dd.DataFrame):
         self.frame = ttk.Frame(tk_parent)
-        self.offset = 0
-        self.height = 20
-
         self.label = ttk.Label(self.frame, text="DataFrame Preview")
+        self.treeview = ttk.Treeview(self.frame, selectmode=tk.NONE)
 
-        self.treeview = ttk.Treeview(self.frame, height=self.height, selectmode=tk.NONE)
-
-        self.scrollbar_x = ttk.Scrollbar(self.frame, orient=tk.HORIZONTAL)
-        self.scrollbar_x.configure(command=self.treeview.xview)
+        self.scrollbar_x = ttk.Scrollbar(self.frame, orient=tk.HORIZONTAL, command=self.treeview.xview)
+        self.scrollbar_y = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.treeview.yview)
         self.treeview.configure(xscrollcommand=self.scrollbar_x.set)
+        self.treeview.configure(yscrollcommand=self.scrollbar_y.set)
 
         self.frame.grid(sticky=tk.NSEW)
 
@@ -449,106 +442,37 @@ class DataFramePreview:
         self.label.grid(row=0, columnspan=2)
         self.treeview.grid(row=1, column=0, sticky=tk.NSEW)
         self.scrollbar_x.grid(row=2, column=0, sticky=tk.EW)
-
-        self.scrollbar_y = ttk.Scrollbar(
-            self.frame, orient=tk.VERTICAL, command=self.scroll_command
-        )
-        self.treeview.bind("<MouseWheel>", self.scroll_event)
-        self.treeview.bind("<Button-4>", self.scroll_event)
-        self.treeview.bind("<Button-5>", self.scroll_event)
-        self.scrollbar_y.grid(row=1, column=1, sticky=tk.NS)
+        self.scrollbar_y.grid(row=1, column=1, stick=tk.NS)
 
         self.update(ddf)
 
     def update(self, ddf: dd.DataFrame):
-        self.ddf = ddf.compute()
-        self.index_length = len(ddf.index)
-        
-        self.index_skip_list_stride = 10000 if self.index_length > 1000000 else 1000
-        self.index_skip_list = list(
-            islice(ddf.index, 0, None, self.index_skip_list_stride)
-        ) if self.index_length else []
-        self.get_index_from_offset.cache_clear()
+
+        if len(ddf) > 1000:
+            self.label['text'] = f"DataFrame Preview (1000 rows out of {len(ddf)}"
+            ddf = crop_dataframe(ddf, 1000)
+        else:
+            self.label['text'] = f"DataFrame Preview {len(ddf)} rows"
 
         # XXX could handle multiindex columns more elegantly than this
         # (but maybe not in a ttk.Treeview)
         column_names = [".".join(c) if type(c) is tuple else c for c in ddf.columns]
+        column_types = [ dt.kind for dt in ddf.dtypes ]
 
         self.treeview["columns"] = column_names
+
         for n, cn in enumerate(column_names):
             self.treeview.heading(n, text=cn)
-            self.treeview.column(n, width=50)
 
-        self.set_offset(0)
+        for n, ct in enumerate(column_types):
+            self.treeview.column(n, anchor = tk.E if ct in ('i', 'f') else tk.W)
 
-    def scroll_event(self, event):
-        """Called when mousewheeling on the treeview"""
-        if event.num == 4 or event.delta == -120:
-            self.set_offset(self.offset - self.height // 2)
-        elif event.num == 5 or event.delta == +120:
-            self.set_offset(self.offset + self.height // 2)
+        for row in self.treeview.get_children():
+            self.treeview.delete(row)
 
-    def scroll_command(self, action: str, number_str: str, unit=None):
-        """Called when scrolling the vertical scrollbar"""
-        # https://tkdocs.com/shipman/scrollbar-callback.html
-        number = float(number_str)
-        if action == tk.MOVETO:
-            # the useful range is 0..1 but you can scroll beyond that.
-            x = max(0, min(1, number))
-            self.set_offset(int((self.index_length - self.height) * x))
-        elif action == tk.SCROLL:
-            scale = self.height if unit == tk.PAGES else 1
-            self.set_offset(self.offset + int(number * scale))
-
-    @lru_cache(maxsize=2000)
-    def get_index_from_offset(self, offset: int):
-        """this doesn't seem like it'd do much, but actually the scrollbar returns a limited number
-        of discrete floating point values (one per pixel height of scrollbar) and page up / page
-        down have fixed offsets too so while it's not easy to predict it can be memoized"""
-        # This could be made a lot more sophisticated but it works.
-        # The "skip list" is used to fast-forward to a more helpful place in the index before we start
-        # iterating through records one at a time. It is a horrible work-around for the lack of a useful
-        # ddf.iloc[n:m] but it seems to work. This function just returns the index value to keep
-        # the lru cache small, the caller can then use `islice(ddf.loc[index:], 0, n)`
-        # to efficiently fetch `n` records starting at `index`.
-
-        stride = self.index_skip_list_stride
-        base_index = self.index_skip_list[offset // stride]
-        return next(
-            islice(
-                self.ddf.loc[base_index:].index, offset % stride, offset % stride + 1
-            )
-        )
-    
-    def get_tuples(self, offset: int, length: int) -> Iterable[tuple]:
-        """Gets rows from `offset` to `offset+length-1`, using `self.get_index_from_offset`
-        to cache and speed up retrieval from the index."""
-        index = self.get_index_from_offset(offset)
-        return islice(self.ddf.loc[index:].itertuples(), 0, length)
-
-    def set_offset(self, offset: int):
-        if len(self.ddf) == 0:
-            self.label["text"] = "Empty dataset"
-            return
-
-        offset = max(0, min(self.index_length - self.height, offset))
-        value_tuples = self.get_tuples(offset, self.height)
-        for n, (index, *values) in enumerate(value_tuples):
-            row_id = str(n)
-            if self.treeview.exists(row_id):
-                self.treeview.delete(row_id)
-            # XXX display NaNs more nicely
-            self.treeview.insert("", "end", iid=row_id, text=index, values=values)
-        self.offset = offset
-
-        if self.index_length > self.height:
-            self.scrollbar_y.set(
-                offset / self.index_length, (offset + self.height) / self.index_length
-            )
-            label = f"Rows {self.offset} - {self.offset+self.height} / {self.index_length}"
-            self.label["text"] = label
-
-
+        for n, (index, *values) in enumerate(ddf.itertuples()):
+            self.treeview.insert("", n, text=index, values=values)
+        
 def main():
     root = ttkthemes.ThemedTk()
     root.title("CountESS")
