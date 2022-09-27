@@ -1,5 +1,5 @@
 import dask.dataframe as dd
-import pandas as pd
+import pandas as pd  # type: ignore
 from itertools import islice
 
 """Utility functions for manipulating Dask DataFrames"""

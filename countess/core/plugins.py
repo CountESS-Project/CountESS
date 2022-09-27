@@ -19,16 +19,19 @@ from countess.core.parameters import (
     IntegerParam,
     StringParam,
 )
+from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes
 
 """
 Plugin lifecycle:
 * Selector of plugins calls cls.can_follow(previous_class_or_instance_or_none)
-  with either a preceding plugin class or instance (or none if this is the first plugin)
+  with either a preceding plugin class or instance (or None if this is the first plugin)
   which returns True if a plugin of this class can follow that one (or come first)
   This lets the interface present a list of plausible plugins you might want to use in the pipeline.
 * When plugin is selected, it gets __init__ed.
+* The plugin then gets .prerun() with a cut-down input.
+  * .prerun() gets run again any time a preceding plugin changes
+  * .prerun() can alter .parameters or throw exceptions, etc.
 * plugin.parameters gets read to get the name of configuration fields.
-* For a Dask plugin, plugin.get_columns() may get called
 
 
 """
@@ -73,8 +76,7 @@ class BasePlugin:
     @classmethod
     def can_follow(cls, plugin: Optional[Type["BasePlugin"]] | Optional["BasePlugin"]):
         """returns True if this plugin/plugin class can follow the plugin/plugin class
-        `plugin` ... the class hierarchy enforces what methods must be present, eg:
-        `DaskBasePlugin` has `output_columns` which identifies what will be passed."""
+        `plugin` ... eg: can the .run() method accept the right kind of object."""
         return plugin is not None and (
             isinstance(plugin, BasePlugin)
             or (type(plugin) is type and issubclass(plugin, BasePlugin))
@@ -84,9 +86,6 @@ class BasePlugin:
         # Parameters store the actual values they are set to, so we copy them so that
         # if the same plugin is used twice in a pipeline it will have its own parameters.
         self.parameters = dict(((k, v.copy()) for k, v in self.parameters.items()))
-
-    def set_previous_plugin(self, previous_plugin: Optional["BasePlugin"]):
-        self.previous_plugin = previous_plugin
 
     def update(self):
         pass
@@ -190,22 +189,22 @@ class DaskBasePlugin(BasePlugin):
             or (type(plugin) is type and issubclass(plugin, DaskBasePlugin))
         )
 
-    def output_columns(self) -> Iterable[str]:
-        return []
-
     def run(
         self,
         ddf: dd.DataFrame,
         callback: Optional[Callable[[int, int, Optional[str]], None]] = None,
     ):
         if not callback:
-            return self.run_dask(ddf)
+            return self.run_dask(ddf.copy())
 
         with DaskProgressCallback(callback):
-            return self.run_dask(ddf)
+            return self.run_dask(ddf.copy())
 
     def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        self.prerun_cache = self.run_dask(crop_dask_dataframe(ddf, PRERUN_ROW_LIMIT) if ddf is not None else None)
+        self.prerun_cache = crop_dask_dataframe(
+                self.run_dask(ddf.copy()),
+                PRERUN_ROW_LIMIT
+        )
         return self.prerun_cache
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
@@ -218,8 +217,7 @@ class DaskBasePlugin(BasePlugin):
 
 
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
-    """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first.
-    DaskInputPlugins don't care about existing columns because they're adding their own records anyway."""
+    """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first."""
 
     def load_files(self, row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
         fps = list(self.get_file_params())
@@ -227,6 +225,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
         per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
         for fp in fps:
+            print(f"{self.__class__.__name__} load_files {fp['filename'].value}")
             df = self.read_file_to_dataframe(fp, per_file_row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
@@ -236,8 +235,9 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         """Consistently handles cases for zero and one input dataframe"""
         # XXX what actually is the logical operation here a) between files in one load
         # and b) between existing dataframe and the new ones.
+        # Merge or concat?
 
-        return combine_dask_dataframes(dfs)
+        return concat_dask_dataframes(dfs)
 
     def run(
         self,
@@ -250,11 +250,11 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         dfs = [] if ddf is None else [ddf]
         num_files = len(list(self.get_file_params()))
         if callback:
-            callback(0, num_files + 1, "Loading")
+            callback(0, num_files, "Loading")
         for num, df in enumerate(self.load_files()):
-            if callback:
-                callback(num, num_files, "Loading")
             dfs.append(df)
+            if callback:
+                callback(num+1, num_files, "Loading")
         if callback:
             callback(num_files, num_files)
 
@@ -279,52 +279,46 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 class DaskTransformPlugin(DaskBasePlugin):
     """a Transform plugin takes columns from the input data frame."""
 
-    _output_columns: Iterable[str] = []
+    input_columns: list[str] = []
 
-    def output_columns(self):
-        return self._output_columns
+    def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        self.input_columns = sorted(ddf.columns)
+        print(f"{self.__class__.__name__} prerun {self.input_columns}")
+        return super().prerun(ddf)
 
 
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of transform which turns counts into scores"""
 
     def update(self):
-        input_columns = sorted(
-            (c for c in self.previous_plugin.output_columns() if c.startswith("count"))
-        )
-
         # XXX Allow to set names of score columns?  The whole [5:] thing is clumsy
         # and horrible but doing this properly maybe needs ArrayParams
 
-        for col in input_columns:
+        for col in self.input_columns:
             scol = "score" + col[5:]
             if scol not in self.parameters:
                 self.parameters[scol] = ChoiceParam(
                     f"{scol} compares {col} and ...", "NONE", ["NONE"]
                 )
             self.parameters[scol].choices = ["NONE"] + [
-                x for x in input_columns if x != col
+                x for x in self.input_columns if x != col
             ]
 
         scols = [k for k in self.parameters.keys() if k.startswith("score")]
         for scol in scols:
             col = "count" + scol[5:]
-            if col not in input_columns:
+            if col not in self.input_columns:
                 del self.parameters[scol]
 
-    def output_columns(self):
-        return list(self._output_columns) + [
-            k for k, v in self.parameters.items() if v.value != "NONE"
-        ]
-
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-
+        print(f"{self} run_dask {ddf.columns} {len(ddf)}")
         for scol, param in self.parameters.items():
             if isinstance(param, ChoiceParam) and param.value != "NONE":
                 ccol = "count" + scol[5:]
                 ddf[scol] = self.score(ddf[ccol], ddf[param.value])
 
         score_cols = [c for c in ddf.columns if c.startswith("score")]
+        print(f"{score_cols} {ddf.columns} {len(ddf)}")
         return ddf.replace([np.inf, -np.inf], np.nan).dropna(
             how="all", subset=score_cols
         )
@@ -333,4 +327,34 @@ class DaskScoringPlugin(DaskTransformPlugin):
         return NotImplementedError(
             "Subclass DaskScoringPlugin and provide a score() method"
         )
+
+class DaskTranslationPlugin(DaskTransformPlugin):
+
+    translate_type = str
+
+    parameters = {
+        "input": ChoiceParam("Input Column", "", choices=[""]),
+        "output": StringParam("Output Column", ""),
+    }
+
+    def update(self):
+        self.parameters["input"].choices = [""] + self.input_columns
+
+    def translate(self, value):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.translate")
+
+    def translate_row(self, row, input_column):
+        return self.translate(row[input_column] if input_column else row.name)
+
+    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        input_column = self.parameters["input"].value
+        output_column = self.parameters["output"].value or '__translate'
+
+        ddf[output_column] = ddf.apply(self.translate_row, axis=1, args=(input_column,), meta=pd.Series(self.translate_type()))
+
+        if output_column == '__translate':
+            ddf = ddf.groupby('__translate').sum()
+
+        return ddf
+
 

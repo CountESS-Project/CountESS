@@ -2,7 +2,7 @@ import logging
 import importlib
 
 from importlib.metadata import entry_points
-from typing import Type, Mapping, Iterable, Tuple, Optional
+from typing import Type, Mapping, Iterable, Tuple, Optional, Any
 from functools import partial
 from countess.core.plugins import BasePlugin
 
@@ -22,6 +22,17 @@ class Pipeline:
             else:
                 logging.warning(f"{plugin_class} is not a valid CountESS plugin")
 
+    def set_plugin_config(self, position: Optional[int], config: Mapping[str,bool|int|float|str]):
+        plugin = self.plugins[-1] if position is None else self.plugins[position]
+
+        for k, v in config.items():
+            print(f"{self.__class__.__name__} set_plugin_config {k} {v}")
+            # XXX cheesy but this way of handling files will be replaced soon
+            if k.startswith("file.") and k.endswith(".filename"):
+                plugin.add_file(v)
+            elif k in plugin.parameters:
+                plugin.parameters[k].set_value(v)
+
     def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]) -> BasePlugin:
         """Loads plugin config from a `plugin_name` and a `config` dictionary"""
         module_name, class_name = plugin_name.split(":")
@@ -29,14 +40,18 @@ class Pipeline:
         assert issubclass(plugin_class, BasePlugin)
 
         plugin = plugin_class()
-        self.add_plugin(plugin)
+        previous_plugin = self.plugins[-1] if self.plugins else None
+        previous_prerun = self.plugins[-1].prerun_cache if self.plugins else None
 
-        for k, v in config.items():
-            # XXX cheesy but this way of handling files will be replaced soon
-            if k.startswith("file.") and k.endswith(".filename"):
-                plugin.add_file(v)
-            else:
-                plugin.parameters[k].set_value(v)
+        self.add_plugin(plugin)
+        self.set_plugin_config(None, config)
+
+        plugin.prerun(previous_prerun)
+        plugin.update()
+        self.set_plugin_config(None, config)
+
+        prerun_value = plugin.prerun(previous_prerun)
+        plugin.update()
 
         return plugin
 
@@ -69,11 +84,7 @@ class Pipeline:
 
         self.plugins.insert(position, plugin)
 
-        if previous_plugin:
-            plugin.set_previous_plugin(previous_plugin)
-            plugin.update()
-        if next_plugin:
-            next_plugin.set_previous_plugin(plugin)
+        plugin.update()
 
     def del_plugin(self, position: int):
         """Deletes the plugin at `position` if that's possible.
@@ -94,7 +105,6 @@ class Pipeline:
         self.plugins.pop(position)
 
         if next_plugin:
-            next_plugin.set_previous_plugin(previous_plugin)
             next_plugin.update()
 
     def move_plugin(self, position: int, new_position: int):
@@ -132,7 +142,6 @@ class Pipeline:
 
     def prerun(self, position: int=0):
         assert 0 <= position < len(self.plugins)
-        print(f"PIPELINE {self} PRERUN {position}")
         obj = self.plugins[position-1].prerun_cache if position > 0 else None
         for plugin in self.plugins[position:]:
             obj = plugin.prerun(obj)

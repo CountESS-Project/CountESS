@@ -10,7 +10,7 @@ from itertools import islice
 from threading import Thread
 from tkinter import filedialog
 from tkinter.scrolledtext import ScrolledText
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Mapping
 
 import dask.dataframe as dd
 import ttkthemes  # type:ignore
@@ -161,7 +161,7 @@ class PluginConfigurator:
         self.frame.columnconfigure(0, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
-        self.wrapper_cache = {}
+        self.wrapper_cache: Mapping[str,ParameterWrapper] = {}
 
         tk.Label(self.frame, text=plugin.description).grid(row=0, sticky=tk.EW)
 
@@ -218,12 +218,13 @@ class PluginConfigurator:
             self.change_callback(self)
 
         if isinstance(self.plugin.prerun_cache, dd.DataFrame):
+            ddf = self.plugin.prerun_cache
             if self.preview:
-                self.preview.update(self.plugin.prerun_cache)
+                self.preview.update(ddf)
             else:
-                self.preview = DataFramePreview(self.frame, self.plugin.prerun_cache)
-            self.preview.frame.grid(row=3)
-            self.frame.rowconfigure(3, weight=1)
+                self.preview = DataFramePreview(self.frame, ddf)
+                self.preview.frame.grid(row=3)
+                self.frame.rowconfigure(3, weight=1)
 
 
 
