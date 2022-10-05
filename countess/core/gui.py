@@ -18,12 +18,14 @@ import re
 import configparser
 
 from .parameters import (
+    ArrayParam,
     BaseParam,
     BooleanParam,
     ChoiceParam,
     FileParam,
     FloatParam,
     IntegerParam,
+    MultiParam,
     SimpleParam,
     StringParam,
 )
@@ -81,6 +83,9 @@ class LabeledProgressbar(ttk.Progressbar):
 
 class ParameterWrapper:
     def __init__(self, tk_parent, parameter, callback=None):
+
+        print(f"{self}.__init__({tk_parent}, {parameter}, {callback}")
+
         self.parameter = parameter
         self.callback = callback
         self.button = None
@@ -94,12 +99,13 @@ class ParameterWrapper:
         elif isinstance(parameter, StringParam) or isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
         else:
-            raise NotImplementedError(f"Unknown parameter type {parameter}")
+            self.var = None
 
-        self.var.trace("w", self.value_changed_callback)
+        if self.var: 
+            self.var.trace("w", self.value_changed_callback)
 
         self.label = ttk.Label(tk_parent, text=parameter.label)
-
+            
         if isinstance(parameter, ChoiceParam):
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices
@@ -114,14 +120,31 @@ class ParameterWrapper:
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
                 self.entry.state(['readonly'])
+        elif isinstance(parameter, ArrayParam):
+            self.entry = ttk.Frame(tk_parent)
+            self.subparams = []
+            for n, p in enumerate(parameter.params):
+                subparam = ParameterWrapper(self.entry, p, callback)
+                self.subparams.append(subparam)
+                subparam.set_row(n)
+            self.button = ttk.Button(tk_parent, text="+", command=self.add_row_callback)
+        elif isinstance(parameter, MultiParam):
+            self.entry = ttk.Frame(tk_parent)
+            self.subparams = []
+            for n, p in enumerate(parameter.params.values()):
+                subparam = ParameterWrapper(self.entry, p, callback)
+                self.subparams.append(subparam)
+                subparam.set_row(n)
         else:
             raise NotImplementedError(f"Unknown parameter type {parameter}")
-
 
         self.entry.grid(sticky=tk.EW)
 
     def update(self):
-        if isinstance(self.parameter, ChoiceParam):
+        if isinstance(self.parameter, (ArrayParam, MultiParam)):
+            for sp in self.subparams:
+                sp.update()
+        elif isinstance(self.parameter, ChoiceParam):
             self.entry["values"] = self.parameter.choices
 
     def set_row(self, row):
@@ -136,6 +159,12 @@ class ParameterWrapper:
         self.parameter.value = ""
         if self.callback is not None:
             self.callback(self.parameter)
+
+    def add_row_callback(self, *_):
+        self.parameter.add_row()
+        subparam = ParameterWrapper(self.entry, self.parameter.params[-1], self.callback)
+        subparam.set_row(len(self.subparams))
+        self.subparams.append(subparam)
 
     def value_changed_callback(self, *_):
         self.parameter.value = self.var.get()
@@ -467,7 +496,8 @@ class DataFramePreview:
             self.treeview.heading(n, text=cn)
 
         for n, ct in enumerate(column_types):
-            self.treeview.column(n, anchor = tk.E if ct in ('i', 'f') else tk.W)
+            # XXX it'd be nicer if we could do "real" decimal point alignment
+            self.treeview.column(n, anchor = tk.E if ct in ('i', 'f') else tk.W, width=1)
 
         for row in self.treeview.get_children():
             self.treeview.delete(row)

@@ -50,6 +50,19 @@ class StringParam(SimpleParam):
     value: str = ""
 
 
+class StringCharacterSetParam(StringParam):
+
+    character_set: set[str] = set()
+
+    def __init__(self, label: str, value=None, read_only: bool=False, character_set: Optional[set[str]]=None):
+        super().__init__(label, value, read_only)
+        if character_set is not None:
+            self.character_set = character_set
+
+    def set_value(self, value):
+        self.value = ''.join([c for c in value if c in self.character_set])
+
+
 class FileParam(StringParam):
     read_only = True
 
@@ -86,7 +99,7 @@ class ArrayParam(BaseParam):
         self.params = [param.copy(f" {n+1}") for n in range(0, size)]
 
     def add_row(self):
-        self = len(self.params)
+        n = len(self.params)
         self.params.append(self.param.copy(f" {n+1}"))
 
     def del_row(self, position: int):
@@ -94,7 +107,7 @@ class ArrayParam(BaseParam):
         for n, param in enumerate(self.params):
             param.label = self.param.label + f" {n+1}"
 
-    def copy(self, suffix: str = ""):
+    def copy(self, suffix: str = "") -> 'ArrayParam':
         return ArrayParam(self.label + suffix, self.param, len(self.params))
 
 
@@ -106,6 +119,7 @@ class MultiParam(BaseParam):
         self.label = label
         self.params = params
 
-    def copy(self, suffix: str = ""):
+    def copy(self, suffix: str = "") -> 'MultiParam':
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
-        mp = MultiParam(self.label + suffix, pp)
+        return MultiParam(self.label + suffix, pp)
+

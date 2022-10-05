@@ -11,12 +11,14 @@ import pandas as pd  # type: ignore
 from dask.callbacks import Callback
 
 from countess.core.parameters import (
+    ArrayParam,
     BaseParam,
     BooleanParam,
     ChoiceParam,
     FileParam,
     FloatParam,
     IntegerParam,
+    MultiParam,
     StringParam,
 )
 from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes
@@ -290,25 +292,38 @@ class DaskTransformPlugin(DaskBasePlugin):
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of transform which turns counts into scores"""
 
+    parameters = {
+        'score': ArrayParam('Scores', MultiParam('Score', {
+            'score': StringParam("Score Column"),
+            'after': ChoiceParam("After Column"),
+            'before': ChoiceParam("Before Column"),
+        }))
+    }
+
     def update(self):
+
+        for p in self.parameters['score'].params:
+            for pp in p.params.values():
+                pp.choices = self.input_columns
+
         # XXX Allow to set names of score columns?  The whole [5:] thing is clumsy
         # and horrible but doing this properly maybe needs ArrayParams
 
-        for col in self.input_columns:
-            scol = "score" + col[5:]
-            if scol not in self.parameters:
-                self.parameters[scol] = ChoiceParam(
-                    f"{scol} compares {col} and ...", "NONE", ["NONE"]
-                )
-            self.parameters[scol].choices = ["NONE"] + [
-                x for x in self.input_columns if x != col
-            ]
-
-        scols = [k for k in self.parameters.keys() if k.startswith("score")]
-        for scol in scols:
-            col = "count" + scol[5:]
-            if col not in self.input_columns:
-                del self.parameters[scol]
+        #for col in self.input_columns:
+        #    scol = "score" + col[5:]
+        #    if scol not in self.parameters:
+        #        self.parameters[scol] = ChoiceParam(
+        #            f"{scol} compares {col} and ...", "NONE", ["NONE"]
+        #        )
+        #    self.parameters[scol].choices = ["NONE"] + [
+        #        x for x in self.input_columns if x != col
+        #    ]
+#
+#        scols = [k for k in self.parameters.keys() if k.startswith("score")]
+#        for scol in scols:
+#            col = "count" + scol[5:]
+#            if col not in self.input_columns:
+#                del self.parameters[scol]
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         print(f"{self} run_dask {ddf.columns} {len(ddf)}")
