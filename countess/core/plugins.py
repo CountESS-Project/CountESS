@@ -128,6 +128,8 @@ class FileInputMixin:
     # used by the GUI file dialog
     file_types = [("Any", "*")]
 
+    parameters: MutableMapping[str, BaseParam] = {}
+
     file_params: MutableMapping[str, BaseParam] = {}
 
     @classmethod
@@ -136,42 +138,14 @@ class FileInputMixin:
         # mixin classes.
         return plugin is None or (not TYPE_CHECKING and super().can_follow(plugin))
 
-    def add_file(self, filename):
-        self.file_number += 1
-        self.add_parameter(
-            f"file.{self.file_number}.filename", FileParam("Filename", filename)
-        )
-        self.add_file_params(filename, self.file_number)
-
-    def add_file_params(self, filename, file_number):
-        return dict(
-            [
-                (key, self.add_parameter(f"file.{file_number}.{key}", param))
-                for key, param in self.file_params.items()
-            ]
-        )
-
-    def remove_file(self, filenumber):
-        for k in list(self.parameters.keys()):
-            if k.startswith(f"file.{filenumber}."):
-                del self.parameters[k]
-
-    def remove_file_by_parameter(self, parameter):
-        for k, v in list(self.parameters.items()):
-            if v == parameter:
-                if m := re.match(r"file\.(\d+)\.", k):
-                    self.remove_file(m.group(1))
+    def __init__(self):
+        super().__init__()
+        file_params = { 'filename': FileParam("Filename", file_types=self.file_types) }
+        file_params.update(self.file_params)
+        self.parameters['files'] = ArrayParam('Files', MultiParam('File', file_params))
 
     def get_file_params(self):
-        for n in range(1, self.file_number + 1):
-            if f"file.{n}.filename" in self.parameters:
-                yield dict(
-                    [("filename", self.parameters[f"file.{n}.filename"])]
-                    + [
-                        (key, self.parameters[f"file.{n}.{key}"])
-                        for key, param in self.file_params.items()
-                    ]
-                )
+        yield from self.parameters["files"]
 
 
 class DaskBasePlugin(BasePlugin):
@@ -293,7 +267,7 @@ class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of transform which turns counts into scores"""
 
     parameters = {
-        'score': ArrayParam('Scores', MultiParam('Score', {
+        'scores': ArrayParam('Scores', MultiParam('Score', {
             'score': StringParam("Score Column"),
             'after': ChoiceParam("After Column"),
             'before': ChoiceParam("Before Column"),
@@ -301,44 +275,28 @@ class DaskScoringPlugin(DaskTransformPlugin):
     }
 
     def update(self):
-
-        for p in self.parameters['score'].params:
+        for p in self.parameters['scores']:
             for pp in p.params.values():
                 pp.choices = self.input_columns
 
-        # XXX Allow to set names of score columns?  The whole [5:] thing is clumsy
-        # and horrible but doing this properly maybe needs ArrayParams
-
-        #for col in self.input_columns:
-        #    scol = "score" + col[5:]
-        #    if scol not in self.parameters:
-        #        self.parameters[scol] = ChoiceParam(
-        #            f"{scol} compares {col} and ...", "NONE", ["NONE"]
-        #        )
-        #    self.parameters[scol].choices = ["NONE"] + [
-        #        x for x in self.input_columns if x != col
-        #    ]
-#
-#        scols = [k for k in self.parameters.keys() if k.startswith("score")]
-#        for scol in scols:
-#            col = "count" + scol[5:]
-#            if col not in self.input_columns:
-#                del self.parameters[scol]
-
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         print(f"{self} run_dask {ddf.columns} {len(ddf)}")
-        for scol, param in self.parameters.items():
-            if isinstance(param, ChoiceParam) and param.value != "NONE":
-                ccol = "count" + scol[5:]
-                ddf[scol] = self.score(ddf[ccol], ddf[param.value])
 
-        score_cols = [c for c in ddf.columns if c.startswith("score")]
-        print(f"{score_cols} {ddf.columns} {len(ddf)}")
+        score_cols = []
+        for pp in self.parameters['scores']:
+            scol = pp.score.value
+            after = pp.after.value
+            before = pp.before.value
+
+            if scol and after and before:
+                ddf[scol] = self.score(ddf[after], ddf[before])
+                score_cols.append(scol)
+
         return ddf.replace([np.inf, -np.inf], np.nan).dropna(
             how="all", subset=score_cols
         )
 
-    def score(self, col1, col0):
+    def score(self, col_after: dd.Series, col_before: dd.Series) -> dd.Series:
         return NotImplementedError(
             "Subclass DaskScoringPlugin and provide a score() method"
         )

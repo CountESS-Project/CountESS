@@ -82,9 +82,11 @@ class LabeledProgressbar(ttk.Progressbar):
 
 
 class ParameterWrapper:
-    def __init__(self, tk_parent, parameter, callback=None):
 
-        print(f"{self}.__init__({tk_parent}, {parameter}, {callback}")
+    # XXX it would probably be better to have ParameterWrapper classes per Parameter class
+    # given the ridiculous amount of if/elif going on in here.
+
+    def __init__(self, tk_parent, parameter, callback=None, delete_callback=None):
 
         self.parameter = parameter
         self.callback = callback
@@ -105,7 +107,14 @@ class ParameterWrapper:
             self.var.trace("w", self.value_changed_callback)
 
         self.label = ttk.Label(tk_parent, text=parameter.label)
-            
+
+        # XXX hang on, what if it's an array in an array?
+
+        if isinstance(parameter, ArrayParam):
+            self.button = ttk.Button(tk_parent, width=1, text="+", command=self.add_row_callback)
+        elif delete_callback:
+            self.button = ttk.Button(tk_parent, text="X", width=1, command=lambda: delete_callback(self))
+
         if isinstance(parameter, ChoiceParam):
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices
@@ -114,7 +123,6 @@ class ParameterWrapper:
             self.entry = ttk.Checkbutton(tk_parent, variable=self.var)
         elif isinstance(parameter, FileParam):
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
-            self.button = CancelButton(tk_parent, command=self.clear_value_callback)
             self.entry.state(['readonly'])
         elif isinstance(parameter, SimpleParam):
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
@@ -124,10 +132,9 @@ class ParameterWrapper:
             self.entry = ttk.Frame(tk_parent)
             self.subparams = []
             for n, p in enumerate(parameter.params):
-                subparam = ParameterWrapper(self.entry, p, callback)
+                subparam = ParameterWrapper(self.entry, p, callback, self.delete_row_callback)
                 self.subparams.append(subparam)
                 subparam.set_row(n)
-            self.button = ttk.Button(tk_parent, text="+", command=self.add_row_callback)
         elif isinstance(parameter, MultiParam):
             self.entry = ttk.Frame(tk_parent)
             self.subparams = []
@@ -141,6 +148,7 @@ class ParameterWrapper:
         self.entry.grid(sticky=tk.EW)
 
     def update(self):
+        self.label["text"] = self.parameter.label
         if isinstance(self.parameter, (ArrayParam, MultiParam)):
             for sp in self.subparams:
                 sp.update()
@@ -148,12 +156,13 @@ class ParameterWrapper:
             self.entry["values"] = self.parameter.choices
 
     def set_row(self, row):
-        self.label.grid(row=row, column=0)
         if self.button:
-            self.entry.grid(row=row, column=1)
-            self.button.grid(row=row, column=2)
+            self.label.grid(row=row, column=0)
+            self.button.grid(row=row, column=1)
         else:
-            self.entry.grid(row=row, column=1, columnspan=2)
+            self.label.grid(row=row, column=0, columnspan=2)
+
+        self.entry.grid(row=row, column=2)
 
     def clear_value_callback(self, *_):
         self.parameter.value = ""
@@ -161,10 +170,38 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def add_row_callback(self, *_):
-        self.parameter.add_row()
-        subparam = ParameterWrapper(self.entry, self.parameter.params[-1], self.callback)
-        subparam.set_row(len(self.subparams))
+        # XXX horribly inelegant ... maybe this should be something to do with FileInputMixin
+        # especially dependence on being called 'filename'
+
+        assert isinstance(self.parameter, ArrayParam)
+
+        if isinstance(self.parameter.param, MultiParam) and 'filename' in self.parameter.param:
+            file_types = self.parameter.param.filename.file_types
+            for filename in filedialog.askopenfilenames(filetypes=file_types):
+                pp = self.parameter.add_row()
+                # XXX is this safe cross-os?
+                pp.filename.value = os.path.relpath(filename)
+                self.add_subparameter(pp)
+        else:
+            self.add_subparameter(self.parameter.add_row())
+
+    def add_subparameter(self, pp):
+        n = len(self.subparams)
+        subparam = ParameterWrapper(self.entry, pp, self.callback, self.delete_row_callback)
+        subparam.set_row(n)
         self.subparams.append(subparam)
+        if self.callback is not None:
+            self.callback(pp)
+
+    def delete_row_callback(self, parameter_wrapper):
+        print(f"delete_row_callback {parameter_wrapper} {self.subparams}")
+        assert isinstance(self.parameter, ArrayParam)
+        self.parameter.del_row(self.subparams.index(parameter_wrapper))
+        self.subparams.remove(parameter_wrapper)
+        parameter_wrapper.destroy()
+        self.update()
+        for n, pw in enumerate(self.subparams):
+            pw.set_row(n)
 
     def value_changed_callback(self, *_):
         self.parameter.value = self.var.get()
@@ -195,24 +232,11 @@ class PluginConfigurator:
         tk.Label(self.frame, text=plugin.description).grid(row=0, sticky=tk.EW)
 
         self.subframe = ttk.Frame(self.frame)
-        self.subframe.columnconfigure(0, weight=1)
-        self.subframe.columnconfigure(1, weight=2)
-        self.subframe.columnconfigure(2, weight=0)
+        self.subframe.columnconfigure(0, weight=0)
+        self.subframe.columnconfigure(1, weight=0)
+        self.subframe.columnconfigure(2, weight=1)
         self.subframe.grid(row=1, sticky=tk.NSEW)
 
-        if isinstance(self.plugin, FileInputMixin):
-            tk.Button(
-                self.frame, text="+ Add File", command=self.add_file
-            ).grid(row=2)
-
-        self.update()
-
-    def add_file(self):
-        filenames = filedialog.askopenfilenames(filetypes=self.plugin.file_types)
-        for filename in filenames:
-            # XXX is this safe cross-os?
-            filename = os.path.relpath(filename)
-            self.plugin.add_file(filename)
         self.update()
 
     def change_parameter(self, parameter):
