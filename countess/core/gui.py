@@ -86,11 +86,16 @@ class ParameterWrapper:
     # XXX it would probably be better to have ParameterWrapper classes per Parameter class
     # given the ridiculous amount of if/elif going on in here.
 
+    # XXX actually refactoring this whole mess of nested wrappers into a single TreeviewEditor
+    # might make more sense (now I've worked out how to make a TreeviewEditor)
+
     def __init__(self, tk_parent, parameter, callback=None, delete_callback=None):
 
         self.parameter = parameter
         self.callback = callback
         self.button = None
+
+        self.subwrappers: Mapping[BaseParam,ParameterWrapper] = {}
 
         if isinstance(parameter, BooleanParam):
             self.var = tk.BooleanVar(tk_parent, value=parameter.value)
@@ -128,32 +133,47 @@ class ParameterWrapper:
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
                 self.entry.state(['readonly'])
-        elif isinstance(parameter, ArrayParam):
+        elif isinstance(parameter, (ArrayParam, MultiParam)):
             self.entry = ttk.Frame(tk_parent)
-            self.subparams = []
-            for n, p in enumerate(parameter.params):
-                subparam = ParameterWrapper(self.entry, p, callback, self.delete_row_callback)
-                self.subparams.append(subparam)
-                subparam.set_row(n)
-        elif isinstance(parameter, MultiParam):
-            self.entry = ttk.Frame(tk_parent)
-            self.subparams = []
-            for n, p in enumerate(parameter.params.values()):
-                subparam = ParameterWrapper(self.entry, p, callback)
-                self.subparams.append(subparam)
-                subparam.set_row(n)
+            self.entry.columnconfigure(0,weight=0)
+            self.entry.columnconfigure(1,weight=0)
+            self.entry.columnconfigure(2,weight=1)
+            if isinstance(parameter, ArrayParam):
+                self.update_subwrappers(parameter.params, self.delete_row_callback)
+            else:
+                self.update_subwrappers(parameter.params.values(), None)
         else:
             raise NotImplementedError(f"Unknown parameter type {parameter}")
 
         self.entry.grid(sticky=tk.EW)
 
     def update(self):
+
+        if isinstance(self.parameter, ArrayParam):
+            self.update_subwrappers(self.parameter.params, self.delete_row_callback)
+        elif isinstance(self.parameter, MultiParam):
+            self.update_subwrappers(self.parameter.params.values(), None)
+
         self.label["text"] = self.parameter.label
-        if isinstance(self.parameter, (ArrayParam, MultiParam)):
-            for sp in self.subparams:
-                sp.update()
-        elif isinstance(self.parameter, ChoiceParam):
+
+        if isinstance(self.parameter, ChoiceParam):
             self.entry["values"] = self.parameter.choices
+
+    def update_subwrappers(self, params, delete_row_callback):
+
+        for n, p in enumerate(params):
+            if p in self.subwrappers:
+                self.subwrappers[p].update()
+            else:
+                self.subwrappers[p] = ParameterWrapper(self.entry, p, self.callback, delete_row_callback)
+                #if self.callback:
+                #    self.callback(p)
+            self.subwrappers[p].set_row(n)
+
+        params_set = set(params)
+        for p, pw in self.subwrappers.items():
+            if p not in params_set:
+                pw.destroy()
 
     def set_row(self, row):
         if self.button:
@@ -162,7 +182,7 @@ class ParameterWrapper:
         else:
             self.label.grid(row=row, column=0, columnspan=2)
 
-        self.entry.grid(row=row, column=2)
+        self.entry.grid(row=row, column=2, sticky=tk.EW)
 
     def clear_value_callback(self, *_):
         self.parameter.value = ""
@@ -170,38 +190,34 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def add_row_callback(self, *_):
-        # XXX horribly inelegant ... maybe this should be something to do with FileInputMixin
-        # especially dependence on being called 'filename'
 
         assert isinstance(self.parameter, ArrayParam)
 
-        if isinstance(self.parameter.param, MultiParam) and 'filename' in self.parameter.param:
+        print(f"{self.parameter} {self.parameter.param} {self.parameter.param.params}")
+        if isinstance(self.parameter.param, FileParam):
             file_types = self.parameter.param.filename.file_types
             for filename in filedialog.askopenfilenames(filetypes=file_types):
                 pp = self.parameter.add_row()
                 # XXX is this safe cross-os?
-                pp.filename.value = os.path.relpath(filename)
-                self.add_subparameter(pp)
-        else:
-            self.add_subparameter(self.parameter.add_row())
+                pp.value = os.path.relpath(filename)
 
-    def add_subparameter(self, pp):
-        n = len(self.subparams)
-        subparam = ParameterWrapper(self.entry, pp, self.callback, self.delete_row_callback)
-        subparam.set_row(n)
-        self.subparams.append(subparam)
-        if self.callback is not None:
-            self.callback(pp)
+        elif isinstance(self.parameter.param, MultiParam) and any(isinstance(p, FileParam) for p in self.parameter.param.values()):
+            file_types = self.parameter.param.filename.file_types
+            for filename in filedialog.askopenfilenames(filetypes=file_types):
+                pp = self.parameter.add_row()
+                for ppp in pp.values():
+                    if isinstance(ppp, FileParam):
+                        ppp.value = os.path.relpath(filename)
+        else:
+            pp = self.parameter.add_row()
+
+        self.update()
 
     def delete_row_callback(self, parameter_wrapper):
-        print(f"delete_row_callback {parameter_wrapper} {self.subparams}")
         assert isinstance(self.parameter, ArrayParam)
-        self.parameter.del_row(self.subparams.index(parameter_wrapper))
-        self.subparams.remove(parameter_wrapper)
-        parameter_wrapper.destroy()
-        self.update()
-        for n, pw in enumerate(self.subparams):
-            pw.set_row(n)
+
+        self.parameter.del_subparam(parameter_wrapper.parameter)
+        self.update_subwrappers(self.parameter.params, self.delete_row_callback)
 
     def value_changed_callback(self, *_):
         self.parameter.value = self.var.get()
@@ -241,11 +257,6 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
-
-        if isinstance(parameter, FileParam) and parameter.value == "":
-            # XXX kinda gross, but the whole "file number" thing just is.
-            self.plugin.remove_file_by_parameter(parameter)
-
         self.update()
 
     def update(self):
@@ -258,7 +269,6 @@ class PluginConfigurator:
                 self.wrapper_cache[key] = ParameterWrapper(
                     self.subframe, parameter, self.change_parameter
                 )
-
             self.wrapper_cache[key].set_row(n + 1)
 
         # Remove any parameter wrappers no longer needed

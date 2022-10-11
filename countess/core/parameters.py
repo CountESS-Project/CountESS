@@ -123,11 +123,21 @@ class ArrayParam(BaseParam):
 
     def del_row(self, position: int):
         self.params.pop(position)
+        self.relabel()
+    
+    def del_subparam(self, param: BaseParam):
+        self.params.remove(param)
+        self.relabel()
+
+    def relabel(self):
         for n, param in enumerate(self.params):
             param.label = self.param.label + f" {n+1}"
 
     def copy(self, suffix: str = "") -> 'ArrayParam':
         return ArrayParam(self.label + suffix, self.param, len(self.params))
+
+    def __len__(self):
+        return len(self.params)
 
     def __getitem__(self, key):
         return self.params[key]
@@ -168,12 +178,6 @@ class MultiParam(BaseParam):
             return self.params[name]
         except KeyError:
             raise AttributeError(name=name, obj=self)
-
-    def __setattr__(self, name, value):
-        try:
-            self.params[name].set_value(value)
-        except KeyError:
-            super().__setattr__(name, value)
 
     def __contains__(self, item):
         return item in self.params

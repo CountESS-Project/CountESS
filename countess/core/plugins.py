@@ -274,6 +274,17 @@ class DaskScoringPlugin(DaskTransformPlugin):
         }))
     }
 
+    def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        count_columns = sorted([c for c in ddf.columns if c.startswith("count")])
+        if len(count_columns) > 1 and  len(self.parameters['scores']) == 0:
+            for cc in count_columns[1:]:
+                pp = self.parameters['scores'].add_row()
+                pp.before.value = count_columns[0]
+                pp.after.value = cc
+                pp.score.value = "score" + cc[5:]
+
+        return super().prerun(ddf)
+
     def update(self):
         for p in self.parameters['scores']:
             for pp in p.params.values():
