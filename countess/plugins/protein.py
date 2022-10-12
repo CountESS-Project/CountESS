@@ -1,15 +1,24 @@
 from fqfa.util.translate import translate_dna
 
-from countess.core.plugins import DaskTranslationPlugin
+from countess.core.plugins import DaskReindexPlugin
+from countess.core.parameters import StringCharacterSetParam, IntegerParam
+
+from functools import partial
+from Levenshtein import distance
 
 VERSION = "0.0.1"
 
-class ProteinTranslatorPlugin(DaskTranslationPlugin):
+class ProteinTranslatorPlugin(DaskReindexPlugin):
 
     name = "Protein Translator"
     title = "Translate from DNA to Proteins"
     description = "Translate from DNA to Proteins"
     version = VERSION
+
+    parameters = {
+        'sequence': StringCharacterSetParam("Target Sequence", character_set=set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
+        'max_distance': IntegerParam("Maximum Levenshtein Distance", 10),
+    }
 
     def translate(self, value: str) -> str:
         # Grab all the possible proteins from this DNA ('*' is a stop codon)
@@ -21,10 +30,11 @@ class ProteinTranslatorPlugin(DaskTranslationPlugin):
                 # XXX some are untranslatable
                 pass
 
-        # XXX Just grabs the longest protein translation, which isn't
-        # especially likely to be the right one.
+
         if len(proteins):
-            proteins.sort(key=len, reverse=True)
-            return proteins[0]
+            _distance = partial(distance, self.parameters['sequence'].value)
+            proteins.sort(key=_distance)
+            print(f"{proteins[0]} {self.parameters['sequence'].value} {_distance(proteins[0])}")
+            return proteins[0] if _distance(proteins[0]) <= self.parameters['max_distance'].value else ""
     
         return ""

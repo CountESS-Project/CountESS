@@ -27,11 +27,8 @@ class Pipeline:
 
         for k, v in config.items():
             print(f"{self.__class__.__name__} set_plugin_config {k} {v}")
-            # XXX cheesy but this way of handling files will be replaced soon
-            if k.startswith("file.") and k.endswith(".filename"):
-                plugin.add_file(v)
-            elif k in plugin.parameters:
-                plugin.parameters[k].set_value(v)
+            if k in plugin.parameters:
+                plugin.parameters[k].value = v
 
     def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]) -> BasePlugin:
         """Loads plugin config from a `plugin_name` and a `config` dictionary"""
@@ -114,13 +111,13 @@ class Pipeline:
         # XXX TODO
         raise NotImplementedError("surprisingly involved")
 
-    def update_plugin(self, position: int):
-        """Updates the plugin at `position` and then all the subsequent plugins,
-        to allow changes to carry through the pipeline"""
-        assert 0 <= position < len(self.plugins)
-        
-        for plugin in self.plugins[position:]:
-            plugin.update()
+    #def update_plugin(self, position: int):
+    #    """Updates the plugin at `position` and then all the subsequent plugins,
+    #    to allow changes to carry through the pipeline"""
+    #    assert 0 <= position < len(self.plugins)
+    #    
+    #    for plugin in self.plugins[position:]:
+    #        plugin.update()
 
     def choose_plugin_classes(self, position: Optional[int]=None):
         if position is None:

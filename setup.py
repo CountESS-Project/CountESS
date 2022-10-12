@@ -21,6 +21,7 @@ setup(
             'distributed>=2022.8.0',
             'fqfa~=1.2.1',
             'more_itertools~=8.14.0',
+            'Levenshtein==0.20.5',
             'numpy~=1.23.2',
             'pandas~=1.4.3',
             'tables @ git+https://github.com/PyTables/PyTables.git@da01cf8908c2d8c2b07e8a35685f0811807453f6',

@@ -71,8 +71,18 @@ class StringCharacterSetParam(StringParam):
         if character_set is not None:
             self.character_set = character_set
 
-    def clean_value(self, value):
-        return ''.join([c for c in value if c in self.character_set])
+    def clean_character(self, c: str):
+        if c in self.character_set: return c
+        elif c.upper() in self.character_set: return c.upper()
+        else: return ''
+
+    def clean_value(self, value: any):
+        value_str = str(value)
+        x = ''.join([self.clean_character(c) for c in value_str])
+        return x
+
+    def copy(self, suffix: str = ""):
+        return self.__class__(self.label + suffix, self.value, self.read_only, character_set=self.character_set)
 
 
 class FileParam(StringParam):

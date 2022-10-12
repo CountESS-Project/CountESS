@@ -257,9 +257,12 @@ class DaskTransformPlugin(DaskBasePlugin):
 
     input_columns: list[str] = []
 
+    def update(self):
+        pass
+
     def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
         self.input_columns = sorted(ddf.columns)
-        print(f"{self.__class__.__name__} prerun {self.input_columns}")
+        self.update()
         return super().prerun(ddf)
 
 
@@ -274,21 +277,24 @@ class DaskScoringPlugin(DaskTransformPlugin):
         }))
     }
 
-    def prerun(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        count_columns = sorted([c for c in ddf.columns if c.startswith("count")])
-        if len(count_columns) > 1 and  len(self.parameters['scores']) == 0:
-            for cc in count_columns[1:]:
-                pp = self.parameters['scores'].add_row()
-                pp.before.value = count_columns[0]
-                pp.after.value = cc
-                pp.score.value = "score" + cc[5:]
-
-        return super().prerun(ddf)
-
     def update(self):
-        for p in self.parameters['scores']:
-            for pp in p.params.values():
-                pp.choices = self.input_columns
+        count_columns = [c for c in self.input_columns if c.startswith("count")]
+
+        for pp in self.parameters['scores']:
+            if pp.before.value not in count_columns or pp.after.value not in count_columns:
+                self.parameters['scores'].del_subparam(pp)
+            else:
+                pp.before.choices = self.input_columns
+                pp.after.choices = self.input_columns
+
+        if len(count_columns) > 1:
+            after_columns = set(p.after.value for p in self.parameters['scores'] if p.after.value)
+            for cc in count_columns[1:]:
+                if cc not in after_columns:
+                    pp = self.parameters['scores'].add_row()
+                    pp.before.value = count_columns[0]
+                    pp.after.value = cc
+                    pp.score.value = "score" + cc[5:]
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         print(f"{self} run_dask {ddf.columns} {len(ddf)}")
@@ -308,9 +314,24 @@ class DaskScoringPlugin(DaskTransformPlugin):
         )
 
     def score(self, col_after: dd.Series, col_before: dd.Series) -> dd.Series:
-        return NotImplementedError(
+        raise NotImplementedError(
             "Subclass DaskScoringPlugin and provide a score() method"
         )
+
+class DaskReindexPlugin(DaskTransformPlugin):
+
+    translate_type = str
+
+    def translate(self, value):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.translate")
+
+    def translate_row(self, row):
+        return self.translate(row.name)
+
+    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        ddf['__reindex'] = ddf.apply(self.translate_row, axis=1, meta=pd.Series(self.translate_type()))
+        return ddf.groupby('__reindex').sum()
+
 
 class DaskTranslationPlugin(DaskTransformPlugin):
 

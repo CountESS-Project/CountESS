@@ -223,6 +223,7 @@ class ParameterWrapper:
         self.parameter.value = self.var.get()
         if self.callback is not None:
             self.callback(self.parameter)
+        self.var.set(self.parameter.value)
 
     def destroy(self):
         self.label.destroy()
@@ -368,7 +369,6 @@ class PipelineManager:
         except ValueError:
             return
 
-        self.pipeline.update_plugin(position)
         self.pipeline.prerun(position)
 
     def notebook_tab_changed(self, event):
@@ -376,7 +376,7 @@ class PipelineManager:
         make sure parameters are updated"""
         position = self.notebook.index(self.notebook.select())
         if position < len(self.configurators):
-            self.pipeline.update_plugin(position)
+            self.pipeline.prerun(position)
             self.configurators[position].update()
         else:
             self.update_plugin_chooser_frame()
