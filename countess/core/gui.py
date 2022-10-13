@@ -193,7 +193,6 @@ class ParameterWrapper:
 
         assert isinstance(self.parameter, ArrayParam)
 
-        print(f"{self.parameter} {self.parameter.param} {self.parameter.param.params}")
         if isinstance(self.parameter.param, FileParam):
             file_types = self.parameter.param.filename.file_types
             for filename in filedialog.askopenfilenames(filetypes=file_types):

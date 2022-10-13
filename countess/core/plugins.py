@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from importlib.metadata import entry_points
 from itertools import islice
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Type
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Type, List
 import re
 
 import dask.dataframe as dd
@@ -201,7 +201,6 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
         per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
         for fp in fps:
-            print(f"{self.__class__.__name__} load_files {fp['filename'].value}")
             df = self.read_file_to_dataframe(fp, per_file_row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
@@ -272,48 +271,48 @@ class DaskScoringPlugin(DaskTransformPlugin):
     parameters = {
         'scores': ArrayParam('Scores', MultiParam('Score', {
             'score': StringParam("Score Column"),
-            'after': ChoiceParam("After Column"),
-            'before': ChoiceParam("Before Column"),
+            'counts': ArrayParam('Counts', ChoiceParam('Column')),
+            #'after': ChoiceParam("After Column"),
+            #'before': ChoiceParam("Before Column"),
         }))
     }
 
     def update(self):
+        print(f"0 {self}.update")
         count_columns = [c for c in self.input_columns if c.startswith("count")]
 
         for pp in self.parameters['scores']:
-            if pp.before.value not in count_columns or pp.after.value not in count_columns:
-                self.parameters['scores'].del_subparam(pp)
-            else:
-                pp.before.choices = self.input_columns
-                pp.after.choices = self.input_columns
+            print(f"1 {pp}")
+            for ppp in pp.counts:
+                print(f"2 {pp} {ppp}")
+                #if ppp.value and ppp.value not in count_columns: pp.counts.del_subparam(ppp)
+                ppp.choices = self.input_columns
 
-        if len(count_columns) > 1:
-            after_columns = set(p.after.value for p in self.parameters['scores'] if p.after.value)
-            for cc in count_columns[1:]:
-                if cc not in after_columns:
-                    pp = self.parameters['scores'].add_row()
-                    pp.before.value = count_columns[0]
-                    pp.after.value = cc
-                    pp.score.value = "score" + cc[5:]
+        #if len(count_columns) > 1:
+        #    after_columns = set(p.after.value for p in self.parameters['scores'] if p.after.value)
+        #    for cc in count_columns[1:]:
+        #        if cc not in after_columns:
+        #            pp = self.parameters['scores'].add_row()
+        #            pp.before.value = count_columns[0]
+        #            pp.after.value = cc
+        #            pp.score.value = "score" + cc[5:]
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        print(f"{self} run_dask {ddf.columns} {len(ddf)}")
 
         score_cols = []
         for pp in self.parameters['scores']:
             scol = pp.score.value
-            after = pp.after.value
-            before = pp.before.value
+            ccols = [ ppp.value for ppp in pp.counts ]
 
-            if scol and after and before:
-                ddf[scol] = self.score(ddf[after], ddf[before])
+            if scol and all(ccols):
+                ddf[scol] = self.score([ddf[col] for col in ccols])
                 score_cols.append(scol)
 
         return ddf.replace([np.inf, -np.inf], np.nan).dropna(
             how="all", subset=score_cols
         )
 
-    def score(self, col_after: dd.Series, col_before: dd.Series) -> dd.Series:
+    def score(self, columns: List[dd.Series]) -> dd.Series:
         raise NotImplementedError(
             "Subclass DaskScoringPlugin and provide a score() method"
         )

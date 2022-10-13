@@ -19,5 +19,5 @@ class LogScorePlugin(DaskScoringPlugin):
     description = "calculates log score from counts"
     version = VERSION
 
-    def score(self, col1, col0):
-        return np.log(col1 / col0)
+    def score(self, cols):
+        return np.log(cols[1] / cols[0])
