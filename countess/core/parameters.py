@@ -6,7 +6,7 @@ class BaseParam:
     label: str = ""
     value: Any=None
 
-    def copy(self, suffix: str = ""):
+    def copy(self):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.copy()")
 
 
@@ -38,8 +38,8 @@ class SimpleParam(BaseParam):
     def value(self):
         self._value = None
 
-    def copy(self, suffix: str = ""):
-        return self.__class__(self.label + suffix, self.value, self.read_only)
+    def copy(self):
+        return self.__class__(self.label, self.value, self.read_only)
 
 
 class BooleanParam(SimpleParam):
@@ -81,8 +81,8 @@ class StringCharacterSetParam(StringParam):
         x = ''.join([self.clean_character(c) for c in value_str])
         return x
 
-    def copy(self, suffix: str = ""):
-        return self.__class__(self.label + suffix, self.value, self.read_only, character_set=self.character_set)
+    def copy(self):
+        return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
 
 
 class FileParam(StringParam):
@@ -94,8 +94,8 @@ class FileParam(StringParam):
         if file_types is not None:
             self.file_types = file_types
 
-    def copy(self, suffix: str = ""):
-        return self.__class__(self.label + suffix, self.value, self.read_only, file_types=self.file_types)
+    def copy(self):
+        return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
 
 
 class ChoiceParam(BaseParam):
@@ -113,26 +113,36 @@ class ChoiceParam(BaseParam):
         assert value is None or value in self.choices
         self.value = value
 
-    def copy(self, suffix: str = ""):
-        return ChoiceParam(self.label + suffix, self.value, self.choices)
+    def copy(self):
+        return ChoiceParam(self.label, self.value, self.choices)
 
 
 class ArrayParam(BaseParam):
 
     params: list[BaseParam] = []
 
-    def __init__(self, label: str, param: BaseParam, size: int = 0):
+    def __init__(self, label: str, param: BaseParam, min_size: int = 0, max_size: Optional[int] = None):
         self.label = label
         self.param = param
-        self.params = [param.copy(f" {n+1}") for n in range(0, size)]
+        self.params = [param.copy() for n in range(0, min_size)]
+        self.relabel()
+        self.min_size = min_size
+        self.max_size = max_size
 
     def add_row(self):
-        pp = self.param.copy(f" {len(self.params)+1}")
-        self.params.append(pp)
-        return pp
+        # XXX probably should throw an exception instead
+        if self.max_size is None or len(self.params) < self.max_size:
+            pp = self.param.copy()
+            self.params.append(pp)
+            self.relabel()
+            return pp
 
     def del_row(self, position: int):
+        assert 0 <= position < len(self.params)
+
         self.params.pop(position)
+        if len(self.params) < self.min_size:
+            self.params.append(self.param.copy())
         self.relabel()
     
     def del_subparam(self, param: BaseParam):
@@ -143,8 +153,8 @@ class ArrayParam(BaseParam):
         for n, param in enumerate(self.params):
             param.label = self.param.label + f" {n+1}"
 
-    def copy(self, suffix: str = "") -> 'ArrayParam':
-        return ArrayParam(self.label + suffix, self.param, len(self.params))
+    def copy(self) -> 'ArrayParam':
+        return ArrayParam(self.label, self.param, self.min_size, self.max_size)
 
     def __len__(self):
         return len(self.params)
@@ -167,9 +177,9 @@ class MultiParam(BaseParam):
         self.label = label
         self.params = params
 
-    def copy(self, suffix: str = "") -> 'MultiParam':
+    def copy(self) -> 'MultiParam':
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
-        return MultiParam(self.label + suffix, pp)
+        return MultiParam(self.label, pp)
 
     def __getitem__(self, key):
         return self.params[key]

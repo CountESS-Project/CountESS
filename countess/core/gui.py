@@ -151,6 +151,10 @@ class ParameterWrapper:
 
         if isinstance(self.parameter, ArrayParam):
             self.update_subwrappers(self.parameter.params, self.delete_row_callback)
+            if len(self.subwrappers) >= self.parameter.max_size:
+                self.button['state'] = tk.DISABLED
+            else:
+                self.button['state'] = tk.NORMAL
         elif isinstance(self.parameter, MultiParam):
             self.update_subwrappers(self.parameter.params.values(), None)
 

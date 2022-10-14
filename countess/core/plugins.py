@@ -87,7 +87,16 @@ class BasePlugin:
     def __init__(self):
         # Parameters store the actual values they are set to, so we copy them so that
         # if the same plugin is used twice in a pipeline it will have its own parameters.
+
         self.parameters = dict(((k, v.copy()) for k, v in self.parameters.items()))
+
+        # XXX should we allow django-esque declarations like this?  Namespace gets 
+        # cluttered, though.
+
+        for key in dir(self):
+            if isinstance(getattr(self, key), BaseParam):
+                self.parameters[key] = getattr(self, key).copy()
+                setattr(self, key, self.parameters[key])
 
     def update(self):
         pass
@@ -268,14 +277,12 @@ class DaskTransformPlugin(DaskBasePlugin):
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of transform which turns counts into scores"""
 
-    parameters = {
-        'scores': ArrayParam('Scores', MultiParam('Score', {
-            'score': StringParam("Score Column"),
-            'counts': ArrayParam('Counts', ChoiceParam('Column')),
-            #'after': ChoiceParam("After Column"),
-            #'before': ChoiceParam("Before Column"),
-        }))
-    }
+    max_counts = 5
+
+    parameters = { 'scores': ArrayParam('Scores', MultiParam('Score', {
+        'score': StringParam("Score Column"),
+        'counts': ArrayParam('Counts', ChoiceParam('Column'), min_size=2, max_size=max_counts),
+    }), min_size=1)}
 
     def update(self):
         print(f"0 {self}.update")
