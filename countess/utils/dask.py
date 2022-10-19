@@ -16,7 +16,7 @@ def crop_dask_dataframe(
     """Takes a dask dataframe `ddf` and returns a frame with at most `row_limit` rows"""
     if len(ddf) > row_limit:
         x, y = islice(ddf.index, 0, row_limit, row_limit - 1)
-        ddf = ddf[x:y]
+        ddf = ddf.loc[x:y]
     return ddf
 
 def concat_dask_dataframes(ddfs: list[dd.DataFrame]) -> dd.DataFrame:
