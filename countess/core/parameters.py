@@ -1,12 +1,16 @@
 from typing import Mapping, Optional, Any
-
+import os.path
 
 class BaseParam:
+    """Represents the parameters which can be set on a plugin."""
 
     label: str = ""
     value: Any=None
 
     def copy(self):
+        """Plugins declare their parameters with instances of BaseParam, these need to 
+        be copied so that multiple Plugins (and multiple rows in an ArrayParam) can have
+        distinct values"""
         raise NotImplementedError(f"Implement {self.__class__.__name__}.copy()")
 
 
@@ -63,6 +67,8 @@ class StringParam(SimpleParam):
 
 
 class StringCharacterSetParam(StringParam):
+    """A StringParam limited to characters from `character_set`.  Call `clean_value` to get
+    an acceptable value"""
 
     character_set: set[str] = set()
 
@@ -86,6 +92,8 @@ class StringCharacterSetParam(StringParam):
 
 
 class FileParam(StringParam):
+    """A StringParam for holding a filename.  Defaults to `read_only` because it really should
+    be populated from a file dialog or simiar."""
     
     file_types = [("Any", "*")]
     
@@ -94,30 +102,46 @@ class FileParam(StringParam):
         if file_types is not None:
             self.file_types = file_types
 
+    def clean_value(self, value: str):
+        return os.path.relpath(value)
+
     def copy(self):
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
 
 
 class ChoiceParam(BaseParam):
+    """A drop-down menu parameter choosing between options. Defaults to 'None'"""
 
     value: Optional[str]
 
     def __init__(
-        self, label: str, value: Optional[str] = None, choices: list[str] = None
+        self, label: str, value: Optional[str] = None, choices: Iterable[str] = None
     ):
         self.label = label
         self.value = value
-        self.choices = choices or []
+        self.choices = list(choices) or []
 
-    def set_value(self, value):
-        assert value is None or value in self.choices
-        self.value = value
+    def set_value(self, value: Optional[str]):
+        if value in self.choices:
+            self.value = value
+        else:
+            self.value = None
+
+    def set_choices(self, choices: Iterable[str]):
+        self.choices = list(choices)
+        if len(self.choices) == 1: self.value = choices[0]
+        elif self.value not in self.choices: self.value = None
 
     def copy(self):
         return ChoiceParam(self.label, self.value, self.choices)
 
 
 class ArrayParam(BaseParam):
+    """An ArrayParam contains zero or more copies of `param`, which can be a SimpleParam or a
+    MultiParam."""
+
+    # XXX the only real use for this is as an array of MultiParams so I think maybe we should have
+    # a TabularParam which combines ArrayParam and MultiParam more directly."""
 
     params: list[BaseParam] = []
 
@@ -130,7 +154,7 @@ class ArrayParam(BaseParam):
         self.max_size = max_size
 
     def add_row(self):
-        # XXX probably should throw an exception instead
+        # XXX probably should throw an exception instead of just ignoring
         if self.max_size is None or len(self.params) < self.max_size:
             pp = self.param.copy()
             self.params.append(pp)
@@ -154,7 +178,7 @@ class ArrayParam(BaseParam):
             param.label = self.param.label + f" {n+1}"
 
     def copy(self) -> 'ArrayParam':
-        return ArrayParam(self.label, self.param, self.min_size, self.max_size)
+        return self.__class__(self.label, self.param, self.min_size, self.max_size)
 
     def __len__(self):
         return len(self.params)
@@ -167,6 +191,30 @@ class ArrayParam(BaseParam):
 
     def __iter__(self):
         return self.params.__iter__()
+
+
+class FileArrayParam(ArrayParam):
+    """FileArrayParam is an ArrayParam arranged per-file.  Using this class really just
+    marks it as expecting to be populated from an open file dialog."""
+
+    def find_fileparam(self):
+        if isinstance(self.param, FileParam):
+            return self.param
+        if isinstance(self.param, MultiParam):
+            for pp in self.param.params.values():
+                if isinstance(pp, FileParam):
+                    return pp
+        raise TypeError("FileArrayParam needs a FileParam inside it")
+
+    @property
+    def file_types(self):
+        return self.find_fileparam().file_types
+
+    def add_files(self, filenames):
+        # XXX slightly daft way of doing it
+        for filename in filenames:
+            self.find_fileparam().value = filename
+            self.add_row()
 
 
 class MultiParam(BaseParam):
@@ -204,4 +252,3 @@ class MultiParam(BaseParam):
 
     def __iter__(self):
         return self.params.__iter__()
-

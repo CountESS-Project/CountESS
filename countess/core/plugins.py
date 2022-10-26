@@ -15,6 +15,7 @@ from countess.core.parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
+    FileArrayParam,
     FileParam,
     FloatParam,
     IntegerParam,
@@ -129,32 +130,20 @@ class BasePlugin:
 class FileInputMixin:
     """Mixin class to indicate that this plugin can read files from local storage."""
 
-    # XXX clumsy ... maybe store file params separately instead of encoding them into
-    # self.parameters which isn't working nicely
-
     file_number = 0
 
     # used by the GUI file dialog
     file_types = [("Any", "*")]
 
-    parameters: MutableMapping[str, BaseParam] = {}
-
-    file_params: MutableMapping[str, BaseParam] = {}
+    parameters: MutableMapping[str, BaseParam] = {
+        'files': FileArrayParam('Files', FileParam('File'))
+    }
 
     @classmethod
     def can_follow(cls, plugin: Optional[Type[BasePlugin]] | Optional[BasePlugin]):
         # the `not TYPE_CHECKING` clause is a workaround for mypy not really understanding
         # mixin classes.
         return plugin is None or (not TYPE_CHECKING and super().can_follow(plugin))
-
-    def __init__(self):
-        super().__init__()
-        file_params = { 'filename': FileParam("Filename", file_types=self.file_types) }
-        file_params.update(self.file_params)
-        self.parameters['files'] = ArrayParam('Files', MultiParam('File', file_params))
-
-    def get_file_params(self):
-        yield from self.parameters["files"]
 
 
 class DaskBasePlugin(BasePlugin):
@@ -205,7 +194,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first."""
 
     def load_files(self, row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
-        fps = list(self.get_file_params())
+        fps = self.parameters['files'].params
         if not fps: return
 
         per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
@@ -232,7 +221,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         mechanism this uses a simple count of files read."""
 
         dfs = [] if ddf is None else [ddf]
-        num_files = len(list(self.get_file_params()))
+        num_files = len(self.parameters['files'].params)
         if callback:
             callback(0, num_files, "Loading")
         for num, df in enumerate(self.load_files()):

@@ -4,9 +4,10 @@ from typing import Mapping, Optional
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
-from countess.core.parameters import BaseParam, StringParam
+from countess.core.parameters import BaseParam, StringParam, ChoiceParam, FileParam, FileArrayParam, MultiParam
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 
+from countess.utils.dask import empty_dask_dataframe
 VERSION = "0.0.1"
 
 
@@ -19,35 +20,49 @@ class LoadHdfPlugin(DaskInputPlugin):
 
     file_types = [("HDF5 File", "*.hdf5")]
 
-    file_params = {
-        "key": StringParam("HDF Key"),
-        "prefix": StringParam("Index Prefix"),
-        "suffix": StringParam("Column Suffix"),
+    parameters = {
+        'files': FileArrayParam('Files', 
+            MultiParam('File', {
+                "filename": FileParam("Filename", file_types=file_types),
+                "key": ChoiceParam("HDF Key"),
+                "prefix": StringParam("Index Prefix"),
+                "suffix": StringParam("Column Suffix"),
+            }),
+        )
     }
 
     keys: list[str] = []
 
-    def add_file_params(self, filename, file_number):
-        # Open the file and read out the keys and the columns for each key.
-        file_params = super().add_file_params(filename, file_number)
+    def update(self):
+        print(f"{self}.update() {self.parameters['files'].params}")
+        super().update()
 
-        with pd.HDFStore(filename) as hs:
-            self.keys = sorted(hs.keys())
+        for fp in self.parameters['files']:
+            with pd.HDFStore(fp.filename.value) as hs:
+                fp.key.choices = sorted(hs.keys())
+            print(f"{fp} {fp.filename.value} {fp.key.choices} {fp.key.value}")
 
     def read_file_to_dataframe(
-        self, file_params: Mapping[str, BaseParam], row_limit: Optional[int] = None
+        self, fp: MultiParam, row_limit: Optional[int] = None
     ) -> pd.DataFrame:
 
-        filename = file_params["filename"].value
-        key = file_params["key"].value
+        if not fp.key.value or fp.key.value not in fp.key.choices:
+            with pd.HDFStore(fp.filename.value) as hs:
+                fp.key.choices = sorted(hs.keys())
+            fp.key.value = fp.key.choices[0] if len(fp.key.choices) == 1 else None
+            return empty_dask_dataframe()
+
+        filename = fp["filename"].value
+        key = fp["key"].value
 
         with pd.HDFStore(filename) as hs:
             df = hs.select(key, start=0, stop=row_limit)
 
-        prefix = file_params["prefix"].value
-        suffix = file_params["suffix"].value
+        prefix = fp["prefix"].value
+        suffix = fp["suffix"].value
         if prefix:
-            df.set_index((prefix + str(i) for i in df.index))
+            df['__index'] = prefix + df.index
+            df.set_index('__index', inplace=True)
         if suffix:
             df.columns = (str(c) + suffix for c in df.columns)
         return df

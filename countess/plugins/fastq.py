@@ -8,7 +8,7 @@ import pandas as pd  # type: ignore
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
-from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam
+from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam, FileArrayParam, FileParam
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import concat_dask_dataframes
 
@@ -26,23 +26,23 @@ class LoadFastqPlugin(DaskInputPlugin):
     version = VERSION
 
     file_types = [("FASTQ", "*.fastq"), ("FASTQ (gzipped)", "*.fastq.gz")]
+
     parameters = {
         "group": BooleanParam("Group by Sequence?", True),
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
-    }
-
-    file_params = {
-        "count_column": StringParam("Count Column Name", "count"),
-        "additional": ArrayParam("Additional Parameters",
-            MultiParam("Key/Value", { 'key': StringParam("Key"), 'val': StringParam("Value")})
+        'files': FileArrayParam('Files',
+            MultiParam('File', {
+                "filename": FileParam("Filename", file_types=file_types),
+                "count_column": StringParam("Count Column Name", "count"),
+                "additional": ArrayParam("Additional Parameters",
+                    MultiParam("Key/Value", { 'key': StringParam("Key"), 'val': StringParam("Value")})
+                ),
+            }),
         ),
     }
 
     def read_file_to_dataframe(self, params, row_limit=None):
         records = []
-        additional_keys = [ p.key.value for p in params["additional"] ]
-        additional_vals = [ p.val.value for p in params["additional"] ]
-        print(f"{additional_keys} {additional_vals}")
         with open(params["filename"].value, "r") as fh:
             for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
                 if (

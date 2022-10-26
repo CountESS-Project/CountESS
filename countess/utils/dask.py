@@ -22,6 +22,9 @@ def crop_dask_dataframe(
 def concat_dask_dataframes(ddfs: list[dd.DataFrame]) -> dd.DataFrame:
     """Concat dask dataframes, but include special cases for 0 and 1 inputs"""
 
+    # extra special case for empty dataframes
+    ddfs = [ df for df in ddfs if len(df) > 0 ]
+
     if len(ddfs) == 0:
         return empty_dask_dataframe()
     elif len(ddfs) == 1:

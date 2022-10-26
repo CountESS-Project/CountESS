@@ -10,9 +10,7 @@ VERSION = "0.0.1"
 
 
 class LogScorePlugin(DaskScoringPlugin):
-    """Load counts from a FASTQ file, by first building a dask dataframe of raw sequences
-    with count=1 and then grouping by sequence and summing counts.  It supports counting
-    in multiple columns."""
+    """Log Scorer"""
 
     name = "Log Scorer"
     title = "Log Scores from Counts"

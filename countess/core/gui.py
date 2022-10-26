@@ -22,6 +22,7 @@ from .parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
+    FileArrayParam,
     FileParam,
     FloatParam,
     IntegerParam,
@@ -33,6 +34,7 @@ from .pipeline import Pipeline
 from .plugins import BasePlugin, FileInputMixin
 from ..utils.dask import crop_dask_dataframe
 
+import numpy as np
 
 class CancelButton(tk.Button):
     """A button which is a red X for cancelling / removing items"""
@@ -194,25 +196,17 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def add_row_callback(self, *_):
-
         assert isinstance(self.parameter, ArrayParam)
 
-        if isinstance(self.parameter.param, FileParam):
-            file_types = self.parameter.param.filename.file_types
-            for filename in filedialog.askopenfilenames(filetypes=file_types):
-                pp = self.parameter.add_row()
-                # XXX is this safe cross-os?
-                pp.value = os.path.relpath(filename)
-
-        elif isinstance(self.parameter.param, MultiParam) and any(isinstance(p, FileParam) for p in self.parameter.param.values()):
-            file_types = self.parameter.param.filename.file_types
-            for filename in filedialog.askopenfilenames(filetypes=file_types):
-                pp = self.parameter.add_row()
-                for ppp in pp.values():
-                    if isinstance(ppp, FileParam):
-                        ppp.value = os.path.relpath(filename)
+        if isinstance(self.parameter, FileArrayParam):
+            file_types = self.parameter.file_types
+            filenames = filedialog.askopenfilenames(filetypes=file_types)
+            self.parameter.add_files(filenames)
         else:
             pp = self.parameter.add_row()
+
+        if self.callback is not None:
+            self.callback(self.parameter)
 
         self.update()
 
@@ -221,6 +215,9 @@ class ParameterWrapper:
 
         self.parameter.del_subparam(parameter_wrapper.parameter)
         self.update_subwrappers(self.parameter.params, self.delete_row_callback)
+
+        if self.callback is not None:
+            self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
         self.parameter.value = self.var.get()
@@ -261,6 +258,7 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
+        self.plugin.update()
         self.update()
 
     def update(self):
@@ -540,6 +538,7 @@ class DataFramePreview:
             self.treeview.delete(row)
 
         for n, (index, *values) in enumerate(ddf.itertuples()):
+            values = [ v if v != np.nan else '—' for v in values ]
             self.treeview.insert("", n, text=index, values=values)
         
 def main():
