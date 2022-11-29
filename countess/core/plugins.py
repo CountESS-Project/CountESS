@@ -21,6 +21,7 @@ from countess.core.parameters import (
     IntegerParam,
     MultiParam,
     StringParam,
+    LEVELS,
 )
 from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes
 
@@ -189,28 +190,41 @@ class DaskBasePlugin(BasePlugin):
 # tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and provide
 # progress feedback.
 
-
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first."""
+
+    def __init__(self):
+        # Add in filenames and levels 
+        super().__init__()
+        file_params = { "filename": FileParam("Filename", file_types=self.file_types) }
+        for name, label in LEVELS:
+            file_params[name] = StringParam(label, "")
+
+        self.parameters['files'] = FileArrayParam('Files', 
+            MultiParam('File', file_params)
+        )
 
     def load_files(self, row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
         fps = self.parameters['files'].params
         if not fps: return
 
         per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-        for fp in fps:
-            df = self.read_file_to_dataframe(fp, per_file_row_limit)
+        for file_param in fps:
+            df = self.read_file_to_dataframe(file_param, per_file_row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
             yield df
 
-    def combine_dfs(self, dfs: list[dd.DataFrame]) -> dd.DataFrame:
+    def combine_dfs(self, ddf0: Optional[dd.DataFrame], ddfs: list[dd.DataFrame]) -> dd.DataFrame:
         """Consistently handles cases for zero and one input dataframe"""
         # XXX what actually is the logical operation here a) between files in one load
         # and b) between existing dataframe and the new ones.
         # Merge or concat?
 
-        return concat_dask_dataframes(dfs)
+        if ddf0 is not None:
+            return concat_dask_dataframes([ddf0, *ddfs])
+        else:
+            return concat_dask_dataframes(ddfs)
 
     def run(
         self,
@@ -220,25 +234,27 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         """Input plugins are likely I/O bound so instead of using the Dask progress callback
         mechanism this uses a simple count of files read."""
 
-        dfs = [] if ddf is None else [ddf]
         num_files = len(self.parameters['files'].params)
         if callback:
             callback(0, num_files, "Loading")
+
+        dfs = []
         for num, df in enumerate(self.load_files()):
             dfs.append(df)
             if callback:
                 callback(num+1, num_files, "Loading")
+
         if callback:
             callback(num_files, num_files)
 
-        return self.combine_dfs(dfs)
+        return self.combine_dfs(ddf, dfs)
 
     def prerun(self, ddf: Optional[dd.DataFrame]) -> dd.DataFrame:
 
-        dfs: list[dd.DataFrame] = [] if ddf is None else [ddf]
+        dfs = []
         for df in self.load_files(row_limit=PRERUN_ROW_LIMIT):
             dfs.append(df)
-        self.prerun_cache = crop_dask_dataframe(self.combine_dfs(dfs), PRERUN_ROW_LIMIT)
+        self.prerun_cache = crop_dask_dataframe(self.combine_dfs(ddf, dfs), PRERUN_ROW_LIMIT)
         return self.prerun_cache
 
     def read_file_to_dataframe(
@@ -247,6 +263,19 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         raise NotImplementedError(
             f"Implement {self.__class__.__name__}.read_file_to_dataframe"
         )
+
+class DaskCountPlugin(DaskInputPlugin):
+
+    def run(
+        self,
+        ddf: Optional[dd.DataFrame],
+        callback: Optional[Callable[..., None]] = None,
+    ) -> dd.DataFrame:
+
+        pass
+
+        
+
 
 
 class DaskTransformPlugin(DaskBasePlugin):

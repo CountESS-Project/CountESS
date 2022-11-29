@@ -172,8 +172,6 @@ class ParameterWrapper:
                 self.subwrappers[p].update()
             else:
                 self.subwrappers[p] = ParameterWrapper(self.entry, p, self.callback, delete_row_callback)
-                #if self.callback:
-                #    self.callback(p)
             self.subwrappers[p].set_row(n)
 
         params_set = set(params)
@@ -538,7 +536,7 @@ class DataFramePreview:
             self.treeview.delete(row)
 
         for n, (index, *values) in enumerate(ddf.itertuples()):
-            values = [ v if v != np.nan else '—' for v in values ]
+            values = [ '—' if v is np.nan else str(v) for v in values ]
             self.treeview.insert("", n, text=index, values=values)
         
 def main():

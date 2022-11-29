@@ -1,5 +1,11 @@
-from typing import Mapping, Optional, Any
+from typing import Mapping, Optional, Any, Iterable
 import os.path
+
+LEVELS = [
+    ('cond', 'Condition'),
+    ('repl', 'Replicate'),
+    ('bin', 'Bin/Time'),
+]
 
 class BaseParam:
     """Represents the parameters which can be set on a plugin."""
@@ -119,7 +125,7 @@ class ChoiceParam(BaseParam):
     ):
         self.label = label
         self.value = value
-        self.choices = list(choices) or []
+        self.choices = list(choices or [])
 
     def set_value(self, value: Optional[str]):
         if value in self.choices:
@@ -252,3 +258,4 @@ class MultiParam(BaseParam):
 
     def __iter__(self):
         return self.params.__iter__()
+
