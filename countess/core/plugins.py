@@ -36,8 +36,6 @@ Plugin lifecycle:
   * .prerun() gets run again any time a preceding plugin changes
   * .prerun() can alter .parameters or throw exceptions, etc.
 * plugin.parameters gets read to get the name of configuration fields.
-
-
 """
 
 PRERUN_ROW_LIMIT = 100
@@ -126,6 +124,19 @@ class BasePlugin:
     def add_parameter(self, name: str, param: BaseParam):
         self.parameters[name] = param.copy()
         return self.parameters[name]
+
+    def load_config(self, config: Mapping[str,bool|int|float|str]):
+        for k, v in config.items():
+            param = self.parameters
+            for kk in k.split("."):
+                param = param[kk]
+            param.value = v
+
+    def get_config(self):
+        for k, p in self.parameters.items():
+            v = p.value
+
+            yield from p.get_config(k)
 
 
 class FileInputMixin:

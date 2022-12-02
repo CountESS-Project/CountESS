@@ -1,10 +1,39 @@
 import logging
 import importlib
+from collections import defaultdict
 
 from importlib.metadata import entry_points
 from typing import Type, Mapping, Iterable, Tuple, Optional, Any
 from functools import partial
 from countess.core.plugins import BasePlugin
+
+
+# XXX This isn't very nice and is making me rethink the whole
+# nested config strategy.
+
+def flatten_config(cfg: dict|list, path: str=""):
+    if type(cfg) is dict:
+        cfg_pairs = sorted(cfg.items())
+    elif type(cfg) is list:
+        cfg_pairs = enumerate(cfg)
+    for k, v in cfg_pairs:
+        if type(v) in (dict, list):
+            yield from flatten_config(v, f"{path}.{k}" if path else k)
+        else:
+            yield f"{path}.{k}" if path else k, str(v)
+
+def unflatten_config(cfg_list):
+    cfg = {}
+    kkl = defaultdict(list)
+    for k, v in cfg_list:
+        k0, *kk = k.split(".", 1)
+        if kk:
+            kkl[k0].append((kk[0], v))
+        else:
+            cfg[k0] = v
+    for k0, cfg_list in kkl.items():
+        cfg[k0] = unflatten_config(cfg_list)
+    return cfg
 
 
 class Pipeline:
@@ -26,11 +55,11 @@ class Pipeline:
         plugin = self.plugins[-1] if position is None else self.plugins[position]
 
         for k, v in config.items():
-            print(f"{self.__class__.__name__} set_plugin_config {k} {v}")
             if k in plugin.parameters:
                 plugin.parameters[k].value = v
 
     def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]) -> BasePlugin:
+
         """Loads plugin config from a `plugin_name` and a `config` dictionary"""
         module_name, class_name = plugin_name.split(":")
         plugin_class = getattr(importlib.import_module(module_name), class_name)
@@ -45,7 +74,9 @@ class Pipeline:
 
         plugin.prerun(previous_prerun)
         plugin.update()
-        self.set_plugin_config(None, config)
+
+        cfg_tree = unflatten_config(config.items())
+        self.set_plugin_config(None, cfg_tree)
 
         prerun_value = plugin.prerun(previous_prerun)
         plugin.update()
@@ -55,8 +86,9 @@ class Pipeline:
     def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
         """Writes plugin configs as a series of names and dictionaries"""
         for plugin in self.plugins:
+            plugin_name = plugin.__module__ + ":" + plugin.__class__.__name__
             config = dict(((k, p.value) for k, p in plugin.parameters.items()))
-            yield f"{plugin.__class__.__module__}:{plugin.__class__.__name__}", config
+            yield plugin_name, flatten_config(config)
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
         """Adds a plugin at `position`, if that's possible.

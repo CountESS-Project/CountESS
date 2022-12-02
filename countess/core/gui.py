@@ -350,8 +350,9 @@ class PipelineManager:
         filename = filedialog.asksaveasfilename(filetypes=[(".INI Config File", "*.ini")])
         with open(filename, "w") as fh:
             for section_name, config in self.pipeline.get_plugin_configs():
+
                 fh.write(f'[{section_name}]\n')
-                for k, v in config.items():
+                for k, v in config:
                     fh.write(f'{k} = {v}\n')
                 fh.write('\n')
 

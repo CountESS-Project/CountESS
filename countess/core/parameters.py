@@ -19,6 +19,10 @@ class BaseParam:
         distinct values"""
         raise NotImplementedError(f"Implement {self.__class__.__name__}.copy()")
 
+    def set_value(self, value):
+        self.value = value
+        return self
+
 
 class SimpleParam(BaseParam):
     """A SimpleParam has a single value"""
@@ -109,11 +113,11 @@ class FileParam(StringParam):
             self.file_types = file_types
 
     def clean_value(self, value: str):
+        if not value: return value
         return os.path.relpath(value)
 
     def copy(self):
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
-
 
 class ChoiceParam(BaseParam):
     """A drop-down menu parameter choosing between options. Defaults to 'None'"""
@@ -198,6 +202,28 @@ class ArrayParam(BaseParam):
     def __iter__(self):
         return self.params.__iter__()
 
+    @property
+    def value(self):
+        return [ p.value for p in self.params ]
+
+    @value.setter
+    def value(self, value):
+
+        # if setting to a dictionary, keep only the values in order
+        # and forget about the numbering.
+
+        if type(value) is dict:
+            values = sorted([ (int(k), v) for k, v in value.items() ])
+            value = [ v[1] for v in values ]
+
+        self.params = [
+            self.param.copy().set_value(v)
+            for v in value
+        ]
+
+    @value.deleter
+    def value(self):
+        self.params = []
 
 class FileArrayParam(ArrayParam):
     """FileArrayParam is an ArrayParam arranged per-file.  Using this class really just
@@ -259,3 +285,16 @@ class MultiParam(BaseParam):
     def __iter__(self):
         return self.params.__iter__()
 
+    @property
+    def value(self):
+        return dict( (k, p.value) for k, p in self.params.items() )
+
+    @value.setter
+    def value(self, value):
+        for k, v in value.items():
+            self.params[k].value = v
+
+    @value.deleter
+    def value(self):
+        for p in self.params.values():
+            del p.value
