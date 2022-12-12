@@ -38,7 +38,7 @@ from ..utils.dask import crop_dask_dataframe
 import numpy as np
 
 def is_nan(v):
-    return v is np.nan or (type(v) is float and math.isnan(v))
+    return v is None or v is np.nan or (type(v) is float and math.isnan(v))
 
 class CancelButton(tk.Button):
     """A button which is a red X for cancelling / removing items"""
