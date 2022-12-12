@@ -531,7 +531,7 @@ class DataFramePreview:
 
         for n, ct in enumerate(column_types):
             # XXX it'd be nicer if we could do "real" decimal point alignment
-            self.treeview.column(n, anchor = tk.E if ct in ('i', 'f') else tk.W, width=1)
+            self.treeview.column(n, anchor = tk.E if ct in ('i', 'f') else tk.W, width=100, minwidth=100, stretch=tk.YES)
 
         for row in self.treeview.get_children():
             self.treeview.delete(row)
