@@ -3,6 +3,9 @@ from setuptools import setup
 setup(
         name = 'countess',
         version = '0.0.1',
+        author = 'CountESS Developers',
+        maintainer = 'Nick Moore',
+        maintainer_email = 'nick@zoic.org',
         packages = [ 'countess', 'countess.plugins', 'countess.core' ],
         entry_points = {
             'countess_plugins': [
@@ -27,6 +30,14 @@ setup(
             'tables @ git+https://github.com/PyTables/PyTables.git@da01cf8908c2d8c2b07e8a35685f0811807453f6',
             'pyarrow~=9.0.0',
             'ttkthemes~=3.2.2',
-        ]
+        ],
+        license_files = ('LICENSE.txt',),
+        classifiers = [
+            'Development Status :: 2 - Pre-Alpha',
+            'Intended Audience :: Science/Research',
+            'License :: OSI Approved :: BSD License',
+            'Operating System :: OS Independent',
+            'Topic :: Scientific/Engineering :: Bio-Informatics',
+        ],
 )
 
