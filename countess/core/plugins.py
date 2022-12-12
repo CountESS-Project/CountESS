@@ -23,7 +23,7 @@ from countess.core.parameters import (
     StringParam,
     LEVELS,
 )
-from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes
+from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes, merge_dask_dataframes
 
 """
 Plugin lifecycle:
@@ -146,6 +146,7 @@ class FileInputMixin:
 
     # used by the GUI file dialog
     file_types = [("Any", "*")]
+    file_params = {}
 
     parameters: MutableMapping[str, BaseParam] = {
         'files': FileArrayParam('Files', FileParam('File'))
@@ -210,6 +211,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         file_params = { "filename": FileParam("Filename", file_types=self.file_types) }
         for name, label in LEVELS:
             file_params[name] = StringParam(label, "")
+        file_params.update(self.file_params)
 
         self.parameters['files'] = FileArrayParam('Files', 
             MultiParam('File', file_params)
@@ -221,21 +223,21 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
         per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
         for file_param in fps:
-            df = self.read_file_to_dataframe(file_param, per_file_row_limit)
+            levels = [file_param[level_name].value for level_name, _ in LEVELS]
+            if any(levels):
+                column_suffix = "_".join(levels)
+            else:
+                column_suffix = None
+            df = self.read_file_to_dataframe(file_param, column_suffix, per_file_row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
             yield df
 
-    def combine_dfs(self, ddf0: Optional[dd.DataFrame], ddfs: list[dd.DataFrame]) -> dd.DataFrame:
+    def combine_dfs(self, df0: Optional[dd.DataFrame], dfs: list[dd.DataFrame]) -> dd.DataFrame:
         """Consistently handles cases for zero and one input dataframe"""
-        # XXX what actually is the logical operation here a) between files in one load
-        # and b) between existing dataframe and the new ones.
-        # Merge or concat?
 
-        if ddf0 is not None:
-            return concat_dask_dataframes([ddf0, *ddfs])
-        else:
-            return concat_dask_dataframes(ddfs)
+        dfs = [ df for df in [ df0 ] + dfs if df is not None and len(df) > 0 ]
+        return merge_dask_dataframes(dfs)
 
     def run(
         self,

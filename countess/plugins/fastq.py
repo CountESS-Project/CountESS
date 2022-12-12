@@ -10,7 +10,7 @@ from more_itertools import ichunked
 
 from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam, FileArrayParam, FileParam, LEVELS
 from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dask_dataframes
+from countess.utils.dask import merge_dask_dataframes
 
 VERSION = "0.0.1"
 
@@ -32,9 +32,10 @@ class LoadFastqPlugin(DaskInputPlugin):
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
     }
 
-    def read_file_to_dataframe(self, file_param, row_limit=None):
+    def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
         records = []
         count_column_name = "count"
+        if column_suffix: count_column_name += "_" + column_suffix
         for level_name, _ in LEVELS:
             if file_param[level_name].value:
                 count_column_name += "_%s" % file_param[level_name].value
@@ -50,11 +51,16 @@ class LoadFastqPlugin(DaskInputPlugin):
             records, columns=("sequence", count_column_name)
         )
 
-    def combine_dfs(self, ddf0, ddfs):
+    def combine_dfs(self, df0, dfs):
+        """first combine the count dataframes, then group them by sequence, then 
+        optionally merge them with ddf0 (data from the previous plugin)"""
 
-        combined_df = super().combine_dfs(ddf0, ddfs)
+        combined_df = merge_dask_dataframes(dfs)
 
-        if len(combined_df) > 1 and self.parameters["group"].value:
+        if len(combined_df) and self.parameters["group"].value:
                 combined_df = combined_df.groupby(by=["sequence"]).sum()
-        
-        return combined_df
+
+        if df0 is not None:
+            return merge_dask_dataframes([ df0, combined_df ])
+        else:
+            return combined_df

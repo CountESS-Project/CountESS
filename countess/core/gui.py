@@ -16,6 +16,7 @@ import dask.dataframe as dd
 import ttkthemes  # type:ignore
 import re
 import configparser
+import math
 
 from .parameters import (
     ArrayParam,
@@ -35,6 +36,9 @@ from .plugins import BasePlugin, FileInputMixin
 from ..utils.dask import crop_dask_dataframe
 
 import numpy as np
+
+def is_nan(v):
+    return v is np.nan or (type(v) is float and math.isnan(v))
 
 class CancelButton(tk.Button):
     """A button which is a red X for cancelling / removing items"""
@@ -531,15 +535,17 @@ class DataFramePreview:
 
         for n, ct in enumerate(column_types):
             # XXX it'd be nicer if we could do "real" decimal point alignment
-            self.treeview.column(n, anchor = tk.E if ct in ('i', 'f') else tk.W, width=100, minwidth=100, stretch=tk.YES)
+            anchor = tk.E if ct in ('i', 'f') else tk.W
+            self.treeview.column(n, anchor=anchor, width=100, minwidth=100, stretch=tk.YES)
 
         for row in self.treeview.get_children():
             self.treeview.delete(row)
 
         for n, (index, *values) in enumerate(ddf.itertuples()):
-            values = [ '—' if v is np.nan else str(v) for v in values ]
+            values = [ '—' if is_nan(v) else str(v) for v in values ]
             self.treeview.insert("", n, text=index, values=values)
-        
+       
+
 def main():
     root = ttkthemes.ThemedTk()
     root.title("CountESS")

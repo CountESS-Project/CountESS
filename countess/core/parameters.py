@@ -225,6 +225,7 @@ class ArrayParam(BaseParam):
     def value(self):
         self.params = []
 
+
 class FileArrayParam(ArrayParam):
     """FileArrayParam is an ArrayParam arranged per-file.  Using this class really just
     marks it as expecting to be populated from an open file dialog."""
@@ -243,7 +244,9 @@ class FileArrayParam(ArrayParam):
         return self.find_fileparam().file_types
 
     def add_files(self, filenames):
-        # XXX slightly daft way of doing it
+        # XXX slightly daft way of doing it.  It is setting the filename
+        # of the 'template' param, and then copying that template to
+        # make the new param.
         for filename in filenames:
             self.find_fileparam().value = filename
             self.add_row()

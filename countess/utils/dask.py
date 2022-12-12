@@ -31,3 +31,12 @@ def concat_dask_dataframes(ddfs: list[dd.DataFrame]) -> dd.DataFrame:
         return ddfs[0].copy()
     else:
         return dd.concat(ddfs)
+
+def merge_dask_dataframes(dfs: list[dd.DataFrame|pd.DataFrame]) -> dd.DataFrame:
+    """Merge multiple dask/pandas dataframes together on their index.
+    Always returns a new Dask dataframe even if there's one or zero input dataframes."""
+
+    left = empty_dask_dataframe()
+    for right in dfs:
+        left = left.merge(right, how="outer")
+    return left

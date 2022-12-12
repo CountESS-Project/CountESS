@@ -19,31 +19,21 @@ class LoadHdfPlugin(DaskInputPlugin):
     version = VERSION
 
     file_types = [("HDF5 File", "*.hdf5")]
-
-    parameters = {
-        'files': FileArrayParam('Files', 
-            MultiParam('File', {
-                "filename": FileParam("Filename", file_types=file_types),
-                "key": ChoiceParam("HDF Key"),
-                "prefix": StringParam("Index Prefix"),
-                "suffix": StringParam("Column Suffix"),
-            }),
-        )
+    file_params = {
+        "key": ChoiceParam("HDF Key"),
     }
 
     keys: list[str] = []
 
     def update(self):
-        print(f"{self}.update() {self.parameters['files'].params}")
         super().update()
 
         for fp in self.parameters['files']:
             with pd.HDFStore(fp.filename.value) as hs:
                 fp.key.choices = sorted(hs.keys())
-            print(f"{fp} {fp.filename.value} {fp.key.choices} {fp.key.value}")
 
     def read_file_to_dataframe(
-        self, fp: MultiParam, row_limit: Optional[int] = None
+            self, fp: MultiParam, column_suffix: str='', row_limit: Optional[int] = None
     ) -> pd.DataFrame:
 
         if not fp.key.value or fp.key.value not in fp.key.choices:
@@ -58,13 +48,8 @@ class LoadHdfPlugin(DaskInputPlugin):
         with pd.HDFStore(filename) as hs:
             df = hs.select(key, start=0, stop=row_limit)
 
-        prefix = fp["prefix"].value
-        suffix = fp["suffix"].value
-        if prefix:
-            df['__index'] = prefix + df.index
-            df.set_index('__index', inplace=True)
-        if suffix:
-            df.columns = (str(c) + suffix for c in df.columns)
+        if column_suffix:
+            df.columns = (str(c) + "_" + column_suffix for c in df.columns)
         return df
 
 
