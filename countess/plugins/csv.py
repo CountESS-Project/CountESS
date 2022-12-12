@@ -51,7 +51,7 @@ class LoadCsvPlugin(DaskInputPlugin):
                     while len(row) > len(columns):
                         columns.append(f"column_%d" % len(columns))
                     records.append(row)
-                if n > row_limit:
+                if row_limit is not None and n > row_limit:
                     break
 
         if column_suffix:
@@ -63,7 +63,8 @@ class LoadCsvPlugin(DaskInputPlugin):
         """Lookup CSV records in with a left join"""
 
         combined_df = merge_dask_dataframes(dfs)
+        join_how = self.parameters['join_how'].value or 'left'
         if df0 is not None:
-            return df0.merge(combined_df, how=self.parameters['join_how'].value)
+            return df0.merge(combined_df, how=join_how)
         else:
             return combined_df
