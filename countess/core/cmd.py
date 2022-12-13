@@ -21,7 +21,7 @@ def progress_callback(n, a, b, s="Running"):
 
 
 def process_ini(config_filenames):
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(strict=False)
     config.read(config_filenames)
 
     pipeline = Pipeline()

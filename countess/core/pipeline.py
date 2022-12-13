@@ -61,9 +61,16 @@ class Pipeline:
     def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]) -> BasePlugin:
 
         """Loads plugin config from a `plugin_name` and a `config` dictionary"""
-        module_name, class_name = plugin_name.split(":")
-        plugin_class = getattr(importlib.import_module(module_name), class_name)
+
+        module_name = config.pop("_module")
+        class_name = config.pop("_class")
+        version = config.pop("_version")
+
+        module = importlib.import_module(module_name)
+        plugin_class = getattr(module, class_name)
         assert issubclass(plugin_class, BasePlugin)
+
+        # XXX compare version with module.VERSION
 
         plugin = plugin_class()
         previous_plugin = self.plugins[-1] if self.plugins else None
@@ -85,10 +92,15 @@ class Pipeline:
 
     def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
         """Writes plugin configs as a series of names and dictionaries"""
-        for plugin in self.plugins:
-            plugin_name = plugin.__module__ + ":" + plugin.__class__.__name__
+        for number, plugin in enumerate(self.plugins):
+            plugin_name = f"{plugin.name} {number+1}"
             config = dict(((k, p.value) for k, p in plugin.parameters.items()))
-            yield plugin_name, flatten_config(config)
+            config_list = [
+                ('_module', plugin.__module__),
+                ('_class', plugin.__class__.__name__),
+                ('_version', plugin.version),
+            ] + list(flatten_config(config))
+            yield plugin_name, config_list
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
         """Adds a plugin at `position`, if that's possible.

@@ -342,7 +342,7 @@ class PipelineManager:
     def load_config(self):
         filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
         if filename:
-            config = configparser.ConfigParser()
+            config = configparser.ConfigParser(strict=False)
             config.read(filename)
             self.clear()
             for section_name in config.sections():
