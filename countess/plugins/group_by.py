@@ -13,11 +13,15 @@ VERSION = "0.0.1"
 class GroupByPlugin(DaskTransformPlugin):
     """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
 
-    # XXX should support multiple operations but we'd need to support MultiIndex columns for that.
+    # XXX should support an operation per column, using
+    # dd.Aggregation to supply appropriate chunk/agg/finalize
+    # functions which (potentially) work differently per column,
+    # as opposed to the built-in aggregations which are the 
+    # same for every column.
 
     name = "Group By"
     title = "Groups records by a column"
-    description = "XXX"
+    description = "Group records by a column"
     version = VERSION
 
     parameters = {

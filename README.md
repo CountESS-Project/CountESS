@@ -12,11 +12,11 @@ Source code is available at [https://github.com/CountESS-Project/CountESS](https
 
 To run the CountESS GUI, use `countess_gui`.
 
-Add plugins and set configuration parameters.  Each plugin tab shows 
-configuration parameters and below that the abbreviated output of that plugin.
-Only the first few hundred rows of input files are read at configuration time.
+Add plugins and set configuration parameters.  Each plugin has its own configuration
+tab which shows parameters and below that the abbreviated output of that plugin.
 
-To perform a complete run, click 'RUN'.
+Only the first few hundred rows of input files are read at configuration time.
+To perform a complete run using the entire input file, click 'RUN'.
 
 Plugin configurations can be saved and loaded in .INI file format.
 CountESS can also be run in headless mode with `countess_cmd your_config.ini`.

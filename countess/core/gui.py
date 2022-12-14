@@ -248,7 +248,7 @@ class PluginConfigurator:
 
         self.wrapper_cache: Mapping[str,ParameterWrapper] = {}
 
-        tk.Label(self.frame, text=plugin.description).grid(row=0, sticky=tk.EW)
+        tk.Label(self.frame, text=plugin.title).grid(row=0, sticky=tk.EW)
 
         self.subframe = ttk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=0)
@@ -397,7 +397,7 @@ class PipelineManager:
             ttk.Button(
                 self.plugin_chooser_frame, text=plugin_class.name, command=add_callback
             ).grid(row=n, column=0)
-            ttk.Label(self.plugin_chooser_frame, text=plugin_class.description).grid(
+            ttk.Label(self.plugin_chooser_frame, text=plugin_class.title).grid(
                 row=n, column=1
             )
 
