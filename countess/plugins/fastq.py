@@ -51,16 +51,12 @@ class LoadFastqPlugin(DaskInputPlugin):
             records, columns=("sequence", count_column_name)
         )
 
-    def combine_dfs(self, df0, dfs):
-        """first combine the count dataframes, then group them by sequence, then 
-        optionally merge them with ddf0 (data from the previous plugin)"""
+    def combine_dfs(self, dfs):
+        """first concatenate the count dataframes, then (optionally) group them by sequence"""
 
-        combined_df = merge_dask_dataframes(dfs)
+        combined_df = concat_dask_dataframes(dfs)
 
         if len(combined_df) and self.parameters["group"].value:
                 combined_df = combined_df.groupby(by=["sequence"]).sum()
 
-        if df0 is not None:
-            return merge_dask_dataframes([ df0, combined_df ])
-        else:
-            return combined_df
+        return combined_df

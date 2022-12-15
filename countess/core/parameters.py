@@ -119,28 +119,34 @@ class FileParam(StringParam):
     def copy(self):
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
 
+
 class ChoiceParam(BaseParam):
     """A drop-down menu parameter choosing between options. Defaults to 'None'"""
 
-    value: Optional[str]
+    _value: Optional[str] = None
 
     def __init__(
         self, label: str, value: Optional[str] = None, choices: Iterable[str] = None
     ):
         self.label = label
-        self.value = value
+        self._value = value
         self.choices = list(choices or [])
 
-    def set_value(self, value: Optional[str]):
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
         if value in self.choices:
-            self.value = value
+            self._value = value
         else:
-            self.value = None
+            self._value = None
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if len(self.choices) == 1: self.value = choices[0]
-        elif self.value not in self.choices: self.value = None
+        if len(self.choices) == 1: self._value = choices[0]
+        elif self.value not in self.choices: self._value = None
 
     def copy(self):
         return ChoiceParam(self.label, self.value, self.choices)

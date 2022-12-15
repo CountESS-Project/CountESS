@@ -23,20 +23,8 @@ class LoadCsvPlugin(DaskInputPlugin):
     file_types = [("CSV", "*.csv"), ("TSV", "*.tsv")]
 
     parameters = {
-        "header": BooleanParam("CSV file has header?", True),
-        "join_how": ChoiceParam("Join Direction", choices=[]),
+        "header": BooleanParam("CSV file has header row?", True),
     }
-
-    def prerun(self, ddf: Optional[dd.DataFrame]) -> dd.DataFrame:
-        join_how_param = self.parameters['join_how']
-
-        if ddf is not None:
-            join_how_param.choices = ["left", "right", "inner", "outer"]
-        else:
-            join_how_param.choices = ["N/A"]
-            join_how_param.value = "N/A"
-
-        return super().prerun(ddf)
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
        
@@ -58,13 +46,3 @@ class LoadCsvPlugin(DaskInputPlugin):
             columns = [ f"{c}_{column_suffix}" for c in columns ]
 
         return pd.DataFrame.from_records(records, columns=columns, index=columns[0])
-
-    def combine_dfs(self, df0, dfs):
-        """Lookup CSV records in with a left join"""
-
-        combined_df = merge_dask_dataframes(dfs)
-        join_how = self.parameters['join_how'].value or 'left'
-        if df0 is not None:
-            return df0.merge(combined_df, how=join_how)
-        else:
-            return combined_df
