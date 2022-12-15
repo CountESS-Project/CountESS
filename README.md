@@ -39,8 +39,7 @@ To write a new plugin:
 
 ... and your plugin will appear in CountESS.
 
-Bundled plugin code is under `countess/plugins/` and further Examples will be
-provided under `example-plugins/`.
+For more details, see [Writing CountESS Plugins](doc/writing_plugins.md)
 
 ## Enquiries
 
