@@ -1,0 +1,4 @@
+The Do Nothing Example Plugin is licensed CC0 "No Rights Reserved",
+it is merely an example of how you might write a plugin.
+
+For starters, you should replace this LICENSE.txt with your own.
