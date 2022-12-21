@@ -205,7 +205,9 @@ class ArrayParam(BaseParam):
         return len(self.params)
 
     def __getitem__(self, key):
-        return self.params[key]
+        while len(self.params) <= int(key):
+            self.add_row()
+        return self.params[int(key)]
 
     def __contains__(self, item):
         return item in self.params
