@@ -76,6 +76,11 @@ class StringParam(SimpleParam):
     _value: str = ""
 
 
+class TextParam(StringParam):
+
+    pass
+
+
 class StringCharacterSetParam(StringParam):
     """A StringParam limited to characters from `character_set`.  Call `clean_value` to get
     an acceptable value"""

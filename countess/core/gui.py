@@ -30,6 +30,7 @@ from .parameters import (
     MultiParam,
     SimpleParam,
     StringParam,
+    TextParam,
 )
 from .pipeline import Pipeline
 from .plugins import BasePlugin, FileInputMixin
@@ -109,6 +110,9 @@ class ParameterWrapper:
             self.var = tk.DoubleVar(tk_parent, value=parameter.value)
         elif isinstance(parameter, IntegerParam):
             self.var = tk.IntVar(tk_parent, value=parameter.value)
+        elif isinstance(parameter, TextParam):
+            # XXX tk.Text version doesn't use a var (see below)
+            self.var = None
         elif isinstance(parameter, StringParam) or isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
         else:
@@ -135,6 +139,12 @@ class ParameterWrapper:
         elif isinstance(parameter, FileParam):
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             self.entry.state(['readonly'])
+        elif isinstance(parameter, TextParam):
+            # tk.Text widget doesn't have a variable, for whatever reason,
+            # so we use a different method!
+            # XXX is this a simpler way to handle other kinds of fields too?
+            self.entry = tk.Text(tk_parent)
+            self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, SimpleParam):
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
@@ -192,11 +202,6 @@ class ParameterWrapper:
 
         self.entry.grid(row=row, column=2, sticky=tk.EW)
 
-    def clear_value_callback(self, *_):
-        self.parameter.value = ""
-        if self.callback is not None:
-            self.callback(self.parameter)
-
     def add_row_callback(self, *_):
         assert isinstance(self.parameter, ArrayParam)
 
@@ -221,11 +226,24 @@ class ParameterWrapper:
         if self.callback is not None:
             self.callback(self.parameter)
 
-    def value_changed_callback(self, *_):
-        self.parameter.value = self.var.get()
+    def set_value(self, value):
+        self.parameter.value = value
         if self.callback is not None:
             self.callback(self.parameter)
-        self.var.set(self.parameter.value)
+        return self.parameter.value
+
+    def value_changed_callback(self, *_):
+        self.var.set(self.set_value(self.var.get()))
+
+    def widget_modified_callback(self, *_):
+        # only gets called the *first* time a modification happens, unless
+        # we reset the flag which says a change has happened ...
+        value = self.entry.get(1.0, tk.END)
+        self.entry.edit_modified(False)
+        self.set_value(value)
+
+    def clear_value_callback(self, *_):
+        self.set_value("")
 
     def destroy(self):
         self.label.destroy()
