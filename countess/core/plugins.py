@@ -131,13 +131,6 @@ class BasePlugin:
             param = param[k]
         param.value = value
 
-    def load_config(self, config: Mapping[str,bool|int|float|str]):
-        for k, v in config.items():
-            param = self.parameters
-            for kk in k.split("."):
-                param = param[kk]
-            param.value = v
-
     def get_config(self):
         for k, p in self.parameters.items():
             v = p.value

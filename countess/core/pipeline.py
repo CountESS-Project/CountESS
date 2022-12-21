@@ -22,19 +22,6 @@ def flatten_config(cfg: dict|list, path: str=""):
         else:
             yield f"{path}.{k}" if path else k, str(v)
 
-def unflatten_config(cfg_list):
-    cfg = {}
-    kkl = defaultdict(list)
-    for k, v in cfg_list:
-        k0, *kk = k.split(".", 1)
-        if kk:
-            kkl[k0].append((kk[0], v))
-        else:
-            cfg[k0] = v
-    for k0, cfg_list in kkl.items():
-        cfg[k0] = unflatten_config(cfg_list)
-    return cfg
-
 
 class Pipeline:
     """Represents a series of plugins linked up to each other.  Plugins can be added
@@ -57,6 +44,7 @@ class Pipeline:
         for k, v in config.items():
             if k in plugin.parameters:
                 plugin.parameters[k].value = v
+                plugin.update()
 
     def load_plugin_config(self, plugin_name: str, config: Mapping[str,bool|int|float|str]) -> BasePlugin:
 
@@ -77,14 +65,11 @@ class Pipeline:
         previous_prerun = self.plugins[-1].prerun_cache if self.plugins else None
 
         self.add_plugin(plugin)
-        self.set_plugin_config(None, config)
 
-        plugin.prerun(previous_prerun)
-        plugin.update()
-
-        cfg_tree = unflatten_config(config.items())
-        self.set_plugin_config(None, cfg_tree)
-
+        for key, value in config.items():
+            plugin.set_parameter(key, value)
+            plugin.update()
+            
         prerun_value = plugin.prerun(previous_prerun)
         plugin.update()
 
