@@ -7,7 +7,7 @@ import pandas as pd  # type: ignore
 from countess.core.parameters import BaseParam, StringParam, ChoiceParam, FileParam, FileArrayParam, MultiParam
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 
-from countess.utils.dask import empty_dask_dataframe
+from countess.utils.dask import empty_dask_dataframe, concat_dask_dataframes
 VERSION = "0.0.1"
 
 

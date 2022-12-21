@@ -10,7 +10,7 @@ from more_itertools import ichunked
 
 from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam, FileArrayParam, FileParam, LEVELS
 from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import merge_dask_dataframes
+from countess.utils.dask import concat_dask_dataframes, merge_dask_dataframes
 
 VERSION = "0.0.1"
 
