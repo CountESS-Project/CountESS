@@ -125,6 +125,12 @@ class BasePlugin:
         self.parameters[name] = param.copy()
         return self.parameters[name]
 
+    def set_parameter(self, key: str, value: bool|int|float|str):
+        param = self.parameters
+        for k in key.split("."):
+            param = param[k]
+        param.value = value
+
     def load_config(self, config: Mapping[str,bool|int|float|str]):
         for k, v in config.items():
             param = self.parameters
