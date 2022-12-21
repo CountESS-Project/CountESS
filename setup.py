@@ -16,6 +16,7 @@ setup(
                 'log_score = countess.plugins.log_score:LogScorePlugin',
                 'group_by = countess.plugins.group_by:GroupByPlugin',
                 'protein = countess.plugins.protein:ProteinTranslatorPlugin',
+                'embed_r = countess.plugins.embed_r:EmbeddedRPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
