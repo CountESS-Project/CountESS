@@ -17,6 +17,7 @@ import ttkthemes  # type:ignore
 import re
 import configparser
 import math
+import sys
 
 from .parameters import (
     ArrayParam,
@@ -326,8 +327,8 @@ class PipelineManager:
         menu_frame = ttk.Frame(self.frame)
         config_menu_button = tk.Menubutton(menu_frame, text="Configure")
         config_menu = config_menu_button['menu'] = tk.Menu(config_menu_button, tearoff=False)
-        config_menu.add_command(label="Load Config", command=self.load_config)
-        config_menu.add_command(label="Save Config", command=self.save_config)
+        config_menu.add_command(label="Load Config", command=self.load_config_dialog)
+        config_menu.add_command(label="Save Config", command=self.save_config_dialog)
         config_menu_button.grid(row=0, column=0, sticky=tk.W)
 
         plugin_menu_button = tk.Menubutton(menu_frame, text="Plugins")
@@ -357,26 +358,31 @@ class PipelineManager:
             self.configurators.pop(position)
             self.notebook.forget(position)
 
-    def load_config(self):
+    def load_config(self, filename):
+        config = configparser.ConfigParser(strict=False)
+        config.read(filename)
+        self.clear()
+        for section_name in config.sections():
+            plugin = self.pipeline.load_plugin_config(section_name, config[section_name])
+            self.add_plugin_configurator(plugin)
+
+    def load_config_dialog(self):
         filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
         if filename:
-            config = configparser.ConfigParser(strict=False)
-            config.read(filename)
-            self.clear()
-            for section_name in config.sections():
-                plugin = self.pipeline.load_plugin_config(section_name, config[section_name])
-                self.add_plugin_configurator(plugin)
+            self.load_config(filename)
 
-
-    def save_config(self):
-        filename = filedialog.asksaveasfilename(filetypes=[(".INI Config File", "*.ini")])
+    def save_config(self, filename):
         with open(filename, "w") as fh:
             for section_name, config in self.pipeline.get_plugin_configs():
-
                 fh.write(f'[{section_name}]\n')
                 for k, v in config:
                     fh.write(f'{k} = {v}\n')
                 fh.write('\n')
+
+    def save_config_dialog(self):
+        filename = filedialog.asksaveasfilename(filetypes=[(".INI Config File", "*.ini")])
+        if filename:
+            self.save_config(filename)
 
     def plugin_menu_open(self):
         self.plugin_menu.delete(0, self.plugin_menu.index(tk.END))
@@ -573,8 +579,12 @@ def main():
         if t in themes:
             root.set_theme(t)
             break
+        
+    pm = PipelineManager(root)
 
-    PipelineManager(root)
+    for filename in sys.argv[1:]:
+        pm.load_config(filename)
+
     root.rowconfigure(0, weight=1)
     root.columnconfigure(0, weight=1)
     root.mainloop()
