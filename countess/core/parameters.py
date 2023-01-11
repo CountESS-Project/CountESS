@@ -119,7 +119,12 @@ class FileParam(StringParam):
 
     def clean_value(self, value: str):
         if not value: return value
-        return os.path.relpath(value)
+        try:
+            return os.path.relpath(value)
+        except ValueError:
+            # If we can't find the relpath, leave it alone.
+            # (eg: windows throws ValueError if path is on a different drive)
+            return value
 
     def copy(self):
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)

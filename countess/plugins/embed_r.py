@@ -1,12 +1,9 @@
 import dask.dataframe as dd
-import rpy2
-import rpy2.robjects as ro
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
+
 import pandas as pd
 
 from countess.core.plugins import DaskTransformPlugin
-from countess.core.parameters import TextParam
+from countess.core.parameters import ChoiceParam, TextParam
 
 VERSION = "0.0.1"
 
@@ -18,21 +15,36 @@ class EmbeddedRPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "code": TextParam("R Code"),
+        "column": ChoiceParam("Group By", "Index", choices=[]),
+        "code_map": TextParam("Map Function"),
+        "code_red": TextParam("Reduce Function"),
+        "code_fin": TextParam("Finalize Function"),
     }
 
+    def update(self):
+        self.parameters["column"].choices = ["Index"] + self.input_columns
+
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        print(f"CODE {self.parameters['code'].value}")
 
-        pdf_in = ddf.compute()
+        try:
+            import rpy2
+            import rpy2.robjects as ro
+            from rpy2.robjects import pandas2ri
+            from rpy2.robjects.conversion import localconverter
+        except ImportError:
+            raise NotImplementedError("No RPy2 Installed")
 
-        func = ro.r(self.parameters['code'].value)
+        col_name = self.parameters["column"].value
+        column = ddf.index if col_name == "Index" else ddf[col_name]
 
-        print(func)
+        map_f = ro.r(self.parameters['code_map'].value)
+        red_f = ro.r(self.parameters['code_red'].value)
+        fin_f = ro.r(self.parameters['code_fin'].value)
 
+        aggregation = dd.Aggregation(f"R_{id(self)}", map_f, red_f, fin_f)
+       
         with localconverter(ro.default_converter + pandas2ri.converter):
-            #print(base.summary(pdf_in))
-            pdf_out = func(pdf_in)
+            result = ddf.groupby(column).agg(aggregation)
 
-        return dd.from_pandas(pd.DataFrame(pdf_out), npartitions=1)
+        return dd.from_pandas(pd.DataFrame(result), npartitions=1)
 

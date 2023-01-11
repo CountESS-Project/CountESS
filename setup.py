@@ -2,11 +2,11 @@ from setuptools import setup
 
 setup(
         name = 'countess',
-        version = '0.0.1',
+        version = '0.0.2',
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',
-        packages = [ 'countess', 'countess.plugins', 'countess.core' ],
+        packages = [ 'countess', 'countess.utils', 'countess.plugins', 'countess.core' ],
         entry_points = {
             'countess_plugins': [
                 'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
@@ -28,11 +28,12 @@ setup(
             'more_itertools~=8.14.0',
             'Levenshtein==0.20.5',
             'numpy~=1.23.2',
-            'pandas~=1.4.3',
-            'tables @ git+https://github.com/PyTables/PyTables.git@da01cf8908c2d8c2b07e8a35685f0811807453f6',
-            'pyarrow~=9.0.0',
+            'pandas~=1.5.2',
+            'tables==3.8.0',
+            'pyarrow~=10.0.1',
             'ttkthemes~=3.2.2',
         ],
+        license = 'BSD',
         license_files = ('LICENSE.txt',),
         classifiers = [
             'Development Status :: 2 - Pre-Alpha',
@@ -41,5 +42,7 @@ setup(
             'Operating System :: OS Independent',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
+        long_description = "Constructs pipelines of plugins for bioinformations data processing",
+        long_description_content_type = "text/x-rst",
 )
 

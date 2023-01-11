@@ -29,8 +29,12 @@ class LoadHdfPlugin(DaskInputPlugin):
         super().update()
 
         for fp in self.parameters['files']:
-            with pd.HDFStore(fp.filename.value) as hs:
-                fp.key.choices = sorted(hs.keys())
+            try:
+                with pd.HDFStore(fp.filename.value) as hs:
+                    fp.key.choices = sorted(hs.keys())
+            except IOError as e:
+                # XXX
+                pass
 
     def read_file_to_dataframe(
             self, fp: MultiParam, column_suffix: str='', row_limit: Optional[int] = None
