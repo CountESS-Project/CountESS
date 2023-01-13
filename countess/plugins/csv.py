@@ -12,6 +12,23 @@ from countess.utils.dask import merge_dask_dataframes
 VERSION = "0.0.1"
 
 
+def maybe_number(x):
+    """CSV is never clear on if something is actually a number so ... try it I guess ..."""
+    try:
+        return int(x)
+    except ValueError:
+        pass
+
+    try:
+        return float(x)
+    except ValueError:
+        pass
+
+    return x
+
+def clean_row(row):
+    return [ maybe_number(x) for x in row ]
+
 class LoadCsvPlugin(DaskInputPlugin):
     """Load CSV files"""
 
@@ -38,7 +55,7 @@ class LoadCsvPlugin(DaskInputPlugin):
                 else:
                     while len(row) > len(columns):
                         columns.append(f"column_%d" % len(columns))
-                    records.append(row)
+                    records.append(clean_row(row))
                 if row_limit is not None and n > row_limit:
                     break
 
