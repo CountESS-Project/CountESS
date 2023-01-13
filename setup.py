@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name = 'countess',
-        version = '0.0.2',
+        version = '0.0.3',
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',
@@ -12,7 +12,6 @@ setup(
                 'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
                 'load_hdf = countess.plugins.hdf5:LoadHdfPlugin',
                 'load_csv = countess.plugins.csv:LoadCsvPlugin',
-                #'store_hdf = countess.plugins.hdf5:StoreHdfPlugin',
                 'log_score = countess.plugins.log_score:LogScorePlugin',
                 'group_by = countess.plugins.group_by:GroupByPlugin',
                 'protein = countess.plugins.protein:ProteinTranslatorPlugin',
@@ -33,6 +32,11 @@ setup(
             'pyarrow~=10.0.1',
             'ttkthemes~=3.2.2',
         ],
+        extras_require = {
+            'r': [
+                'rpy2==3.5.1'
+            ],
+        },
         license = 'BSD',
         license_files = ('LICENSE.txt',),
         classifiers = [
