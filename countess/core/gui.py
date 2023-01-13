@@ -259,6 +259,7 @@ class ParameterWrapper:
 
 class PluginConfigurator:
 
+    output_text = None
     preview = None
 
     def __init__(self, tk_parent: tk.Widget, plugin: BasePlugin, change_callback=None):
@@ -307,14 +308,31 @@ class PluginConfigurator:
         if self.change_callback:
             self.change_callback(self)
 
+        if self.plugin.error_str is not None:
+            if self.output_text is None:
+                self.output_text = tk.Text(self.frame, height=10)
+                self.output_text.grid(row=3)
+
+            # can't actually replace the text if it is "disabled"
+            self.output_text['state'] = 'normal'
+            self.output_text.replace("1.0", tk.END, self.plugin.error_str)
+            self.output_text['state'] = 'disabled'
+
+        elif self.output_text is not None:
+            self.output_text.destroy()
+            self.output_text = None
+
         if isinstance(self.plugin.prerun_cache, dd.DataFrame):
             ddf = self.plugin.prerun_cache
             if self.preview:
                 self.preview.update(ddf)
             else:
                 self.preview = DataFramePreview(self.frame, ddf)
-                self.preview.frame.grid(row=3)
-                self.frame.rowconfigure(3, weight=1)
+                self.preview.frame.grid(row=4)
+                self.frame.rowconfigure(4, weight=1)
+        elif self.preview is not None:
+            self.preview.destroy()
+            self.preview = None
 
 
 
@@ -572,7 +590,9 @@ class DataFramePreview:
         for n, (index, *values) in enumerate(ddf.itertuples()):
             values = [ '—' if is_nan(v) else str(v) for v in values ]
             self.treeview.insert("", n, text=index, values=values)
-       
+    
+    def destroy(self):
+        self.frame.destroy()
 
 def main():
     root = ttkthemes.ThemedTk()
