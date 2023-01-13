@@ -15,36 +15,34 @@ class EmbeddedRPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "column": ChoiceParam("Group By", "Index", choices=[]),
-        "code_map": TextParam("Map Function"),
-        "code_red": TextParam("Reduce Function"),
-        "code_fin": TextParam("Finalize Function"),
+        "mode": ChoiceParam("Mode", "Apply", choices=["Apply", "Map Partitions", "Collect"]),
+        "code": TextParam("R Function")
     }
-
-    def update(self):
-        self.parameters["column"].choices = ["Index"] + self.input_columns
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
 
         try:
             import rpy2
-            import rpy2.robjects as ro
-            from rpy2.robjects import pandas2ri
-            from rpy2.robjects.conversion import localconverter
         except ImportError:
-            raise NotImplementedError("No RPy2 Installed")
+            raise NotImplementedError("RPy2 doesn't seem to be installed")
 
-        col_name = self.parameters["column"].value
-        column = ddf.index if col_name == "Index" else ddf[col_name]
+        import rpy2.robjects as ro
+        from rpy2.robjects import pandas2ri
+        pandas2ri.activate()
 
-        map_f = ro.r(self.parameters['code_map'].value)
-        red_f = ro.r(self.parameters['code_red'].value)
-        fin_f = ro.r(self.parameters['code_fin'].value)
+        #from rpy2.robjects.conversion import localconverter
 
-        aggregation = dd.Aggregation(f"R_{id(self)}", map_f, red_f, fin_f)
-       
-        with localconverter(ro.default_converter + pandas2ri.converter):
-            result = ddf.groupby(column).agg(aggregation)
+        r_func = ro.r(self.parameters['code'].value)
 
-        return dd.from_pandas(pd.DataFrame(result), npartitions=1)
+        mode = self.parameters['mode'].value
+        if mode == 'Apply':
+            x = ddf.apply(lambda x: r_func(**x.to_dict())[0], axis=1, meta=pd.Series(dtype='float', name='x'))
+            ddf['x'] = x
+        elif mode == 'Map Partitions':
+            x = ddf.map_partitions(r_func)
+            ddf['x'] = x
+        elif mode == 'Collect':
+            ddf = pd.DataFrame(r_func(ddf.compute()))
+
+        return ddf
 
