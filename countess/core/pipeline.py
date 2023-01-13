@@ -169,12 +169,28 @@ class Pipeline:
     def prerun(self, position: int=0):
         assert 0 <= position < len(self.plugins)
         obj = self.plugins[position-1].prerun_cache if position > 0 else None
+
         for plugin in self.plugins[position:]:
-            obj = plugin.prerun(obj)
+            plugin.error_str = None
+            plugin.prerun_cache = None
+
+        for plugin in self.plugins[position:]:
+            try:
+                obj = plugin.prerun(obj)
+            except Exception as exc:
+                plugin.error_str = str(exc)
         
     def run(self, progress_callback):
         obj = None
+        
+        for plugin in self.plugins:
+            plugin.error_str = None
+            plugin.prerun_cache = None
+
         for num, plugin in enumerate(self.plugins):
             cb = partial(progress_callback, num)
-            obj = plugin.run(obj, cb)
+            try:
+                obj = plugin.run(obj, cb)
+            except Exception as exc:
+                plugin.error_str = str(exc)
         return obj
