@@ -74,6 +74,7 @@ class BasePlugin:
     parameters: MutableMapping[str, BaseParam] = {}
 
     prerun_cache: Any=None
+    error_str: Optional[str]=None
 
     @classmethod
     def can_follow(cls, plugin: Optional[Type["BasePlugin"]] | Optional["BasePlugin"]):
