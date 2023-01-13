@@ -60,6 +60,12 @@ class BooleanParam(SimpleParam):
     var_type = bool
     _value: bool = False
 
+    def clean_value(self, value):
+        if type(value) is str:
+            if value in ('true', 'True', '1'): return True
+            if value in ('false', 'False', '0'): return False
+            raise ValueError(f"Can't convert {value} to boolean")
+        return bool(value)
 
 class IntegerParam(SimpleParam):
     var_type = int
