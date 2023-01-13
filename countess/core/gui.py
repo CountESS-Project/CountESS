@@ -144,8 +144,12 @@ class ParameterWrapper:
             # tk.Text widget doesn't have a variable, for whatever reason,
             # so we use a different method!
             # XXX is this a simpler way to handle other kinds of fields too?
-            self.entry = tk.Text(tk_parent)
-            self.entry.bind("<<Modified>>", self.widget_modified_callback)
+            self.entry = tk.Text(tk_parent, height=10)
+            self.entry.insert('1.0', parameter.value)
+            if parameter.read_only:
+                self.entry['state'] = 'disabled'
+            else:
+                self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, SimpleParam):
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
