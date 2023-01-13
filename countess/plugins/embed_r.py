@@ -3,7 +3,7 @@ import dask.dataframe as dd
 import pandas as pd
 
 from countess.core.plugins import DaskTransformPlugin
-from countess.core.parameters import ChoiceParam, TextParam
+from countess.core.parameters import StringParam, TextParam
 
 VERSION = "0.0.1"
 
@@ -15,7 +15,7 @@ class EmbeddedRPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "mode": ChoiceParam("Mode", "Apply", choices=["Apply", "Map Partitions", "Collect"]),
+        "column": StringParam("Column"),
         "code": TextParam("R Function")
     }
 
@@ -34,15 +34,21 @@ class EmbeddedRPlugin(DaskTransformPlugin):
 
         r_func = ro.r(self.parameters['code'].value)
 
-        mode = self.parameters['mode'].value
-        if mode == 'Apply':
-            x = ddf.apply(lambda x: r_func(**x.to_dict())[0], axis=1, meta=pd.Series(dtype='float', name='x'))
-            ddf['x'] = x
-        elif mode == 'Map Partitions':
-            x = ddf.map_partitions(r_func)
-            ddf['x'] = x
-        elif mode == 'Collect':
-            ddf = pd.DataFrame(r_func(ddf.compute()))
+        x = ddf.map_partitions(r_func)
 
+        # XXX problem: this works great if the R function returns
+        # a single column which maps per row of the input, but that's
+        # not the only format it can come out in.  
+        # I'd like to be able to support:
+        #  function (z) { aggregate(z$y, list(z$x), FUN=mean) }
+        # or even:
+        #  function (z) { list(aggregate(z$y, list(z$x), FUN=mean), aggregate(z$y, list(z$x), FUN=median)) }
+        # for example, but we end up dealing with a pandas Series
+        # of rpy2 DataFrames, which we need to convert back to 
+        # something we can use.  The autoconversion doesn't seem 
+        # to catch this at all.
+
+        ddf[self.parameters['column'].value] = x
+        
         return ddf
 
