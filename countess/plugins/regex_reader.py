@@ -75,16 +75,18 @@ class RegexReaderPlugin(DaskInputPlugin):
         if row_limit and first_row: row_limit = row_limit + first_row
 
         # XXX should probably slice into pieces rather than building all in one go.
+        # XXX note arbitrary backstop against broken REs reading the whole file.
+        # this should be removed once resource-based processing limits are added.
 
         with open(file_param["filename"].value, "r") as fh:
-            for line in fh:
+            for num, line in enumerate(fh):
                 match = line_re.match(line)
                 if match:
                     if match.groups():
                         records.append([ maybe_number(match.group(n)) for n in column_nums ])
                     elif match.group(0):
                         records.append([maybe_number(match.group(0))])
-                if row_limit is not None and len(records) >= row_limit:
+                if row_limit is not None and (len(records) >= row_limit or num > 100 * row_limit):
                     break
                 
 
