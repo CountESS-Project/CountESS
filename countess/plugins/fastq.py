@@ -8,7 +8,7 @@ import pandas as pd  # type: ignore
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
-from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam, FileArrayParam, FileParam, LEVELS
+from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam, FileArrayParam, FileParam
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import concat_dask_dataframes, merge_dask_dataframes
 
@@ -36,9 +36,6 @@ class LoadFastqPlugin(DaskInputPlugin):
         records = []
         count_column_name = "count"
         if column_suffix: count_column_name += "_" + column_suffix
-        for level_name, _ in LEVELS:
-            if file_param[level_name].value:
-                count_column_name += "_%s" % file_param[level_name].value
             
         with open(file_param["filename"].value, "r") as fh:
             for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):

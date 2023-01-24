@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import csv
 
-from countess.core.parameters import BooleanParam, ChoiceParam, LEVELS
+from countess.core.parameters import BooleanParam, ChoiceParam
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import merge_dask_dataframes
 
@@ -44,7 +44,10 @@ class LoadCsvPlugin(DaskInputPlugin):
     }
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
-       
+      
+        # XXX should probably slice into pieces rather than building all in one go.
+        # then build those pandas dataframes into a single Dask dataframe as we go.
+
         columns = []
         records = []
         with open(file_param["filename"].value, "r") as fh:
