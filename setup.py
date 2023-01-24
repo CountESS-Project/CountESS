@@ -16,6 +16,7 @@ setup(
                 'group_by = countess.plugins.group_by:GroupByPlugin',
                 'protein = countess.plugins.protein:ProteinTranslatorPlugin',
                 'embed_r = countess.plugins.embed_r:EmbeddedRPlugin',
+                'regex_reader = countess.plugins.regex_reader:RegexReaderPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
