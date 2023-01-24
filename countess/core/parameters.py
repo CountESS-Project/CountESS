@@ -1,12 +1,6 @@
 from typing import Mapping, Optional, Any, Iterable
 import os.path
 
-LEVELS = [
-    ('cond', 'Condition'),
-    ('repl', 'Replicate'),
-    ('bin', 'Bin/Time'),
-]
-
 class BaseParam:
     """Represents the parameters which can be set on a plugin."""
 

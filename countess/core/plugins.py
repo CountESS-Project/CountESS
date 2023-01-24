@@ -21,7 +21,6 @@ from countess.core.parameters import (
     IntegerParam,
     MultiParam,
     StringParam,
-    LEVELS,
 )
 from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes, merge_dask_dataframes
 
@@ -206,11 +205,9 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first."""
 
     def __init__(self):
-        # Add in filenames and levels 
+        # Add in filenames
         super().__init__()
         file_params = { "filename": FileParam("Filename", file_types=self.file_types) }
-        for name, label in LEVELS:
-            file_params[name] = StringParam(label, "")
         file_params.update(self.file_params)
 
         self.parameters['files'] = FileArrayParam('Files', 
@@ -223,12 +220,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
         per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
         for file_param in fps:
-            levels = [file_param[level_name].value for level_name, _ in LEVELS]
-            if any(levels):
-                column_suffix = "_".join(levels)
-            else:
-                column_suffix = None
-            df = self.read_file_to_dataframe(file_param, column_suffix, per_file_row_limit)
+            df = self.read_file_to_dataframe(file_param, None, per_file_row_limit)
             if isinstance(df, pd.DataFrame):
                 df = dd.from_pandas(df, chunksize=100_000_000)
             yield df
@@ -237,7 +229,8 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         """First stage: collect all the files together in whatever
         way is appropriate.  Override this to do it differently
         or do more work on the dataframes (eg: counting, renaming, etc)"""
-        return merge_dask_dataframes(dfs, how='outer')
+        #return merge_dask_dataframes(dfs, how='outer')
+        return concat_dask_dataframes(dfs)
 
     def merge_dfs(self, prev_ddf: dd.DataFrame, this_ddf: dd.DataFrame) -> dd.DataFrame:
         """Merge the new data into the old data.  Only called
