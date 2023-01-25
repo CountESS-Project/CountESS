@@ -18,6 +18,7 @@ import re
 import configparser
 import math
 import sys
+import pandas as pd
 
 from .parameters import (
     ArrayParam,
@@ -308,28 +309,31 @@ class PluginConfigurator:
         if self.change_callback:
             self.change_callback(self)
 
-        if self.plugin.error_str is not None:
+    def set_output(self, output):
+
+        if output is not None:
             if self.output_text is None:
                 self.output_text = tk.Text(self.frame, height=10)
                 self.output_text.grid(row=3)
 
             # can't actually replace the text if it is "disabled"
             self.output_text['state'] = 'normal'
-            self.output_text.replace("1.0", tk.END, self.plugin.error_str)
+            self.output_text.replace("1.0", tk.END, output)
             self.output_text['state'] = 'disabled'
 
         elif self.output_text is not None:
             self.output_text.destroy()
             self.output_text = None
 
-        if isinstance(self.plugin.prerun_cache, dd.DataFrame):
-            ddf = self.plugin.prerun_cache
+    def set_result(self, result):
+        if isinstance(result, (dd.DataFrame, pd.DataFrame)):
             if self.preview:
-                self.preview.update(ddf)
+                self.preview.update(result)
             else:
-                self.preview = DataFramePreview(self.frame, ddf)
+                self.preview = DataFramePreview(self.frame, result)
                 self.preview.frame.grid(row=4)
                 self.frame.rowconfigure(4, weight=1)
+        # XXX should display *something* for other results
         elif self.preview is not None:
             self.preview.destroy()
             self.preview = None
@@ -419,14 +423,16 @@ class PipelineManager:
         except ValueError:
             return
 
-        self.pipeline.prerun(position)
+        result, output = self.pipeline.prerun(position)
+        plugin_configurator.set_result(result)
+        plugin_configurator.set_output(output)
 
     def notebook_tab_changed(self, event):
         """Triggered when the notebook tab is changed, refresh the displayed tab to
         make sure parameters are updated"""
         position = self.notebook.index(self.notebook.select())
         if position < len(self.configurators):
-            self.pipeline.prerun(position)
+            self.pipeline.prepare(position)
             self.configurators[position].update()
         else:
             self.update_plugin_chooser_frame()
@@ -471,7 +477,7 @@ class PipelineManager:
             anchor=tk.NE, relx=1, rely=0
         )
 
-        self.pipeline.prerun()
+        self.pipeline.prepare(position)
         self.notebook.select(position)
 
     def del_plugin(self, position):
@@ -481,8 +487,7 @@ class PipelineManager:
         self.pipeline.del_plugin(position)
         self.configurators.pop(position)
         self.notebook.forget(position)
-
-        self.pipeline.prerun()
+        self.pipeline.prepare(position)
 
     def run_pipeline(self):
         Thread(target=self.run_pipeline_thread).start()

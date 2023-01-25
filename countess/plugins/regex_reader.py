@@ -14,6 +14,10 @@ VERSION = "0.0.1"
 
 def maybe_number(x):
     """CSV is never clear on if something is actually a number so ... try it I guess ..."""
+    # XXX this seems really clumsy
+
+    if x is None: return None
+
     try:
         return int(x)
     except ValueError:
@@ -45,15 +49,14 @@ class RegexReaderPlugin(DaskInputPlugin):
         "index": IntegerParam("Index Column", 0),
     }
 
-    # XXX should have an update() method to set the column names instead of using "column number"
-    # which is pretty clumsy.
-    # XXX if regex isn't setting column names maybe there should be StringParams for those?
-    # thus avoiding some of the mess of regex named fields.
+    # XXX should have an update() method to set the column names instead of
+    # using "column number" which is pretty clumsy.
+    # XXX if regex isn't setting column names there should be StringParams
+    # for those thus avoiding some of the mess of regex named fields.
+    # XXX this is common to CSV reader and some others too I'm sure.
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
      
-        print(f"{file_param} {row_limit}")
-
         records = []
 
         line_re = re.compile(self.parameters['regex'].value)
@@ -71,15 +74,14 @@ class RegexReaderPlugin(DaskInputPlugin):
         else:
             index_column = None
 
-        first_row = 1 if self.parameters['skip'].value else 0
-        if row_limit and first_row: row_limit = row_limit + first_row
-
         # XXX should probably slice into pieces rather than building all in one go.
         # XXX note arbitrary backstop against broken REs reading the whole file.
         # this should be removed once resource-based processing limits are added.
 
         with open(file_param["filename"].value, "r") as fh:
             for num, line in enumerate(fh):
+                if num == 0 and self.parameters['skip'].value:
+                    continue
                 match = line_re.match(line)
                 if match:
                     if match.groups():

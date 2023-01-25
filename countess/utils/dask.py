@@ -36,6 +36,7 @@ def merge_dask_dataframes(dfs: list[dd.DataFrame|pd.DataFrame], how:str = 'outer
     """Merge multiple dask/pandas dataframes together on their index.
     Always returns a new Dask dataframe even if there's one or zero input dataframes."""
 
+    # XXX wrong for inner & left joins
     left = empty_dask_dataframe()
     for right in dfs:
         left = left.merge(right, how=how)
