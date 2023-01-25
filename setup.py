@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name = 'countess',
-        version = '0.0.3',
+        version = '0.0.4',
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',
@@ -14,7 +14,7 @@ setup(
                 'load_csv = countess.plugins.csv:LoadCsvPlugin',
                 'log_score = countess.plugins.log_score:LogScorePlugin',
                 'group_by = countess.plugins.group_by:GroupByPlugin',
-                'protein = countess.plugins.protein:ProteinTranslatorPlugin',
+                #'protein = countess.plugins.protein:ProteinTranslatorPlugin',
                 #'embed_r = countess.plugins.embed_r:EmbeddedRPlugin',
                 'embed_py = countess.plugins.embed_python:EmbeddedPythonPlugin',
                 'regex_reader = countess.plugins.regex_reader:RegexReaderPlugin',
