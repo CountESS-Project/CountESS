@@ -152,7 +152,8 @@ class Pipeline:
             item.output = traceback.format_exception(exc)
 
     def prerun_callback(self, n: int, a: int, b: int, s: Optional[str]=None):
-        print(f"PRERUN {n} {a}/{b} {s}")
+        # print(f"PRERUN {n} {a}/{b} {s}")
+        pass
 
     def prerun(self, position: int):
         self.run(position, partial(self.prerun_callback, position), PRERUN_ROW_LIMIT)

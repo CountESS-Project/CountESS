@@ -221,7 +221,6 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         if join_how == 'concat':
             return concat_dask_dataframes([prev_ddf, this_ddf])
         else:
-            print(f"MERGE: {prev_ddf.columns} {this_ddf.columns}")
             return prev_ddf.merge(this_ddf, how=join_how, left_index=True, right_index=True)
 
     def prepare(self, df):

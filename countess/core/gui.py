@@ -510,8 +510,8 @@ class PipelineRunner:
         toplevel.rowconfigure(0, weight=1)
         toplevel.columnconfigure(0, weight=1)
 
-        for num, plugin in enumerate(self.pipeline.plugins):
-            ttk.Label(self.frame, text=plugin.title).grid(row=num * 2, sticky=tk.EW)
+        for num, item in enumerate(self.pipeline.items):
+            ttk.Label(self.frame, text=item.plugin.title).grid(row=num * 2, sticky=tk.EW)
             pbar = LabeledProgressbar(self.frame, length=500)
             self.pbars.append(pbar)
             pbar.grid(row=num * 2 + 1, sticky=tk.EW)
@@ -530,13 +530,16 @@ class PipelineRunner:
             self.pbars[n].update_label(f"{s} : {a}" if a is not None else s)
 
     def run(self):
-        value = self.pipeline.run(self.progress_callback)
+        preview = DataFramePreview(self.frame, None)
+        preview.frame.grid(row=1000, sticky=tk.NSEW)
+        self.frame.rowconfigure(1000, weight=1)
+        self.frame.columnconfigure(0, weight=1)
 
-        if isinstance(value, dd.DataFrame):
-            preview = DataFramePreview(self.frame, value)
-            preview.frame.grid(row=1000, sticky=tk.NSEW)
-            self.frame.rowconfigure(1000, weight=1)
-            self.frame.columnconfigure(0, weight=1)
+        for num, item in enumerate(self.pipeline.items):
+            self.pipeline.run(num, partial(self.progress_callback, num))
+            print(f"{num} {item.result} {item.output} {type(item.result)}")
+            if isinstance(item.result, (dd.DataFrame, pd.DataFrame)):
+                preview.update(item.result)
 
 
 class DataFramePreview:
@@ -545,7 +548,7 @@ class DataFramePreview:
     # XXX uses a treeview, which seemed like a good match but actually a grid-layout
     # of custom styled labels might work better.
 
-    def __init__(self, tk_parent, ddf: dd.DataFrame):
+    def __init__(self, tk_parent, ddf: Optional[dd.DataFrame] = None):
         self.frame = ttk.Frame(tk_parent)
         self.label = ttk.Label(self.frame, text="DataFrame Preview")
         self.treeview = ttk.Treeview(self.frame, selectmode=tk.NONE)
@@ -564,7 +567,7 @@ class DataFramePreview:
         self.scrollbar_x.grid(row=2, column=0, sticky=tk.EW)
         self.scrollbar_y.grid(row=1, column=1, stick=tk.NS)
 
-        self.update(ddf)
+        if ddf is not None: self.update(ddf)
 
     def update(self, ddf: dd.DataFrame):
 
