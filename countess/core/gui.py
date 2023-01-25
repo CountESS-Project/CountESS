@@ -357,6 +357,7 @@ class PipelineManager:
         config_menu = config_menu_button['menu'] = tk.Menu(config_menu_button, tearoff=False)
         config_menu.add_command(label="Load Config", command=self.load_config_dialog)
         config_menu.add_command(label="Save Config", command=self.save_config_dialog)
+        config_menu.add_command(label="QUIT", command=self.quit_dialog)
         config_menu_button.grid(row=0, column=0, sticky=tk.W)
 
         plugin_menu_button = tk.Menubutton(menu_frame, text="Plugins")
@@ -415,6 +416,11 @@ class PipelineManager:
         )
         if filename:
             self.save_config(filename)
+
+    def quit_dialog(self):
+        # XXX probably should have a check if 
+        # config is dirty ask for confirmation
+        self.frame.quit()
 
     def plugin_menu_open(self):
         self.plugin_menu.delete(0, self.plugin_menu.index(tk.END))
