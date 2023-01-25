@@ -19,22 +19,23 @@ class EmbeddedRPlugin(DaskTransformPlugin):
         "code": TextParam("R Function")
     }
 
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-
+    def prepare(self, ddf: dd.DataFrame):
         try:
             import rpy2
         except ImportError:
             raise NotImplementedError("RPy2 doesn't seem to be installed")
 
+    def run_dask(self, df) -> dd.DataFrame:
+
         import rpy2.robjects as ro
         from rpy2.robjects import pandas2ri
         pandas2ri.activate()
 
-        #from rpy2.robjects.conversion import localconverter
-
         r_func = ro.r(self.parameters['code'].value)
 
-        x = ddf.map_partitions(r_func)
+        print(df)
+
+        x = df.apply(r_func, raw=True, axis=1)
 
         # XXX problem: this works great if the R function returns
         # a single column which maps per row of the input, but that's
@@ -48,7 +49,11 @@ class EmbeddedRPlugin(DaskTransformPlugin):
         # something we can use.  The autoconversion doesn't seem 
         # to catch this at all.
 
-        ddf[self.parameters['column'].value] = x
+        print(str(x))
+        if isinstance(x, dd.DataFrame):
+            return x
+        else:
+            df[self.parameters['column'].value] = x
         
-        return ddf
+        return df
 
