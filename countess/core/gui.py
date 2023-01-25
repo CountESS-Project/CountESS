@@ -343,6 +343,8 @@ class PluginConfigurator:
 class PipelineManager:
     # XXX allow some way to drag and drop tabs
 
+    config_file_name = None
+
     def __init__(self, tk_parent):
         self.pipeline = Pipeline()
         self.configurators = []
@@ -391,6 +393,7 @@ class PipelineManager:
         for section_name in config.sections():
             plugin = self.pipeline.load_plugin_config(section_name, config[section_name])
             self.add_plugin_configurator(plugin)
+        self.config_file_name = filename
 
     def load_config_dialog(self):
         filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
@@ -406,7 +409,10 @@ class PipelineManager:
                 fh.write('\n')
 
     def save_config_dialog(self):
-        filename = filedialog.asksaveasfilename(filetypes=[(".INI Config File", "*.ini")])
+        filename = filedialog.asksaveasfilename(
+            initialfile = self.config_file_name,
+            filetypes=[(".INI Config File", "*.ini")]
+        )
         if filename:
             self.save_config(filename)
 
