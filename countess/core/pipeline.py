@@ -77,12 +77,13 @@ class Pipeline:
 
         plugin = plugin_class()
         plugin.prepare(self.items[-1].result if self.items else None)
-        self.add_plugin(plugin)
 
         for key, value in config.items():
             plugin.set_parameter(key, value)
             plugin.update()
 
+        self.add_plugin(plugin)
+        self.prerun(len(self.items)-1)
         return plugin
 
     def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
@@ -109,7 +110,7 @@ class Pipeline:
         assert 0 <= position <= len(self.items)
 
         self.items.insert(position, PipelineItem(plugin))
-        self.prerun(position)
+        self.prepare(position)
 
     def del_plugin(self, position: int):
         """Deletes the plugin at `position`"""
@@ -144,6 +145,7 @@ class Pipeline:
 
         item = self.items[position]
         prev_result = self.items[position-1].result if position > 0 else None
+
         try:
             item.result = item.plugin.run(prev_result, callback, row_limit)
             item.output = None
