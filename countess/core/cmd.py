@@ -8,6 +8,8 @@ import dask.dataframe as dd
 from .pipeline import Pipeline
 from .plugins import BasePlugin
 
+import dask
+dask.config.set(scheduler='processes')
 
 def progress_callback(n, a, b, s="Running"):
     if b > 0:

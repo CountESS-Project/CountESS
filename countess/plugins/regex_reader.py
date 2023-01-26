@@ -74,9 +74,10 @@ class RegexReaderPlugin(DaskInputPlugin):
         else:
             index_column = None
 
-        # XXX should probably slice into pieces rather than building all in one go.
         # XXX note arbitrary backstop against broken REs reading the whole file.
         # this should be removed once resource-based processing limits are added.
+
+        pdfs = []
 
         with open(file_param["filename"].value, "r") as fh:
             for num, line in enumerate(fh):
@@ -90,6 +91,12 @@ class RegexReaderPlugin(DaskInputPlugin):
                         records.append([maybe_number(match.group(0))])
                 if row_limit is not None and (len(records) >= row_limit or num > 100 * row_limit):
                     break
-                
 
-        return pd.DataFrame.from_records(records, columns=columns, index=index_column)
+                if len(records) > 1000000:
+                    pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_column))
+                    records = []
+
+        if len(records):
+            pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_column))
+        
+        return dd.concat(pdfs)
