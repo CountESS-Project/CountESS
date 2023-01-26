@@ -14,19 +14,23 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "code": ArrayParam("Python Expressions", TextParam(""))
+        "code": TextParam('Code')
     }
 
     def run_dask(self, df) -> dd.DataFrame:
 
-        for pp in self.parameters['code'].params:
-            code = pp.value.replace('\n', '')
+        for c in self.parameters['code'].value.split('\n\n'):
+            code = c.replace('\n', ' ')
+            if not code:
+                continue
 
             try:
                 df = df.query(code)
             except ValueError as exc:
                 if str(exc) == 'cannot assign without a target object':
                     df = df.eval(code)
+                else:
+                    raise
 
         return df
 
