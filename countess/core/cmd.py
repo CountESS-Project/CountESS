@@ -4,10 +4,11 @@ import re
 import sys
 
 import dask.dataframe as dd
+import pandas as pd
 
 from .pipeline import Pipeline
 from .plugins import BasePlugin
-
+from functools import partial
 
 def progress_callback(n, a, b, s="Running"):
     if b > 0:
@@ -28,12 +29,18 @@ def process_ini(config_filenames):
     for section_name in config.sections():
         pipeline.load_plugin_config(section_name, config[section_name])
 
-    obj = pipeline.run(progress_callback)
+    for num, item in enumerate(pipeline.items):
 
-    if isinstance(obj, dd.DataFrame):
-        print()
-        print(obj.compute())
+        print(f"{num+1}: {item.plugin.name}\n")
 
+        pipeline.run(num, partial(progress_callback, num))
+
+        if isinstance(item.result, dd.DataFrame):
+            print(item.result.compute())
+        else:
+            print(item.result)
+        
+        print("\n==========\n")
 
 def main():
     process_ini(["./countess.ini"] + sys.argv[1:])
