@@ -18,6 +18,7 @@ setup(
                 #'embed_r = countess.plugins.embed_r:EmbeddedRPlugin',
                 'embed_py = countess.plugins.embed_python:EmbeddedPythonPlugin',
                 'regex_reader = countess.plugins.regex_reader:RegexReaderPlugin',
+                'pivot = countess.plugins.pivot:DaskPivotPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
