@@ -2,6 +2,7 @@ import logging
 import importlib
 from collections import defaultdict
 from dataclasses import dataclass
+import ast
 
 from importlib.metadata import entry_points
 from typing import Type, Mapping, Iterable, Tuple, Optional, Any, Callable
@@ -23,7 +24,7 @@ def flatten_config(cfg: dict|list, path: str=""):
         if type(v) in (dict, list):
             yield from flatten_config(v, f"{path}.{k}" if path else k)
         else:
-            yield f"{path}.{k}" if path else k, str(v)
+            yield f"{path}.{k}" if path else k, repr(v)
 
 
 def debug_progress_callback(name):
@@ -79,6 +80,8 @@ class Pipeline:
         plugin.prepare(self.items[-1].result if self.items else None)
 
         for key, value in config.items():
+            # XXX should this be optional? Postel's Law vs. Least Surprise.
+            value = ast.literal_eval(value)
             plugin.set_parameter(key, value)
             plugin.update()
 
