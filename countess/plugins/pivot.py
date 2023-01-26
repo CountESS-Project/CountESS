@@ -33,6 +33,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
         pivot_cols = [ p.value for p in self.parameters['pivot'].params if p.value ]
         sum_cols = [ p.value for p in self.parameters['sum'].params if p.value ]
 
+        ddf = ddf.reset_index(drop=True)
         new_ddf = ddf[index_cols + sum_cols].copy()
 
         pivot_product = itertools.product(*[ list(ddf[c].unique()) for c in pivot_cols ])
@@ -51,9 +52,17 @@ class DaskPivotPlugin(DaskTransformPlugin):
                 for col, val in pg:
                     new_ddf[new_sum_col] *= (ddf[col] == val).astype(int)
 
+        #only = dd.Aggregation(
+        #    'only',
+        #    lambda s: (s.first(), s.nunique() == 1),
+        #    lambda s, u: (s.first(), s.nunique() == 1, u.all()),
+        #    lambda s, u, uu: s.where(u, None).where(uu, None)
+        #    )
+
         ops = dict(
+            #[ (c, only) for c in index_cols ] +
             [ (c, 'first') for c in index_cols ] +
             [ (c, 'sum') for c in new_sum_cols ]
         )
        
-        return new_ddf.groupby(index_cols or new_ddf.index).agg(ops).reset_index(drop=True)
+        return new_ddf.groupby(index_cols or new_ddf.index).agg(ops)
