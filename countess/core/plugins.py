@@ -15,6 +15,8 @@ from countess.core.parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
+    ColumnChoiceParam,
+    ColumnOrNoneChoiceParam,
     FileArrayParam,
     FileParam,
     FloatParam,
@@ -137,12 +139,6 @@ class FileInputMixin:
         """Input Plugins can accept `None` as their input, since they're getting
         their data from a file anyway."""
         return data is None or super().accepts(data)
-
-    #@classmethod
-    #def can_follow(cls, plugin: Optional[Type[BasePlugin]] | Optional[BasePlugin]):
-    #    # the `not TYPE_CHECKING` clause is a workaround for mypy not really understanding
-    #    # mixin classes.
-    #    return plugin is None or (not TYPE_CHECKING and super().can_follow(plugin))
 
 
 class DaskProgressCallback(Callback):
@@ -278,6 +274,18 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             f"Implement {self.__class__.__name__}.read_file_to_dataframe"
         )
 
+def _set_column_choice_params(parameter, column_names):
+    if isinstance(parameter, ArrayParam):
+        _set_column_choice_params(parameter.param, column_names)
+        for p in parameter.params:
+            _set_column_choice_params(p, column_names)
+    elif isinstance(parameter, MultiParam):
+        for p in parameter.params.values():
+            _set_column_choice_params(p, column_names)
+    elif isinstance(parameter, ColumnOrNoneChoiceParam):
+        parameter.set_choices(['--'] + column_names) 
+    elif isinstance(parameter, ColumnChoiceParam):
+        parameter.set_choices(column_names)
 
 class DaskTransformPlugin(DaskBasePlugin):
     """a Transform plugin takes columns from the input data frame."""
@@ -289,6 +297,9 @@ class DaskTransformPlugin(DaskBasePlugin):
             self.input_columns = []
         else:
             self.input_columns = sorted(data.columns)
+
+        for p in self.parameters.values():
+            _set_column_choice_params(p, self.input_columns)
 
 
 class DaskScoringPlugin(DaskTransformPlugin):

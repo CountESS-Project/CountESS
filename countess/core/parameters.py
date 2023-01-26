@@ -159,8 +159,15 @@ class ChoiceParam(BaseParam):
         elif self.value not in self.choices: self._value = None
 
     def copy(self):
-        return ChoiceParam(self.label, self.value, self.choices)
+        return self.__class__(self.label, self.value, self.choices)
 
+class ColumnChoiceParam(ChoiceParam):
+    """A ChoiceParam which DaskTransformPlugin knows 
+    it should automatically update with a list of columns"""
+    pass
+
+class ColumnOrNoneChoiceParam(ColumnChoiceParam):
+    pass
 
 class ArrayParam(BaseParam):
     """An ArrayParam contains zero or more copies of `param`, which can be a SimpleParam or a
@@ -280,7 +287,7 @@ class MultiParam(BaseParam):
 
     def copy(self) -> 'MultiParam':
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
-        return MultiParam(self.label, pp)
+        return self.__class__(self.label, pp)
 
     def __getitem__(self, key):
         return self.params[key]
