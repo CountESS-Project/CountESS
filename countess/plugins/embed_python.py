@@ -6,6 +6,20 @@ from countess.core.parameters import StringParam, TextParam, BooleanParam, Array
 
 VERSION = "0.0.1"
 
+def process(df: pd.DataFrame, codes):
+
+    for code in codes:
+        result = df.eval(code)
+        if isinstance(result, (dd.Series, pd.Series)):
+            # this was a filter
+            df['_filter'] = result
+            df = df.query('_filter').drop(columns='_filter')
+        else:
+            # this was a column assignment
+            df = result
+
+    return df
+
 class EmbeddedPythonPlugin(DaskTransformPlugin):
 
     name = "Embedded Python"
@@ -19,18 +33,13 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
 
     def run_dask(self, df) -> dd.DataFrame:
 
-        for c in self.parameters['code'].value.split('\n\n'):
-            code = c.replace('\n', ' ').strip()
-            if not code:
-                continue
+        codes = [ 
+            c.replace('\n', ' ').strip()
+            for c in self.parameters['code'].value.split('\n\n')
+            if c.strip()
+        ]
 
-            try:
-                df = df.query(code)
-            except ValueError as exc:
-                if str(exc) == 'cannot assign without a target object':
-                    df = df.eval(code)
-                else:
-                    raise
-
-        return df
-
+        if isinstance(df, dd.DataFrame):
+            return df.map_partitions(process, codes)
+        else:
+            return process(df, codes)
