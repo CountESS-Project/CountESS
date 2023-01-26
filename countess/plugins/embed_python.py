@@ -20,7 +20,7 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
     def run_dask(self, df) -> dd.DataFrame:
 
         for c in self.parameters['code'].value.split('\n\n'):
-            code = c.replace('\n', ' ')
+            code = c.replace('\n', ' ').strip()
             if not code:
                 continue
 
