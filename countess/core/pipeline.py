@@ -3,6 +3,7 @@ import importlib
 from collections import defaultdict
 from dataclasses import dataclass
 import ast
+import re
 
 from importlib.metadata import entry_points
 from typing import Type, Mapping, Iterable, Tuple, Optional, Any, Callable
@@ -92,14 +93,23 @@ class Pipeline:
     def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
         """Writes plugin configs as a series of names and dictionaries"""
         for number, item in enumerate(self.items):
-            plugin_name = f"{item.plugin.name} {number+1}"
             config = dict(((k, p.value) for k, p in item.plugin.parameters.items()))
             config_list = [
                 ('_module', item.plugin.__module__),
                 ('_class', item.plugin.__class__.__name__),
                 ('_version', item.plugin.version),
             ] + list(flatten_config(config))
-            yield plugin_name, config_list
+            yield item.plugin.name, config_list
+
+    def get_new_plugin_name(self, plugin):
+        names = [ ii.plugin.name for ii in self.items if ii.plugin.name.startswith(plugin.name) ]
+        numbers = [ 0 ]
+        for nn in names:
+            m = re.match(r'.*?\s(\d+)$', nn)
+            if m: 
+                numbers.append(int(m.group(1)))
+        number = max(numbers) + 1        
+        return f"{plugin.name} {number}"
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
         """Adds a plugin at `position`, if that's possible.
@@ -112,6 +122,7 @@ class Pipeline:
             position = len(self.items)
         assert 0 <= position <= len(self.items)
 
+        plugin.name = self.get_new_plugin_name(plugin)
         self.items.insert(position, PipelineItem(plugin))
         self.prepare(position)
 
