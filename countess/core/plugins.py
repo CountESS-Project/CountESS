@@ -136,9 +136,25 @@ class FileInputMixin:
 
     @classmethod
     def accepts(self, data) -> bool:
-        """Input Plugins can accept `None` as their input, since they're getting
+        """Input Plugins can accept anything as their input, since they're getting
         their data from a file anyway."""
-        return data is None or super().accepts(data)
+        return True
+
+    def run(
+        self,
+        previous: Any,
+        callback: Callable[[int, int, Optional[str]], None],
+        row_limit: Optional[int] = None,
+    ):
+
+        df = self.load_files(callback, row_limit)
+
+        if type(previous) is list:
+            return [ df ] + previous
+        elif previous is not None:
+            return [ df, previous ]
+        else:
+            return df
 
 
 class DaskProgressCallback(Callback):
@@ -170,16 +186,20 @@ class DaskBasePlugin(BasePlugin):
 
     @classmethod
     def accepts(self, data) -> bool:
-        return isinstance(data, (dd.DataFrame, pd.DataFrame))
+        return isinstance(data, (dd.DataFrame, pd.DataFrame)) or \
+                type(data) is list and isinstance(data[0], (dd.DataFrame, pd.DataFrame))
 
     def run(
         self,
-        ddf: dd.DataFrame,
+        data,
         callback: Callable[[int, int, Optional[str]], None],
         row_limit: Optional[int],
     ):
         with DaskProgressCallback(callback):
-            return self.run_dask(ddf.copy())
+            if type(data) is list:
+                return [ self.run_dask(data[0].copy()) ] + data[1:]
+            else:
+                return self.run_dask(data.copy())
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
@@ -208,34 +228,11 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         or do more work on the dataframes (eg: counting, renaming, etc)"""
         return concat_dask_dataframes(dfs)
 
-    def merge_dfs(self, prev_ddf: dd.DataFrame, this_ddf: dd.DataFrame) -> dd.DataFrame:
-        """Merge the new data into the old data.  Only called
-        if there is a previous plugin to merge data from."""
-        join_how = self.parameters['join_how'].value
-        if join_how == 'none':
-            return this_ddf
-        if join_how == 'concat':
-            return concat_dask_dataframes([prev_ddf, this_ddf])
-        else:
-            return prev_ddf.merge(this_ddf, how=join_how, left_index=True, right_index=True)
+    def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
+        fps = self.parameters['files'].params
+        if not fps: return
 
-    def prepare(self, df):
-        super().prepare(df)
-        if df is not None and 'join_how' not in self.parameters:
-            self.parameters['join_how'] = ChoiceParam("Join Direction", "none", ["none", "outer", "inner", "left", "right", "concat"])
-        if df is None and 'join_how' in self.parameters:
-            del self.parameters['join_how']
-
-    def run(
-        self,
-        prev_ddf: Optional[dd.DataFrame],
-        callback: Callable[[int, int, Optional[str]], None],
-        row_limit: Optional[int] = None,
-    ) -> dd.DataFrame:
-
-        num_files = len(self.parameters['files'].params)
-
-        if num_files == 1:
+        if len(fps) == 1:
             with DaskProgressCallback(callback):
                 file_param = self.parameters['files'].params[0]
                 ddf = self.read_file_to_dataframe(file_param, None, row_limit)
@@ -243,29 +240,17 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             # Input plugins are likely I/O bound so if there's more than one
             # file, instead of using the Dask progress callback mechanism
             # this uses a simple count of files read."""
+            per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
             callback(0, num_files, "Loading")
             dfs = []
-            for num, df in enumerate(self.load_files(row_limit)):
+            for num, fp in enumerate(fps):
+                df = self.read_file_to_dataframe(fp, None, per_file_row_limit)
                 dfs.append(df)
                 callback(num+1, num_files, "Loading")
             callback(num_files, num_files)
             ddf = self.combine_dfs(dfs)
-        
-        if prev_ddf is None:
-            return ddf
-        else:
-            return self.merge_dfs(prev_ddf, ddf)
 
-    def load_files(self, row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
-        fps = self.parameters['files'].params
-        if not fps: return
-
-        per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-        for file_param in fps:
-            df = self.read_file_to_dataframe(file_param, None, per_file_row_limit)
-            if isinstance(df, pd.DataFrame):
-                df = dd.from_pandas(df, chunksize=100_000_000)
-            yield df
+        return ddf
 
     def read_file_to_dataframe(
         self, file_params: Mapping[str, BaseParam], row_limit: Optional[int] = None
@@ -286,6 +271,7 @@ def _set_column_choice_params(parameter, column_names):
         parameter.set_choices(['--'] + column_names) 
     elif isinstance(parameter, ColumnChoiceParam):
         parameter.set_choices(column_names)
+
 
 class DaskTransformPlugin(DaskBasePlugin):
     """a Transform plugin takes columns from the input data frame."""

@@ -326,6 +326,7 @@ class PluginConfigurator:
             self.output_text = None
 
     def set_result(self, result):
+        if type(result) is list: result = result[0]
         if isinstance(result, (dd.DataFrame, pd.DataFrame)):
             if self.preview:
                 self.preview.update(result)

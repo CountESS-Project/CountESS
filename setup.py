@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name = 'countess',
-        version = '0.0.4',
+        version = '0.0.5',
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',
@@ -19,6 +19,7 @@ setup(
                 'embed_py = countess.plugins.embed_python:EmbeddedPythonPlugin',
                 'regex_reader = countess.plugins.regex_reader:RegexReaderPlugin',
                 'pivot = countess.plugins.pivot:DaskPivotPlugin',
+                'join = countess.plugins.join:DaskJoinPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
