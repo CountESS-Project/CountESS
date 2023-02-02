@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 import itertools
+from collections import defaultdict
 
 from countess.utils.dask import empty_dask_dataframe
 from countess.core.parameters import ArrayParam, ColumnChoiceParam, ChoiceParam, MultiParam
@@ -31,41 +32,67 @@ class DaskPivotPlugin(DaskTransformPlugin):
             "function": ChoiceParam("Function", choices=AGG_FUNCTIONS),
         })),
     }
+
+    # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
         
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         index_cols = [ p.value for p in self.parameters['index'].params if p.value ]
         pivot_cols = [ p.value for p in self.parameters['pivot'].params if p.value ]
 
+        # dask's built-in "dd.pivot_table" can only handle one index column
+        # and one pivot column which is too limiting.  So this is a slightly
+        # cheesy replacement.
+
+        # First, collect all the aggregated columns together in one place.
         agg_cols = [
             (p.params['column'].value, p.params['function'].value)
             for p in self.parameters['agg'].params
             if p.params['column'].value and p.params['function'].value
         ]
 
+        # This won't run on multiindexes, but we're about to trash the indexing
+        # anyway so just drop the existing index, we don't care.
         ddf = ddf.reset_index(drop=True)
 
+        # `pivot_product` is every combination of every pivot column, so eg: if you're
+        # pivoting on a `bin` column with values 1..4 and a `rep` column with values
+        # 1..3 you'll end up with 12 elements, [ [1,1],[1,2],[1,3],[1,4],[2,1],[2,2] etc ]
         pivot_product = itertools.product(*[ list(ddf[c].unique()) for c in pivot_cols ])
+
+        # `pivot_groups` then reattaches the labels to those values, eg:
+        # [[('bin', 1), ('rep', 1)], [('bin', 1), ('rep', 2)] etc
         pivot_groups = sorted([
             list(zip(pivot_cols, pivot_values))
             for pivot_values in pivot_product
         ])
 
-        # dask's built-in "dd.pivot_table" can only handle one index column
-        # and one pivot column which is too limiting.  So this is a slightly
-        # cheesy replacement.
-
-        aggregate_ops = [(c, 'first') for c in index_cols]
-
+        # Each pivot group is a set of conditions to filter for in that pivot
+        # group.
+        aggregate_ops = defaultdict(list, [(c, ['first']) for c in index_cols])
         ddfs = []
         for pg in pivot_groups:
-            query = ' and '.join(f"`{col}` == {val}" for col, val in pg)
-            new_ddf = ddf.query(query)
+            # We first filter the source dataframe using the values in `pivot_group`
+            # then rename the aggregated columns to add a specific suffix for
+            # this group.
+            suffix = ''.join([f"__{pc}_{pv}" for pc, pv in pg])
+            query = ' and '.join(f"`{col}` == {repr(val)}" for col, val in pg)
 
+            # work out what columns we need to rename and accumulate the
+            # required aggregation operations in `aggregate_ops`.
+            rename_cols = {}
             for col, agg_op in agg_cols:
-                new_col = col + ''.join([f"__{pc}_{pv}__{agg_op}" for pc, pv in pg])
-                aggregate_ops.append((new_col, agg_op))
-                new_ddf.insert(len(new_ddf.columns), column=new_col, value=new_ddf[col])
+                aggregate_ops[col+suffix].append(agg_op)
+                rename_cols[col] = col+suffix
 
-            ddfs.append(new_ddf)
+            ddfs.append(
+                ddf.query(query).rename(columns=rename_cols)
+            )
 
-        return dd.concat(ddfs).groupby(index_cols or new_ddf.index).agg(dict(aggregate_ops))
+        # If there aren't multple aggregations for any one column,
+        # squish to prevent column name mangling.
+        # XXX this could be improved to make mangling column specific.
+        if all((len(v)==1) for k, v in aggregate_ops.items()):
+            aggregate_ops = dict((k, v[0]) for k, v in aggregate_ops.items())
+
+        # Group by the index columns and aggregate.
+        return dd.concat(ddfs).groupby(index_cols or new_ddf.index).agg(aggregate_ops)
