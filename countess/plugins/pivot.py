@@ -26,15 +26,20 @@ class DaskPivotPlugin(DaskTransformPlugin):
         "index": ArrayParam("Index By", ColumnChoiceParam("Column")),
         "pivot": ArrayParam("Pivot By", ColumnChoiceParam("Column")),
         "sum": ArrayParam("Aggregate Sum", ColumnChoiceParam("Column")),
+        "count": ArrayParam("Aggregate Count", ColumnChoiceParam("Column")),
+        "mean": ArrayParam("Aggregate Mean", ColumnChoiceParam("Column")),
     }
         
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         index_cols = [ p.value for p in self.parameters['index'].params if p.value ]
         pivot_cols = [ p.value for p in self.parameters['pivot'].params if p.value ]
-        sum_cols = [ p.value for p in self.parameters['sum'].params if p.value ]
+
+        agg_cols = [
+            (op, [ p.value for p in self.parameters[op].params if p.value ])
+            for op in ('sum', 'count', 'mean')
+        ]
 
         ddf = ddf.reset_index(drop=True)
-        new_ddf = ddf[index_cols + sum_cols].copy()
 
         pivot_product = itertools.product(*[ list(ddf[c].unique()) for c in pivot_cols ])
         pivot_groups = sorted([
@@ -42,27 +47,27 @@ class DaskPivotPlugin(DaskTransformPlugin):
             for pivot_values in pivot_product
         ])
 
-        new_sum_cols = []
-        for sc in sum_cols:
-            for pg in pivot_groups:
-                new_series = ddf[sc]
-                new_sum_col = sc + ''.join([f"__{col}_{val}" for col, val in pg])
-                new_sum_cols.append(new_sum_col)
-                new_ddf[new_sum_col] = ddf[sc]
-                for col, val in pg:
-                    new_ddf[new_sum_col] *= (ddf[col] == val).astype(int)
+        # dask's built-in "dd.pivot_table" can only handle one index column
+        # and one pivot column which is too limiting.  So this is a slightly
+        # cheesy replacement.
 
-        #only = dd.Aggregation(
-        #    'only',
-        #    lambda s: (s.first(), s.nunique() == 1),
-        #    lambda s, u: (s.first(), s.nunique() == 1, u.all()),
-        #    lambda s, u, uu: s.where(u, None).where(uu, None)
-        #    )
+        aggregate_ops = [ (c, 'first') for c in index_cols ]
 
-        ops = dict(
-            #[ (c, only) for c in index_cols ] +
-            [ (c, 'first') for c in index_cols ] +
-            [ (c, 'sum') for c in new_sum_cols ]
-        )
-       
-        return new_ddf.groupby(index_cols or new_ddf.index).agg(ops)
+        ddfs = []
+        for pg in pivot_groups:
+            rename_cols = []
+            for agg_op, cols in agg_cols:
+                new_cols = [
+                    col + ''.join([f"__{pc}_{pv}__{agg_op}" for pc, pv in pg])
+                    for col in cols
+                ]
+                aggregate_ops += [ (nc, agg_op) for nc in new_cols ]
+                rename_cols += zip(cols, new_cols)
+            query = ' and '.join(f"`{col}` == {val}" for col, val in pg)
+
+            nddf = ddf.query(query)
+            for oc, nc in rename_cols:
+                nddf.insert(0, column=nc, value=nddf[oc])
+            ddfs.append(nddf)
+
+        return dd.concat(ddfs).groupby(index_cols or new_ddf.index).agg(dict(aggregate_ops))
