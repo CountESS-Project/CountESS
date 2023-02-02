@@ -9,11 +9,13 @@ import itertools
 from collections.abc import Callable
 from typing import Optional
 
-from countess.core.parameters import ChoiceParam
+from countess.core.parameters import ChoiceParam, StringParam
 from countess.core.plugins import DaskBasePlugin, DaskProgressCallback
 
 VERSION = "0.0.1"
 
+
+INDEX = '— INDEX —'
 
 class DaskJoinPlugin(DaskBasePlugin):
     """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
@@ -24,24 +26,51 @@ class DaskJoinPlugin(DaskBasePlugin):
     version = VERSION
 
     parameters = {
-        "join_how": ChoiceParam("Join Direction", "outer", ["outer", "inner", "left", "right", "concat"])
+        "join_how": ChoiceParam("Join Direction", "outer", ["outer", "inner", "left", "right"]),
+        "left_on": ChoiceParam("Left Column", 'Index', choices = [INDEX]),
+        "right_on": ChoiceParam("Right Column", 'Index', choices = [INDEX]),
+        "left_suffix": StringParam("Left Suffix", "_x"),
+        "right_suffix": StringParam("Right_Suffix", "_y"),
+        "indicator": StringParam("Merge Indicator Column", ""),
     }
 
     @classmethod
     def accepts(self, data) -> bool:
-        return type(data) is list and all(
-                isinstance(d, (dd.DataFrame, pd.DataFrame))
-                for d in data
-            )
+        return (
+            type(data) is list and
+            isinstance(data[0], (dd.DataFrame, pd.DataFrame)) and
+            isinstance(data[1], (dd.DataFrame, pd.DataFrame))
+        )
+
+    def prepare(self, data):
+        self.parameters['left_on'].set_choices([INDEX] + list(data[1].columns))
+        self.parameters['right_on'].set_choices([INDEX] + list(data[0].columns))
+        
 
     def merge_dfs(self, prev_ddf: dd.DataFrame, this_ddf: dd.DataFrame) -> dd.DataFrame:
         """Merge the new data into the old data.  Only called
         if there is a previous plugin to merge data from."""
-        join_how = self.parameters['join_how'].value
-        if join_how == 'concat':
-            return dd.concat([prev_ddf, this_ddf])
+        join_params = {
+            "how": self.parameters['join_how'].value
+        }
+        if self.parameters['left_on'].value == INDEX:
+            join_params['left_index'] = True
         else:
-            return prev_ddf.merge(this_ddf, how=join_how, left_index=True, right_index=True)
+            join_params['left_on'] = self.parameters['left_on'].value 
+        if self.parameters['right_on'].value == INDEX:
+            join_params['right_index'] = True
+        else:
+            join_params['right_on'] = self.parameters['right_on'].value 
+
+        if self.parameters['left_suffix'].value or self.parameters['right_suffix'].value:
+            join_params['suffixes'] = [
+                self.parameters['left_suffix'].value, self.parameters['right_suffix'].value
+            ]
+
+        if self.parameters['indicator'].value:
+            join_params['indicator'] = self.parameters['indicator'].value
+        
+        return prev_ddf.merge(this_ddf, **join_params)
        
     def run(
         self,
