@@ -273,7 +273,11 @@ class PluginConfigurator:
 
         self.wrapper_cache: Mapping[str,ParameterWrapper] = {}
 
-        tk.Label(self.frame, text=plugin.title).grid(row=0, sticky=tk.EW)
+        #tk.Label(self.frame, text=plugin.title).grid(row=0, sticky=tk.EW)
+
+        self.name_var = tk.StringVar(self.frame, value=self.plugin.name)
+        tk.Entry(self.frame, textvariable=self.name_var).grid(row=0, sticky=tk.EW)
+        self.name_var.trace("w", self.name_changed_callback)
 
         self.subframe = ttk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=0)
@@ -282,6 +286,10 @@ class PluginConfigurator:
         self.subframe.grid(row=1, sticky=tk.NSEW)
 
         self.update()
+
+    def name_changed_callback(self, *_):
+        self.plugin.name = self.name_var.get()
+        if self.change_callback: self.change_callback(self)
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
@@ -436,6 +444,7 @@ class PipelineManager:
         except ValueError:
             return
 
+        self.notebook.tab(position, text=self.configurators[position].plugin.name)
         result, output = self.pipeline.prerun(position)
         plugin_configurator.set_result(result)
         plugin_configurator.set_output(output)
