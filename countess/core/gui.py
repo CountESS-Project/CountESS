@@ -40,9 +40,6 @@ from ..utils.dask import crop_dask_dataframe
 
 import numpy as np
 
-import dask
-dask.config.set(scheduler='processes')
-
 def is_nan(v):
     return v is None or v is np.nan or (type(v) is float and math.isnan(v))
 

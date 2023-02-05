@@ -226,7 +226,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         """First stage: collect all the files together in whatever
         way is appropriate.  Override this to do it differently
         or do more work on the dataframes (eg: counting, renaming, etc)"""
-        return concat_dask_dataframes(dfs)
+        return concat_dask_dataframes(dfs).persist()
 
     def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
         fps = self.parameters['files'].params

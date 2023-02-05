@@ -11,8 +11,8 @@ from .plugins import BasePlugin
 
 from functools import partial
 
-import dask
-dask.config.set(scheduler='processes')
+#import dask
+#dask.config.set(scheduler='processes')
 
 def progress_callback(n, a, b, s="Running"):
     if b > 0:
@@ -43,6 +43,9 @@ def process_ini(config_filenames):
             print(item.result.compute())
         else:
             print(item.result)
+
+        if item.output:
+            print(item.output)
         
         print("\n==========\n")
 
