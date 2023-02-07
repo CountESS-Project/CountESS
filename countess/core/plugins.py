@@ -9,6 +9,7 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd  # type: ignore
 from dask.callbacks import Callback
+import hashlib
 
 from countess.core.parameters import (
     ArrayParam,
@@ -114,11 +115,20 @@ class BasePlugin:
             param = param[k]
         param.value = value
 
-    def get_config(self):
-        for k, p in self.parameters.items():
-            v = p.value
+    def get_parameters(self):
+        for key, parameter in self.parameters.items():
+            yield from parameter.get_parameters(key)
 
-            yield from p.get_config(k)
+    def get_parameter_hash(self):
+        """Build a hash of all configuration parameters"""
+        h = hashlib.sha256()
+        for k, v in self.parameters.items():
+            h.update((k + '\0' + v.get_hash_value()).encode('utf-8'))
+        return h
+
+    def hash(self):
+        """Returns a hex digest of the hash of all configuration parameters"""
+        return self.get_parameter_hash().hexdigest()
 
 
 class FileInputMixin:

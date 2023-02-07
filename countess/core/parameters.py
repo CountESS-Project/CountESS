@@ -1,5 +1,9 @@
 from typing import Mapping, Optional, Any, Iterable
 import os.path
+import re
+import hashlib
+
+PARAM_DIGEST_HASH = 'sha256'
 
 class BaseParam:
     """Represents the parameters which can be set on a plugin."""
@@ -16,6 +20,14 @@ class BaseParam:
     def set_value(self, value):
         self.value = value
         return self
+
+    def get_parameters(self, key):
+        return ((key, self.value),)
+
+    def get_hash_value(self):
+        digest = hashlib.new(PARAM_DIGEST_HASH)
+        digest.update(repr(self.value).encode('utf-8'))
+        return digest.hexdigest()
 
 
 class SimpleParam(BaseParam):
@@ -78,7 +90,8 @@ class StringParam(SimpleParam):
 
 class TextParam(StringParam):
 
-    pass
+    def clean_value(self, value):
+        return re.sub('\n\n\n+', '\n\n', value)
 
 
 class StringCharacterSetParam(StringParam):
@@ -106,19 +119,42 @@ class StringCharacterSetParam(StringParam):
         return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
 
 
+
 class FileParam(StringParam):
     """A StringParam for holding a filename.  Defaults to `read_only` because it really should
     be populated from a file dialog or simiar."""
     
     file_types = [("Any", "*")]
+
+    _hash = None
     
     def __init__(self, label: str, value=None, read_only: bool=True, file_types=None):
         super().__init__(label, value, read_only)
         if file_types is not None:
             self.file_types = file_types
 
-    def clean_value(self, value: str):
-        if not value: return value
+    def get_file_hash(self):
+        if not self.value: return '0'
+        try:
+            with open(self.value, "rb") as file:
+                try:
+                    # Python 3.11
+                    digest = hashlib.file_digest(file, PARAM_DIGEST_HASH)
+                except AttributeError:
+                    digest = hashlib.new(PARAM_DIGEST_HASH)
+                    while True:
+                        data = file.read()
+                        if not data: break
+                        digest.update(data)
+            print(f"Digest: {self.value} {digest.hexdigest()}")
+            return digest.hexdigest()
+        except IOError:
+            return '0'
+
+    def clean_value(self, value: str|tuple|list):
+        self._hash = self.get_file_hash()
+        if not value:
+            return value
         try:
             return os.path.relpath(value)
         except ValueError:
@@ -128,6 +164,12 @@ class FileParam(StringParam):
 
     def copy(self):
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
+
+    def get_hash_value(self) -> str:
+        # For reproducability, we don't actually care about the filename, just its hash.
+        if self._hash is None:
+            self._hash = self.get_file_hash()
+        return self._hash
 
 
 class ChoiceParam(BaseParam):
@@ -160,6 +202,7 @@ class ChoiceParam(BaseParam):
 
     def copy(self):
         return self.__class__(self.label, self.value, self.choices)
+
 
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows 
@@ -250,6 +293,16 @@ class ArrayParam(BaseParam):
     def value(self):
         self.params = []
 
+    def get_parameters(self, key):
+        for n, p in enumerate(self.params):
+            yield from p.get_parameters(f"{key}.{n}")
+
+    def get_hash_value(self):
+        digest = hashlib.new(PARAM_DIGEST_HASH)
+        for p in self.params:
+            digest.update(p.get_hash_value().encode('utf-8'))
+        return digest.hexdigest()
+
 
 class FileArrayParam(ArrayParam):
     """FileArrayParam is an ArrayParam arranged per-file.  Using this class really just
@@ -326,3 +379,14 @@ class MultiParam(BaseParam):
     def value(self):
         for p in self.params.values():
             del p.value
+
+    def get_parameters(self, key):
+        for k, p in self.params.items():
+            yield from p.get_parameters(f"{key}.{k}")
+
+    def get_hash_value(self):
+        digest = hashlib.new(PARAM_DIGEST_HASH)
+        for k, p in self.params.items():
+            digest.update((k + '\0' + p.get_hash_value()).encode('utf-8'))
+        return digest.hexdigest()
+

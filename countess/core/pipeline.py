@@ -13,21 +13,6 @@ import traceback
 
 PRERUN_ROW_LIMIT=1000
 
-# XXX This isn't very nice and is making me rethink the whole
-# nested config strategy.
-
-def flatten_config(cfg: dict|list, path: str=""):
-    if type(cfg) is dict:
-        cfg_pairs = sorted(cfg.items())
-    elif type(cfg) is list:
-        cfg_pairs = enumerate(cfg)
-    for k, v in cfg_pairs:
-        if type(v) in (dict, list):
-            yield from flatten_config(v, f"{path}.{k}" if path else k)
-        else:
-            yield f"{path}.{k}" if path else k, repr(v)
-
-
 def debug_progress_callback(name):
     return lambda a, b, s='': print(f"{n}: {a}/{b} {s}")
     
@@ -81,6 +66,7 @@ class Pipeline:
         plugin.prepare(self.items[-1].result if self.items else None)
 
         for key, value in config.items():
+            if key.startswith('_'): continue
             # XXX should this be optional? Postel's Law vs. Least Surprise.
             value = ast.literal_eval(value)
             plugin.set_parameter(key, value)
@@ -93,12 +79,13 @@ class Pipeline:
     def get_plugin_configs(self) -> Iterable[Tuple[str, Mapping[str,bool|int|float|str]]]:
         """Writes plugin configs as a series of names and dictionaries"""
         for number, item in enumerate(self.items):
-            config = dict(((k, p.value) for k, p in item.plugin.parameters.items()))
             config_list = [
                 ('_module', item.plugin.__module__),
                 ('_class', item.plugin.__class__.__name__),
                 ('_version', item.plugin.version),
-            ] + list(flatten_config(config))
+                ('_hash', item.plugin.hash()),
+            ] + [(k, repr(v)) for k, v in item.plugin.get_parameters()]
+
             yield item.plugin.name, config_list
 
     def get_new_plugin_name(self, plugin):
