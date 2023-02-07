@@ -165,6 +165,12 @@ canvas = FlippyCanvas(root)
 canvas.configure(bg="skyblue")
 canvas.grid(sticky=tk.NSEW, row=0, column=0)
 
+_selected_line = None
+
+def lines_onstart(self, event):
+    item = canvas.find_closest(event.x, event.y)
+
+
 #frame = tk.Frame(root)
 #frame.configure(bg="orange")
 #frame.grid(sticky=tk.NSEW, row=0, column=1)
@@ -237,6 +243,9 @@ class Node:
         xc, yc, wc, hc = _geometry(self.canvas)
         node = find_node_at_position(event.x + xl, event.y + yl)
 
+        if node == self:
+            return
+
         if not node:
             xn = (event.x + xl) / wc
             yn = (event.y + yl) / hc
@@ -250,7 +259,7 @@ class Node:
         elif (event.x if wc > hc else event.y) > 0:
             node.add_or_del_parent(self)
         else:
-            self.add_or_del>parent(node)
+            self.add_or_del_parent(node)
 
         dump_nodes_by_stratum()
 
@@ -261,6 +270,26 @@ class Node:
 
     def is_ancestor(self, other):
         return self in other.parents or any((self.is_ancestor(node) for node in other.parents))
+
+    def is_alone(self):
+        if self.parents: return False
+        for n in nodes:
+            if self in n.parents: 
+                return False
+        return True
+
+def on_button_3(event):
+    items = canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
+    if len(items) != 1: return
+    for node in nodes:
+        try:
+            idx = [ cl.line for cl in node.lines].index(items[0])
+            node.parents.pop(idx)
+            node.lines.pop(idx).destroy()
+        except ValueError:
+            pass
+
+canvas.bind("<Button-3>", on_button_3, add=True)
 
 nodes.append(Node(canvas, "ZERO", (0.1, 0.75), []))
 nodes.append(Node(canvas, "ONE", (0.1, 0.5), []))
