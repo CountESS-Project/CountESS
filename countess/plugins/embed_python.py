@@ -40,6 +40,6 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
         ]
 
         if isinstance(df, dd.DataFrame):
-            return df.map_partitions(process, codes).persist(scheduler='multiprocessing')
+            return df.map_partitions(process, codes)
         else:
             return process(df, codes)

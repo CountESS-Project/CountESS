@@ -68,9 +68,12 @@ class BasePlugin:
         except (ImportError, TypeError, ValueError, AssertionError):
             return False
 
-    def __init__(self):
+    def __init__(self, plugin_name=None):
         # Parameters store the actual values they are set to, so we copy them so that
         # if the same plugin is used twice in a pipeline it will have its own parameters.
+        
+        if plugin_name is not None:
+            self.name = plugin_name
 
         self.parameters = dict(((k, v.copy()) for k, v in self.parameters.items()))
 
@@ -199,6 +202,17 @@ class DaskBasePlugin(BasePlugin):
         return isinstance(data, (dd.DataFrame, pd.DataFrame)) or \
                 type(data) is list and isinstance(data[0], (dd.DataFrame, pd.DataFrame))
 
+    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
+
+    def _run_top(self, ddf: dd.DataFrame|pd.DataFrame):
+        new_ddf = self.run_dask(ddf.copy())
+        if len(ddf) > 1000000:
+            new_ddf = new_ddf.persist(scheduler='multiprocessing')
+        elif len(ddf) > 10000:
+            new_ddf = new_ddf.persist()
+        return new_ddf
+
     def run(
         self,
         data,
@@ -207,13 +221,10 @@ class DaskBasePlugin(BasePlugin):
     ):
         with DaskProgressCallback(callback):
             if type(data) is list:
-                return [ self.run_dask(data[0].copy()) ] + data[1:]
+                # Horrible hack to apply operation to only the topmost dataframe
+                return [ self._run_top(data[0]) ] + data[1:]
             else:
-                return self.run_dask(data.copy())
-
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
-
+                return self._run_top(data)
 
 # XXX Potentially there's a PandasBasePlugin which can use a technique much like
 # tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and provide
@@ -222,9 +233,9 @@ class DaskBasePlugin(BasePlugin):
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
     """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first."""
 
-    def __init__(self):
+    def __init__(self, *a, **k):
         # Add in filenames
-        super().__init__()
+        super().__init__(*a, **k)
         file_params = { "filename": FileParam("Filename", file_types=self.file_types) }
         file_params.update(self.file_params)
 

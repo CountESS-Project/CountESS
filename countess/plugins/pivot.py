@@ -95,4 +95,4 @@ class DaskPivotPlugin(DaskTransformPlugin):
             aggregate_ops = dict((k, v[0]) for k, v in aggregate_ops.items())
 
         # Group by the index columns and aggregate.
-        return dd.concat(ddfs).groupby(index_cols or new_ddf.index).agg(aggregate_ops).persist(scheduler='multiprocessing')
+        return dd.concat(ddfs).groupby(index_cols or new_ddf.index).agg(aggregate_ops)
