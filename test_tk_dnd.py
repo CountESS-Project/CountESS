@@ -1,12 +1,18 @@
 import tkinter as tk
+from tkinter import ttk
 import tkinter.dnd
 import re
+
+from countess.core.gui import PluginConfigurator
+from countess.plugins.pivot import DaskPivotPlugin
+from countess.core.pipeline import Pipeline
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
 class DraggableMixin:
 
+    __mousedown = False
     __moving = False
     __ghost = None
     __ghost_line = None
@@ -18,17 +24,21 @@ class DraggableMixin:
         self.bind("<ButtonRelease-1>", self.__on_release, add="+")
 
     def __on_start(self, event):
+        print("START")
         self.__start_x = event.x
         self.__start_y = event.y
         self.after(500, self.__on_timeout)
+        self.__mousedown = True
 
     def __on_timeout(self):
-        if not self.__moving:
+        print("TIMEOUT")
+        if self.__mousedown and not self.__moving:
             self.__ghost = tk.Frame(self.master)
             self.__ghost.place(self.place_info())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, 'red', True)
         
     def __on_motion(self, event):
+        if not self.__moving: print("MOVING")
         self.__moving = True
         mw = self.master.winfo_width()
         mh = self.master.winfo_height()
@@ -45,11 +55,14 @@ class DraggableMixin:
             self.place({'x': x, 'y': y})
 
     def __on_release(self, event):
+        print("RELEASE")
         if self.__ghost is not None:
+            print("GHOST")
             self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
             self.__ghost_line.destroy()
             self.__ghost.destroy()
             self.__ghost = None
+        self.__mousedown = False
         self.__moving = False
 
 
@@ -75,7 +88,19 @@ class FixedUnbindMixin:
         self.deletecommand(funcid)
 
 
-class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Label):
+class PluginChooserFrame(tk.Frame):
+
+    def __init__(self, master, callback, *a, **k):
+        super().__init__(master, *a, **k)
+
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=2)
+        for n, plugin_class in enumerate(Pipeline().plugin_classes):
+            ttk.Button(self, text=plugin_class.name, command=lambda plugin_class=plugin_class: callback(plugin_class)).grid(row=n, column=0, sticky=tk.EW)
+            ttk.Label(self, text=plugin_class.title).grid(row=n, column=1, sticky=tk.W)
+
+
+class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
 class ConnectingLine:
@@ -157,9 +182,9 @@ class FlippyCanvas(tk.Canvas):
 
 root = tk.Tk()
 root.rowconfigure(0, weight=1)
-#root.rowconfigure(1, weight=2)
+root.rowconfigure(1, weight=2)
 root.columnconfigure(0, weight=1)
-#root.columnconfigure(1, weight=2)
+root.columnconfigure(1, weight=2)
 
 canvas = FlippyCanvas(root)
 canvas.configure(bg="skyblue")
@@ -167,28 +192,46 @@ canvas.grid(sticky=tk.NSEW, row=0, column=0)
 
 _selected_line = None
 
-def lines_onstart(self, event):
-    item = canvas.find_closest(event.x, event.y)
-
-
-#frame = tk.Frame(root)
+frame = tk.Frame(root)
 #frame.configure(bg="orange")
-#frame.grid(sticky=tk.NSEW, row=0, column=1)
-#
-#def root_configure(event):
-#    if event.widget == root:
-#        if event.width > event.height:
-#            root.rowconfigure(1, minsize=0, weight=0)
-#            root.columnconfigure(1, weight=3)
-#            frame.grid(rowspan=2, row=0, column=1)
-#        else:
-#            root.rowconfigure(1, weight=3)
-#            root.columnconfigure(1, minsize=0, weight=0)
-#            frame.grid(row=1, column=0)
-#
-#root.bind("<Configure>", root_configure)
+frame.grid(sticky=tk.NSEW, row=0, column=1)
+
+def root_configure(event):
+    if event.widget == root:
+        if event.width > event.height:
+            root.rowconfigure(1, minsize=0, weight=0)
+            root.columnconfigure(1, weight=3)
+            frame.grid(rowspan=2, row=0, column=1)
+        else:
+            root.rowconfigure(1, weight=3)
+            root.columnconfigure(1, minsize=0, weight=0)
+            frame.grid(row=1, column=0)
+
+root.bind("<Configure>", root_configure)
 
 nodes = []
+
+subframe = None
+
+
+def node_changed(configurator):
+    for node in nodes:
+        if node.plugin == configurator.plugin:
+            node.name = configurator.plugin.name
+            node.label['text'] = node.name
+    
+def node_clicked(node):
+    global subframe
+    if subframe: subframe.destroy()
+    if node.plugin:
+        subframe = PluginConfigurator(frame, node.plugin, node_changed).frame
+    else:
+        subframe = PluginChooserFrame(frame, lambda plugin_class, node=node: plugin_chosen(node, plugin_class))
+    subframe.grid(sticky=tk.NSEW)
+
+def plugin_chosen(node, plugin_class):
+    node.plugin = plugin_class()
+    node_clicked(node)
 
 def find_node_at_position(x, y):
     for node in nodes:
@@ -215,13 +258,13 @@ class Node:
         self.parents = parents
         self.lines = [ ConnectingLine(canvas, p.label, self.label) for p in parents ]
 
+        self.label.bind("<Button-1>", self.on_click, add=True)
         self.label.bind("<<GhostRelease>>", self.on_ghost_release)
 
-    def on_enter(self, event):
-        print(event)
+        self.plugin = None
 
-    def on_leave(self, event):
-        print(event)
+    def on_click(self, event):
+        node_clicked(self)
 
     def add_parent(self, other):
         self.parents.append(other)
