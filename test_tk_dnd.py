@@ -46,7 +46,7 @@ class DraggableMixin:
 
     def __on_release(self, event):
         if self.__ghost is not None:
-            self.event_generate("<<GhostRelease>>")
+            self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
             self.__ghost_line.destroy()
             self.__ghost.destroy()
             self.__ghost = None
@@ -93,7 +93,6 @@ class ConnectingLine:
         self.canvas.bind("<Configure>", self.update_line, add="+")
 
     def update_line(self, event=None):
-        print(event)
         x1, y1, w1, h1 = _geometry(self.widget1)
         x2, y2, w2, h2 = _geometry(self.widget2)
 
@@ -158,35 +157,56 @@ class FlippyCanvas(tk.Canvas):
 
 root = tk.Tk()
 root.rowconfigure(0, weight=1)
-root.rowconfigure(1, weight=2)
+#root.rowconfigure(1, weight=2)
 root.columnconfigure(0, weight=1)
-root.columnconfigure(1, weight=2)
+#root.columnconfigure(1, weight=2)
 
 canvas = FlippyCanvas(root)
 canvas.configure(bg="skyblue")
 canvas.grid(sticky=tk.NSEW, row=0, column=0)
 
-frame = tk.Frame(root)
-frame.configure(bg="orange")
-frame.grid(sticky=tk.NSEW, row=0, column=1)
+#frame = tk.Frame(root)
+#frame.configure(bg="orange")
+#frame.grid(sticky=tk.NSEW, row=0, column=1)
+#
+#def root_configure(event):
+#    if event.widget == root:
+#        if event.width > event.height:
+#            root.rowconfigure(1, minsize=0, weight=0)
+#            root.columnconfigure(1, weight=3)
+#            frame.grid(rowspan=2, row=0, column=1)
+#        else:
+#            root.rowconfigure(1, weight=3)
+#            root.columnconfigure(1, minsize=0, weight=0)
+#            frame.grid(row=1, column=0)
+#
+#root.bind("<Configure>", root_configure)
 
-def root_configure(event):
-    if event.widget == root:
-        if event.width > event.height:
-            root.rowconfigure(1, minsize=0, weight=0)
-            root.columnconfigure(1, weight=3)
-            frame.grid(rowspan=2, row=0, column=1)
-        else:
-            root.rowconfigure(1, weight=3)
-            root.columnconfigure(1, minsize=0, weight=0)
-            frame.grid(row=1, column=0)
+nodes = []
 
-root.bind("<Configure>", root_configure)
+def find_node_at_position(x, y):
+    for node in nodes:
+        nx, ny, nw, nh = _geometry(node.label)
+        if (nx <= x <= nx + nw) and (ny <= y <= ny+nh):
+            return node
+    return None
+
+def dump_nodes_by_stratum():
+    # XXX nasty
+    for s in range(1,100):
+        nn = [ n for n in nodes if n.stratum() == s ]
+        if not nn: break
+        for n in nn:
+            print(f"{s}: {n.name}")
 
 class Node:
+
     def __init__(self, canvas, label_text, position, parents=[]):
+        self.canvas = canvas
+        self.name = label_text
         self.label = DraggableLabel(canvas, text=label_text)
         self.label.place({'relx': position[0], 'rely': position[1], 'anchor': tk.CENTER})
+        self.parents = parents
         self.lines = [ ConnectingLine(canvas, p.label, self.label) for p in parents ]
 
         self.label.bind("<<GhostRelease>>", self.on_ghost_release)
@@ -197,11 +217,51 @@ class Node:
     def on_leave(self, event):
         print(event)
 
+    def add_parent(self, other):
+        self.parents.append(other)
+        self.lines.append(ConnectingLine(self.canvas, other.label, self.label))
+
+    def del_parent(self, other):
+        n = self.parents.index(other)
+        self.parents.pop(n)
+        self.lines.pop(n).destroy()
+
+    def add_or_del_parent(self, other):
+        try:
+            self.del_parent(other)
+        except ValueError:
+            self.add_parent(other)
+
     def on_ghost_release(self, event):
-        print(event)
+        xl, yl, wl, hl = _geometry(self.label)
+        xc, yc, wc, hc = _geometry(self.canvas)
+        node = find_node_at_position(event.x + xl, event.y + yl)
 
+        if not node:
+            xn = (event.x + xl) / wc
+            yn = (event.y + yl) / hc
+            node = Node(self.canvas, f"NEW {len(nodes)}", (xn, yn), [])
+            nodes.append(node)
+        
+        if self.is_ancestor(node):
+            node.add_or_del_parent(self)
+        elif node.is_ancestor(self):
+            self.add_or_del_parent(node)
+        elif (event.x if wc > hc else event.y) > 0:
+            node.add_or_del_parent(self)
+        else:
+            self.add_or_del>parent(node)
 
-nodes = []
+        dump_nodes_by_stratum()
+
+    def stratum(self):
+        # XXX not very efficient for a big graph!
+        if not self.parents: return 1
+        return max(n.stratum() for n in self.parents) + 1
+
+    def is_ancestor(self, other):
+        return self in other.parents or any((self.is_ancestor(node) for node in other.parents))
+
 nodes.append(Node(canvas, "ZERO", (0.1, 0.75), []))
 nodes.append(Node(canvas, "ONE", (0.1, 0.5), []))
 nodes.append(Node(canvas, "TWO", (0.3, 0.25), [nodes[1]]))
