@@ -62,7 +62,7 @@ class Pipeline:
 
         # XXX compare version with module.VERSION
 
-        plugin = plugin_class()
+        plugin = plugin_class(plugin_name)
         plugin.prepare(self.items[-1].result if self.items else None)
 
         for key, value in config.items():
@@ -90,13 +90,11 @@ class Pipeline:
 
     def get_new_plugin_name(self, plugin):
         names = [ ii.plugin.name for ii in self.items if ii.plugin.name.startswith(plugin.name) ]
-        numbers = [ 0 ]
-        for nn in names:
-            m = re.match(r'.*?\s(\d+)$', nn)
-            if m: 
-                numbers.append(int(m.group(1)))
-        number = max(numbers) + 1        
-        return f"{plugin.name} {number}"
+        numbers = [int(re.match(r'.*?(\s\d+)?$', nn).group(1) or 1) for nn in names]
+        try:
+            return f"{plugin.name} {max(numbers)+1}"
+        except ValueError:
+            return plugin.name
 
     def add_plugin(self, plugin: BasePlugin, position: int = None):
         """Adds a plugin at `position`, if that's possible.
@@ -122,7 +120,7 @@ class Pipeline:
 
     def choose_plugin_classes(self, position: Optional[int]=None):
         if position is None:
-            position = len(self.plugins)
+            position = len(self.items)
         previous_result = self.items[position - 1].result if position > 0 else None
 
         # XXX doesn't check subsequent plugins will be happy with our output

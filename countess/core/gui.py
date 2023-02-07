@@ -494,7 +494,7 @@ class PipelineManager:
             position, configurator.frame, text=plugin.name, sticky=tk.NSEW
         )
 
-        cancel_command = lambda: self.del_plugin(position)
+        cancel_command = lambda: self.remove_plugin(plugin)
         CancelButton(configurator.frame, command=cancel_command).place(
             anchor=tk.NE, relx=1, rely=0
         )
@@ -504,12 +504,17 @@ class PipelineManager:
 
     def del_plugin(self, position):
         assert 0 <= position < len(self.configurators)
-
         # XXX Possibly can't delete this plugin because the one before and after aren't compatible.
         self.pipeline.del_plugin(position)
         self.configurators.pop(position)
         self.notebook.forget(position)
-        self.pipeline.prepare(position)
+        if position < len(self.configurators):
+            self.pipeline.prepare(position)
+
+    def remove_plugin(self, plugin):
+        for n, p  in enumerate(self.pipeline.items):
+            if p.plugin == plugin:
+                self.del_plugin(n)
 
     def run_pipeline(self):
         Thread(target=self.run_pipeline_thread).start()
