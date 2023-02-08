@@ -27,8 +27,8 @@ class DaskJoinPlugin(DaskBasePlugin):
 
     parameters = {
         "join_how": ChoiceParam("Join Direction", "outer", ["outer", "inner", "left", "right"]),
-        "left_on": ChoiceParam("Left Column", 'Index', choices = [INDEX]),
-        "right_on": ChoiceParam("Right Column", 'Index', choices = [INDEX]),
+        "left_on": ChoiceParam("Left Column", INDEX, choices = [INDEX]),
+        "right_on": ChoiceParam("Right Column", INDEX, choices = [INDEX]),
     }
 
     @classmethod

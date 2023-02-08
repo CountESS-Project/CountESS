@@ -247,7 +247,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         """First stage: collect all the files together in whatever
         way is appropriate.  Override this to do it differently
         or do more work on the dataframes (eg: counting, renaming, etc)"""
-        return concat_dask_dataframes(dfs).persist()
+        return concat_dask_dataframes(dfs)
 
     def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
         fps = self.parameters['files'].params
@@ -257,19 +257,22 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             with DaskProgressCallback(callback):
                 file_param = self.parameters['files'].params[0]
                 ddf = self.read_file_to_dataframe(file_param, None, row_limit)
+                ddf = self.combine_dfs([ddf])
         else:
+            num_files = len(fps)
             # Input plugins are likely I/O bound so if there's more than one
             # file, instead of using the Dask progress callback mechanism
             # this uses a simple count of files read."""
             per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-            callback(0, num_files, "Loading")
+            callback(0, num_files+1, "Loading")
             dfs = []
             for num, fp in enumerate(fps):
                 df = self.read_file_to_dataframe(fp, None, per_file_row_limit)
                 dfs.append(df)
-                callback(num+1, num_files, "Loading")
-            callback(num_files, num_files)
+                callback(num+1, num_files+1, "Loading")
+            callback(num_files, num_files+1, "Combining")
             ddf = self.combine_dfs(dfs)
+            callback(num_files+1, num_files+1)
 
         return ddf
 

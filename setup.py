@@ -9,8 +9,8 @@ setup(
         packages = [ 'countess', 'countess.utils', 'countess.plugins', 'countess.core' ],
         entry_points = {
             'countess_plugins': [
-                #'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
-                #'load_hdf = countess.plugins.hdf5:LoadHdfPlugin',
+                'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
+                'load_hdf = countess.plugins.hdf5:LoadHdfPlugin',
                 'load_csv = countess.plugins.csv:LoadCsvPlugin',
                 'log_score = countess.plugins.log_score:LogScorePlugin',
                 'group_by = countess.plugins.group_by:GroupByPlugin',
