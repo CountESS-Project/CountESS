@@ -172,6 +172,22 @@ class FileParam(StringParam):
         return self._hash
 
 
+class FileSaveParam(StringParam):
+
+    file_types = [("Any", "*")]
+
+    def __init__(self, label: str, value=None, read_only: bool=False, file_types=None):
+        super().__init__(label, value, read_only)
+        if file_types is not None:
+            self.file_types = file_types
+
+    def clean_value(self, value: str|tuple|list, file_types=None):
+        try:
+            return os.path.relpath(value)
+        except ValueError:
+            return value
+
+
 class ChoiceParam(BaseParam):
     """A drop-down menu parameter choosing between options. Defaults to 'None'"""
 

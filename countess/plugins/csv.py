@@ -4,9 +4,10 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd  # type: ignore
 import csv
+from typing import Any, Callable
 
-from countess.core.parameters import BooleanParam, ChoiceParam
-from countess.core.plugins import DaskInputPlugin
+from countess.core.parameters import BooleanParam, ChoiceParam, FileParam, FileSaveParam, StringParam
+from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 from countess.utils.dask import merge_dask_dataframes
 
 VERSION = "0.0.1"
@@ -41,28 +42,59 @@ class LoadCsvPlugin(DaskInputPlugin):
 
     parameters = {
         "header": BooleanParam("CSV file has header row?", True),
+        "prefix": StringParam("Column Name Prefix", ""),
+    }
+
+    file_params = {
+        "suffix": StringParam("Column Name Suffix", ""),
     }
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
-      
-        # XXX should probably slice into pieces rather than building all in one go.
-        # then build those pandas dataframes into a single Dask dataframe as we go.
+     
+        filename = file_param["filename"].value
 
-        columns = []
-        records = []
-        with open(file_param["filename"].value, "r") as fh:
-            csv_reader = csv.reader(fh)
-            for n, row in enumerate(csv_reader):
-                if n == 0 and self.parameters['header'].value:
-                    columns = row
-                else:
-                    while len(row) > len(columns):
-                        columns.append(f"column_%d" % len(columns))
-                    records.append(clean_row(row))
-                if row_limit is not None and n > row_limit:
-                    break
+        options = {
+            'blocksize': '32MB',
+            'header': 0 if self.parameters['header'].value else None
+        }
+        
+        ddf = dd.read_csv(filename, **options)
 
-        if column_suffix:
-            columns = [ f"{c}_{column_suffix}" for c in columns ]
+        # XXX is this reading the whole file?  Is this bad?
+        if row_limit is not None:
+            ddf = ddf.head(n=row_limit)
 
-        return pd.DataFrame.from_records(records, columns=columns, index=columns[0])
+        prefix = self.parameters["prefix"].value
+        suffix = file_param["suffix"].value
+        if prefix or suffix:
+            ddf.columns = [ prefix + str(colname) + suffix for colname in ddf.columns ]
+ 
+        return ddf
+
+class SaveCsvPlugin(DaskBasePlugin):
+
+    name = "CSV Save"
+    title = "Save to CSV"
+    description = "CSV CSV CSV"
+
+    file_types = [("CSV", "*.csv")]
+
+    parameters = {
+        "header": BooleanParam("CSV header row?", True),
+        "filename": FileSaveParam("Filename", file_types=file_types),
+    }
+
+    def run(self, obj: Any, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None):
+
+        filename = self.parameters["filename"].value
+
+        if row_limit is None:
+            if isinstance(obj, dd.DataFrame):
+                obj.to_csv(filename, single_file=True, compute=True)
+            else:
+                obj.to_csv(filename)
+
+        return obj
+
+
+

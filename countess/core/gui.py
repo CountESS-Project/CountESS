@@ -27,6 +27,7 @@ from .parameters import (
     ChoiceParam,
     FileArrayParam,
     FileParam,
+    FileSaveParam,
     FloatParam,
     IntegerParam,
     MultiParam,
@@ -211,6 +212,10 @@ class ParameterWrapper:
     def add_row_callback(self, *_):
         assert isinstance(self.parameter, ArrayParam)
 
+        if isinstance(self.parameter, FileSaveParam):
+            file_types = self.parameter.file_types
+            filename = filedialog.asksaveasfilename(filetypes=file_types)
+            self.parameter.value = filename
         if isinstance(self.parameter, FileArrayParam):
             file_types = self.parameter.file_types
             filenames = filedialog.askopenfilenames(filetypes=file_types)

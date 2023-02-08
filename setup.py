@@ -20,6 +20,7 @@ setup(
                 'regex_reader = countess.plugins.regex_reader:RegexReaderPlugin',
                 'pivot = countess.plugins.pivot:DaskPivotPlugin',
                 'join = countess.plugins.join:DaskJoinPlugin',
+                'save_csv = countess.plugins.csv:SaveCsvPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.core.gui:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
