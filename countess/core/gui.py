@@ -281,7 +281,7 @@ class PluginConfigurator:
         #tk.Label(self.frame, text=plugin.title).grid(row=0, sticky=tk.EW)
 
         self.name_var = tk.StringVar(self.frame, value=self.plugin.name)
-        tk.Entry(self.frame, textvariable=self.name_var).grid(row=0, sticky=tk.EW)
+        tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
         self.name_var.trace("w", self.name_changed_callback)
 
         self.subframe = ttk.Frame(self.frame)
@@ -573,7 +573,6 @@ class PipelineRunner:
             if isinstance(item.result, (dd.DataFrame, pd.DataFrame)):
                 preview.update(item.result)
 
-
 class DataFramePreview:
     """Provides a visual preview of a Dask dataframe arranged as a table."""
 
@@ -583,6 +582,7 @@ class DataFramePreview:
     def __init__(self, tk_parent, ddf: Optional[dd.DataFrame] = None):
         self.frame = ttk.Frame(tk_parent)
         self.label = ttk.Label(self.frame, text="DataFrame Preview")
+
         self.treeview = ttk.Treeview(self.frame, selectmode=tk.NONE)
 
         self.scrollbar_x = ttk.Scrollbar(self.frame, orient=tk.HORIZONTAL, command=self.treeview.xview)

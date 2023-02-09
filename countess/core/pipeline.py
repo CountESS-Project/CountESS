@@ -159,3 +159,4 @@ class Pipeline:
     def prerun(self, position: int):
         self.run(position, partial(self.prerun_callback, position), PRERUN_ROW_LIMIT)
         return self.items[position].result, self.items[position].output
+

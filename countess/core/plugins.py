@@ -11,6 +11,9 @@ import pandas as pd  # type: ignore
 from dask.callbacks import Callback
 import hashlib
 
+import importlib
+import importlib.metadata
+
 from countess.core.parameters import (
     ArrayParam,
     BaseParam,
@@ -42,6 +45,25 @@ Plugin lifecycle:
 """
 
 PRERUN_ROW_LIMIT = 100
+
+
+def get_plugin_classes():
+    plugin_classes = []
+    for ep in importlib.metadata.entry_points(group="countess_plugins"):
+        plugin_class = ep.load()
+        if issubclass(plugin_class, BasePlugin):
+            plugin_classes.append(plugin_class)
+        else:
+            logging.warning(f"{plugin_class} is not a valid CountESS plugin")
+    return plugin_classes
+
+
+def load_plugin(module_name, class_name):
+    module = importlib.import_module(module_name)
+    plugin_class = getattr(module, class_name)
+    assert issubclass(plugin_class, BasePlugin)
+    plugin = plugin_class(plugin_name)
+    return plugin
 
 
 class BasePlugin:
