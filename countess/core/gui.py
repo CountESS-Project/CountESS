@@ -284,9 +284,9 @@ class PluginConfigurator:
 
         #tk.Label(self.frame, text=plugin.title).grid(row=0, sticky=tk.EW)
 
-        self.name_var = tk.StringVar(self.frame, value=self.plugin.name)
-        tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
-        self.name_var.trace("w", self.name_changed_callback)
+        #self.name_var = tk.StringVar(self.frame, value=self.plugin.name)
+        #tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
+        #self.name_var.trace("w", self.name_changed_callback)
 
         self.subframe = ttk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=0)

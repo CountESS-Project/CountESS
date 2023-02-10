@@ -10,6 +10,7 @@ import dask.dataframe as dd
 import numpy as np
 
 from countess import VERSION
+from countess.core.plugins import get_plugin_classes
 from countess.core.gui import PluginConfigurator, DataFramePreview
 from countess.plugins.pivot import DaskPivotPlugin
 from countess.core.pipeline import Pipeline
@@ -146,6 +147,23 @@ class ConnectingLine:
         self.widget1.unbind("<Configure>", self.widget1_bind)
         self.widget2.unbind("<Configure>", self.widget2_bind)
 
+plugin_classes = get_plugin_classes()
+
+class PluginChooserFrame(tk.Frame):
+
+    def __init__(self, master, title, callback, *a, **k):
+        super().__init__(master, *a, **k)
+
+        self.columnconfigure(0, weight=1)
+
+        font = ('Helvetica', 16, 'bold')
+        tk.Label(self, text=title, font=font).grid(row=0, column=0, sticky=tk.EW)
+        label_frame = tk.LabelFrame(self, text="Choose Plugin", padx=10, pady=10)
+        label_frame.grid(row=1, column=0, sticky=tk.EW)
+
+        for n, plugin_class in enumerate(plugin_classes):
+            ttk.Button(label_frame, text=plugin_class.name, command=lambda plugin_class=plugin_class: callback(plugin_class)).grid(row=n+1, column=0, sticky=tk.EW)
+            ttk.Label(label_frame, text=plugin_class.title).grid(row=n+1, column=1, sticky=tk.W)
 
 def on_button_3(event):
     items = canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
@@ -187,9 +205,20 @@ class FlippyCanvas(tk.Canvas):
             self.__flip(event.width, event.height)
             self.__flipped = flipped
 
+
 class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
+
+class PipelineNodeWrapper:
+    def __init__(self, canvas, pipeline_node):
+        self.canvas = canvas
+        self.pipeline_node = pipeline_node
+        
+        self.label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
+
+
+        
 class MainWindow:
 
     preview_frame = None
@@ -213,20 +242,23 @@ class MainWindow:
 
         self.frame.bind('<Configure>', self.on_frame_configure, add=True)
 
-        label_for_node = {}
-        for n, node in enumerate(pipeline_graph.nodes):
-            label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
-            if not node.position:
-                node.position = (n%5)*0.2+0.1, (n//5)*0.2+0.1
-            label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
-    
-            for pn in node.parent_nodes:
-                ConnectingLine(self.canvas, label_for_node[pn], label)
-    
-            label_for_node[node] = label
-            label.bind('<Button-1>', lambda event, node=node: self.node_select(node), add=True)
-            label.bind('<Configure>', lambda event, node=node: self.node_configure(event, node), add=True)
+        self.label_for_node = {}
+        for node in pipeline_graph.nodes:
+            self.create_label(node)
 
+    def create_label(self, node):
+        label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
+        if not node.position: node.position = (0.5, 0.5)
+        label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
+   
+        for pn in node.parent_nodes:
+            ConnectingLine(self.canvas, self.label_for_node[pn], label)
+ 
+        self.label_for_node[node] = label
+
+        label.bind('<Button-1>', lambda event, node=node: self.node_select(node), add=True)
+        label.bind('<Configure>', lambda event, node=node: self.node_configure(event, node), add=True)
+        label.bind('<<GhostRelease>>', lambda event, node=node: self.node_add(event, node), add=True)
 
     def node_select(self, node):
         for widget in self.subframe.winfo_children():
@@ -235,17 +267,68 @@ class MainWindow:
         self.node_update(node)
         self.selected_node = node
 
-        self.configurator = PluginConfigurator(self.subframe, node.plugin, self.change_callback)
-        self.configurator.frame.grid(row=0, column=0, sticky=tk.NSEW)
+        self.name_var = tk.StringVar(self.subframe, value=node.name)
+        tk.Entry(self.subframe, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
+        self.name_var.trace("w", self.name_changed_callback)
+
+        if node.plugin:
+            self.configurator = PluginConfigurator(self.subframe, node.plugin, self.change_callback)
+            self.configurator.frame.grid(row=1, column=0, sticky=tk.NSEW)
+        else:
+            self.configurator = None
+            PluginChooserFrame(self.subframe, "Choose Plugin", self.choose_plugin).grid(row=0, column=0, sticky=tk.NSEW)
+
+    def name_changed_callback(self, *_):
+        self.selected_node.name = self.name_var.get()
+        self.label_for_node[self.selected_node]['text'] = self.name_var.get()
+
+    def choose_plugin(self, plugin_class):
+        self.selected_node.plugin = plugin_class()
+        self.selected_node.is_dirty = True
+        self.node_select(self.selected_node)
 
     def node_configure(self, event, node):
         place_info = event.widget.place_info()
         node.position = ( place_info['relx'], place_info['rely'] )
 
+    def find_node_at_position(self, x, y):
+        for node, label in self.label_for_node.items():
+            nx, ny, nw, nh = _geometry(label)
+            if (nx <= x <= nx + nw) and (ny <= y <= ny+nh):
+                return node
+
+    def add_or_delete_parent(self, parent_node, child_node):
+        if child_node in parent_node.child_nodes:
+            child_node.del_parent(parent_node)
+            # XXX delete line too!
+        else:
+            child_node.add_parent(parent_node)
+            ConnectingLine(self.canvas, self.label_for_node[parent_node], self.label_for_node[child_node])
+
+    def node_add(self, event, node):
+        xl, yl, wl, hl = _geometry(event.widget)
+        other = self.find_node_at_position(event.x + xl, event.y + yl)
+        if other == node:
+            return
+        elif other is None:
+            position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
+            other = PipelineNode(name="NEW", position=position)
+            self.create_label(other)
+
+        if node.is_ancestor_of(other):
+            self.add_or_delete_parent(node, other)
+        elif other.is_ancestor_of(node):
+            self.add_or_delete_parent(other, node)
+        elif (event.x > 0) if self.canvas.winfo_width() > self.canvas.winfo_height() else (event.y > 0):
+            self.add_or_delete_parent(node, other)
+        else:
+            self.add_or_delete_parent(other, node)
+
     def node_update(self, node):
         if self.preview_frame: self.preview_frame.destroy()
-        node.prepare()
-        node.prerun()
+        if node.plugin:
+            node.prepare()
+            node.prerun()
 
         if isinstance(node.result, (dd.DataFrame, pd.DataFrame)):
             self.preview_frame = DataFramePreview(self.subframe, node.result).frame
@@ -254,7 +337,7 @@ class MainWindow:
             self.preview_frame.replace("1.0", tk.END, node.output)
         else:
             self.preview_frame = tk.Frame(self.subframe, bg='orange')
-        self.preview_frame.grid(row=1, column=0, sticky=tk.NSEW)
+        self.preview_frame.grid(row=2, column=0, sticky=tk.NSEW)
 
     def change_callback(self, _):
         print(f"CHANGE CALLBACK {_}")

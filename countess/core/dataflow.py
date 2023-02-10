@@ -9,8 +9,8 @@ PRERUN_ROW_LIMIT = 1000
 @dataclass
 class PipelineNode:
     name: str
-    plugin: BasePlugin
-    position: Optional[tuple[float, float]]
+    plugin: Optional[BasePlugin] = None
+    position: Optional[tuple[float, float]] = None
     parent_nodes: set['PipelineNode'] = field(default_factory=set)
     child_nodes: set['PipelineNode'] = field(default_factory=set)
     result: Any = None
@@ -21,10 +21,10 @@ class PipelineNode:
         return id(self)
 
     def is_ancestor_of(self, node):
-        return self in node.parent_nodes or [ self.is_ancestor_of(n) for n in node.parent_nodes ]
+        return (self in node.parent_nodes) or any(( self.is_ancestor_of(n) for n in node.parent_nodes ))
 
     def is_descendant_of(self, node):
-        return self in node.child_nodes or [ self.is_descendant_of(n) for n in node.child_nodes ]
+        return (self in node.child_nodes) or any(( self.is_descendant_of(n) for n in node.child_nodes ))
 
     def default_callback(self, a, b, s=''):
         print(f"{self.name:40s} {a:4d}/{b:4d} {s}")
@@ -62,6 +62,10 @@ class PipelineNode:
     def add_parent(self, parent):
         self.parent_nodes.add(parent)
         parent.child_nodes.add(self)
+
+    def del_parent(self, parent):
+        self.parent_nodes.discard(parent)
+        parent.child_nodes.discard(self)
 
     def mark_dirty(self):
         self.is_dirty = True

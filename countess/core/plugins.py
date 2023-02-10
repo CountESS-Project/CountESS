@@ -200,6 +200,7 @@ class DaskProgressCallback(Callback):
 
     def _start_state(self, dsk, state):
         self.total_tasks = len(state["ready"]) + len(state["waiting"])
+        pass
 
     def _posttask(self, key, result, dsk, state, worker_id):
         self.progress_callback(len(state["finished"]), self.total_tasks)
@@ -228,12 +229,15 @@ class DaskBasePlugin(BasePlugin):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
 
     def _run_top(self, ddf: dd.DataFrame|pd.DataFrame):
-        new_ddf = self.run_dask(ddf.copy())
-        if len(ddf) > 1000000:
-            new_ddf = new_ddf.persist(scheduler='multiprocessing')
-        elif len(ddf) > 10000:
-            new_ddf = new_ddf.persist()
-        return new_ddf
+        print("RUN DASK")
+        new_df = self.run_dask(ddf.copy())
+        print("YEAH OKAY")
+        if isinstance(new_df, dd.DataFrame):
+            if len(ddf) > 1000000:
+                return new_df.persist(scheduler='multiprocessing')
+            else:
+                return new_df.persist()
+        return new_df
 
     def run(
         self,
@@ -329,8 +333,6 @@ class DaskTransformPlugin(DaskBasePlugin):
             self.input_columns = []
         else:
             self.input_columns = sorted(data.columns)
-
-        print(f"{self.__class__.__name__} {self.input_columns}")
 
         for p in self.parameters.values():
             _set_column_choice_params(p, self.input_columns)
