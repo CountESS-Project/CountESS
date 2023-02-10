@@ -12,7 +12,7 @@ import numpy as np
 
 from countess import VERSION
 from countess.core.plugins import get_plugin_classes
-from countess.core.gui import PluginConfigurator, DataFramePreview
+from countess.core.gui_old import PluginConfigurator, DataFramePreview
 from countess.plugins.pivot import DaskPivotPlugin
 from countess.core.pipeline import Pipeline
 from countess.core.dataflow import PipelineGraph, PipelineNode
