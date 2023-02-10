@@ -41,7 +41,6 @@ class PipelineNode:
         input_data = self.get_input_data()
         try:
             self.result = self.plugin.run(input_data, callback, row_limit)
-            print(self.result)
             self.output = None
         except Exception as exc:
             self.result = None
@@ -53,6 +52,7 @@ class PipelineNode:
 
     def prerun(self, callback=None, row_limit=PRERUN_ROW_LIMIT):
         if not callback: callback = self.default_callback
+        print(f"PRERUN {self.name} {self.is_dirty}")
         if self.is_dirty:
             for parent_node in self.parent_nodes:
                 parent_node.prerun(callback, row_limit)

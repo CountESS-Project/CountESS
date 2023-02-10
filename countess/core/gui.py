@@ -238,8 +238,12 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def set_value(self, value):
+        # self.parameter.value is a property, and some cleaning may occur, so we just
+        # check before and after to see if it has changed.
+        old_parameter_value = self.parameter.value
         self.parameter.value = value
-        if self.callback is not None:
+        new_parameter_value = self.parameter.value
+        if old_parameter_value != new_parameter_value and self.callback is not None:
             self.callback(self.parameter)
         return self.parameter.value
 
@@ -298,8 +302,10 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
+        print(f"CHANGE PARAMETER {self} {parameter}")
         self.plugin.update()
         self.update()
+        if self.change_callback: self.change_callback(self)
 
     def update(self):
 
@@ -318,9 +324,6 @@ class PluginConfigurator:
             if key not in self.plugin.parameters:
                 wrapper.destroy()
                 del self.wrapper_cache[key]
-
-        if self.change_callback:
-            self.change_callback(self)
 
     def set_output(self, output):
 
