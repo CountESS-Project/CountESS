@@ -128,7 +128,7 @@ class ParameterWrapper:
 
         # XXX hang on, what if it's an array in an array?
 
-        if isinstance(parameter, ArrayParam):
+        if isinstance(parameter, ArrayParam) and not parameter.read_only:
             self.button = ttk.Button(tk_parent, width=1, text="+", command=self.add_row_callback)
         elif delete_callback:
             self.button = ttk.Button(tk_parent, text="X", width=1, command=lambda: delete_callback(self))
@@ -162,7 +162,8 @@ class ParameterWrapper:
             self.entry.columnconfigure(1,weight=0)
             self.entry.columnconfigure(2,weight=1)
             if isinstance(parameter, ArrayParam):
-                self.update_subwrappers(parameter.params, self.delete_row_callback)
+                drc = self.delete_row_callback if not parameter.read_only else None
+                self.update_subwrappers(parameter.params, drc)
             else:
                 self.update_subwrappers(parameter.params.values(), None)
         else:

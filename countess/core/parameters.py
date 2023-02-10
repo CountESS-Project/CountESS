@@ -237,9 +237,11 @@ class ArrayParam(BaseParam):
 
     params: list[BaseParam] = []
 
-    def __init__(self, label: str, param: BaseParam, min_size: int = 0, max_size: Optional[int] = None):
+    def __init__(self, label: str, param: BaseParam, read_only: bool = False, min_size: int = 0, max_size: Optional[int] = None):
         self.label = label
         self.param = param
+        self.read_only = read_only
+
         self.params = [param.copy() for n in range(0, min_size)]
         self.relabel()
         self.min_size = min_size
@@ -270,7 +272,7 @@ class ArrayParam(BaseParam):
             param.label = self.param.label + f" {n+1}"
 
     def copy(self) -> 'ArrayParam':
-        return self.__class__(self.label, self.param, self.min_size, self.max_size)
+        return self.__class__(self.label, self.param, self.read_only, self.min_size, self.max_size)
 
     def __len__(self):
         return len(self.params)
