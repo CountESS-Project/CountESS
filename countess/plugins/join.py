@@ -37,11 +37,17 @@ class DaskJoinPlugin(DaskBasePlugin):
             type(data) is list and
             isinstance(data[0], (dd.DataFrame, pd.DataFrame)) and
             isinstance(data[1], (dd.DataFrame, pd.DataFrame))
+        ) or (
+            type(data) is dict and 
+            all((isinstance(d, (dd.DataFrame, pd.DataFrame)) for d in data.values()))
         )
 
     def prepare(self, data):
-        self.parameters['left_on'].set_choices([INDEX] + list(data[1].columns))
-        self.parameters['right_on'].set_choices([INDEX] + list(data[0].columns))
+        if type(data) is dict:
+            data = list(data.values())
+        if len(data) >= 2:
+            self.parameters['left_on'].set_choices([INDEX] + list(data[1].columns))
+            self.parameters['right_on'].set_choices([INDEX] + list(data[0].columns))
 
     def merge_dfs(self, prev_ddf: dd.DataFrame, this_ddf: dd.DataFrame) -> dd.DataFrame:
         """Merge the new data into the old data.  Only called
@@ -67,4 +73,6 @@ class DaskJoinPlugin(DaskBasePlugin):
         row_limit: Optional[int],
     ):
         with DaskProgressCallback(callback):
+            if type(data) is dict:
+                data = list(data.values())
             return self.merge_dfs(data[1], data[0])

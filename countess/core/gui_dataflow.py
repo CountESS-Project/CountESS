@@ -2,11 +2,19 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.dnd
 import re
+import sys
+from dataclasses import dataclass
 
-from countess.core.gui import PluginConfigurator
+import pandas as pd
+import dask.dataframe as dd
+import numpy as np
+
+from countess import VERSION
+from countess.core.gui import PluginConfigurator, DataFramePreview
 from countess.plugins.pivot import DaskPivotPlugin
 from countess.core.pipeline import Pipeline
-from countess.core.dataflow import PipelineGraph
+from countess.core.dataflow import PipelineGraph, PipelineNode
+from countess.core.config import read_config
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -28,6 +36,9 @@ class ConnectingLine:
         self.color = color
         self.switch = switch
 
+        self.widget1.bind("<Configure>", self.update_line, add=True)
+        self.widget2.bind("<Configure>", self.update_line, add=True)
+        self.canvas.bind("<Configure>", self.update_line, add=True)
         self.update_line()
 
     def update_line(self, event=None):
@@ -274,15 +285,157 @@ class DataflowNode:
     def __init__(self, widget, parents):
         self.widget = widget
 
+@dataclass
+class Widgets:
+    label: tk.Message
+    config: tk.Frame
 
-canvas.bind("<Button-3>", on_button_3, add=True)
 
-nodes.append(Node(canvas, "ZERO", (0.1, 0.75), []))
-nodes.append(Node(canvas, "ONE", (0.1, 0.5), []))
-nodes.append(Node(canvas, "TWO", (0.3, 0.25), [nodes[1]]))
-nodes.append(Node(canvas, "FOO", (0.5, 0.5), [nodes[0],nodes[1],nodes[2]]))
-nodes.append(Node(canvas, "BAR", (0.7, 0.25), [nodes[2],nodes[3]]))
-nodes.append(Node(canvas, "BAZ", (0.9, 0.33), [nodes[3], nodes[4]]))
-nodes.append(Node(canvas, "QUX", (0.9, 0.75), [nodes[0], nodes[3], nodes[4]]))
+class PipelineCanvas(tk.Canvas):
 
-root.mainloop()
+    def __init__(self, tk_parent, pipeline_graph, *a, **k):
+        super().__init__(tk_parent, *a, **k)
+        self.__pipeline_graph = pipeline_graph
+        self['bg'] = 'skyblue'
+        self.__lines = []
+
+        widgets_for_node = {}
+
+            
+
+
+class FlippyCanvas(tk.Canvas):
+    """A canvas which flips all its children's X and Y
+    coordinates when it goes from portrait to landscape.
+    Place children with .place(relx=, rely=) for best results."""
+
+    __flipped = False
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.bind("<Configure>", self.__on_configure)
+
+    def __flip(self, width, height):
+        for c in self.winfo_children():
+            c.place({
+                'x': c.place_info()['y'],
+                'y': c.place_info()['x'],
+                'relx': c.place_info()['rely'],
+                'rely': c.place_info()['relx'],
+            })
+        # XXX should flip canvas items as well,
+        # but I didn't actually need that so I didn't bother.
+
+    def __on_configure(self, event):
+        flipped = event.height > event.width
+        if flipped != self.__flipped:
+            self.__flip(event.width, event.height)
+            self.__flipped = flipped
+
+class MainWindow:
+
+    preview_frame = None
+   
+    def __init__(self, tk_parent, pipeline_graph):
+
+        self.frame = tk.Frame(tk_parent)
+        self.frame.grid(sticky=tk.NSEW)
+        self.frame.columnconfigure(0, weight=0)
+
+        self.canvas = FlippyCanvas(self.frame, bg='skyblue')
+        self.subframe = tk.Frame(self.frame, bg="beige")
+        self.subframe.rowconfigure(0, weight=0)
+        self.subframe.rowconfigure(1, weight=1)
+        self.subframe.columnconfigure(0, weight=1)
+
+        tk.Label(self.subframe, text=f"CountESS {VERSION}", font=('Helvetica', 20, 'bold')).grid(row=1, sticky=tk.NSEW)
+        
+        self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
+        self.subframe.grid(row=0, column=1, sticky=tk.NSEW)
+
+        self.frame.bind('<Configure>', self.on_frame_configure, add=True)
+
+        label_for_node = {}
+        for n, node in enumerate(pipeline_graph.nodes):
+            label = tk.Message(self.canvas, text=node.name, aspect=200, cursor='hand1')
+            if not node.position:
+                node.position = (n%5)*0.2+0.1, (n//5)*0.2+0.1
+            label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
+    
+            for pn in node.parent_nodes:
+                ConnectingLine(self.canvas, label_for_node[pn], label)
+    
+            label_for_node[node] = label
+            label.bind('<Button-1>', lambda event, node=node: self.node_select(node), add=True)
+
+
+    def node_select(self, node):
+        for widget in self.subframe.winfo_children():
+            widget.destroy()
+
+        self.node_update(node)
+        self.selected_node = node
+
+        self.configurator = PluginConfigurator(self.subframe, node.plugin, self.change_callback)
+        self.configurator.frame.grid(row=0, column=0, sticky=tk.NSEW)
+
+    def node_update(self, node):
+        if self.preview_frame: self.preview_frame.destroy()
+        node.prepare()
+        node.prerun()
+
+        if isinstance(node.result, (dd.DataFrame, pd.DataFrame)):
+            self.preview_frame = DataFramePreview(self.subframe, node.result).frame
+        elif node.output:
+            self.preview_frame = tk.Text(self.subframe, bg='red')
+            self.preview_frame.replace("1.0", tk.END, node.output)
+        else:
+            self.preview_frame = tk.Frame(self.subframe, bg='orange')
+        self.preview_frame.grid(row=1, column=0, sticky=tk.NSEW)
+
+    def change_callback(self, _):
+        print("YO")
+        self.selected_node.mark_dirty()
+        self.node_update(self.selected_node)
+
+    def on_frame_configure(self, event):
+        """Swaps layout around when the window goes from landscape to portrait"""
+        print(event)
+        self.frame.columnconfigure(0, minsize=event.width / 3, weight=1)
+        self.frame.rowconfigure(0, minsize = event.height / 3, weight=1)
+    
+        if event.width > event.height:
+            self.subframe.grid(row=0, column=1, sticky=tk.NSEW)
+            self.frame.rowconfigure(1, weight=0)
+            self.frame.columnconfigure(1, minsize=0, weight=4)
+        else:
+            self.subframe.grid(row=1, column=0, sticky=tk.NSEW)
+            self.frame.columnconfigure(1, weight=0)
+            self.frame.rowconfigure(1, minsize=0, weight=4)
+
+def main():
+    try:
+        import ttkthemes  # type:ignore
+        root = ttkthemes.ThemedTk()
+        themes = set(root.get_themes())
+        for t in ["winnative", "aqua", "ubuntu", "clam"]:
+            if t in themes:
+                root.set_theme(t)
+    except ImportError:
+        root = tk.root()
+        # XXX some kind of ttk style setup goes here
+
+    root.title(f"CountESS {VERSION}")
+    root.rowconfigure(0, weight=1)
+    root.columnconfigure(0, weight=1)
+
+    pipeline_graph = read_config(sys.argv[1:])
+    
+    MainWindow(root, pipeline_graph)
+
+    root.mainloop()
+
+
+
+if __name__ == "__main__":
+    main()

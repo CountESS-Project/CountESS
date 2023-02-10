@@ -1,8 +1,10 @@
 from configparser import ConfigParser
 from typing import Iterable
+import ast
+import re
 
 from countess.core.plugins import load_plugin
-from countess.core.dataflow import PipelineGraph
+from countess.core.dataflow import PipelineGraph, PipelineNode
 
 def read_config(filenames: Iterable[str]) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
@@ -12,33 +14,46 @@ def read_config(filenames: Iterable[str]) -> PipelineGraph:
     cp.read(filenames)
 
     pipeline_graph = PipelineGraph()
-    plugins_by_name = {}
+    nodes_by_name = {}
 
-    for section_name in config.sections():
-        config_dict = config[section_name]
+    for section_name in cp.sections():
+        config_dict = cp[section_name]
 
         module_name = config_dict['_module']
         class_name = config_dict['_class']
-        version = config_dict['_version']
+        version = config_dict.get('_version')
+        hash_digest = config_dict.get('_hash')
+        position_str = config_dict.get('_position')
+
+        position = None
+        if position_str:
+            position_match = re.match(r'(\d+) (\d+)$', position_str)
+            if position_match:
+                position = int(position_match.group(1))/1000, int(position_match.group(2))/1000
+
+        # XXX check version and hash_digest and emit warnings.
 
         plugin = load_plugin(module_name, class_name)
-        pipeline_graph.add_plugin(plugin, section_name)
+        node = PipelineNode(
+            name = section_name,
+            plugin = plugin,
+            position = position,
+        )
+        pipeline_graph.nodes.append(node)
 
         for key, val in config_dict.items():
             if key.startswith('_parent'):
-                pipeline_graph.add_plugin_link(
-                    plugins_by_name[val],
-                    plugin
-                )
+                node.add_parent(nodes_by_name[val])
 
-        # XXX progress callback
-        pipeline_graph.prerun_plugin(plugin)
+        nodes_by_name[section_name] = node
 
-        for key, val in config[section_name]:
+        # XXX progress callback for preruns.
+        node.prepare()
+        node.prerun()
+
+        for key, val in config_dict.items():
             if key.startswith('_'): continue
-            plugin.set_parameter(key, ast.literal_eval(val))
-
-        plugins_by_name[section_name] = plugin
+            node.configure_plugin(key, ast.literal_eval(val))
 
     return pipeline_graph
 
@@ -47,23 +62,21 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     """Write `pipeline_graph`'s configuration out to `filename`"""
 
     cp = ConfigParser()
-    plugin_names = {}
 
-    for plugin_name, plugin, parent_plugins in pipeline_graph.traverse_plugins():
-        plugin_config = cp[plugin_name]
-        plugin_config.update({
-            '_module': plugin.__module__,
-            '_class': plugin.__class__.__name__,
-            '_version': plugin.version,
-            '_hash': plugin.hash(),
+    for node in pipeline_graph.traverse_nodes():
+        config_section = cp[node.name]
+        config_section.update({
+            '_module': node.plugin.__module__,
+            '_class': node.plugin.__class__.__name__,
+            '_version': node.plugin.version,
+            '_hash': node.plugin.hash(),
+            '_position': ' '.join([str(int(x*1000)) for x in node.position]),
         })
-        cp[plugin_name].update(dict([
-            (f"_parent_{n}", plugin_names[pp])
-            for n, pp in enumerate(parent_plugins)
+        config_section.update(dict([
+            (f"_parent_{n}", parent.name)
+            for n, parent in enumerate(node.parent_nodes)
         ]))
-        cp[plugin_name].update(plugin.get_parameters())
-        
-        plugin_names[plugin_name] = plugin
+        config_section.update(plugin.get_parameters())
 
     with open(filename, "w") as fh:
         cp.write(fh)

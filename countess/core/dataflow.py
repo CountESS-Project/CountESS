@@ -1,19 +1,24 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional, Mapping
+import traceback
 
 from countess.core.plugins import BasePlugin, get_plugin_classes, load_plugin
 
 PRERUN_ROW_LIMIT = 1000
 
 @dataclass
-class PipelineGraphNode:
+class PipelineNode:
     name: str
     plugin: BasePlugin
-    parent_nodes: set['PipelineGraphNode']
-    child_nodes: set['PipelineGraphNode']
+    position: Optional[tuple[float, float]]
+    parent_nodes: set['PipelineNode'] = field(default_factory=set)
+    child_nodes: set['PipelineNode'] = field(default_factory=set)
     result: Any = None
     output: Optional[str] = None
     is_dirty: bool = True
+
+    def __hash__(self):
+        return id(self)
 
     def is_ancestor_of(self, node):
         return self in node.parent_nodes or [ self.is_ancestor_of(n) for n in node.parent_nodes ]
@@ -21,90 +26,92 @@ class PipelineGraphNode:
     def is_descendant_of(self, node):
         return self in node.child_nodes or [ self.is_descendant_of(n) for n in node.child_nodes ]
 
-    def execute(self, callback, row_limit=None):
-        input_data = dict([(n.name, n.result) for n in self.parent_nodes if n.result is not None])
+    def default_callback(self, a, b, s=''):
+        print(f"{self.name:40s} {a:4d}/{b:4d} {s}")
 
+    def get_input_data(self):
+        if len(self.parent_nodes) == 0:
+            return None
+        elif len(self.parent_nodes) == 1:
+            return list(self.parent_nodes)[0].result
+        else:
+            return dict([(n.name, n.result) for n in self.parent_nodes if n.result is not None])
+
+    def execute(self, callback, row_limit=None):
+        input_data = self.get_input_data()
         try:
-            self.result = self.plugin.run(input_data, partial(callback, self.name), row_limit)
+            self.result = self.plugin.run(input_data, callback, row_limit)
+            print(self.result)
             self.output = None
         except Exception as exc:
             self.result = None
             self.output = traceback.format_exception(exc)
 
+    def prepare(self):
+        input_data = self.get_input_data()
+        self.plugin.prepare(input_data)
+
+    def prerun(self, callback=None, row_limit=PRERUN_ROW_LIMIT):
+        if not callback: callback = self.default_callback
+        if self.is_dirty:
+            for parent_node in self.parent_nodes:
+                parent_node.prerun(callback, row_limit)
+            self.execute(callback, row_limit)
+            self.is_dirty = False
+
+    def add_parent(self, parent):
+        self.parent_nodes.add(parent)
+        parent.child_nodes.add(self)
+
     def mark_dirty(self):
         self.is_dirty = True
-        for child in child_nodes:
+        for child_node in self.child_nodes:
             if not child_node.is_dirty:
                 child_node.mark_dirty()
+
+    def configure_plugin(self, key, value):
+        self.plugin.set_parameter(key, value)
+        self.mark_dirty()
 
     def final_descendants(self):
         if self.child_nodes: return set(n2 for n1 in self.child_nodes for n2 in n1.final_descendants())
         else: return set(self)
 
+    def detatch(self):
+        for parent_node in self.parent_nodes:
+            parent_node.child_nodes.discard(self)
+        for child_node in self.child_nodes:
+            child_node.parent_nodes.discard(self)
+
+    @classmethod
+    def get_ancestor_list(cls, nodes):
+        """Given a bunch of nodes, find the list of all the ancestors in a sensible order"""
+        parents = set(( p for n in nodes for p in n.parent_nodes ))
+        if not parents: return list(nodes)
+        return cls.get_ancestor_list(parents) + list(nodes)
+        
 
 class PipelineGraph:
 
-    # XXX probably excessive duplication here
-    nodes: set[PipelineGraphNode]
-    plugin_nodes: Mapping[BasePlugin, PipelineGraphNode]
+    # XXX probably excessive duplication here between `nodes` and `plugin_nodes`
+    # XXX also, just about all of these have become PipelineNode methods.  Interesting.
 
     def __init__(self):
 
         self.plugin_classes = get_plugin_classes()
-        self.nodes = set()
-        self.plugin_nodes = dict()
+        self.nodes = []
  
-    def default_callback(self, n, a, b, s=''):
-        print(f"{n:40s} {a:4d}/{b:4d} {s}")
-
-    def link_nodes(self, node1, node2):
-        node1.child_nodes.add(node2)
-        node2.parent_nodes.add(node1)
-
-    def add_plugin(self, plugin, name=None):
-        assert(plugin in self.plugin_classes)
-        if name is None: name = plugin.name
-        node = PipelineGraphNode(name, plugin, [])
-        self.nodes.add(node)
-        self.plugin_nodes[plugin] = node
-
-    def add_plugin_link(self, plugin1, plugin2):
-        self.link_nodes(self.plugin_nodes[plugin1], self.plugin_nodes[plugin2])
-
-    def set_plugin_name(self, plugin, name):
-        self.plugin_nodes[plugin].name = name
-
-    def configure_plugin(self, plugin, key, value):
-        plugin.set_parameter(key, value)
-        self.plugin_nodes[plugin].mark_dirty()
-
     def del_node(self, node):
-        for n in self.nodes:
-            n.parent_nodes.discard(node)
-        for n in self.nodes:
-            n.child_nodes.discard(node)
+        node.detatch()
         self.nodes.remove(node)
 
-    def del_plugin(self, plugin):
-        self.del_node(self.plugin_nodes.pop(plugin))
-
-    def prerun_node(self, node, callback=None, row_limit=PRERUN_ROW_LIMIT):
-        assert(node in self.nodes)
-        if not callback: callback = self.default_callback
-
-        for parent_node in node.parent_nodes:
-            if parent_node.is_dirty:
-                self.prerun_node(parent_node, row_limit=row_limit)
-
-        node.execute(callback, row_limit)
-        node.is_dirty = False
-
-    def prerun_plugin(self, plugin, callback=None, row_limit=PRERUN_ROW_LIMIT):
-        node = self.plugin_nodes[plugin]
-        if node.is_dirty:
-            self.prerun_node(node, callback, row_limit)
+    def default_callback(self, n, a, b, s=''):
+         print(f"{n:40s} {a:4d}/{b:4d} {s}")
 
     def run(self, callback=None):
+        # XXX this is the last thing PipelineGraph actually does!
+        # might be easier to just keep a set of nodes and sort through
+        # them for output nodes, or something.
         if not callback: callback = self.default_callback
 
         ready_nodes = [ node for node in self.nodes if not node.parent_nodes ]

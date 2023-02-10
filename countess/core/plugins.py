@@ -62,8 +62,7 @@ def load_plugin(module_name, class_name):
     module = importlib.import_module(module_name)
     plugin_class = getattr(module, class_name)
     assert issubclass(plugin_class, BasePlugin)
-    plugin = plugin_class(plugin_name)
-    return plugin
+    return plugin_class()
 
 
 class BasePlugin:
@@ -184,6 +183,7 @@ class FileInputMixin:
 
         df = self.load_files(callback, row_limit)
 
+        return df
         if type(previous) is list:
             return [ df ] + previous
         elif previous is not None:
@@ -329,6 +329,8 @@ class DaskTransformPlugin(DaskBasePlugin):
             self.input_columns = []
         else:
             self.input_columns = sorted(data.columns)
+
+        print(f"{self.__class__.__name__} {self.input_columns}")
 
         for p in self.parameters.values():
             _set_column_choice_params(p, self.input_columns)

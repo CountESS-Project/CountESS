@@ -4,12 +4,12 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd  # type: ignore
 
+from countess import VERSION
 from countess.core.parameters import BooleanParam, StringParam, IntegerParam
 from countess.core.plugins import DaskInputPlugin
 
 import re
 
-VERSION = "0.0.1"
 
 
 def maybe_number(x):
@@ -56,7 +56,7 @@ class RegexReaderPlugin(DaskInputPlugin):
     # XXX this is common to CSV reader and some others too I'm sure.
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
-     
+        print(f"READING {file_param.value}")     
         records = []
 
         line_re = re.compile(self.parameters['regex'].value)

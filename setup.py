@@ -1,8 +1,9 @@
 from setuptools import setup
+from countess import VERSION
 
 setup(
         name = 'countess',
-        version = '0.0.5',
+        version = VERSION,
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',

@@ -1,10 +1,9 @@
 import dask.dataframe as dd
-
 import pandas as pd
+
+from countess import VERSION
 from countess.core.plugins import DaskTransformPlugin
 from countess.core.parameters import StringParam, TextParam, BooleanParam, ArrayParam
-
-VERSION = "0.0.1"
 
 def process(df: pd.DataFrame, codes):
 
