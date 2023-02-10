@@ -249,7 +249,7 @@ class GraphWrapper:
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
             position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
-            other_node = PipelineNode(name="NEW", position=position)
+            other_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
             self.graph.add_node(other_node)
             self.labels[other_node] = self.label_for_node(other_node)
             self.lines[other_node] = {}
@@ -320,7 +320,7 @@ class ConfiguratorWrapper:
             self.preview_subframe = tk.Text(self.frame, bg='indian red')
             self.preview_subframe.replace("1.0", tk.END, self.node.output)
         else:
-            self.preview_frame = tk.Frame(self.frame, bg='orange')
+            self.preview_subframe = tk.Frame(self.frame, bg='orange')
 
         self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
 
@@ -363,14 +363,11 @@ class MainWindow:
 
         self.frame.bind('<Configure>', self.on_frame_configure, add=True)
 
+        if len(pipeline_graph.nodes) == 0:
+            new_node = PipelineNode(name="NEW 1", position=(0.5, 0.5))
+            pipeline_graph.add_node(new_node)
+
         self.graph_wrapper = GraphWrapper(self.canvas, pipeline_graph, self.node_select)
-        #node_wrapper_dict = {}
-        #for node in pipeline_graph.nodes:
-        #    nw = NodeWrapper(self, self.canvas, node)
-        #    for parent in node.parent_nodes:
-        #        nw.add_parent_wrapper(node_wrapper_dict[parent])
-        #    node_wrapper_dict[node] = nw
-        #self.node_wrappers = list(node_wrapper_dict.values())
 
     def node_select(self, node, label):
         for widget in self.subframe.winfo_children():
@@ -378,40 +375,6 @@ class MainWindow:
         node.prepare()
         node.prerun()
         ConfiguratorWrapper(self.subframe, node, label)
-
-    def find_node_at_position(self, x, y):
-        for node_wrapper in self.node_wrappers:
-            if node_wrapper.overlaps_position(x,y):
-                return node_wrapper.node
-
-    def add_or_delete_parent(self, parent_node, child_node):
-        if child_node in parent_node.child_nodes:
-            child_node.del_parent(parent_node)
-            # XXX delete line too!
-        else:
-            child_node.add_parent(parent_node)
-            #ConnectingLine(self.canvas, self.label_for_node[parent_node], self.label_for_node[child_node])
-
-    def node_add(self, event, node):
-        xl, yl, wl, hl = _geometry(event.widget)
-        other = self.find_node_at_position(event.x + xl, event.y + yl)
-        if other == node:
-            return
-        elif other is None:
-            position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
-            other = PipelineNode(name="NEW", position=position)
-            self.node_wrappers.append(
-                NodeWrapper(self, self.canvas, other)
-            )
-
-        if node.is_ancestor_of(other):
-            self.add_or_delete_parent(node, other)
-        elif other.is_ancestor_of(node):
-            self.add_or_delete_parent(other, node)
-        elif (event.x > 0) if self.canvas.winfo_width() > self.canvas.winfo_height() else (event.y > 0):
-            self.add_or_delete_parent(node, other)
-        else:
-            self.add_or_delete_parent(other, node)
 
     def node_update(self, node):
         if self.preview_frame: self.preview_frame.destroy()

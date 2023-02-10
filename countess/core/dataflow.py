@@ -49,14 +49,15 @@ class PipelineNode:
     def prepare(self):
         try:
             input_data = self.get_input_data()
-            self.plugin.prepare(input_data)
+            if self.plugin:
+                self.plugin.prepare(input_data)
         except Exception as exc:
             self.result = None
             self.output = traceback.format_exception(exc)
 
     def prerun(self, callback=None, row_limit=PRERUN_ROW_LIMIT):
         if not callback: callback = self.default_callback
-        if self.is_dirty:
+        if self.is_dirty and self.plugin:
             for parent_node in self.parent_nodes:
                 parent_node.prerun(callback, row_limit)
             self.execute(callback, row_limit)
