@@ -56,7 +56,6 @@ class RegexReaderPlugin(DaskInputPlugin):
     # XXX this is common to CSV reader and some others too I'm sure.
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
-        print(f"READING {file_param.value}")     
         records = []
 
         line_re = re.compile(self.parameters['regex'].value)

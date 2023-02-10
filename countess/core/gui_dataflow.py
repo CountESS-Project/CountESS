@@ -43,7 +43,6 @@ class DraggableMixin:
         self.bind("<ButtonRelease-1>", self.__on_release, add="+")
 
     def __on_start(self, event):
-        print("START")
         self['cursor'] = 'fleur'
         self.__start_x = event.x
         self.__start_y = event.y
@@ -51,15 +50,13 @@ class DraggableMixin:
         self.__mousedown = True
 
     def __on_timeout(self):
-        print("TIMEOUT")
         if self.__mousedown and not self.__moving:
             self['cursor'] = 'plus'
-            self.__ghost = tk.Label(self.master, text="?")
+            self.__ghost = tk.Frame(self.master)
             self.__ghost.place(self.place_info())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, 'red', True)
 
     def __on_motion(self, event):
-        if not self.__moving: print("MOVING")
         self.__moving = True
         mw = self.master.winfo_width()
         mh = self.master.winfo_height()
@@ -76,9 +73,7 @@ class DraggableMixin:
             self.place({'x': x, 'y': y})
 
     def __on_release(self, event):
-        print("RELEASE")
         if self.__ghost is not None:
-            print("GHOST")
             self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
             self.__ghost_line.destroy()
             self.__ghost.destroy()
@@ -322,7 +317,7 @@ class ConfiguratorWrapper:
         if isinstance(self.node.result, (dd.DataFrame, pd.DataFrame)):
             self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
         elif self.node.output:
-            self.preview_subframe = tk.Text(self.frame, bg='red')
+            self.preview_subframe = tk.Text(self.frame, bg='indian red')
             self.preview_subframe.replace("1.0", tk.END, self.node.output)
         else:
             self.preview_frame = tk.Frame(self.frame, bg='orange')
@@ -425,13 +420,11 @@ class MainWindow:
             node.prerun()
 
     def change_callback(self, _):
-        print(f"CHANGE CALLBACK {_}")
         self.selected_node.mark_dirty()
         self.node_update(self.selected_node)
 
     def on_frame_configure(self, event):
         """Swaps layout around when the window goes from landscape to portrait"""
-        print(event)
         self.frame.columnconfigure(0, minsize=event.width / 5, weight=1)
         self.frame.rowconfigure(0, minsize = event.height / 3, weight=1)
     

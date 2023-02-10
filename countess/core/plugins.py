@@ -229,9 +229,7 @@ class DaskBasePlugin(BasePlugin):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
 
     def _run_top(self, ddf: dd.DataFrame|pd.DataFrame):
-        print("RUN DASK")
         new_df = self.run_dask(ddf.copy())
-        print("YEAH OKAY")
         if isinstance(new_df, dd.DataFrame):
             if len(ddf) > 1000000:
                 return new_df.persist(scheduler='multiprocessing')
