@@ -4,6 +4,7 @@ import tkinter.dnd
 import re
 import sys
 from dataclasses import dataclass
+import random
 
 import pandas as pd
 import dask.dataframe as dd
@@ -53,7 +54,7 @@ class DraggableMixin:
         print("TIMEOUT")
         if self.__mousedown and not self.__moving:
             self['cursor'] = 'plus'
-            self.__ghost = tk.Frame(self.master)
+            self.__ghost = tk.Label(self.master, text="?")
             self.__ghost.place(self.place_info())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, 'red', True)
 
@@ -110,9 +111,13 @@ class ConnectingLine:
         self.color = color
         self.switch = switch
 
+        # XXX I'm not totally in love with all this event
+        # binding and unbinding and might replace it with
+        # a GraphWrapper-level binding.
+
         self.widget1_bind = self.widget1.bind("<Configure>", self.update_line, add=True)
         self.widget2_bind = self.widget2.bind("<Configure>", self.update_line, add=True)
-        self.canvas.bind("<Configure>", self.update_line, add=True)
+        self.canvas_bind = self.canvas.bind("<Configure>", self.update_line, add=True)
         self.update_line()
 
     def update_line(self, event=None):
@@ -144,8 +149,10 @@ class ConnectingLine:
 
     def destroy(self):
         self.canvas.delete(self.line)
+        self.canvas.unbind("<Configure>", self.canvas_bind)
         self.widget1.unbind("<Configure>", self.widget1_bind)
         self.widget2.unbind("<Configure>", self.widget2_bind)
+
 
 plugin_classes = get_plugin_classes()
 
@@ -165,19 +172,8 @@ class PluginChooserFrame(tk.Frame):
             ttk.Button(label_frame, text=plugin_class.name, command=lambda plugin_class=plugin_class: callback(plugin_class)).grid(row=n+1, column=0, sticky=tk.EW)
             ttk.Label(label_frame, text=plugin_class.title).grid(row=n+1, column=1, sticky=tk.W)
 
-def on_button_3(event):
-    items = canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
-    if len(items) != 1: return
-    for node in nodes:
-        try:
-            idx = [ cl.line for cl in node.lines].index(items[0])
-            node.parents.pop(idx)
-            node.lines.pop(idx).destroy()
-        except ValueError:
-            pass
 
-
-class FlippyCanvas(tk.Canvas):
+class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
     """A canvas which flips all its children's X and Y
     coordinates when it goes from portrait to landscape.
     Place children with .place(relx=, rely=) for best results."""
@@ -210,15 +206,145 @@ class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
 
-class PipelineNodeWrapper:
-    def __init__(self, canvas, pipeline_node):
+class GraphWrapper:
+
+    def __init__(self, canvas, graph, node_select_callback):
         self.canvas = canvas
-        self.pipeline_node = pipeline_node
-        
-        self.label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
+        self.graph = graph
+        self.node_select_callback = node_select_callback
+
+        self.labels = dict([ (node, self.label_for_node(node)) for node in graph.nodes ])
+        self.lines = dict([ (node, self.lines_for_node(node)) for node in graph.nodes ])
+
+    def label_for_node(self, node):
+        label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
+        if not node.position: node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
+        label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
+        label.bind('<Button-1>', lambda event, node=node: self.on_mousedown(event, node), add=True)
+        label.bind('<Configure>', lambda event, node=node: self.on_configure(event, node), add=True)
+        label.bind('<<GhostRelease>>', lambda event, node=node: self.on_ghost_release(event, node), add=True)
+        return label
+
+    def lines_for_node(self, node):
+        return dict([
+            (parent_node, ConnectingLine(self.canvas, self.labels[parent_node], self.labels[node]))
+            for parent_node in node.parent_nodes
+        ])
+
+    def highlight_node(self, node):
+        for label in self.labels.values(): label['bg'] = '#DDD'
+        self.labels[node]['bg'] = 'orange'
+
+    def on_mousedown(self, event, node):
+        self.highlight_node(node)
+        self.node_select_callback(node, self.labels[node])
+
+    def on_configure(self, event, node):
+        place_info = event.widget.place_info()
+        node.position = ( place_info['relx'], place_info['rely'] )
+
+    def find_node_at_position(self, x, y):
+        for node, label in self.labels.items():
+            nx, ny, nw, nh = _geometry(label)
+            if (nx <= x <= nx + nw) and (ny <= y <= ny+nh): 
+                return node
+
+    def on_ghost_release(self, event, start_node):
+        xl, yl, wl, hl = _geometry(event.widget)
+        other_node = self.find_node_at_position(event.x + xl, event.y + yl)
+        if other_node is None:
+            position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
+            other_node = PipelineNode(name="NEW", position=position)
+            self.graph.add_node(other_node)
+            self.labels[other_node] = self.label_for_node(other_node)
+            self.lines[other_node] = {}
+
+        elif other_node == start_node:
+            return
+        elif start_node in other_node.parent_nodes:
+            other_node.del_parent(start_node)
+            self.lines[other_node].pop(start_node).destroy()
+            return
+        elif other_node in start_node.parent_nodes:
+            start_node.del_parent(other_node)
+            self.lines[start_node].pop(other_node).destroy()
+            self.node_select_callback(start_node, self.labels[start_node])
+            return
+
+        if start_node.is_ancestor_of(other_node):
+            self.add_parent(start_node, other_node)
+        elif other_node.is_ancestor_of(start_node):
+            self.add_parent(other_node, start_node)
+        elif (event.x > 0) if self.canvas.winfo_width() > self.canvas.winfo_height() else (event.y > 0):
+            self.add_parent(start_node, other_node)
+        else:
+            self.add_parent(other_node, start_node)
+
+        self.highlight_node(other_node)
+        self.node_select_callback(other_node, self.labels[other_node])
+
+    def add_parent(self, parent_node, child_node):
+        child_node.add_parent(parent_node)
+        self.lines[child_node][parent_node] = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
+            
+
+class ConfiguratorWrapper:
+
+    config_subframe = None
+    preview_subframe = None
+
+    def __init__(self, frame, node, label):
+        self.frame = frame
+        self.node = node
+        self.label = label
+
+        self.name_var = tk.StringVar(self.frame, value=node.name)
+        tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
+        self.name_var.trace("w", self.name_changed_callback)
+
+        self.frame.rowconfigure(0, weight=0)
+        self.frame.rowconfigure(1, weight=0)
+        self.frame.rowconfigure(2, weight=2)
+
+        self.show_config_subframe()
+        self.show_preview_subframe()
+
+    def show_config_subframe(self):
+        if self.config_subframe: self.config_subframe.destroy()
+        if self.node.plugin:
+            self.config_subframe = PluginConfigurator(self.frame, self.node.plugin, self.config_change_callback).frame
+        else:
+            self.config_subframe = PluginChooserFrame(self.frame, "Choose Plugin", self.choose_plugin)
+        self.config_subframe.grid(row=1, sticky=tk.NSEW)
+
+    def show_preview_subframe(self):
+        if self.preview_subframe: self.preview_subframe.destroy()
+        if isinstance(self.node.result, (dd.DataFrame, pd.DataFrame)):
+            self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
+        elif self.node.output:
+            self.preview_subframe = tk.Text(self.frame, bg='red')
+            self.preview_subframe.replace("1.0", tk.END, self.node.output)
+        else:
+            self.preview_frame = tk.Frame(self.frame, bg='orange')
+
+        self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
+
+    def name_changed_callback(self, *_):
+        name = self.name_var.get()
+        self.node.name = name
+        self.label['text'] = name
+
+    def config_change_callback(self, *_):
+        self.node.mark_dirty()
+        self.node.prerun()
+        self.show_preview_subframe()
+
+    def choose_plugin(self, plugin_class):
+        self.node.plugin = plugin_class()
+        self.node.is_dirty = True
+        self.show_config_subframe()
 
 
-        
 class MainWindow:
 
     preview_frame = None
@@ -242,60 +368,26 @@ class MainWindow:
 
         self.frame.bind('<Configure>', self.on_frame_configure, add=True)
 
-        self.label_for_node = {}
-        for node in pipeline_graph.nodes:
-            self.create_label(node)
+        self.graph_wrapper = GraphWrapper(self.canvas, pipeline_graph, self.node_select)
+        #node_wrapper_dict = {}
+        #for node in pipeline_graph.nodes:
+        #    nw = NodeWrapper(self, self.canvas, node)
+        #    for parent in node.parent_nodes:
+        #        nw.add_parent_wrapper(node_wrapper_dict[parent])
+        #    node_wrapper_dict[node] = nw
+        #self.node_wrappers = list(node_wrapper_dict.values())
 
-    def create_label(self, node):
-        label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
-        if not node.position: node.position = (0.5, 0.5)
-        label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
-   
-        for pn in node.parent_nodes:
-            ConnectingLine(self.canvas, self.label_for_node[pn], label)
- 
-        self.label_for_node[node] = label
-
-        label.bind('<Button-1>', lambda event, node=node: self.node_select(node), add=True)
-        label.bind('<Configure>', lambda event, node=node: self.node_configure(event, node), add=True)
-        label.bind('<<GhostRelease>>', lambda event, node=node: self.node_add(event, node), add=True)
-
-    def node_select(self, node):
+    def node_select(self, node, label):
         for widget in self.subframe.winfo_children():
             widget.destroy()
-
-        self.node_update(node)
-        self.selected_node = node
-
-        self.name_var = tk.StringVar(self.subframe, value=node.name)
-        tk.Entry(self.subframe, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
-        self.name_var.trace("w", self.name_changed_callback)
-
-        if node.plugin:
-            self.configurator = PluginConfigurator(self.subframe, node.plugin, self.change_callback)
-            self.configurator.frame.grid(row=1, column=0, sticky=tk.NSEW)
-        else:
-            self.configurator = None
-            PluginChooserFrame(self.subframe, "Choose Plugin", self.choose_plugin).grid(row=0, column=0, sticky=tk.NSEW)
-
-    def name_changed_callback(self, *_):
-        self.selected_node.name = self.name_var.get()
-        self.label_for_node[self.selected_node]['text'] = self.name_var.get()
-
-    def choose_plugin(self, plugin_class):
-        self.selected_node.plugin = plugin_class()
-        self.selected_node.is_dirty = True
-        self.node_select(self.selected_node)
-
-    def node_configure(self, event, node):
-        place_info = event.widget.place_info()
-        node.position = ( place_info['relx'], place_info['rely'] )
+        node.prepare()
+        node.prerun()
+        ConfiguratorWrapper(self.subframe, node, label)
 
     def find_node_at_position(self, x, y):
-        for node, label in self.label_for_node.items():
-            nx, ny, nw, nh = _geometry(label)
-            if (nx <= x <= nx + nw) and (ny <= y <= ny+nh):
-                return node
+        for node_wrapper in self.node_wrappers:
+            if node_wrapper.overlaps_position(x,y):
+                return node_wrapper.node
 
     def add_or_delete_parent(self, parent_node, child_node):
         if child_node in parent_node.child_nodes:
@@ -303,7 +395,7 @@ class MainWindow:
             # XXX delete line too!
         else:
             child_node.add_parent(parent_node)
-            ConnectingLine(self.canvas, self.label_for_node[parent_node], self.label_for_node[child_node])
+            #ConnectingLine(self.canvas, self.label_for_node[parent_node], self.label_for_node[child_node])
 
     def node_add(self, event, node):
         xl, yl, wl, hl = _geometry(event.widget)
@@ -313,7 +405,9 @@ class MainWindow:
         elif other is None:
             position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
             other = PipelineNode(name="NEW", position=position)
-            self.create_label(other)
+            self.node_wrappers.append(
+                NodeWrapper(self, self.canvas, other)
+            )
 
         if node.is_ancestor_of(other):
             self.add_or_delete_parent(node, other)
@@ -329,15 +423,6 @@ class MainWindow:
         if node.plugin:
             node.prepare()
             node.prerun()
-
-        if isinstance(node.result, (dd.DataFrame, pd.DataFrame)):
-            self.preview_frame = DataFramePreview(self.subframe, node.result).frame
-        elif node.output:
-            self.preview_frame = tk.Text(self.subframe, bg='red')
-            self.preview_frame.replace("1.0", tk.END, node.output)
-        else:
-            self.preview_frame = tk.Frame(self.subframe, bg='orange')
-        self.preview_frame.grid(row=2, column=0, sticky=tk.NSEW)
 
     def change_callback(self, _):
         print(f"CHANGE CALLBACK {_}")

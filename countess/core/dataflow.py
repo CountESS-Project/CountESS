@@ -47,8 +47,12 @@ class PipelineNode:
             self.output = traceback.format_exception(exc)
 
     def prepare(self):
-        input_data = self.get_input_data()
-        self.plugin.prepare(input_data)
+        try:
+            input_data = self.get_input_data()
+            self.plugin.prepare(input_data)
+        except Exception as exc:
+            self.result = None
+            self.output = traceback.format_exception(exc)
 
     def prerun(self, callback=None, row_limit=PRERUN_ROW_LIMIT):
         if not callback: callback = self.default_callback
@@ -59,19 +63,21 @@ class PipelineNode:
             self.execute(callback, row_limit)
             self.is_dirty = False
 
-    def add_parent(self, parent):
-        self.parent_nodes.add(parent)
-        parent.child_nodes.add(self)
-
-    def del_parent(self, parent):
-        self.parent_nodes.discard(parent)
-        parent.child_nodes.discard(self)
-
     def mark_dirty(self):
         self.is_dirty = True
         for child_node in self.child_nodes:
             if not child_node.is_dirty:
                 child_node.mark_dirty()
+
+    def add_parent(self, parent):
+        self.parent_nodes.add(parent)
+        parent.child_nodes.add(self)
+        self.mark_dirty()
+
+    def del_parent(self, parent):
+        self.parent_nodes.discard(parent)
+        parent.child_nodes.discard(self)
+        self.mark_dirty()
 
     def configure_plugin(self, key, value):
         self.plugin.set_parameter(key, value)
@@ -104,7 +110,10 @@ class PipelineGraph:
 
         self.plugin_classes = get_plugin_classes()
         self.nodes = []
- 
+
+    def add_node(self, node):
+        self.nodes.append(node)
+
     def del_node(self, node):
         node.detatch()
         self.nodes.remove(node)
