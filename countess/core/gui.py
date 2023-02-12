@@ -205,6 +205,8 @@ class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
 class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
+TK_EVENT_STATE_SHIFT = 1
+TK_EVENT_STATE_CONTROL = 4
 
 class GraphWrapper:
 
@@ -217,13 +219,16 @@ class GraphWrapper:
         self.lines = dict([ (node, self.lines_for_node(node)) for node in graph.nodes ])
 
     def label_for_node(self, node):
-        label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1')
+        label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1', takefocus=True)
         if not node.position: node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
         label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
         label.bind('<Button-1>', lambda event, node=node: self.on_mousedown(event, node), add=True)
         label.bind('<Configure>', lambda event, node=node: self.on_configure(event, node), add=True)
         label.bind('<<GhostRelease>>', lambda event, node=node: self.on_ghost_release(event, node), add=True)
+        label.bind('<Key-Delete>', lambda event, node=node: self.on_delete(event, node), add=True)
+
         return label
+
 
     def lines_for_node(self, node):
         return dict([
@@ -233,7 +238,9 @@ class GraphWrapper:
 
     def highlight_node(self, node):
         for label in self.labels.values(): label['bg'] = '#DDD'
-        self.labels[node]['bg'] = 'orange'
+        if node:
+            self.labels[node]['bg'] = 'orange'
+            self.labels[node].focus()
 
     def on_mousedown(self, event, node):
         self.highlight_node(node)
@@ -242,6 +249,37 @@ class GraphWrapper:
     def on_configure(self, event, node):
         place_info = event.widget.place_info()
         node.position = ( place_info['relx'], place_info['rely'] )
+
+    def on_delete(self, event, node):
+        """<Delete> disconnects a node from the graph, connects it parents to its children,
+        and deletes the node.  <Shift-Delete> removes and deletes the node, but doesn't
+        reconnect parents and children.  <Ctrl-Delete> disconnects the node but doesn't
+        delete it."""
+        
+        parent_nodes = list(node.parent_nodes)
+        child_nodes = list(node.child_nodes)
+        for line in self.lines[node].values(): line.destroy()
+        for parent_node in parent_nodes:
+            node.del_parent(parent_node)
+        for child_node in child_nodes:
+            child_node.del_parent(node)
+            self.lines[child_node].pop(node).destroy()
+            if not event.state & TK_EVENT_STATE_SHIFT:
+                for parent_node in parent_nodes: self.add_parent(parent_node, child_node)
+        if not event.state & TK_EVENT_STATE_CONTROL:
+            self.graph.nodes.remove(node)
+            del self.labels[node]
+            del self.lines[node]
+            event.widget.destroy()
+            self.node_select_callback(None, None)
+            self.highlight_node(None)
+
+        if len(self.graph.nodes) == 0:
+            new_node = PipelineNode(name="NEW 1", position=(0.5, 0.5))
+            self.graph.add_node(new_node)
+            self.labels[new_node] = self.label_for_node(new_node)
+            self.lines[new_node] = {}
+            self.highlight_node(new_node)
 
     def find_node_at_position(self, x, y):
         for node, label in self.labels.items():
@@ -254,7 +292,7 @@ class GraphWrapper:
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
             position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
-            other_node = PipelineNode(name="NEW", position=position)
+            other_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
             self.graph.add_node(other_node)
             self.labels[other_node] = self.label_for_node(other_node)
             self.lines[other_node] = {}
@@ -284,8 +322,9 @@ class GraphWrapper:
         self.node_select_callback(other_node, self.labels[other_node])
 
     def add_parent(self, parent_node, child_node):
-        child_node.add_parent(parent_node)
-        self.lines[child_node][parent_node] = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
+        if parent_node not in child_node.parent_nodes:
+            child_node.add_parent(parent_node)
+            self.lines[child_node][parent_node] = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
             
 
 class ConfiguratorWrapper:
@@ -301,10 +340,6 @@ class ConfiguratorWrapper:
         self.name_var = tk.StringVar(self.frame, value=node.name)
         tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
         self.name_var.trace("w", self.name_changed_callback)
-
-        self.frame.rowconfigure(0, weight=0)
-        self.frame.rowconfigure(1, weight=0)
-        self.frame.rowconfigure(2, weight=2)
 
         self.show_config_subframe()
         self.show_preview_subframe()
@@ -325,7 +360,7 @@ class ConfiguratorWrapper:
             self.preview_subframe = tk.Text(self.frame, bg='indian red')
             self.preview_subframe.replace("1.0", tk.END, self.node.output)
         else:
-            self.preview_frame = tk.Frame(self.frame, bg='orange')
+            self.preview_subframe = tk.Frame(self.frame, bg='orange')
 
         self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
 
@@ -358,65 +393,32 @@ class MainWindow:
         self.canvas = FlippyCanvas(self.frame, bg='skyblue')
         self.subframe = tk.Frame(self.frame, bg="beige")
         self.subframe.rowconfigure(0, weight=0)
-        self.subframe.rowconfigure(1, weight=1)
+        self.subframe.rowconfigure(1, weight=0)
+        self.subframe.rowconfigure(2, weight=2)
         self.subframe.columnconfigure(0, weight=1)
 
-        tk.Label(self.subframe, text=f"CountESS {VERSION}", font=('Helvetica', 20, 'bold')).grid(row=1, sticky=tk.NSEW)
-        
         self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
         self.subframe.grid(row=0, column=1, sticky=tk.NSEW)
 
         self.frame.bind('<Configure>', self.on_frame_configure, add=True)
 
+        if len(pipeline_graph.nodes) == 0:
+            new_node = PipelineNode(name="NEW 1", position=(0.5, 0.5))
+            pipeline_graph.add_node(new_node)
+
         self.graph_wrapper = GraphWrapper(self.canvas, pipeline_graph, self.node_select)
-        #node_wrapper_dict = {}
-        #for node in pipeline_graph.nodes:
-        #    nw = NodeWrapper(self, self.canvas, node)
-        #    for parent in node.parent_nodes:
-        #        nw.add_parent_wrapper(node_wrapper_dict[parent])
-        #    node_wrapper_dict[node] = nw
-        #self.node_wrappers = list(node_wrapper_dict.values())
+        self.node_select(None, None)
 
     def node_select(self, node, label):
         for widget in self.subframe.winfo_children():
             widget.destroy()
-        node.prepare()
-        node.prerun()
-        ConfiguratorWrapper(self.subframe, node, label)
-
-    def find_node_at_position(self, x, y):
-        for node_wrapper in self.node_wrappers:
-            if node_wrapper.overlaps_position(x,y):
-                return node_wrapper.node
-
-    def add_or_delete_parent(self, parent_node, child_node):
-        if child_node in parent_node.child_nodes:
-            child_node.del_parent(parent_node)
-            # XXX delete line too!
+        if node:
+            node.prepare()
+            node.prerun()
+            ConfiguratorWrapper(self.subframe, node, label)
         else:
-            child_node.add_parent(parent_node)
-            #ConnectingLine(self.canvas, self.label_for_node[parent_node], self.label_for_node[child_node])
+            tk.Label(self.subframe, text=f"CountESS {VERSION}", font=('Helvetica', 20, 'bold')).grid(row=2, sticky=tk.NSEW)
 
-    def node_add(self, event, node):
-        xl, yl, wl, hl = _geometry(event.widget)
-        other = self.find_node_at_position(event.x + xl, event.y + yl)
-        if other == node:
-            return
-        elif other is None:
-            position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
-            other = PipelineNode(name="NEW", position=position)
-            self.node_wrappers.append(
-                NodeWrapper(self, self.canvas, other)
-            )
-
-        if node.is_ancestor_of(other):
-            self.add_or_delete_parent(node, other)
-        elif other.is_ancestor_of(node):
-            self.add_or_delete_parent(other, node)
-        elif (event.x > 0) if self.canvas.winfo_width() > self.canvas.winfo_height() else (event.y > 0):
-            self.add_or_delete_parent(node, other)
-        else:
-            self.add_or_delete_parent(other, node)
 
     def node_update(self, node):
         if self.preview_frame: self.preview_frame.destroy()
