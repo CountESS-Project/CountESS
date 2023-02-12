@@ -21,7 +21,7 @@ from countess.core.config import read_config
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
-def _snap(value, scale, steps=20):
+def _snap(value, scale, steps=21):
     step_size = scale / steps
     value = _limit(value, 0, scale)
     return ((value // step_size) + 0.5) * step_size
@@ -388,17 +388,13 @@ class MainWindow:
 
         self.frame = tk.Frame(tk_parent)
         self.frame.grid(sticky=tk.NSEW)
-        self.frame.columnconfigure(0, weight=0)
 
         self.canvas = FlippyCanvas(self.frame, bg='skyblue')
         self.subframe = tk.Frame(self.frame, bg="beige")
+        self.subframe.columnconfigure(0, weight=1)
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
-        self.subframe.rowconfigure(2, weight=2)
-        self.subframe.columnconfigure(0, weight=1)
-
-        self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
-        self.subframe.grid(row=0, column=1, sticky=tk.NSEW)
+        self.subframe.rowconfigure(2, weight=1)
 
         self.frame.bind('<Configure>', self.on_frame_configure, add=True)
 
@@ -432,17 +428,15 @@ class MainWindow:
 
     def on_frame_configure(self, event):
         """Swaps layout around when the window goes from landscape to portrait"""
-        self.frame.columnconfigure(0, minsize=event.width / 5, weight=1)
-        self.frame.rowconfigure(0, minsize = event.height / 3, weight=1)
-    
+        print(f"CONFIGURE {event.width} {event.height}")
         if event.width > event.height:
-            self.subframe.grid(row=0, column=1, sticky=tk.NSEW)
-            self.frame.rowconfigure(1, weight=0)
-            self.frame.columnconfigure(1, minsize=0, weight=4)
+            x = event.width // 5
+            self.canvas.place(x=0, y=0, w=x, h=event.height)
+            self.subframe.place(x=x, y=0, w=event.width - x, h=event.height)
         else:
-            self.subframe.grid(row=1, column=0, sticky=tk.NSEW)
-            self.frame.columnconfigure(1, weight=0)
-            self.frame.rowconfigure(1, minsize=0, weight=4)
+            y = event.height // 4
+            self.canvas.place(x=0,y=0,w=event.width, h=y)
+            self.subframe.place(x=0, y=y, w=event.width, h=event.height-y)
 
 def main():
     try:
