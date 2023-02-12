@@ -21,6 +21,11 @@ from countess.core.config import read_config
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
+def _snap(value, scale, steps=20):
+    step_size = scale / steps
+    value = _limit(value, 0, scale)
+    return ((value // step_size) + 0.5) * step_size
+
 def _geometry(widget):
     return (
         widget.winfo_x(),
@@ -62,8 +67,8 @@ class DraggableMixin:
         mh = self.master.winfo_height()
         w = self.winfo_width()
         h = self.winfo_height()
-        x = _limit(self.winfo_x() - self.__start_x + event.x, w//2, mw-w//2)
-        y = _limit(self.winfo_y() - self.__start_y + event.y, h//2, mh-h//2)
+        x = _snap(self.winfo_x() - self.__start_x + event.x, mw)
+        y = _snap(self.winfo_y() - self.__start_y + event.y, mh)
 
         if self.__ghost:
             self.__ghost.place({'relx': x / mw, 'rely': y / mh})
