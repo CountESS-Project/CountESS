@@ -81,3 +81,22 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     with open(filename, "w") as fh:
         cp.write(fh)
 
+
+def export_config_graphviz(pipeline_graph: PipelineGraph, filename: str):
+    with open(filename, "w") as fh:
+        fh.write("digraph {\n")
+        for node in pipeline_graph.traverse_nodes():
+            label = node.name.replace('"', r'\"')
+            if node.child_nodes and not node.parent_nodes:
+                fh.write(f'\t"{label}" [ shape="invhouse" ];\n')
+            elif node.parent_nodes and not node.child_nodes:
+                fh.write(f'\t"{label}" [ shape="house" ];\n')
+            else:
+                fh.write(f'\t"{label}" [ shape="box" ];\n')
+
+            for child_node in node.child_nodes:
+                label2 = child_node.name.replace('"', r'\"')
+                fh.write(f'\t"{label}" -> "{label2}";\n')
+
+        fh.write("}\n")
+

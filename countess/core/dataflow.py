@@ -120,25 +120,26 @@ class PipelineGraph:
     def default_callback(self, n, a, b, s=''):
          print(f"{n:40s} {a:4d}/{b:4d} {s}")
 
+    def traverse_nodes(self):
+        found_nodes  = set(( node for node in self.nodes if not node.parent_nodes ))
+        yield from found_nodes
+
+        while len(found_nodes) < len(self.nodes):
+            for node in self.nodes:
+                if node not in found_nodes and node.parent_nodes.issubset(found_nodes):
+                    yield node
+                    found_nodes.add(node)
+
     def run(self, callback=None):
         # XXX this is the last thing PipelineGraph actually does!
         # might be easier to just keep a set of nodes and sort through
         # them for output nodes, or something.
         if not callback: callback = self.default_callback
 
-        ready_nodes = [ node for node in self.nodes if not node.parent_nodes ]
-        finished_nodes = set()
-
-        while ready_nodes:
+        for node in self.traverse_nodes():
             # XXX TODO there's some opportunity for easy parallelization here, by 
             # pushing each node into a pool as soon as its parents are complete.
-            for node in ready_nodes:
-                node.execute(callback)
-                finished_nodes.add(node)
-            ready_nodes = [
-                node for node in self.nodes
-                if node not in finished_nodes and node.parent_nodes.issubset(finished_nodes)
-            ]
+            node.execute(callback)
 
     def reset(self):
         for node in self.nodes:
