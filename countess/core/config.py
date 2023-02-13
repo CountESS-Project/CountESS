@@ -49,11 +49,12 @@ def read_config(filenames: Iterable[str]) -> PipelineGraph:
 
         # XXX progress callback for preruns.
         node.prepare()
-        node.prerun()
 
         for key, val in config_dict.items():
             if key.startswith('_'): continue
             node.configure_plugin(key, ast.literal_eval(val))
+
+        node.prerun()
 
     return pipeline_graph
 
