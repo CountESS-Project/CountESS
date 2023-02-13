@@ -47,6 +47,7 @@ class LoadCsvPlugin(DaskInputPlugin):
         "columns": ArrayParam("Columns", MultiParam("Column", {
             "name": StringParam("Column Name", ""),
             "type": ChoiceParam("Column Type", "string", choices = ["string", "number", "integer", "boolean", "none"]),
+            "index": BooleanParam("Index?", False),
         }))
     }
 
@@ -74,7 +75,7 @@ class LoadCsvPlugin(DaskInputPlugin):
             'converters': dict([
                 (n, lambda v, t=pp["type"].value: cast(v, t))
                 for n, pp in enumerate(self.parameters["columns"])
-            ])
+            ]),
         }
         
         ddf = dd.read_csv(filename, **options)
@@ -96,6 +97,10 @@ class LoadCsvPlugin(DaskInputPlugin):
         filename_column = self.parameters['filename_column'].value
         if filename_column:
             ddf[filename_column] = filename
+
+        index_cols = [ddf.columns[n] for n, pp in enumerate(self.parameters["columns"]) if pp["index"].value ]
+        if index_cols:
+            ddf = ddf.set_index(index_cols)
 
         return ddf
 

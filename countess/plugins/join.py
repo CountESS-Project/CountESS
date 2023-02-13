@@ -30,42 +30,31 @@ class DaskJoinPlugin(DaskBasePlugin):
                 "source": StringParam("Source", read_only=True),
                 "join_on": ChoiceParam("Join On", INDEX, choices = [INDEX]),
                 "required": BooleanParam("Required", True),
-            }), read_only=True
+            }), read_only=True, min_size=2, max_size=2
         )
     }
 
     def prepare(self, data):
 
-        print(data.keys())
-        if len(data.keys()) > 2:
-            raise NotImplementedError("Only two-way joins supported right now")
-
+        data_items = list(data.items())
         inputs_param = self.parameters["inputs"]
 
-        print(inputs_param.value)
+        if len(data_items) != 2 or len(inputs_param) != 2:
+            raise NotImplementedError("Only two-way joins supported right now")
+        if not all(( isinstance(df, (dd.DataFrame, pd.DataFrame)) for _, df in data_items )):
+            raise NotImplementedError("Feed me dataframes")
 
-        found = set()
-        for n, sp in enumerate(inputs_param):
-            source = sp['source'].value
-            if isinstance(data.get(source), (pd.DataFrame, dd.DataFrame)):
-                print(f"FOUND {source}")
-                found.add(source)
-                sp['join_on'].choices = [ INDEX ] + list(data[source].columns)
-            else:
-                print(f"DEL {source}")
-                inputs_param.del_row(n)
+        for input_param, (source_name, source_ddf) in zip(inputs_param, data.items()):
+            input_param['source'].value = source_name
+            input_param['join_on'].choices = [ INDEX ] + list(source_ddf.columns)
 
-        for key, df in data.items():
-            if isinstance(df, (pd.DataFrame, dd.DataFrame)) and not key in found:
-                print(f"ADD {key}")
-                #sp = inputs_param.add_row()
-                #if sp:
-                #    sp['source'].value = key
-                #    sp['join_on'].choices = [ INDEX ] + list(df.columns )
-                
-    def merge_dfs(self, prev_ddf: dd.DataFrame, this_ddf: dd.DataFrame) -> dd.DataFrame:
-        """Merge the new data into the old data.  Only called
-        if there is a previous plugin to merge data from."""
+    def run(
+        self,
+        data,
+        callback: Callable[[int, int, Optional[str]], None],
+        row_limit: Optional[int],
+    ):
+
         ip1 = self.parameters["inputs"][0]
         ip2 = self.parameters["inputs"][1]
         if ip1['required'].value:
@@ -91,15 +80,4 @@ class DaskJoinPlugin(DaskBasePlugin):
         else:
             join_params['right_on'] = ip2['join_on'].value
 
-        return prev_ddf.merge(this_ddf, **join_params)
-       
-    def run(
-        self,
-        data,
-        callback: Callable[[int, int, Optional[str]], None],
-        row_limit: Optional[int],
-    ):
-        with DaskProgressCallback(callback):
-            if type(data) is dict:
-                data = list(data.values())
-            return self.merge_dfs(data[1], data[0])
+        return data[ip1['source'].value].merge(data[ip2['source'].value], **join_params)

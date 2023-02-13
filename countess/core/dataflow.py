@@ -4,7 +4,7 @@ import traceback
 
 from countess.core.plugins import BasePlugin, get_plugin_classes, load_plugin
 
-PRERUN_ROW_LIMIT = 1000
+PRERUN_ROW_LIMIT = 10000
 
 @dataclass
 class PipelineNode:
