@@ -42,7 +42,7 @@ def read_config(filenames: Iterable[str]) -> PipelineGraph:
         pipeline_graph.nodes.append(node)
 
         for key, val in config_dict.items():
-            if key.startswith('_parent'):
+            if key.startswith('_parent.'):
                 node.add_parent(nodes_by_name[val])
 
         nodes_by_name[section_name] = node
@@ -65,19 +65,19 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     cp = ConfigParser()
 
     for node in pipeline_graph.traverse_nodes():
-        config_section = cp[node.name]
-        config_section.update({
-            '_module': node.plugin.__module__,
-            '_class': node.plugin.__class__.__name__,
-            '_version': node.plugin.version,
-            '_hash': node.plugin.hash(),
-            '_position': ' '.join([str(int(x*1000)) for x in node.position]),
-        })
-        config_section.update(dict([
-            (f"_parent_{n}", parent.name)
+        cp[node.name] = dict([
+            ('_module', node.plugin.__module__),
+            ('_class', node.plugin.__class__.__name__),
+            ('_version', node.plugin.version),
+            ('_hash', node.plugin.hash()),
+            ('_position', ' '.join([str(int(x*1000)) for x in node.position])),
+        ] + [
+            (f"_parent.{n}", parent.name)
             for n, parent in enumerate(node.parent_nodes)
-        ]))
-        config_section.update(plugin.get_parameters())
+        ] + [
+            (k, repr(v))
+            for k, v in node.plugin.get_parameters()
+        ])
 
     with open(filename, "w") as fh:
         cp.write(fh)

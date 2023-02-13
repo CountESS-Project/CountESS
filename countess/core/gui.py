@@ -1,6 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
-import tkinter.dnd
+from tkinter import ttk, filedialog, messagebox
 import re
 import sys
 from dataclasses import dataclass
@@ -16,7 +15,7 @@ from countess.core.gui_old import PluginConfigurator, DataFramePreview
 from countess.plugins.pivot import DaskPivotPlugin
 from countess.core.pipeline import Pipeline
 from countess.core.dataflow import PipelineGraph, PipelineNode
-from countess.core.config import read_config
+from countess.core.config import read_config, write_config, export_config_graphviz
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -229,7 +228,6 @@ class GraphWrapper:
 
         return label
 
-
     def lines_for_node(self, node):
         return dict([
             (parent_node, ConnectingLine(self.canvas, self.labels[parent_node], self.labels[node]))
@@ -248,7 +246,7 @@ class GraphWrapper:
 
     def on_configure(self, event, node):
         place_info = event.widget.place_info()
-        node.position = ( place_info['relx'], place_info['rely'] )
+        node.position = ( float(place_info['relx']), float(place_info['rely']) )
 
     def on_delete(self, event, node):
         """<Delete> disconnects a node from the graph, connects it parents to its children,
@@ -325,7 +323,13 @@ class GraphWrapper:
         if parent_node not in child_node.parent_nodes:
             child_node.add_parent(parent_node)
             self.lines[child_node][parent_node] = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
-            
+
+    def destroy(self):
+        for node_lines in self.lines.values():
+            for line in node_lines.values():
+                line.destroy()
+        for label in self.labels.values():
+            label.destroy()
 
 class ConfiguratorWrapper:
 
@@ -360,7 +364,7 @@ class ConfiguratorWrapper:
             self.preview_subframe = tk.Text(self.frame, bg='indian red')
             self.preview_subframe.replace("1.0", tk.END, self.node.output)
         else:
-            self.preview_subframe = tk.Frame(self.frame, bg='orange')
+            self.preview_subframe = tk.Frame(self.frame)
 
         self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
 
@@ -379,18 +383,41 @@ class ConfiguratorWrapper:
         self.node.is_dirty = True
         self.show_config_subframe()
 
+class ButtonMenu:
+
+    def __init__(self, tk_parent, buttons):
+        self.frame = tk.Frame(tk_parent)
+        for button_number, (button_label, button_command) in enumerate(buttons):
+            tk.Button(self.frame, text=button_label, command=button_command).grid(row=0, column=button_number, sticky=tk.EW)
+        self.frame.grid(sticky=tk.NSEW)
+
 
 class MainWindow:
 
+    graph_wrapper = None
     preview_frame = None
    
-    def __init__(self, tk_parent, pipeline_graph):
+    def __init__(self, tk_parent, config_filename=None):
+        self.tk_parent = tk_parent
+
+        ButtonMenu(tk_parent, [
+            ( "New Config", self.config_new ),
+            ( "Load Config", self.config_load ),
+            ( "Save Config", self.config_save ),
+            ( "Export Config", self.config_export ),
+            ( "New Node", self.node_new ),
+            ( "Delete Node", self.node_delete ),
+            ( "Duplicate Node", self.node_duplicate ),
+            ( "Detatch Node", self.node_detatch ),
+            ( "Run", self.program_run ),
+            ( "Exit", self.program_exit ),
+        ])
 
         self.frame = tk.Frame(tk_parent)
         self.frame.grid(sticky=tk.NSEW)
 
         self.canvas = FlippyCanvas(self.frame, bg='skyblue')
-        self.subframe = tk.Frame(self.frame, bg="beige")
+        self.subframe = tk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=1)
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
@@ -398,12 +425,71 @@ class MainWindow:
 
         self.frame.bind('<Configure>', self.on_frame_configure, add=True)
 
-        if len(pipeline_graph.nodes) == 0:
-            new_node = PipelineNode(name="NEW 1", position=(0.5, 0.5))
-            pipeline_graph.add_node(new_node)
+        if config_filename:
+            self.config_load(config_filename)
+        else:
+            self.config_new()
 
-        self.graph_wrapper = GraphWrapper(self.canvas, pipeline_graph, self.node_select)
+    def config_new(self):
+        self.config_filename = None
+        if self.graph_wrapper: self.graph_wrapper.destroy()
+        self.graph = PipelineGraph()
+        new_node = PipelineNode(name="NEW 1", position=(0.25, 0.5))
+        self.graph.add_node(new_node)
+        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
         self.node_select(None, None)
+
+    def config_load(self, filename=None):
+        if not filename:
+            filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
+        if not filename: return
+        self.config_filename = filename
+        if self.graph_wrapper: self.graph_wrapper.destroy()
+        self.graph = read_config(filename)
+        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+        self.node_select(None, None)
+
+    def config_save(self, filename=None):
+        if not filename:
+            filename = filedialog.asksaveasfilename(
+                initialfile = self.config_filename,
+                filetypes=[(".INI Config File", "*.ini")]
+            )
+        if not filename: return
+        write_config(self.graph, filename)
+
+    def config_export(self, filename=None):
+        if not filename:
+            if self.config_filename:
+                initialfile = self.config_filename.removesuffix('.ini') + '.dot'
+            else:
+                initialfile = None
+            filename = filedialog.asksaveasfilename(
+                initialfile = initialfile,
+                filetypes=[("Graphviz File", "*.dot")]
+            )
+        if not filename: return
+        export_config_graphviz(self.graph, filename)
+        pass
+
+    def node_new(self):
+        pass
+
+    def node_delete(self):
+        pass
+
+    def node_duplicate(self):
+        pass
+
+    def node_detatch(self):
+        pass
+
+    def program_run(self):
+        self.pipeline_graph.run()
+
+    def program_exit(self):
+        if messagebox.askokcancel("Exit", "Exit CountESS?"):
+            self.tk_parent.quit()
 
     def node_select(self, node, label):
         for widget in self.subframe.winfo_children():
@@ -451,12 +537,11 @@ def main():
         # XXX some kind of ttk style setup goes here
 
     root.title(f"CountESS {VERSION}")
-    root.rowconfigure(0, weight=1)
+    root.rowconfigure(0, weight=0)
+    root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)
 
-    pipeline_graph = read_config(sys.argv[1:])
-    
-    MainWindow(root, pipeline_graph)
+    MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 
     root.mainloop()
 
