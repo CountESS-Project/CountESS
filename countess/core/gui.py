@@ -220,7 +220,12 @@ class GraphWrapper:
     def label_for_node(self, node):
         label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1', takefocus=True)
         if not node.position: node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
-        label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
+        # XXX should be more elegant way of answering the question "are we flipped?"
+        if self.canvas.winfo_width() >= self.canvas.winfo_height():
+            label.place({'relx': node.position[0], 'rely': node.position[1], 'anchor': 'c'})
+        else:
+            label.place({'relx': node.position[1], 'rely': node.position[0], 'anchor': 'c'})
+
         label.bind('<Button-1>', lambda event, node=node: self.on_mousedown(event, node), add=True)
         label.bind('<Configure>', lambda event, node=node: self.on_configure(event, node), add=True)
         label.bind('<<GhostRelease>>', lambda event, node=node: self.on_ghost_release(event, node), add=True)
@@ -246,7 +251,12 @@ class GraphWrapper:
 
     def on_configure(self, event, node):
         place_info = event.widget.place_info()
-        node.position = ( float(place_info['relx']), float(place_info['rely']) )
+        # XXX should be more elegant way of answering the question "are we flipped?"
+        if self.canvas.winfo_width() >= self.canvas.winfo_height():
+            node.position = ( float(place_info['relx']), float(place_info['rely']) )
+        else:
+            node.position = ( float(place_info['rely']), float(place_info['relx']) )
+
 
     def on_delete(self, event, node):
         """<Delete> disconnects a node from the graph, connects it parents to its children,
@@ -285,16 +295,19 @@ class GraphWrapper:
             if (nx <= x <= nx + nw) and (ny <= y <= ny+nh): 
                 return node
 
+    def add_new_node(self, position=(0.5, 0.5)):
+        new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
+        self.graph.add_node(new_node)
+        self.labels[new_node] = self.label_for_node(new_node)
+        self.lines[new_node] = {}
+        return new_node
+
     def on_ghost_release(self, event, start_node):
         xl, yl, wl, hl = _geometry(event.widget)
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
             position = (event.x + xl) / self.canvas.winfo_width(), (event.y + yl) / self.canvas.winfo_height()
-            other_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
-            self.graph.add_node(other_node)
-            self.labels[other_node] = self.label_for_node(other_node)
-            self.lines[other_node] = {}
-
+            other_node = self.add_new_node(position)
         elif other_node == start_node:
             return
         elif start_node in other_node.parent_nodes:
@@ -473,7 +486,7 @@ class MainWindow:
         pass
 
     def node_new(self):
-        pass
+        self.graph_wrapper.add_new_node()
 
     def node_delete(self):
         pass
@@ -485,7 +498,7 @@ class MainWindow:
         pass
 
     def program_run(self):
-        self.pipeline_graph.run()
+        self.graph.run()
 
     def program_exit(self):
         if messagebox.askokcancel("Exit", "Exit CountESS?"):
@@ -500,7 +513,6 @@ class MainWindow:
             ConfiguratorWrapper(self.subframe, node, label)
         else:
             tk.Label(self.subframe, text=f"CountESS {VERSION}", font=('Helvetica', 20, 'bold')).grid(row=2, sticky=tk.NSEW)
-
 
     def node_update(self, node):
         if self.preview_frame: self.preview_frame.destroy()
