@@ -175,10 +175,8 @@ class ParameterWrapper:
 
         if isinstance(self.parameter, ArrayParam):
             self.update_subwrappers(self.parameter.params, self.delete_row_callback)
-            if self.parameter.max_size is not None and len(self.subwrappers) >= self.parameter.max_size:
-                self.button['state'] = tk.DISABLED
-            else:
-                self.button['state'] = tk.NORMAL
+            if self.button:
+                self.button['state'] = tk.DISABLED if self.parameter.max_size is not None and len(self.subwrappers) >= self.parameter.max_size else tk.NORMAL
         elif isinstance(self.parameter, MultiParam):
             self.update_subwrappers(self.parameter.params.values(), None)
 
@@ -303,7 +301,6 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
-        print(f"CHANGE PARAMETER {self} {parameter}")
         self.plugin.update()
         self.update()
         if self.change_callback: self.change_callback(self)
@@ -573,7 +570,6 @@ class PipelineRunner:
 
         for num, item in enumerate(self.pipeline.items):
             self.pipeline.run(num, partial(self.progress_callback, num))
-            print(f"{num} {item.result} {item.output} {type(item.result)}")
             if isinstance(item.result, (dd.DataFrame, pd.DataFrame)):
                 preview.update(item.result)
 
