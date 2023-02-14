@@ -46,65 +46,50 @@ class LoadCsvPlugin(DaskInputPlugin):
         "filename_column": StringParam("Filename Column", ""),
         "columns": ArrayParam("Columns", MultiParam("Column", {
             "name": StringParam("Column Name", ""),
-            "type": ChoiceParam("Column Type", "string", choices = ["string", "number", "integer", "boolean", "none"]),
+            "type": ChoiceParam("Column Type", "string", choices = ["string", "number", "integer", "none"]),
             "index": BooleanParam("Index?", False),
         }))
     }
 
-    file_params = { }
+    column_type_translate = { 'string': str, 'number': float, 'integer': int, 'none': None }
 
     def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
      
         filename = file_param["filename"].value
 
-        def cast(value, datatype):
-            if datatype == 'string':
-                return str(value) if value is not None else None
-            elif datatype == 'number':
-                return float(value if value is not None else math.nan)
-            elif datatype == 'integer':
-                return int(value or 0)
-            elif datatype == 'boolean':
-                return bool(value) if value is not None else None
-            else:
-                return None
-
         options = {
-            'blocksize': '32MB',
             'header': 0 if self.parameters['header'].value else None,
-            'converters': dict([
-                (n, lambda v, t=pp["type"].value: cast(v, t))
-                for n, pp in enumerate(self.parameters["columns"])
-            ]),
+            'names': [],
+            'dtype': {},
+            'usecols': [],
         }
-        
-        ddf = dd.read_csv(filename, **options)
-
-        # XXX is this reading the whole file?  Is this bad?
-        # Dask doesn't support nrows, I think.
         if row_limit is not None:
-            ddf = ddf.head(n=row_limit)
-        else:
-            ddf = ddf.persist(scheduler="multiprocessing")
-
-        while len(ddf.columns) > len(self.parameters['columns']):
-            self.parameters['columns'].add_row()
+            options['nrows'] = row_limit
 
         for n, pp in enumerate(self.parameters["columns"]):
-            if pp["type"].value == 'none':
-                ddf = ddf.drop(columns=[ddf.columns[n]])
-            elif pp["name"].value and pp["name"].value != ddf.columns[n]:
-                ddf = ddf.rename(columns={ ddf.columns[n]: pp["name"].value})
+            options['names'].append(pp["name"].value or f"column_{n}")
+            column_type = self.column_type_translate[pp["type"].value]
+            if column_type:
+                options['dtype'][n] = column_type
+                options['usecols'].append(n)
+
+        # XXX dd.read_csv().set_index() is very very slow!
+        # XXX pd.read_csv(index_col=) is half the speed of pd.read_csv().set_index()
+
+        df = pd.read_csv(filename, **options)
+
+        while len(df.columns) > len(self.parameters['columns']):
+            self.parameters['columns'].add_row()
 
         filename_column = self.parameters['filename_column'].value
         if filename_column:
-            ddf[filename_column] = filename
+            df[filename_column] = filename
 
-        index_cols = [ddf.columns[n] for n, pp in enumerate(self.parameters["columns"]) if pp["index"].value ]
+        index_cols = [df.columns[n] for n, pp in enumerate(self.parameters["columns"]) if pp["index"].value ]
         if index_cols:
-            ddf = ddf.set_index(index_cols)
+           df = df.set_index(index_cols)
 
-        return ddf
+        return df
 
 class SaveCsvPlugin(DaskBasePlugin):
 
