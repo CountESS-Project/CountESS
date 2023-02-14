@@ -296,11 +296,14 @@ class GraphWrapper:
             if (nx <= x <= nx + nw) and (ny <= y <= ny+nh): 
                 return node
 
-    def add_new_node(self, position=(0.5, 0.5)):
+    def add_new_node(self, position=(0.5, 0.5), select=True):
         new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
         self.graph.add_node(new_node)
         self.labels[new_node] = self.label_for_node(new_node)
         self.lines[new_node] = {}
+        if select:
+            self.highlight_node(new_node)
+            self.node_select_callback(new_node, self.labels[new_node])
         return new_node
 
     def on_ghost_release(self, event, start_node):
@@ -450,7 +453,6 @@ class MainWindow:
         new_node = PipelineNode(name="NEW 1", position=(0.25, 0.5))
         self.graph.add_node(new_node)
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
-        self.node_select(None, None)
 
     def config_load(self, filename=None):
         if not filename:
