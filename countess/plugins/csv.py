@@ -84,6 +84,8 @@ class LoadCsvPlugin(DaskInputPlugin):
         # Dask doesn't support nrows, I think.
         if row_limit is not None:
             ddf = ddf.head(n=row_limit)
+        else:
+            ddf = ddf.persist(scheduler="multiprocessing")
 
         while len(ddf.columns) > len(self.parameters['columns']):
             self.parameters['columns'].add_row()

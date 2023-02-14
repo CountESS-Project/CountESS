@@ -27,16 +27,12 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "code": TextParam('Code')
+        "code": ArrayParam("Code", TextParam('Code'))
     }
 
     def run_dask(self, df) -> dd.DataFrame:
 
-        codes = [ 
-            c.replace('\n', ' ').strip()
-            for c in self.parameters['code'].value.split('\n\n')
-            if c.strip()
-        ]
+        codes = [ p.value.replace('\n', ' ') for p in self.parameters["code"] if p.value.strip() ]
 
         if isinstance(df, dd.DataFrame):
             return df.map_partitions(process, codes)

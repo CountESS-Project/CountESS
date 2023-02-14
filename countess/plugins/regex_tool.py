@@ -69,10 +69,16 @@ class RegexToolPlugin(DaskTransformPlugin):
             df = df.copy()
             x = df.apply(func, axis=1, result_type='expand')
     
-            if regex_parameter["drop_column"].value:
-                df = df.drop(columns=[ column_name ])
-
             for n in range(0, compiled_re.groups):
                 df[output_names[n]] = x[n]
+
+        drop_columns = set([
+            rp["column"].value 
+            for rp in self.parameters["regexes"]
+            if rp["drop_column"].value
+        ])
+        df = df.drop(columns=drop_columns)
+
+
 
         return df
