@@ -7,7 +7,7 @@ setup(
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',
-        packages = [ 'countess', 'countess.utils', 'countess.plugins', 'countess.core' ],
+        packages = [ 'countess', 'countess.utils', 'countess.plugins', 'countess.core', 'countess.gui' ],
         entry_points = {
             'countess_plugins': [
                 'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
@@ -39,11 +39,11 @@ setup(
             'pyarrow~=10.0.1',
             'ttkthemes~=3.2.2',
         ],
-        extras_require = {
-            'r': [
-                'rpy2==3.5.1'
-            ],
-        },
+        #extras_require = {
+        #    'r': [
+        #        'rpy2==3.5.1'
+        #    ],
+        #},
         license = 'BSD',
         license_files = ('LICENSE.txt',),
         classifiers = [
