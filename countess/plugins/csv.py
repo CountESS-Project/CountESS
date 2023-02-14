@@ -42,13 +42,13 @@ class LoadCsvPlugin(DaskInputPlugin):
     file_types = [("CSV", "*.csv"), ("TSV", "*.tsv")]
 
     parameters = {
-        "header": BooleanParam("CSV file has header row?", True),
-        "filename_column": StringParam("Filename Column", ""),
         "columns": ArrayParam("Columns", MultiParam("Column", {
             "name": StringParam("Column Name", ""),
             "type": ChoiceParam("Column Type", "string", choices = ["string", "number", "integer", "none"]),
             "index": BooleanParam("Index?", False),
-        }))
+        })),
+        "header": BooleanParam("CSV file has header row?", True),
+        "filename_column": StringParam("Filename Column", ""),
     }
 
     column_type_translate = { 'string': str, 'number': float, 'integer': int, 'none': None }
@@ -59,19 +59,21 @@ class LoadCsvPlugin(DaskInputPlugin):
 
         options = {
             'header': 0 if self.parameters['header'].value else None,
-            'names': [],
-            'dtype': {},
-            'usecols': [],
         }
         if row_limit is not None:
             options['nrows'] = row_limit
 
-        for n, pp in enumerate(self.parameters["columns"]):
-            options['names'].append(pp["name"].value or f"column_{n}")
-            column_type = self.column_type_translate[pp["type"].value]
-            if column_type:
-                options['dtype'][n] = column_type
-                options['usecols'].append(n)
+        if len(self.parameters['columns']):
+            options['names'] = []
+            options['dtype'] = {}
+            options['usecols'] = []
+
+            for n, pp in enumerate(self.parameters["columns"]):
+                options['names'].append(pp["name"].value or f"column_{n}")
+                column_type = self.column_type_translate[pp["type"].value]
+                if column_type:
+                    options['dtype'][n] = column_type
+                    options['usecols'].append(n)
 
         # XXX dd.read_csv().set_index() is very very slow!
         # XXX pd.read_csv(index_col=) is half the speed of pd.read_csv().set_index()
@@ -80,6 +82,11 @@ class LoadCsvPlugin(DaskInputPlugin):
 
         while len(df.columns) > len(self.parameters['columns']):
             self.parameters['columns'].add_row()
+
+        if self.parameters['header'].value:
+            for n, col in enumerate(df.columns):
+                if not self.parameters['columns'][n]['name'].value:
+                    self.parameters['columns'][n]['name'].value = str(col)
 
         filename_column = self.parameters['filename_column'].value
         if filename_column:
