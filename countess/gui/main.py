@@ -420,9 +420,8 @@ class MainWindow:
             ( "Save Config", self.config_save ),
             ( "Export Config", self.config_export ),
             ( "New Node", self.node_new ),
-            ( "Delete Node", self.node_delete ),
-            ( "Duplicate Node", self.node_duplicate ),
-            ( "Detatch Node", self.node_detatch ),
+            #( "Delete Node", self.node_delete ),
+            #( "Duplicate Node", self.node_duplicate ),
             ( "Run", self.program_run ),
             ( "Exit", self.program_exit ),
         ])
@@ -493,9 +492,6 @@ class MainWindow:
         pass
 
     def node_duplicate(self):
-        pass
-
-    def node_detatch(self):
         pass
 
     def program_run(self):
