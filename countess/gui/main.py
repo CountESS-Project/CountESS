@@ -163,14 +163,12 @@ class PluginChooserFrame(tk.Frame):
 
         self.columnconfigure(0, weight=1)
 
-        font = ('Helvetica', 16, 'bold')
-        tk.Label(self, text=title, font=font).grid(row=0, column=0, sticky=tk.EW)
-        label_frame = tk.LabelFrame(self, text="Choose Plugin", padx=10, pady=10)
-        label_frame.grid(row=1, column=0, sticky=tk.EW)
+        label_frame = tk.LabelFrame(self, text=title, padx=10, pady=10)
+        label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
             ttk.Button(label_frame, text=plugin_class.name, command=lambda plugin_class=plugin_class: callback(plugin_class)).grid(row=n+1, column=0, sticky=tk.EW)
-            ttk.Label(label_frame, text=plugin_class.title).grid(row=n+1, column=1, sticky=tk.W)
+            ttk.Label(label_frame, text=plugin_class.title).grid(row=n+1, column=1, sticky=tk.W, padx=10)
 
 
 class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
@@ -359,7 +357,7 @@ class ConfiguratorWrapper:
         self.label = label
 
         self.name_var = tk.StringVar(self.frame, value=node.name)
-        tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
+        tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW, padx=10, pady=5)
         self.name_var.trace("w", self.name_changed_callback)
 
         self.show_config_subframe()
