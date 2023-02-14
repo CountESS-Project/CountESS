@@ -262,8 +262,9 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         file_params = { "filename": FileParam("Filename", file_types=self.file_types) }
         file_params.update(self.file_params)
 
-        self.parameters['files'] = FileArrayParam('Files', 
-            MultiParam('File', file_params)
+        self.parameters = dict(
+            [('files', FileArrayParam('Files', MultiParam('File', file_params)))] +
+            list(self.parameters.items())
         )
 
     def combine_dfs(self, dfs: list[dd.DataFrame]) -> dd.DataFrame:
