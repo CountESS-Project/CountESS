@@ -133,18 +133,19 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-    def run(self, callback=None):
+    def run(self, progress_callback=None, output_callback=None):
         # XXX this is the last thing PipelineGraph actually does!
         # might be easier to just keep a set of nodes and sort through
         # them for output nodes, or something.
-        if not callback: callback = self.default_callback
+        if not progress_callback: progress_callback = self.default_callback
+        if not output_callback: output_callback = print
 
-        print("RUN!")
         for node in self.traverse_nodes():
-            print(f"{node}")
             # XXX TODO there's some opportunity for easy parallelization here, by 
             # pushing each node into a pool as soon as its parents are complete.
-            node.execute(partial(callback, node.name))
+            node.execute(partial(progress_callback, node.name))
+            if node.output and output_callback:
+                output_callback(node.output)
 
     def reset(self):
         for node in self.nodes:

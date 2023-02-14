@@ -1,12 +1,13 @@
 from configparser import ConfigParser
-from typing import Iterable
+from typing import Iterable, Optional, Callable
 import ast
 import re
+from functools import partial
 
 from countess.core.plugins import load_plugin
 from countess.core.dataflow import PipelineGraph, PipelineNode
 
-def read_config(filenames: Iterable[str]) -> PipelineGraph:
+def read_config(filenames: Iterable[str], progress_callback: Optional[Callable] = None, output_callback: Optional[Callable] = None) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
     config_tree = {}
@@ -54,7 +55,8 @@ def read_config(filenames: Iterable[str]) -> PipelineGraph:
             if key.startswith('_'): continue
             node.configure_plugin(key, ast.literal_eval(val))
 
-        node.prerun()
+        node.prerun(partial(progress_callback, node.name))
+        if node.output and output_callback: output_callback(node.output)
 
     return pipeline_graph
 

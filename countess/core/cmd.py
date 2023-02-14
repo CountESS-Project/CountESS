@@ -2,56 +2,31 @@ import configparser
 import importlib
 import re
 import sys
+import time
 
-import dask.dataframe as dd
-import pandas as pd
-
-from .pipeline import Pipeline
-from .plugins import BasePlugin
-
-from functools import partial
+from .config import read_config
 
 #import dask
 #dask.config.set(scheduler='processes')
 
-def progress_callback(n, a, b, s="Running"):
-    if b > 0:
-        print(
-            "%-20s %4d/%4d %-50s" % (s, a, b, "*" * int(a * 50 / b)),
-            end="\r",
-            flush=True,
-        )
-    else:
-        print("%-20s %d" % (s, a), end="\r", flush=True)
+start_time = time.time()
 
+def progress_callback(name, a, b, s=''):
+    if a == 1 and b != 1: print()
+    elapsed = time.time() - start_time
+    print(f"{name:40s} {a:4d}/{b:4d} {elapsed:9.3f} {s}", end='\r', flush=True)
 
-def process_ini(config_filenames):
-    config = configparser.ConfigParser(strict=False)
-    config.read(config_filenames)
+def output_callback(output):
+    print()
+    print(output)
 
-    pipeline = Pipeline()
-    for section_name in config.sections():
-        pipeline.load_plugin_config(section_name, config[section_name])
-
-    for num, item in enumerate(pipeline.items):
-
-        print(f"{num+1}: {item.plugin.name}\n")
-
-        pipeline.run(num, partial(progress_callback, num))
-
-        if isinstance(item.result, dd.DataFrame):
-            print(item.result.compute())
-        else:
-            print(item.result)
-
-        if item.output:
-            print(item.output)
-        
-        print("\n==========\n")
+def process_ini(config_filename):
+    graph = read_config(config_filename, progress_callback=progress_callback, output_callback=output_callback)
+    graph.run(progress_callback, output_callback)
 
 def main():
-    process_ini(["./countess.ini"] + sys.argv[1:])
-
+    for config_filename in sys.argv[1:]:
+        process_ini(config_filename)
 
 if __name__ == "__main__":
     main()
