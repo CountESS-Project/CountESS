@@ -127,8 +127,9 @@ class ConnectingLine:
             if self.switch and x1 > x2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             coords = (
-                x1 + w1, y1 + h1 //2,
-                x1 + w1 + 50, y1 + h1//2,
+                x1 + w1 // 2, y1 + h1 // 2,
+                #x1 + w1, y1 + h1 //2,
+                #x1 + w1 + 20, y1 + h1//2,
                 x2 - 50, y2 + h2//2,
                 x2, y2 + h2//2
             )
@@ -136,14 +137,15 @@ class ConnectingLine:
             if self.switch and y1 > y2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             coords = (
-                x1 + w1 // 2, y1 + h1,
-                x1 + w1 // 2, y1 + h1 + 50,
+                x1 + w1 // 2, y1 + h1 // 2,
+                #x1 + w1 // 2, y1 + h1,
+                #x1 + w1 // 2, y1 + h1 + 20,
                 x2 + w2 // 2, y2 - 50,
                 x2 + w2 // 2, y2
             )
 
         if self.line: self.canvas.coords(self.line, *coords)
-        else: self.line = self.canvas.create_line(*coords, smooth=True, width=3, arrow='last', arrowshape=(20,20,8), fill=self.color)
+        else: self.line = self.canvas.create_line(*coords, smooth=True, width=3, arrow='last', arrowshape=(15,15,6), fill=self.color)
 
     def destroy(self):
         self.canvas.delete(self.line)
