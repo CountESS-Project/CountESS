@@ -3,11 +3,18 @@ from typing import Iterable, Optional, Callable
 import ast
 import re
 from functools import partial
+import sys
 
 from countess.core.plugins import load_plugin
 from countess.core.dataflow import PipelineGraph, PipelineNode
 
-def read_config(filenames: Iterable[str], progress_callback: Optional[Callable] = None, output_callback: Optional[Callable] = None) -> PipelineGraph:
+def default_progress_callback(n, a, b, s=''):
+         print(f"{n:40s} {a:4d}/{b:4d} {s}")
+
+def default_output_callback(output):
+    sys.stderr.write(repr(output))
+
+def read_config(filenames: Iterable[str], progress_callback: Callable = default_progress_callback, output_callback: Callable = default_output_callback) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
     config_tree = {}
