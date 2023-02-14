@@ -11,9 +11,8 @@ import numpy as np
 
 from countess import VERSION
 from countess.core.plugins import get_plugin_classes
-from countess.core.gui_old import PluginConfigurator, DataFramePreview
+from countess.gui.config import PluginConfigurator, DataFramePreview
 from countess.plugins.pivot import DaskPivotPlugin
-from countess.core.pipeline import Pipeline
 from countess.core.dataflow import PipelineGraph, PipelineNode
 from countess.core.config import read_config, write_config, export_config_graphviz
 

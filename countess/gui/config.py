@@ -20,7 +20,7 @@ import math
 import sys
 import pandas as pd
 
-from .parameters import (
+from ..core.parameters import (
     ArrayParam,
     BaseParam,
     BooleanParam,
@@ -35,8 +35,7 @@ from .parameters import (
     StringParam,
     TextParam,
 )
-from .pipeline import Pipeline
-from .plugins import BasePlugin, FileInputMixin
+from ..core.plugins import BasePlugin, FileInputMixin
 from ..utils.dask import crop_dask_dataframe
 
 import numpy as np
