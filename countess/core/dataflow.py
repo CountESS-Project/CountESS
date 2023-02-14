@@ -4,6 +4,8 @@ import traceback
 
 from countess.core.plugins import BasePlugin, get_plugin_classes, load_plugin
 
+from functools import partial
+
 PRERUN_ROW_LIMIT = 10000
 
 @dataclass
@@ -137,10 +139,12 @@ class PipelineGraph:
         # them for output nodes, or something.
         if not callback: callback = self.default_callback
 
+        print("RUN!")
         for node in self.traverse_nodes():
+            print(f"{node}")
             # XXX TODO there's some opportunity for easy parallelization here, by 
             # pushing each node into a pool as soon as its parents are complete.
-            node.execute(callback)
+            node.execute(partial(callback, node.name))
 
     def reset(self):
         for node in self.nodes:

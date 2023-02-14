@@ -231,10 +231,9 @@ class DaskBasePlugin(BasePlugin):
     def _run_top(self, ddf: dd.DataFrame|pd.DataFrame):
         new_df = self.run_dask(ddf.copy())
         if isinstance(new_df, dd.DataFrame):
-            if len(ddf) > 1000000:
-                return new_df.persist(scheduler='multiprocessing')
-            else:
-                return new_df.persist()
+            #if len(ddf) > 1000000:
+            #    return new_df.persist(scheduler='multiprocessing')
+            return new_df.persist()
         return new_df
 
     def run(
