@@ -33,10 +33,15 @@ def read_config(
     for section_name in cp.sections():
         config_dict = cp[section_name]
 
-        module_name = config_dict["_module"]
-        class_name = config_dict["_class"]
-        # XXX version = config_dict.get("_version")
-        # XXX hash_digest = config_dict.get("_hash")
+        if "_module" in config_dict:
+            module_name = config_dict["_module"]
+            class_name = config_dict["_class"]
+            # XXX version = config_dict.get("_version")
+            # XXX hash_digest = config_dict.get("_hash")
+            plugin = load_plugin(module_name, class_name)
+        else:
+            plugin = None
+
         position_str = config_dict.get("_position")
 
         position = None
@@ -50,7 +55,6 @@ def read_config(
 
         # XXX check version and hash_digest and emit warnings.
 
-        plugin = load_plugin(module_name, class_name)
         node = PipelineNode(
             name=section_name,
             plugin=plugin,
@@ -64,17 +68,18 @@ def read_config(
 
         nodes_by_name[section_name] = node
 
-        # XXX progress callback for preruns.
-        node.prepare()
+        if plugin:
+            # XXX progress callback for preruns.
+            node.prepare()
 
-        for key, val in config_dict.items():
-            if key.startswith("_"):
-                continue
-            node.configure_plugin(key, ast.literal_eval(val))
+            for key, val in config_dict.items():
+                if key.startswith("_"):
+                    continue
+                node.configure_plugin(key, ast.literal_eval(val))
 
-        node.prerun(partial(progress_callback, node.name))
-        if node.output and output_callback is not None:
-            output_callback(node.output)
+            node.prerun(partial(progress_callback, node.name))
+            if node.output and output_callback is not None:
+                output_callback(node.output)
 
     return pipeline_graph
 
@@ -85,20 +90,23 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     cp = ConfigParser()
 
     for node in pipeline_graph.traverse_nodes():
-        cp[node.name] = dict(
-            [
-                ("_module", node.plugin.__module__),
-                ("_class", node.plugin.__class__.__name__),
-                ("_version", node.plugin.version),
-                ("_hash", node.plugin.hash()),
-                ("_position", " ".join([str(int(x * 1000)) for x in node.position])),
-            ]
-            + [
-                (f"_parent.{n}", parent.name)
-                for n, parent in enumerate(node.parent_nodes)
-            ]
-            + [(k, repr(v)) for k, v in node.plugin.get_parameters()]
-        )
+        cp.add_section(node.name)
+        if node.plugin:
+            cp[node.name].update({
+                "_module": node.plugin.__module__,
+                "_class": node.plugin.__class__.__name__,
+                "_version": node.plugin.version,
+                "_hash": node.plugin.hash(),
+            })
+        if node.position:
+            cp[node.name]['_position'] = " ".join(
+                str(int(x * 1000)) for x in node.position
+            )
+        for n, parent in enumerate(node.parent_nodes):
+            cp[node.name][f'_parent.{n}'] = parent.name
+        if node.plugin:
+            for k, v in node.plugin.get_parameters():
+                cp[node.name][k] = repr(v)
 
     with open(filename, "w") as fh:
         cp.write(fh)

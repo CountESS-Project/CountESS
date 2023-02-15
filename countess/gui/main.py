@@ -4,6 +4,7 @@ import sys
 import tkinter as tk
 from enum import Enum, IntFlag
 from tkinter import filedialog, messagebox, ttk
+from functools import partial
 
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
@@ -320,55 +321,40 @@ class GraphWrapper:
                 {"relx": node.position[1], "rely": node.position[0], "anchor": "c"}
             )
 
-        label.bind(
-            "<Button-1>",
-            lambda event, node=node: self.on_mousedown(event, node),
-            add=True,
-        )
-        label.bind(
-            "<Configure>",
-            lambda event, node=node: self.on_configure(event, node),
-            add=True,
-        )
-        label.bind(
-            "<<GhostRelease>>",
-            lambda event, node=node: self.on_ghost_release(event, node),
-            add=True,
-        )
-        label.bind(
-            "<Key-Delete>",
-            lambda event, node=node: self.on_delete(event, node),
-            add=True,
-        )
+        label.bind("<Button-1>", partial(self.on_mousedown, node), add=True)
+        label.bind("<Configure>", partial(self.on_configure, node), add=True)
+        label.bind("<<GhostRelease>>", partial(self.on_ghost_release, node), add=True)
+        label.bind("<Key-Delete>", partial(self.on_delete, node), add=True)
         label.bind("<Enter>", self.on_canvas_leave, add=True)
 
         return label
 
     def lines_for_node(self, node):
         return dict(
-            [
-                (
-                    parent_node,
-                    ConnectingLine(
-                        self.canvas, self.labels[parent_node], self.labels[node]
-                    ),
-                )
-                for parent_node in node.parent_nodes
-            ]
+            (
+                parent_node,
+                ConnectingLine(
+                    self.canvas, self.labels[parent_node], self.labels[node]
+                ),
+            )
+            for parent_node in node.parent_nodes
         )
 
     def highlight_node(self, node):
+        """Highlight the current node in orange"""
         for label in self.labels.values():
             label["bg"] = "#DDD"
         if node:
             self.labels[node]["bg"] = "orange"
             self.labels[node].focus()
 
-    def on_mousedown(self, event, node):
+    def on_mousedown(self, node, event):
+        """Button-1 click selects a node to view"""
         self.highlight_node(node)
-        self.node_select_callback(node, self.labels[node])
+        self.node_select_callback(node)
 
-    def on_configure(self, event, node):
+    def on_configure(self, node, event):
+        """Stores the updated position of the label in node.position"""
         place_info = event.widget.place_info()
         # XXX should be more elegant way of answering the question "are we flipped?"
         if self.canvas.winfo_width() >= self.canvas.winfo_height():
@@ -376,14 +362,8 @@ class GraphWrapper:
         else:
             node.position = (float(place_info["rely"]), float(place_info["relx"]))
 
-    def find_lines_at(x, y, d=10):
-        items = self.canvas.find_overlapping(x - d, y - d, x + d, y + d)
-        for child_node, lines_for_child in self.lines.items():
-            for parent_node, connecting_line in list(lines_for_child.items()):
-                if connecting_line.line in items:
-                    yield connecting_line
-
     def on_canvas_motion(self, event):
+        """Show a preview of line selection when the cursor is over line(s)"""
         items = self.canvas.find_overlapping(
             event.x - 10, event.y - 10, event.x + 10, event.y + 10
         )
@@ -392,10 +372,14 @@ class GraphWrapper:
             self.canvas.itemconfig(connecting_line.line, fill=color)
 
     def on_canvas_leave(self, event):
+        """Called when the mouse leaves the canvas *OR* the mouse enters
+        any of the labels, to clear the line selection preview."""
         for connecting_line, _, _ in self.lines_lookup.values():
             self.canvas.itemconfig(connecting_line.line, fill="black")
 
     def on_canvas_button1(self, event):
+        """Click to create a new node, if it is created on top of a line
+        that line is broken and the node is included."""
         items = self.canvas.find_overlapping(
             event.x - 10, event.y - 10, event.x + 10, event.y + 10
         )
@@ -413,7 +397,7 @@ class GraphWrapper:
             self.add_parent(parent_node, new_node)
 
     def on_canvas_button3(self, event):
-        """Button3 on canvas: delete links"""
+        """Button3 on canvas: delete line(s)."""
         items = self.canvas.find_overlapping(
             event.x - 10, event.y - 10, event.x + 10, event.y + 10
         )
@@ -421,7 +405,7 @@ class GraphWrapper:
             connecting_line, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
 
-    def on_delete(self, event, node):
+    def on_delete(self, node, event):
         """<Delete> disconnects a node from the graph, connects it parents to its children,
         and deletes the node.  <Shift-Delete> removes and deletes the node, but doesn't
         reconnect parents and children.  <Ctrl-Delete> disconnects the node but doesn't
@@ -444,15 +428,17 @@ class GraphWrapper:
             del self.labels[node]
             del self.lines[node]
             event.widget.destroy()
-            self.node_select_callback(None, None)
+            self.node_select_callback(None)
             self.highlight_node(None)
 
         if len(self.graph.nodes) == 0:
-            new_node = PipelineNode(name="NEW 1", position=(0.5, 0.5))
-            self.graph.add_node(new_node)
-            self.labels[new_node] = self.label_for_node(new_node)
-            self.lines[new_node] = {}
+            self.add_new_node(select=True)
+        else:
+            # arbitrary choice here ... would maybe be nicer to pick one
+            # related or close by, but it's not too important.
+            new_node = list(self.graph.nodes)[0]
             self.highlight_node(new_node)
+            self.node_select_callback(new_node)
 
     def find_node_at_position(self, x, y):
         for node, label in self.labels.items():
@@ -469,10 +455,10 @@ class GraphWrapper:
         self.lines[new_node] = {}
         if select:
             self.highlight_node(new_node)
-            self.node_select_callback(new_node, self.labels[new_node])
+            self.node_select_callback(new_node)
         return new_node
 
-    def on_ghost_release(self, event, start_node):
+    def on_ghost_release(self, start_node, event):
         xl, yl, wl, hl = _geometry(event.widget)
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
@@ -503,7 +489,7 @@ class GraphWrapper:
             self.add_parent(other_node, start_node)
 
         self.highlight_node(other_node)
-        self.node_select_callback(other_node, self.labels[other_node])
+        self.node_select_callback(other_node)
 
     def add_parent(self, parent_node, child_node):
         if parent_node not in child_node.parent_nodes:
@@ -524,6 +510,11 @@ class GraphWrapper:
         connecting_line.destroy()
         child_node.del_parent(parent_node)
 
+    def node_changed(self, node):
+        """Called when something external updates the node's name, status
+        or configuration."""
+        self.labels[node]['text'] = node.name
+
     def destroy(self):
         for node_lines in self.lines.values():
             for line in node_lines.values():
@@ -533,14 +524,16 @@ class GraphWrapper:
 
 
 class ConfiguratorWrapper:
+    """Wraps up the PluginConfigurator or PluginChooserFrame, plus a
+    DataFramePreview, to make up the larger part of the main window"""
 
     config_subframe = None
     preview_subframe = None
 
-    def __init__(self, frame, node, label):
+    def __init__(self, frame, node, change_callback):
         self.frame = frame
         self.node = node
-        self.label = label
+        self.change_callback = change_callback
 
         self.name_var = tk.StringVar(self.frame, value=node.name)
         tk.Entry(
@@ -580,17 +573,19 @@ class ConfiguratorWrapper:
     def name_changed_callback(self, *_):
         name = self.name_var.get()
         self.node.name = name
-        self.label["text"] = name
+        self.change_callback(self.node)
 
     def config_change_callback(self, *_):
         self.node.mark_dirty()
         self.node.prerun()
         self.show_preview_subframe()
+        self.change_callback(self.node)
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
         self.node.is_dirty = True
         self.show_config_subframe()
+        self.change_callback(self.node)
 
 
 class ButtonMenu:
@@ -604,9 +599,13 @@ class ButtonMenu:
 
 
 class MainWindow:
+    """Arrange the parts of the main window, with the FrameWrapper on the top
+    left and the ConfiguratorWrapper either beside it or under it depending on
+    the window dimenstions"""
 
     graph_wrapper = None
     preview_frame = None
+    config_changed = False
 
     def __init__(self, tk_parent, config_filename=None):
         self.tk_parent = tk_parent
@@ -618,9 +617,6 @@ class MainWindow:
                 ("Load Config", self.config_load),
                 ("Save Config", self.config_save),
                 ("Export Config", self.config_export),
-                ("New Node", self.node_new),
-                # ( "Delete Node", self.node_delete ),
-                # ( "Duplicate Node", self.node_duplicate ),
                 ("Run", self.program_run),
                 ("Exit", self.program_exit),
             ],
@@ -644,6 +640,10 @@ class MainWindow:
             self.config_new()
 
     def config_new(self):
+        if self.config_changed:
+            if not messagebox.askokcancel("Clear Config", "Clear unsaved config?"):
+               return
+        self.config_changed = False
         self.config_filename = None
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
@@ -664,7 +664,7 @@ class MainWindow:
             self.graph_wrapper.destroy()
         self.graph = read_config(filename)
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
-        self.node_select(None, None)
+        self.node_select(None)
 
     def config_save(self, filename=None):
         if not filename:
@@ -675,6 +675,7 @@ class MainWindow:
         if not filename:
             return
         write_config(self.graph, filename)
+        self.config_changed=False
 
     def config_export(self, filename=None):
         if not filename:
@@ -690,29 +691,22 @@ class MainWindow:
         export_config_graphviz(self.graph, filename)
         pass
 
-    def node_new(self):
-        self.graph_wrapper.add_new_node()
-
-    def node_delete(self):
-        pass
-
-    def node_duplicate(self):
-        pass
-
     def program_run(self):
+        # XXX should be handled in a different thread
         self.graph.run()
 
     def program_exit(self):
-        if messagebox.askokcancel("Exit", "Exit CountESS?"):
+        if not self.config_changed or \
+                messagebox.askokcancel("Exit", "Exit CountESS without saving config?"):
             self.tk_parent.quit()
 
-    def node_select(self, node, label):
+    def node_select(self, node):
         for widget in self.subframe.winfo_children():
             widget.destroy()
         if node:
             node.prepare()
             node.prerun()
-            ConfiguratorWrapper(self.subframe, node, label)
+            ConfiguratorWrapper(self.subframe, node, self.node_changed)
         else:
             tk.Label(
                 self.subframe,
@@ -720,16 +714,9 @@ class MainWindow:
                 font=("Helvetica", 20, "bold"),
             ).grid(row=2, sticky=tk.NSEW)
 
-    def node_update(self, node):
-        if self.preview_frame:
-            self.preview_frame.destroy()
-        if node.plugin:
-            node.prepare()
-            node.prerun()
-
-    def change_callback(self, _):
-        self.selected_node.mark_dirty()
-        self.node_update(self.selected_node)
+    def node_changed(self, node):
+        self.config_changed=True
+        self.graph_wrapper.node_changed(node)
 
     def on_frame_configure(self, event):
         """Swaps layout around when the window goes from landscape to portrait"""
