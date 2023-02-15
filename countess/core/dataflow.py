@@ -41,21 +41,28 @@ class PipelineNode:
 
     def execute(self, callback, row_limit=None):
         input_data = self.get_input_data()
-        try:
-            self.result = self.plugin.run(input_data, callback, row_limit)
+        if self.plugin:
+            try:
+                self.result = self.plugin.run(input_data, callback, row_limit)
+                self.output = None
+            except Exception as exc:
+                self.result = None
+                self.output = traceback.format_exception(exc)
+        else:
+            self.result = input_data
             self.output = None
-        except Exception as exc:
-            self.result = None
-            self.output = traceback.format_exception(exc)
 
     def prepare(self):
-        try:
-            input_data = self.get_input_data()
-            if self.plugin:
+        input_data = self.get_input_data()
+        if self.plugin:
+            try:
                 self.plugin.prepare(input_data)
-        except Exception as exc:
-            self.result = None
-            self.output = traceback.format_exception(exc)
+            except Exception as exc:
+                self.result = None
+                self.output = traceback.format_exception(exc)
+        else:
+            self.result = input_data
+            self.output = None
 
     def prerun(self, callback=None, row_limit=PRERUN_ROW_LIMIT):
         if not callback: callback = self.default_callback
