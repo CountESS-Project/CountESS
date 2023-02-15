@@ -1,22 +1,56 @@
-# CountESS
+# CountESS 0.0.11
 
 This is CountESS, a modular, Python 3 reimplementation of Enrich2.
 
 ## License
 
-BSD 3-clause.  See LICENSE.txt
+BSD 3-clause.  See [LICENSE.txt](LICENSE.txt)
 
-Source code is available at [https://github.com/CountESS-Project/CountESS](https://github.com/CountESS-Project/CountESS)
+Source code is available at [https://github.com/CountESS-Project/CountESS](https://github.com/CountESS-Project/CountESS) and contributions are welcomed.
+
+## Installing
+
+CountESS can (soon) be install from pypi:
+```
+pip install CountESS
+```
+
+... or install the latest development version directly from github:
+```
+pip install git+https://github.com/CountESS-Project/CountESS.git
+```
+
+... or download and install for development:
+```
+git clone https://github.com/CountESS-Project/CountESS.git
+cd CountESS
+pip install -e .
+```
 
 ## Counting with CountESS
 
 To run the CountESS GUI, use `countess_gui`.
 
-Add plugins and set configuration parameters.  Each plugin has its own configuration
-tab which shows parameters and below that the abbreviated output of that plugin.
+A CountESS pipeline consists of a bunch of components called 'nodes',
+connected in an acyclic graph.
+Some components read or write files, others perform basic data operations, 
+others perform more specialized operations relevant to specific fields.
+
+The graph is displayed on the left of the window (or at the top of the window,
+on portrait monitors).  To add a node, click on the graph window and a node
+called "NEW" will be added to the graph.  Pick a plugin for this node from
+the menu.
+
+To select a node for configuration, left-click it.  You can also move it
+around on the scren with left-click and drag.  To remove a node, select it
+and then press Delete.
+
+To link nodes, right-click and drag a new link between them.  Nodes cannot be
+linked to themselves, or in cycles.  To remove a link between nodes, right-click
+the link.
 
 Only the first few hundred rows of input files are read at configuration time.
-To perform a complete run using the entire input file, click 'RUN'.
+To perform a complete run using the entire input file, click 'Run'.
 
 Plugin configurations can be saved and loaded in .INI file format.
 CountESS can also be run in headless mode with `countess_cmd your_config.ini`.
@@ -24,7 +58,7 @@ CountESS can also be run in headless mode with `countess_cmd your_config.ini`.
 ## Writing Plugins
 
 CountESS is really just a pipeline of plugins, which are run sequentially to 
-process your data.  Some of these are bundled as part of CounteSS or 
+process your data.  Some of these are bundled as part of CountESS or 
 available as packages on PyPI, but it is easy to create your own plugin packages.
 
 To write a new plugin:

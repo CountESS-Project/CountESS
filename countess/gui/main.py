@@ -585,16 +585,21 @@ class ConfiguratorWrapper:
         self.node.plugin = plugin_class()
         self.node.is_dirty = True
         self.show_config_subframe()
+        if self.node.name.startswith("NEW "):
+            self.node.name = self.node.plugin.name + self.node.name.removeprefix("NEW") 
+            self.name_var.set(self.node.name)
         self.change_callback(self.node)
 
 
 class ButtonMenu:
-    def __init__(self, tk_parent, buttons):
+    def __init__(self, tk_parent, buttons, label):
         self.frame = tk.Frame(tk_parent)
         for button_number, (button_label, button_command) in enumerate(buttons):
             tk.Button(self.frame, text=button_label, command=button_command).grid(
                 row=0, column=button_number, sticky=tk.EW
             )
+        tk.Label(self.frame, text=label, font=("Helvetica", 12, "bold")).grid(row=0, column=button_number+1, sticky=tk.E)
+        self.frame.columnconfigure(button_number+1, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
 
@@ -620,6 +625,7 @@ class MainWindow:
                 ("Run", self.program_run),
                 ("Exit", self.program_exit),
             ],
+            f"CountESS {VERSION}"
         )
 
         self.frame = tk.Frame(tk_parent)
@@ -648,9 +654,8 @@ class MainWindow:
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph()
-        new_node = PipelineNode(name="NEW 1", position=(0.25, 0.5))
-        self.graph.add_node(new_node)
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+        self.graph_wrapper.add_new_node(select=True)
 
     def config_load(self, filename=None):
         if not filename:
@@ -707,12 +712,6 @@ class MainWindow:
             node.prepare()
             node.prerun()
             ConfiguratorWrapper(self.subframe, node, self.node_changed)
-        else:
-            tk.Label(
-                self.subframe,
-                text=f"CountESS {VERSION}",
-                font=("Helvetica", 20, "bold"),
-            ).grid(row=2, sticky=tk.NSEW)
 
     def node_changed(self, node):
         self.config_changed=True
