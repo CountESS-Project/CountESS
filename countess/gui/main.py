@@ -4,7 +4,7 @@ import re
 import sys
 from dataclasses import dataclass
 import random
-from enum import Enum
+from enum import Enum, IntFlag
 
 import pandas as pd
 import dask.dataframe as dd
@@ -37,7 +37,7 @@ def _geometry(widget):
 # XXX note cross-platform mapping for modifiers and buttons
 # https://wiki.tcl-lang.org/page/Modifier+Keys
 
-class TkEventState(Enum):
+class TkEventState(IntFlag):
     SHIFT = 1
     CAPS_LOCK = 2
     CONTROL = 4
@@ -56,8 +56,7 @@ DraggableMixinState = Enum('DraggableMixinState', ['READY', 'DRAG_WAIT', 'LINK_W
 
 class DraggableMixin:
 
-    __state = State.READY
-    __ghost = None
+    __state = DraggableMixinState.READY
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
@@ -70,40 +69,42 @@ class DraggableMixin:
         self['cursor'] = 'hand1'
 
     def __on_button(self, event):
-        print(event)
-        self.__state = DraggableMixinState.LINK_WAIT if event.state & TkEventState.CONTROL or event.num == 3 else DraggableMixinState.DRAG_WAIT
+        if event.state & TkEventState.CONTROL or event.num == 3:
+            self.__state = self.__state.LINK_WAIT
+        else:
+            self.__state = self.__state.DRAG_WAIT
         self.after(500, self.__on_timeout)
 
     def __place(self, event=None):
         return {
             'relx': (self.winfo_x() + (event.x if event else self.winfo_width() // 2)) / self.master.winfo_width(),
-            'rely': (self.winfo_y() + (event.y if event else self.winfo_height() // 2)) / self.master.winfo_height()
+            'rely': (self.winfo_y() + (event.y if event else self.winfo_height() // 2)) / self.master.winfo_height(),
+            'anchor': 'c'
         }
 
     def __on_timeout(self):
-        if self.__state == DraggableMixinState.DRAG_WAIT:
-            self.__state = DraggableMixinState.DRAGGING
+        if self.__state == self.__state.DRAG_WAIT:
+            self.__state = self.__state.DRAGGING
             self['cursor'] = 'fleur'
-        elif self.__state == DraggableMixinState.LINK_WAIT:
-            self.__state = DraggableMixinState.LINKING
-            self.__ghost = tk.Frame(self.master, bg='lightslategrey')
-            self.__ghost.place({'width': self.winfo_width(), 'height': self.winfo_height(), 'anchor': 'c'})
+        elif self.__state == self.__state.LINK_WAIT:
+            self.__state = self.__state.LINKING
+            self.__ghost = tk.Frame(self.master)
             self.__ghost.place(self.__place())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, 'red', True)
             self['cursor'] = 'plus'
 
     def __on_motion(self, event):
-        if self.__state == DraggableMixinState.DRAGGING:
+        if self.__state == self.__state.DRAGGING:
             self.place(self.__place(event))
-        elif self.__state == DraggableMixinState.LINKING:
+        elif self.__state == self.__state.LINKING:
             self.__ghost.place(self.__place(event))
 
     def __on_release(self, event):
-        if self.__state == DraggableMixinState.LINKING:
+        if self.__state == self.__state.LINKING:
             self.__ghost_line.destroy()
             self.__ghost.destroy()
             self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
-        self.__state = DraggableMixinState.READY
+        self.__state = self.__state.READY
         self['cursor'] = 'hand1'
 
 
@@ -142,6 +143,11 @@ class ConnectingLine:
     def update_line(self, event=None):
         x1, y1, w1, h1 = _geometry(self.widget1)
         x2, y2, w2, h2 = _geometry(self.widget2)
+
+        # special case for dragging invisible frames
+        # XXX bit of a hack just to get it to look nice
+        if w2 == 1 and h2 == 1:
+            x2, y2, w2, h2 = x2 - 20, y2 - 20, 40, 40
 
         xc, yc, wc, hc = _geometry(self.canvas)
         if wc > hc: 
