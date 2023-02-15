@@ -122,8 +122,8 @@ class ParameterWrapper:
 
         elif isinstance(parameter, ArrayParam) and self.level < 3: 
             label_frame_label = tk.Frame(tk_parent)
-            tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=10)
-            self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10)
+            tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
+            self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
             self.button = ttk.Button(label_frame_label, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
             self.button.grid(row=0, column=1, padx=10)
             
@@ -138,6 +138,11 @@ class ParameterWrapper:
                 self.entry.columnconfigure(0, weight=0)
                 self.entry.columnconfigure(1, weight=0)
                 self.entry.columnconfigure(2, weight=1)
+
+                # XXX hack because the empty labelframe collapses
+                # for some reason.
+                tk.Label(self.entry, text="").grid()
+
                 self.update_subwrappers(parameter.params, drc)
 
         elif isinstance(parameter, (ArrayParam, MultiParam)):
@@ -159,7 +164,7 @@ class ParameterWrapper:
             self.button = ttk.Button(tk_parent, text=UNICODE_CROSS, width=2, command=lambda: delete_callback(self))
 
         if not isinstance(parameter, BooleanParam):
-            self.entry.grid(sticky=tk.EW, padx=10)
+            self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def update(self):
 
@@ -217,7 +222,6 @@ class ParameterWrapper:
         self.cull_subwrappers([ pp for p in params for pp in p.params.values() ])
 
     def update_subwrappers_framed(self, params, delete_row_callback):
-        #while self.subwrapper_buttons: self.subwrapper_buttons.pop().destroy()
 
         for n, p in enumerate(params):
             if p in self.subwrappers:
