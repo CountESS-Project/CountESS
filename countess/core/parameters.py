@@ -110,7 +110,7 @@ class StringCharacterSetParam(StringParam):
         elif c.upper() in self.character_set: return c.upper()
         else: return ''
 
-    def clean_value(self, value: any):
+    def clean_value(self, value: Any):
         value_str = str(value)
         x = ''.join([self.clean_character(c) for c in value_str])
         return x
@@ -156,7 +156,7 @@ class FileParam(StringParam):
         if not value:
             return value
         try:
-            return os.path.relpath(value)
+            return os.path.relpath(str(value))
         except ValueError:
             # If we can't find the relpath, leave it alone.
             # (eg: windows throws ValueError if path is on a different drive)
@@ -183,7 +183,7 @@ class FileSaveParam(StringParam):
 
     def clean_value(self, value: str|tuple|list, file_types=None):
         try:
-            return os.path.relpath(value)
+            return os.path.relpath(str(value))
         except ValueError:
             return value
 
@@ -194,7 +194,7 @@ class ChoiceParam(BaseParam):
     _value: Optional[str] = None
 
     def __init__(
-        self, label: str, value: Optional[str] = None, choices: Iterable[str] = None
+        self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
     ):
         self.label = label
         self._value = value
@@ -213,7 +213,7 @@ class ChoiceParam(BaseParam):
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if len(self.choices) == 1: self._value = choices[0]
+        if len(self.choices) == 1: self._value = list(choices)[0]
         elif self.value not in self.choices: self._value = None
 
     def copy(self):

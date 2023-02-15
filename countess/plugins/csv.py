@@ -53,7 +53,7 @@ class LoadCsvPlugin(DaskInputPlugin):
 
     column_type_translate = { 'string': str, 'number': float, 'integer': int, 'none': None }
 
-    def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
+    def read_file_to_dataframe(self, file_param, row_limit=None):
      
         filename = file_param["filename"].value
 
@@ -112,6 +112,7 @@ class SaveCsvPlugin(DaskBasePlugin):
     }
 
     def run(self, obj: Any, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None):
+        assert isinstance(self.parameters["filename"], StringParam)
 
         filename = self.parameters["filename"].value
 
@@ -121,7 +122,7 @@ class SaveCsvPlugin(DaskBasePlugin):
             else:
                 obj.to_csv(filename)
 
-        return obj
+        return None
 
 
 

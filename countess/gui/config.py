@@ -18,7 +18,7 @@ import re
 import configparser
 import math
 import sys
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from ..core.parameters import (
     ArrayParam,
@@ -56,30 +56,19 @@ class ParameterWrapper:
     # XXX actually refactoring this whole mess of nested wrappers into a single TreeviewEditor
     # might make more sense (now I've worked out how to make a TreeviewEditor)
 
-    def __init__(self, tk_parent, parameter, callback=None, delete_callback=None, level=0):
+    def __init__(self, tk_parent: tk.Widget, parameter: BaseParam, callback=None, delete_callback=None, level=0):
 
         self.parameter = parameter
         self.callback = callback
         self.button = None
         self.level = level
-        self.subwrapper_buttons = []
+        self.subwrapper_buttons: list[tk.Button] = []
 
         self.subwrappers: Mapping[BaseParam,ParameterWrapper] = {}
 
-        if isinstance(parameter, FloatParam):
-            self.var = tk.DoubleVar(tk_parent, value=parameter.value)
-        elif isinstance(parameter, IntegerParam):
-            self.var = tk.IntVar(tk_parent, value=parameter.value)
-        elif isinstance(parameter, TextParam):
-            # XXX tk.Text version doesn't use a var (see below)
-            self.var = None
-        elif isinstance(parameter, StringParam) or isinstance(parameter, ChoiceParam):
-            self.var = tk.StringVar(tk_parent, value=parameter.value)
-        else:
-            self.var = None
-
-        if self.var: 
-            self.var.trace("w", self.value_changed_callback)
+        self.var: Optional[tk.Variable] = None
+        self.entry: Optional[tk.Widget] = None
+        self.label: Optional[tk.Widget] = None
 
         if isinstance(parameter, ArrayParam):
             self.label = None
@@ -87,6 +76,7 @@ class ParameterWrapper:
             self.label = ttk.Label(tk_parent, text=parameter.label)
 
         if isinstance(parameter, ChoiceParam):
+            self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices
             self.entry.state(["readonly"])
@@ -94,6 +84,7 @@ class ParameterWrapper:
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value(parameter.value)
         elif isinstance(parameter, FileParam):
+            self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             self.entry.state(['readonly'])
         elif isinstance(parameter, TextParam):
@@ -107,6 +98,13 @@ class ParameterWrapper:
             else:
                 self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, SimpleParam):
+            if isinstance(parameter, FloatParam):
+                self.var = tk.DoubleVar(tk_parent, value=parameter.value)
+            elif isinstance(parameter, IntegerParam):
+                self.var = tk.IntVar(tk_parent, value=parameter.value)
+            else:
+                self.var = tk.StringVar(tk_parent, value=parameter.value)
+            
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
                 self.entry.state(['readonly'])
@@ -124,7 +122,7 @@ class ParameterWrapper:
             label_frame_label = tk.Frame(tk_parent)
             tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
             self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
-            self.button = ttk.Button(label_frame_label, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
+            self.button = tk.Button(label_frame_label, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
             self.button.grid(row=0, column=1, padx=10)
             
             drc = self.delete_row_callback if not parameter.read_only else None
@@ -153,15 +151,18 @@ class ParameterWrapper:
             if isinstance(parameter, ArrayParam):
                 drc = self.delete_row_callback if not parameter.read_only else None
                 self.update_subwrappers(parameter.params, drc)
-                self.button = ttk.Button(tk_parent, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
+                self.button = tk.Button(tk_parent, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
             else:
                 self.update_subwrappers(parameter.params.values(), None)
         else:
             raise NotImplementedError(f"Unknown parameter type {parameter}")
 
+        if self.var: 
+            self.var.trace("w", self.value_changed_callback)
+
         # XXX hang on, what if it's an array in an array?
         if delete_callback and not self.button:
-            self.button = ttk.Button(tk_parent, text=UNICODE_CROSS, width=2, command=lambda: delete_callback(self))
+            self.button = tk.Button(tk_parent, text=UNICODE_CROSS, width=2, command=lambda: delete_callback(self))
 
         if not isinstance(parameter, BooleanParam):
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
@@ -472,7 +473,9 @@ class DataFramePreview:
         for n, ct in enumerate(column_types):
             # XXX it'd be nicer if we could do "real" decimal point alignment
             anchor = tk.E if ct in ('i', 'f') else tk.W
-            self.treeview.column(n, anchor=anchor, width=100, minwidth=100, stretch=tk.YES)
+            # XXX type signature appears to be wrong, or at least overly restrictive.
+            # I think I'm going to replace treeview anyway so I'm ignoring it for now.
+            self.treeview.column(n, anchor=anchor, width=100, minwidth=100, stretch=tk.YES)  # type: ignore
 
         for row in self.treeview.get_children():
             self.treeview.delete(row)

@@ -3,7 +3,7 @@ from typing import Generator, Optional
 
 import dask.dataframe as dd
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore
 
 import itertools
 from collections import defaultdict
@@ -36,8 +36,12 @@ class DaskPivotPlugin(DaskTransformPlugin):
     # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
         
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        index_cols = [ p.value for p in self.parameters['index'].params if p.value ]
-        pivot_cols = [ p.value for p in self.parameters['pivot'].params if p.value ]
+        assert(isinstance(self.parameters["index"], ArrayParam))
+        assert(isinstance(self.parameters["pivot"], ArrayParam))
+        assert(isinstance(self.parameters["agg"], ArrayParam))
+
+        index_cols = [ p.value for p in self.parameters['index'].params if isinstance(p, ChoiceParam) and p.value ]
+        pivot_cols = [ p.value for p in self.parameters['pivot'].params if isinstance(p, ChoiceParam) and p.value ]
 
         # dask's built-in "dd.pivot_table" can only handle one index column
         # and one pivot column which is too limiting.  So this is a slightly
@@ -47,7 +51,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
         agg_cols = [
             (p.params['column'].value, p.params['function'].value)
             for p in self.parameters['agg'].params
-            if p.params['column'].value and p.params['function'].value
+            if isinstance(p, MultiParam) and p.params['column'].value and p.params['function'].value
         ]
         aggregate_ops = defaultdict(list, [(c, ['first']) for c in index_cols])
 
@@ -98,7 +102,8 @@ class DaskPivotPlugin(DaskTransformPlugin):
         # squish to prevent column name mangling.
         # XXX this could be improved to make mangling column specific.
         if all((len(v)==1) for k, v in aggregate_ops.items()):
-            aggregate_ops = dict((k, v[0]) for k, v in aggregate_ops.items())
+            aggregate_ops = defaultdict(list, [ (k, v[0]) for k, v in aggregate_ops.items()])
+                                        
 
         # Group by the index columns and aggregate.
         return ddf.groupby(index_cols or ddf.index).agg(aggregate_ops)

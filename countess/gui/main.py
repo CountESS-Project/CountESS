@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import random
 from enum import Enum, IntFlag
 
-import pandas as pd
+import pandas as pd  # type: ignore
 import dask.dataframe as dd
 import numpy as np
 
@@ -115,16 +115,20 @@ class DraggableMixin:
 
 class FixedUnbindMixin:
 
-    def unbind(self, seq, funcid):
+    def unbind(self, seq, funcid=None):
         # widget.unbind(seq, funcid) doesn't actually work as documented. This is
         # my own take on the horrible hacks found at https://bugs.python.org/issue31485
         # and https://mail.python.org/pipermail/tkinter-discuss/2012-May/003152.html
         # Also quite horrible.  "I'm not proud, but I'm not tired either"
-
-        self.bind(seq, re.sub(
-            r'^if {"\[' + funcid + '.*$', '', self.bind(seq), flags=re.M
-        ))
-        self.deletecommand(funcid)
+        if not funcid:
+            for f in re.findall(r'^if {"\[(\w+).*$', self.bind(seq), flags=re.M):
+                self.deletecommand(f)
+            super().unbind(seq, None)
+        else:
+            self.bind(seq, re.sub(
+                r'^if {"\[' + funcid + '.*$', '', self.bind(seq), flags=re.M
+            ))
+            self.deletecommand(funcid)
 
 
 class ConnectingLine:

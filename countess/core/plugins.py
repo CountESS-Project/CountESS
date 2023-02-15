@@ -106,7 +106,7 @@ class BasePlugin:
                 self.parameters[key] = getattr(self, key).copy()
                 setattr(self, key, self.parameters[key])
 
-    def prepare(self, data) -> bool:
+    def prepare(self, data):
         """The plugin gets a preview version of its input data so it can 
         check types, column names, etc.  Should throw an exception if this isn't 
         a suitable data input."""
@@ -136,8 +136,9 @@ class BasePlugin:
     def set_parameter(self, key: str, value: bool|int|float|str):
         param = self.parameters
         for k in key.split("."):
-            param = param[k]
-        param.value = value
+            # XXX types are a mess here
+            param = param[k]  # type: ignore
+        param.value = value   # type: ignore
 
     def get_parameters(self):
         for key, parameter in self.parameters.items():
@@ -162,7 +163,7 @@ class FileInputMixin:
 
     # used by the GUI file dialog
     file_types = [("Any", "*")]
-    file_params = {}
+    file_params : MutableMapping[str, BaseParam] = {}
 
     parameters: MutableMapping[str, BaseParam] = {
         'files': FileArrayParam('Files', FileParam('File'))
@@ -173,6 +174,9 @@ class FileInputMixin:
         """Input Plugins can accept anything as their input, since they're getting
         their data from a file anyway."""
         return True
+
+    def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None):
+        raise NotImplementedError("FileInputMixin.load_files")
 
     def run(
         self,
@@ -240,7 +244,7 @@ class DaskBasePlugin(BasePlugin):
         self,
         data,
         callback: Callable[[int, int, Optional[str]], None],
-        row_limit: Optional[int],
+        row_limit: Optional[int] = None,
     ):
         with DaskProgressCallback(callback):
             if type(data) is list:
@@ -274,13 +278,15 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         return concat_dask_dataframes(dfs)
 
     def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
+        assert isinstance(self.parameters['files'], ArrayParam)
         fps = self.parameters['files'].params
-        if not fps: return
+        if not fps: return []
 
         if len(fps) == 1:
             with DaskProgressCallback(callback):
                 file_param = self.parameters['files'].params[0]
-                ddf = self.read_file_to_dataframe(file_param, None, row_limit)
+                assert isinstance(file_param, MultiParam)
+                ddf = self.read_file_to_dataframe(file_param, row_limit)
                 ddf = self.combine_dfs([ddf])
         else:
             num_files = len(fps)
@@ -291,17 +297,18 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             callback(0, num_files+1, "Loading")
             dfs = []
             for num, fp in enumerate(fps):
-                df = self.read_file_to_dataframe(fp, None, per_file_row_limit)
+                assert isinstance(fp, MultiParam)
+                df = self.read_file_to_dataframe(fp, per_file_row_limit)
                 dfs.append(df)
                 callback(num+1, num_files+1, "Loading")
             callback(num_files, num_files+1, "Combining")
             ddf = self.combine_dfs(dfs)
-            callback(num_files+1, num_files+1)
+            callback(num_files+1, num_files+1, '')
 
         return ddf
 
     def read_file_to_dataframe(
-        self, file_params: Mapping[str, BaseParam], row_limit: Optional[int] = None
+        self, file_params: MultiParam, row_limit: Optional[int] = None
     ) -> dd.DataFrame | pd.DataFrame:
         raise NotImplementedError(
             f"Implement {self.__class__.__name__}.read_file_to_dataframe"
@@ -355,6 +362,7 @@ class DaskScoringPlugin(DaskTransformPlugin):
                 ppp.choices = self.input_columns
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        assert isinstance(self.parameters['scores'], ArrayParam)
         score_cols = []
         for pp in self.parameters['scores']:
             scol = pp.score.value

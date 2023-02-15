@@ -1,5 +1,5 @@
 import dask.dataframe as dd
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from countess import VERSION
 from countess.core.plugins import DaskTransformPlugin
@@ -31,8 +31,9 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
     }
 
     def run_dask(self, df) -> dd.DataFrame:
+        assert(isinstance(self.parameters["code"], ArrayParam))
 
-        codes = [ p.value.replace('\n', ' ') for p in self.parameters["code"] if p.value.strip() ]
+        codes = [ p.value.replace('\n', ' ') for p in self.parameters["code"] if isinstance(p, TextParam) and p.value.strip() ]
 
         if isinstance(df, dd.DataFrame):
             return df.map_partitions(process, codes)

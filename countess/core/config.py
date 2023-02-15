@@ -17,12 +17,11 @@ def default_output_callback(output):
 def read_config(filenames: Iterable[str], progress_callback: Callable = default_progress_callback, output_callback: Callable = default_output_callback) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
-    config_tree = {}
     cp = ConfigParser()
     cp.read(filenames)
 
     pipeline_graph = PipelineGraph()
-    nodes_by_name = {}
+    nodes_by_name : dict[str, PipelineNode] = {}
 
     for section_name in cp.sections():
         config_dict = cp[section_name]
@@ -63,7 +62,7 @@ def read_config(filenames: Iterable[str], progress_callback: Callable = default_
             node.configure_plugin(key, ast.literal_eval(val))
 
         node.prerun(partial(progress_callback, node.name))
-        if node.output and output_callback: output_callback(node.output)
+        if node.output and output_callback is not None: output_callback(node.output)
 
     return pipeline_graph
 
