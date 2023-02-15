@@ -6,7 +6,7 @@ from functools import partial
 import sys
 
 from countess.core.plugins import load_plugin
-from countess.core.dataflow import PipelineGraph, PipelineNode
+from countess.core.pipeline import PipelineGraph, PipelineNode
 
 def default_progress_callback(n, a, b, s=''):
          print(f"{n:40s} {a:4d}/{b:4d} {s}")

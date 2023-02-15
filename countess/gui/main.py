@@ -14,7 +14,7 @@ from countess import VERSION
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator, DataFramePreview
 from countess.plugins.pivot import DaskPivotPlugin
-from countess.core.dataflow import PipelineGraph, PipelineNode
+from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.config import read_config, write_config, export_config_graphviz
 
 def _limit(value, min_value, max_value):
