@@ -2,8 +2,14 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    StringParam,
+    TextParam,
+)
 from countess.core.plugins import DaskTransformPlugin
-from countess.core.parameters import StringParam, TextParam, BooleanParam, ArrayParam
+
 
 def process(df: pd.DataFrame, codes):
 
@@ -11,13 +17,14 @@ def process(df: pd.DataFrame, codes):
         result = df.eval(code)
         if isinstance(result, (dd.Series, pd.Series)):
             # this was a filter
-            df['_filter'] = result
-            df = df.query('_filter').drop(columns='_filter')
+            df["_filter"] = result
+            df = df.query("_filter").drop(columns="_filter")
         else:
             # this was a column assignment
             df = result
 
     return df
+
 
 class EmbeddedPythonPlugin(DaskTransformPlugin):
 
@@ -26,14 +33,16 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
     description = "Embed Python code into CountESS"
     version = VERSION
 
-    parameters = {
-        "code": ArrayParam("Code", TextParam('Code'))
-    }
+    parameters = {"code": ArrayParam("Code", TextParam("Code"))}
 
     def run_dask(self, df) -> dd.DataFrame:
-        assert(isinstance(self.parameters["code"], ArrayParam))
+        assert isinstance(self.parameters["code"], ArrayParam)
 
-        codes = [ p.value.replace('\n', ' ') for p in self.parameters["code"] if isinstance(p, TextParam) and p.value.strip() ]
+        codes = [
+            p.value.replace("\n", " ")
+            for p in self.parameters["code"]
+            if isinstance(p, TextParam) and p.value.strip()
+        ]
 
         if isinstance(df, dd.DataFrame):
             return df.map_partitions(process, codes)

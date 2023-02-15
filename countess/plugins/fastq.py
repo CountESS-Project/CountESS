@@ -8,7 +8,15 @@ import pandas as pd  # type: ignore
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
-from countess.core.parameters import BooleanParam, FloatParam, StringParam, ArrayParam, MultiParam, FileArrayParam, FileParam
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    FileArrayParam,
+    FileParam,
+    FloatParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import concat_dask_dataframes, merge_dask_dataframes
 
@@ -32,11 +40,12 @@ class LoadFastqPlugin(DaskInputPlugin):
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
     }
 
-    def read_file_to_dataframe(self, file_param, column_suffix='', row_limit=None):
+    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
         records = []
         count_column_name = "count"
-        if column_suffix: count_column_name += "_" + column_suffix
-            
+        if column_suffix:
+            count_column_name += "_" + column_suffix
+
         with open(file_param["filename"].value, "r") as fh:
             for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
                 if (
@@ -54,6 +63,6 @@ class LoadFastqPlugin(DaskInputPlugin):
         combined_df = concat_dask_dataframes(dfs)
 
         if len(combined_df) and self.parameters["group"].value:
-                combined_df = combined_df.groupby(by=["sequence"]).sum()
+            combined_df = combined_df.groupby(by=["sequence"]).sum()
 
         return combined_df

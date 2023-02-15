@@ -16,7 +16,7 @@ class GroupByPlugin(DaskTransformPlugin):
     # XXX should support an operation per column, using
     # dd.Aggregation to supply appropriate chunk/agg/finalize
     # functions which (potentially) work differently per column,
-    # as opposed to the built-in aggregations which are the 
+    # as opposed to the built-in aggregations which are the
     # same for every column.
 
     name = "Group By"

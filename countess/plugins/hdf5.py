@@ -4,10 +4,17 @@ from typing import Mapping, Optional
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
-from countess.core.parameters import BaseParam, StringParam, ChoiceParam, FileParam, FileArrayParam, MultiParam
+from countess.core.parameters import (
+    BaseParam,
+    ChoiceParam,
+    FileArrayParam,
+    FileParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
+from countess.utils.dask import concat_dask_dataframes, empty_dask_dataframe
 
-from countess.utils.dask import empty_dask_dataframe, concat_dask_dataframes
 VERSION = "0.0.1"
 
 
@@ -28,7 +35,7 @@ class LoadHdfPlugin(DaskInputPlugin):
     def update(self):
         super().update()
 
-        for fp in self.parameters['files']:
+        for fp in self.parameters["files"]:
             try:
                 with pd.HDFStore(fp.filename.value) as hs:
                     fp.key.choices = sorted(hs.keys())
@@ -37,7 +44,7 @@ class LoadHdfPlugin(DaskInputPlugin):
                 pass
 
     def read_file_to_dataframe(
-            self, fp: MultiParam, column_suffix: str='', row_limit: Optional[int] = None
+        self, fp: MultiParam, column_suffix: str = "", row_limit: Optional[int] = None
     ) -> pd.DataFrame:
 
         if not fp.key.value or fp.key.value not in fp.key.choices:

@@ -1,20 +1,21 @@
-from typing import Mapping, Optional, Any, Iterable
+import hashlib
 import os.path
 import re
-import hashlib
+from typing import Any, Iterable, Mapping, Optional
 
-PARAM_DIGEST_HASH = 'sha256'
+PARAM_DIGEST_HASH = "sha256"
+
 
 class BaseParam:
     """Represents the parameters which can be set on a plugin."""
 
     label: str = ""
-    value: Any=None
+    value: Any = None
 
     def copy(self):
-        """Plugins declare their parameters with instances of BaseParam, these need to 
-        be copied so that multiple Plugins (and multiple rows in an ArrayParam) can have
-        distinct values"""
+        """Plugins declare their parameters with instances of BaseParam, these
+        need to be copied so that multiple Plugins (and multiple rows in an
+        ArrayParam) can have distinct values"""
         raise NotImplementedError(f"Implement {self.__class__.__name__}.copy()")
 
     def set_value(self, value):
@@ -26,7 +27,7 @@ class BaseParam:
 
     def get_hash_value(self):
         digest = hashlib.new(PARAM_DIGEST_HASH)
-        digest.update(repr(self.value).encode('utf-8'))
+        digest.update(repr(self.value).encode("utf-8"))
         return digest.hexdigest()
 
 
@@ -68,10 +69,13 @@ class BooleanParam(SimpleParam):
 
     def clean_value(self, value):
         if type(value) is str:
-            if value in ('true', 'True', '1'): return True
-            if value in ('false', 'False', '0'): return False
+            if value in ("true", "True", "1"):
+                return True
+            if value in ("false", "False", "0"):
+                return False
             raise ValueError(f"Can't convert {value} to boolean")
         return bool(value)
+
 
 class IntegerParam(SimpleParam):
     var_type = int
@@ -89,52 +93,63 @@ class StringParam(SimpleParam):
 
 
 class TextParam(StringParam):
-
     def clean_value(self, value):
-        return re.sub('\n\n\n+', '\n\n', value)
+        return re.sub("\n\n\n+", "\n\n", value)
 
 
 class StringCharacterSetParam(StringParam):
-    """A StringParam limited to characters from `character_set`.  Call `clean_value` to get
-    an acceptable value"""
+    """A StringParam limited to characters from `character_set`.
+    Call `clean_value` to get an acceptable value"""
 
     character_set: set[str] = set()
 
-    def __init__(self, label: str, value=None, read_only: bool=False, *, character_set: Optional[set[str]]=None):
+    def __init__(
+        self,
+        label: str,
+        value=None,
+        read_only: bool = False,
+        *,
+        character_set: Optional[set[str]] = None,
+    ):
         super().__init__(label, value, read_only)
         if character_set is not None:
             self.character_set = character_set
 
     def clean_character(self, c: str):
-        if c in self.character_set: return c
-        elif c.upper() in self.character_set: return c.upper()
-        else: return ''
+        if c in self.character_set:
+            return c
+        elif c.upper() in self.character_set:
+            return c.upper()
+        else:
+            return ""
 
     def clean_value(self, value: Any):
         value_str = str(value)
-        x = ''.join([self.clean_character(c) for c in value_str])
+        x = "".join([self.clean_character(c) for c in value_str])
         return x
 
     def copy(self):
-        return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
-
+        return self.__class__(
+            self.label, self.value, self.read_only, character_set=self.character_set
+        )
 
 
 class FileParam(StringParam):
-    """A StringParam for holding a filename.  Defaults to `read_only` because it really should
-    be populated from a file dialog or simiar."""
-    
+    """A StringParam for holding a filename.  Defaults to `read_only` because
+    it really should be populated from a file dialog or simiar."""
+
     file_types = [("Any", "*")]
 
     _hash = None
-    
-    def __init__(self, label: str, value=None, read_only: bool=True, file_types=None):
+
+    def __init__(self, label: str, value=None, read_only: bool = True, file_types=None):
         super().__init__(label, value, read_only)
         if file_types is not None:
             self.file_types = file_types
 
     def get_file_hash(self):
-        if not self.value: return '0'
+        if not self.value:
+            return "0"
         try:
             with open(self.value, "rb") as file:
                 try:
@@ -144,14 +159,15 @@ class FileParam(StringParam):
                     digest = hashlib.new(PARAM_DIGEST_HASH)
                     while True:
                         data = file.read()
-                        if not data: break
+                        if not data:
+                            break
                         digest.update(data)
             print(f"Digest: {self.value} {digest.hexdigest()}")
             return digest.hexdigest()
         except IOError:
-            return '0'
+            return "0"
 
-    def clean_value(self, value: str|tuple|list):
+    def clean_value(self, value: str | tuple | list):
         self._hash = self.get_file_hash()
         if not value:
             return value
@@ -163,10 +179,13 @@ class FileParam(StringParam):
             return value
 
     def copy(self):
-        return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
+        return self.__class__(
+            self.label, self.value, self.read_only, file_types=self.file_types
+        )
 
     def get_hash_value(self) -> str:
-        # For reproducability, we don't actually care about the filename, just its hash.
+        # For reproducability, we don't actually care about the filename, just
+        # its hash.
         if self._hash is None:
             self._hash = self.get_file_hash()
         return self._hash
@@ -176,12 +195,14 @@ class FileSaveParam(StringParam):
 
     file_types = [("Any", "*")]
 
-    def __init__(self, label: str, value=None, read_only: bool=False, file_types=None):
+    def __init__(
+        self, label: str, value=None, read_only: bool = False, file_types=None
+    ):
         super().__init__(label, value, read_only)
         if file_types is not None:
             self.file_types = file_types
 
-    def clean_value(self, value: str|tuple|list, file_types=None):
+    def clean_value(self, value: str | tuple | list, file_types=None):
         try:
             return os.path.relpath(str(value))
         except ValueError:
@@ -189,12 +210,16 @@ class FileSaveParam(StringParam):
 
 
 class ChoiceParam(BaseParam):
-    """A drop-down menu parameter choosing between options. Defaults to 'None'"""
+    """A drop-down menu parameter choosing between options.
+    Defaults to 'None'"""
 
     _value: Optional[str] = None
 
     def __init__(
-        self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
+        self,
+        label: str,
+        value: Optional[str] = None,
+        choices: Optional[Iterable[str]] = None,
     ):
         self.label = label
         self._value = value
@@ -213,31 +238,44 @@ class ChoiceParam(BaseParam):
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if len(self.choices) == 1: self._value = list(choices)[0]
-        elif self.value not in self.choices: self._value = None
+        if len(self.choices) == 1:
+            self._value = list(choices)[0]
+        elif self.value not in self.choices:
+            self._value = None
 
     def copy(self):
         return self.__class__(self.label, self.value, self.choices)
 
 
 class ColumnChoiceParam(ChoiceParam):
-    """A ChoiceParam which DaskTransformPlugin knows 
+    """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
+
     pass
+
 
 class ColumnOrNoneChoiceParam(ColumnChoiceParam):
     pass
 
-class ArrayParam(BaseParam):
-    """An ArrayParam contains zero or more copies of `param`, which can be a SimpleParam or a
-    MultiParam."""
 
-    # XXX the only real use for this is as an array of MultiParams so I think maybe we should have
-    # a TabularParam which combines ArrayParam and MultiParam more directly."""
+class ArrayParam(BaseParam):
+    """An ArrayParam contains zero or more copies of `param`, which can be a
+    SimpleParam or a MultiParam."""
+
+    # XXX the only real use for this is as an array of MultiParams so I think
+    # maybe we should have a TabularParam which combines ArrayParam and
+    # MultiParam more directly."""
 
     params: list[BaseParam] = []
 
-    def __init__(self, label: str, param: BaseParam, read_only: bool = False, min_size: int = 0, max_size: Optional[int] = None):
+    def __init__(
+        self,
+        label: str,
+        param: BaseParam,
+        read_only: bool = False,
+        min_size: int = 0,
+        max_size: Optional[int] = None,
+    ):
         self.label = label
         self.param = param
         self.read_only = read_only
@@ -262,7 +300,7 @@ class ArrayParam(BaseParam):
         if len(self.params) < self.min_size:
             self.params.append(self.param.copy())
         self.relabel()
-    
+
     def del_subparam(self, param: BaseParam):
         self.params.remove(param)
         self.relabel()
@@ -271,8 +309,10 @@ class ArrayParam(BaseParam):
         for n, param in enumerate(self.params):
             param.label = self.param.label + f" {n+1}"
 
-    def copy(self) -> 'ArrayParam':
-        return self.__class__(self.label, self.param, self.read_only, self.min_size, self.max_size)
+    def copy(self) -> "ArrayParam":
+        return self.__class__(
+            self.label, self.param, self.read_only, self.min_size, self.max_size
+        )
 
     def __len__(self):
         return len(self.params)
@@ -290,7 +330,7 @@ class ArrayParam(BaseParam):
 
     @property
     def value(self):
-        return [ p.value for p in self.params ]
+        return [p.value for p in self.params]
 
     @value.setter
     def value(self, value):
@@ -299,13 +339,10 @@ class ArrayParam(BaseParam):
         # and forget about the numbering.
 
         if type(value) is dict:
-            values = sorted([ (int(k), v) for k, v in value.items() ])
-            value = [ v[1] for v in values ]
+            values = sorted([(int(k), v) for k, v in value.items()])
+            value = [v[1] for v in values]
 
-        self.params = [
-            self.param.copy().set_value(v)
-            for v in value
-        ]
+        self.params = [self.param.copy().set_value(v) for v in value]
 
     @value.deleter
     def value(self):
@@ -318,13 +355,14 @@ class ArrayParam(BaseParam):
     def get_hash_value(self):
         digest = hashlib.new(PARAM_DIGEST_HASH)
         for p in self.params:
-            digest.update(p.get_hash_value().encode('utf-8'))
+            digest.update(p.get_hash_value().encode("utf-8"))
         return digest.hexdigest()
 
 
 class FileArrayParam(ArrayParam):
-    """FileArrayParam is an ArrayParam arranged per-file.  Using this class really just
-    marks it as expecting to be populated from an open file dialog."""
+    """FileArrayParam is an ArrayParam arranged per-file.  Using this class
+    really just marks it as expecting to be populated from an open file
+    dialog."""
 
     def find_fileparam(self):
         if isinstance(self.param, FileParam):
@@ -356,7 +394,7 @@ class MultiParam(BaseParam):
         self.label = label
         self.params = params
 
-    def copy(self) -> 'MultiParam':
+    def copy(self) -> "MultiParam":
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
         return self.__class__(self.label, pp)
 
@@ -386,7 +424,7 @@ class MultiParam(BaseParam):
 
     @property
     def value(self):
-        return dict( (k, p.value) for k, p in self.params.items() )
+        return dict((k, p.value) for k, p in self.params.items())
 
     @value.setter
     def value(self, value):
@@ -405,6 +443,5 @@ class MultiParam(BaseParam):
     def get_hash_value(self):
         digest = hashlib.new(PARAM_DIGEST_HASH)
         for k, p in self.params.items():
-            digest.update((k + '\0' + p.get_hash_value()).encode('utf-8'))
+            digest.update((k + "\0" + p.get_hash_value()).encode("utf-8"))
         return digest.hexdigest()
-

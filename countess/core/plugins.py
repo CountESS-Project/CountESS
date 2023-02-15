@@ -1,42 +1,35 @@
+import hashlib
+import importlib
+import importlib.metadata
 import logging
-from collections.abc import Callable, Iterable, Mapping, MutableMapping
-from importlib.metadata import entry_points
-from itertools import islice
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Type, List
-import re
+from collections.abc import Callable, Iterable, MutableMapping
+from typing import Any, List, Optional
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd  # type: ignore
 from dask.callbacks import Callback
-import hashlib
-
-import importlib
-import importlib.metadata
 
 from countess.core.parameters import (
     ArrayParam,
     BaseParam,
-    BooleanParam,
     ChoiceParam,
     ColumnChoiceParam,
     ColumnOrNoneChoiceParam,
     FileArrayParam,
     FileParam,
-    FloatParam,
-    IntegerParam,
     MultiParam,
     StringParam,
 )
-from countess.utils.dask import empty_dask_dataframe, crop_dask_dataframe, concat_dask_dataframes, merge_dask_dataframes
+from countess.utils.dask import concat_dask_dataframes
 
 """
 Plugin lifecycle:
-* Selector of plugins calls cls.accepts(previous_data) with the input data which will
-  be provided to this plugin (or None if this is the first plugin)
+* Selector of plugins calls cls.accepts(previous_data) with the input data
+  which will be provided to this plugin (or None if this is the first plugin)
   which returns True if a plugin of this class can accept that data.
-  This lets the interface present a list of plausible plugins you might want to use
-  in the pipeline.
+  This lets the interface present a list of plausible plugins you might want to
+  use in the pipeline.
 * When plugin is selected, it gets __init__ed.
 * The plugin then gets .prepare()d with a cut-down input.
   * .prepare() gets run again any time a preceding plugin changes
@@ -80,9 +73,9 @@ class BasePlugin:
     @classmethod
     def accepts(cls, data) -> bool:
         """Work out if this plugin class can accept `data` as an input by
-        trying it and finding out.  Subclasses should override this if they 
+        trying it and finding out.  Subclasses should override this if they
         have an easier way."""
-        
+
         try:
             cls().prepare(data)
             return True
@@ -90,16 +83,17 @@ class BasePlugin:
             return False
 
     def __init__(self, plugin_name=None):
-        # Parameters store the actual values they are set to, so we copy them so that
-        # if the same plugin is used twice in a pipeline it will have its own parameters.
-        
+        # Parameters store the actual values they are set to, so we copy them
+        # so that if the same plugin is used twice in a pipeline it will have
+        # its own parameters.
+
         if plugin_name is not None:
             self.name = plugin_name
 
-        self.parameters = dict(((k, v.copy()) for k, v in self.parameters.items()))
+        self.parameters = dict((k, v.copy()) for k, v in self.parameters.items())
 
-        # XXX should we allow django-esque declarations like this?  Namespace gets 
-        # cluttered, though.
+        # XXX should we allow django-esque declarations like this?
+        # Code gets cleaner, Namespace gets cluttered, though.
 
         for key in dir(self):
             if isinstance(getattr(self, key), BaseParam):
@@ -107,9 +101,9 @@ class BasePlugin:
                 setattr(self, key, self.parameters[key])
 
     def prepare(self, data):
-        """The plugin gets a preview version of its input data so it can 
-        check types, column names, etc.  Should throw an exception if this isn't 
-        a suitable data input."""
+        """The plugin gets a preview version of its input data so it can
+        check types, column names, etc.  Should throw an exception if this
+        isn't a suitable data input."""
         pass
 
     def update(self):
@@ -121,11 +115,12 @@ class BasePlugin:
         callback: Callable[[int, int, Optional[str]], None],
         row_limit: Optional[int] = None,
     ):
-        """Plugins which support progress monitoring should override this method
-        to call `callback` sporadically with two numbers estimating a fraction of
-        the work completed, and an optional string describing what they're doing:
+        """Plugins which support progress monitoring should override this
+        method to call `callback` sporadically with two numbers estimating a
+        fraction of the work completed, and an optional string describing
+        what they're doing:
             callback(42, 107, 'Thinking hard about stuff')
-        The user interface code will then display this to the user while the 
+        The user interface code will then display this to the user while the
         pipeline is running."""
         raise NotImplementedError(f"{self.__class__}.run()")
 
@@ -133,12 +128,12 @@ class BasePlugin:
         self.parameters[name] = param.copy()
         return self.parameters[name]
 
-    def set_parameter(self, key: str, value: bool|int|float|str):
+    def set_parameter(self, key: str, value: bool | int | float | str):
         param = self.parameters
         for k in key.split("."):
             # XXX types are a mess here
             param = param[k]  # type: ignore
-        param.value = value   # type: ignore
+        param.value = value  # type: ignore
 
     def get_parameters(self):
         for key, parameter in self.parameters.items():
@@ -148,7 +143,7 @@ class BasePlugin:
         """Build a hash of all configuration parameters"""
         h = hashlib.sha256()
         for k, v in self.parameters.items():
-            h.update((k + '\0' + v.get_hash_value()).encode('utf-8'))
+            h.update((k + "\0" + v.get_hash_value()).encode("utf-8"))
         return h
 
     def hash(self):
@@ -157,25 +152,30 @@ class BasePlugin:
 
 
 class FileInputMixin:
-    """Mixin class to indicate that this plugin can read files from local storage."""
+    """Mixin class to indicate that this plugin can read files from local
+    storage."""
 
     file_number = 0
 
     # used by the GUI file dialog
     file_types = [("Any", "*")]
-    file_params : MutableMapping[str, BaseParam] = {}
+    file_params: MutableMapping[str, BaseParam] = {}
 
     parameters: MutableMapping[str, BaseParam] = {
-        'files': FileArrayParam('Files', FileParam('File'))
+        "files": FileArrayParam("Files", FileParam("File"))
     }
 
     @classmethod
     def accepts(self, data) -> bool:
-        """Input Plugins can accept anything as their input, since they're getting
-        their data from a file anyway."""
+        """Input Plugins can accept anything as their input, since they're
+        getting their data from a file anyway."""
         return True
 
-    def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None):
+    def load_files(
+        self,
+        callback: Callable[[int, int, Optional[str]], None],
+        row_limit: Optional[int] = None,
+    ):
         raise NotImplementedError("FileInputMixin.load_files")
 
     def run(
@@ -189,9 +189,9 @@ class FileInputMixin:
 
         return df
         if type(previous) is list:
-            return [ df ] + previous
+            return [df] + previous
         elif previous is not None:
-            return [ df, previous ]
+            return [df, previous]
         else:
             return df
 
@@ -217,7 +217,8 @@ class DaskProgressCallback(Callback):
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask DataFrames"""
 
-    # XXX there's a slight disconnect here: is this plugin class indicating that the
+    # XXX there's a slight disconnect here: is this plugin class indicating
+    # that the
     # input and output format are dask dataframes or that the computing done by
     # this plugin is in Dask?  I mean, if one then probably the other, but it's
     # possible we'll want to develop a plugin which takes some arbitrary file,
@@ -226,16 +227,19 @@ class DaskBasePlugin(BasePlugin):
 
     @classmethod
     def accepts(self, data) -> bool:
-        return isinstance(data, (dd.DataFrame, pd.DataFrame)) or \
-                type(data) is list and isinstance(data[0], (dd.DataFrame, pd.DataFrame))
+        return (
+            isinstance(data, (dd.DataFrame, pd.DataFrame))
+            or type(data) is list
+            and isinstance(data[0], (dd.DataFrame, pd.DataFrame))
+        )
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
 
-    def _run_top(self, ddf: dd.DataFrame|pd.DataFrame):
+    def _run_top(self, ddf: dd.DataFrame | pd.DataFrame):
         new_df = self.run_dask(ddf.copy())
         if isinstance(new_df, dd.DataFrame):
-            #if len(ddf) > 1000000:
+            # if len(ddf) > 1000000:
             #    return new_df.persist(scheduler='multiprocessing')
             return new_df.persist()
         return new_df
@@ -248,27 +252,30 @@ class DaskBasePlugin(BasePlugin):
     ):
         with DaskProgressCallback(callback):
             if type(data) is list:
-                # Horrible hack to apply operation to only the topmost dataframe
-                return [ self._run_top(data[0]) ] + data[1:]
+                # Horrible hack to apply operation to only the top dataframe
+                return [self._run_top(data[0])] + data[1:]
             else:
                 return self._run_top(data)
 
-# XXX Potentially there's a PandasBasePlugin which can use a technique much like
-# tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and provide
-# progress feedback.
+
+# XXX Potentially there's a PandasBasePlugin which can use a technique much
+# like tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and
+# provide progress feedback.
+
 
 class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
-    """A specialization of the DaskBasePlugin to allow it to follow nothing, eg: come first."""
+    """A specialization of the DaskBasePlugin to allow it to follow nothing,
+    eg: come first."""
 
     def __init__(self, *a, **k):
         # Add in filenames
         super().__init__(*a, **k)
-        file_params = { "filename": FileParam("Filename", file_types=self.file_types) }
+        file_params = {"filename": FileParam("Filename", file_types=self.file_types)}
         file_params.update(self.file_params)
 
         self.parameters = dict(
-            [('files', FileArrayParam('Files', MultiParam('File', file_params)))] +
-            list(self.parameters.items())
+            [("files", FileArrayParam("Files", MultiParam("File", file_params)))]
+            + list(self.parameters.items())
         )
 
     def combine_dfs(self, dfs: list[dd.DataFrame]) -> dd.DataFrame:
@@ -277,14 +284,19 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         or do more work on the dataframes (eg: counting, renaming, etc)"""
         return concat_dask_dataframes(dfs)
 
-    def load_files(self, callback: Callable[[int, int, Optional[str]], None], row_limit: Optional[int] = None) -> Iterable[dd.DataFrame]:
-        assert isinstance(self.parameters['files'], ArrayParam)
-        fps = self.parameters['files'].params
-        if not fps: return []
+    def load_files(
+        self,
+        callback: Callable[[int, int, Optional[str]], None],
+        row_limit: Optional[int] = None,
+    ) -> Iterable[dd.DataFrame]:
+        assert isinstance(self.parameters["files"], ArrayParam)
+        fps = self.parameters["files"].params
+        if not fps:
+            return []
 
         if len(fps) == 1:
             with DaskProgressCallback(callback):
-                file_param = self.parameters['files'].params[0]
+                file_param = self.parameters["files"].params[0]
                 assert isinstance(file_param, MultiParam)
                 ddf = self.read_file_to_dataframe(file_param, row_limit)
                 ddf = self.combine_dfs([ddf])
@@ -294,16 +306,16 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             # file, instead of using the Dask progress callback mechanism
             # this uses a simple count of files read."""
             per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-            callback(0, num_files+1, "Loading")
+            callback(0, num_files + 1, "Loading")
             dfs = []
             for num, fp in enumerate(fps):
                 assert isinstance(fp, MultiParam)
                 df = self.read_file_to_dataframe(fp, per_file_row_limit)
                 dfs.append(df)
-                callback(num+1, num_files+1, "Loading")
-            callback(num_files, num_files+1, "Combining")
+                callback(num + 1, num_files + 1, "Loading")
+            callback(num_files, num_files + 1, "Combining")
             ddf = self.combine_dfs(dfs)
-            callback(num_files+1, num_files+1, '')
+            callback(num_files + 1, num_files + 1, "")
 
         return ddf
 
@@ -314,6 +326,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             f"Implement {self.__class__.__name__}.read_file_to_dataframe"
         )
 
+
 def _set_column_choice_params(parameter, column_names):
     if isinstance(parameter, ArrayParam):
         _set_column_choice_params(parameter.param, column_names)
@@ -323,7 +336,7 @@ def _set_column_choice_params(parameter, column_names):
         for p in parameter.params.values():
             _set_column_choice_params(p, column_names)
     elif isinstance(parameter, ColumnOrNoneChoiceParam):
-        parameter.set_choices(['--'] + column_names) 
+        parameter.set_choices(["--"] + column_names)
     elif isinstance(parameter, ColumnChoiceParam):
         parameter.set_choices(column_names)
 
@@ -348,25 +361,34 @@ class DaskScoringPlugin(DaskTransformPlugin):
 
     max_counts = 5
 
-    parameters = { 'scores': ArrayParam('Scores', MultiParam('Score', {
-        'score': StringParam("Score Column"),
-        'counts': ArrayParam('Counts', ChoiceParam('Column'), min_size=2, max_size=max_counts),
-    }), min_size=1)}
+    parameters = {
+        "scores": ArrayParam(
+            "Scores",
+            MultiParam(
+                "Score",
+                {
+                    "score": StringParam("Score Column"),
+                    "counts": ArrayParam(
+                        "Counts", ChoiceParam("Column"), min_size=2, max_size=max_counts
+                    ),
+                },
+            ),
+            min_size=1,
+        )
+    }
 
     def prepare(self, data):
         super().prepare(data)
-        count_columns = [c for c in self.input_columns if c.startswith("count")]
-
-        for pp in self.parameters['scores']:
+        for pp in self.parameters["scores"]:
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        assert isinstance(self.parameters['scores'], ArrayParam)
+        assert isinstance(self.parameters["scores"], ArrayParam)
         score_cols = []
-        for pp in self.parameters['scores']:
+        for pp in self.parameters["scores"]:
             scol = pp.score.value
-            ccols = [ ppp.value for ppp in pp.counts ]
+            ccols = [ppp.value for ppp in pp.counts]
 
             if scol and all(ccols):
                 ddf[scol] = self.score([ddf[col] for col in ccols])
@@ -393,8 +415,10 @@ class DaskReindexPlugin(DaskTransformPlugin):
         return self.translate(row.name)
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        ddf['__reindex'] = ddf.apply(self.translate_row, axis=1, meta=pd.Series(self.translate_type()))
-        return ddf.groupby('__reindex').sum()
+        ddf["__reindex"] = ddf.apply(
+            self.translate_row, axis=1, meta=pd.Series(self.translate_type())
+        )
+        return ddf.groupby("__reindex").sum()
 
 
 class DaskTranslationPlugin(DaskTransformPlugin):
@@ -418,13 +442,16 @@ class DaskTranslationPlugin(DaskTransformPlugin):
 
     def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
         input_column = self.parameters["input"].value
-        output_column = self.parameters["output"].value or '__translate'
+        output_column = self.parameters["output"].value or "__translate"
 
-        ddf[output_column] = ddf.apply(self.translate_row, axis=1, args=(input_column,), meta=pd.Series(self.translate_type()))
+        ddf[output_column] = ddf.apply(
+            self.translate_row,
+            axis=1,
+            args=(input_column,),
+            meta=pd.Series(self.translate_type()),
+        )
 
-        if output_column == '__translate':
-            ddf = ddf.groupby('__translate').sum()
+        if output_column == "__translate":
+            ddf = ddf.groupby("__translate").sum()
 
         return ddf
-
-
