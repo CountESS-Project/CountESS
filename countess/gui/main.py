@@ -4,6 +4,7 @@ import re
 import sys
 from dataclasses import dataclass
 import random
+from enum import Enum
 
 import pandas as pd
 import dask.dataframe as dd
@@ -32,57 +33,77 @@ def _geometry(widget):
         widget.winfo_height()
     )
 
+# Weird that these aren't defined anywhere obvious?
+# XXX note cross-platform mapping for modifiers and buttons
+# https://wiki.tcl-lang.org/page/Modifier+Keys
+
+class TkEventState(Enum):
+    SHIFT = 1
+    CAPS_LOCK = 2
+    CONTROL = 4
+    MOD1 = 8
+    MOD2 = 16
+    MOD3 = 32
+    MOD4 = 64
+    MOD5 = 128
+    BUTTON1 = 256
+    BUTTON2 = 512
+    BUTTON3 = 1024
+    BUTTON4 = 2048
+    BUTTON5 = 4096
+
+DraggableMixinState = Enum('DraggableMixinState', ['READY', 'DRAG_WAIT', 'LINK_WAIT', 'DRAGGING', 'LINKING'])
+
 class DraggableMixin:
 
-    __mousedown = False
-    __moving = False
+    __state = State.READY
     __ghost = None
-    __ghost_line = None
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        self.bind("<Button-1>", self.__on_start, add="+")
-        self.bind("<B1-Motion>", self.__on_motion, add="+")
-        self.bind("<ButtonRelease-1>", self.__on_release, add="+")
+        self.bind("<Button-1>", self.__on_button, add=True)
+        self.bind("<Button-3>", self.__on_button, add=True)
+        self.bind("<B1-Motion>", self.__on_motion, add=True)
+        self.bind("<B3-Motion>", self.__on_motion, add=True)
+        self.bind("<ButtonRelease-1>", self.__on_release, add=True)
+        self.bind("<ButtonRelease-3>", self.__on_release, add=True)
+        self['cursor'] = 'hand1'
 
-    def __on_start(self, event):
-        self['cursor'] = 'fleur'
-        self.__start_x = event.x
-        self.__start_y = event.y
+    def __on_button(self, event):
+        print(event)
+        self.__state = DraggableMixinState.LINK_WAIT if event.state & TkEventState.CONTROL or event.num == 3 else DraggableMixinState.DRAG_WAIT
         self.after(500, self.__on_timeout)
-        self.__mousedown = True
+
+    def __place(self, event=None):
+        return {
+            'relx': (self.winfo_x() + (event.x if event else self.winfo_width() // 2)) / self.master.winfo_width(),
+            'rely': (self.winfo_y() + (event.y if event else self.winfo_height() // 2)) / self.master.winfo_height()
+        }
 
     def __on_timeout(self):
-        if self.__mousedown and not self.__moving:
-            self['cursor'] = 'plus'
-            self.__ghost = tk.Frame(self.master)
-            self.__ghost.place(self.place_info())
+        if self.__state == DraggableMixinState.DRAG_WAIT:
+            self.__state = DraggableMixinState.DRAGGING
+            self['cursor'] = 'fleur'
+        elif self.__state == DraggableMixinState.LINK_WAIT:
+            self.__state = DraggableMixinState.LINKING
+            self.__ghost = tk.Frame(self.master, bg='lightslategrey')
+            self.__ghost.place({'width': self.winfo_width(), 'height': self.winfo_height(), 'anchor': 'c'})
+            self.__ghost.place(self.__place())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, 'red', True)
+            self['cursor'] = 'plus'
 
     def __on_motion(self, event):
-        self.__moving = True
-        mw = self.master.winfo_width()
-        mh = self.master.winfo_height()
-        w = self.winfo_width()
-        h = self.winfo_height()
-        x = _snap(self.winfo_x() - self.__start_x + event.x, mw)
-        y = _snap(self.winfo_y() - self.__start_y + event.y, mh)
-
-        if self.__ghost:
-            self.__ghost.place({'relx': x / mw, 'rely': y / mh})
-        elif self.place_info()['relx']:
-            self.place({'relx': x / mw, 'rely': y / mh})
-        else:
-            self.place({'x': x, 'y': y})
+        if self.__state == DraggableMixinState.DRAGGING:
+            self.place(self.__place(event))
+        elif self.__state == DraggableMixinState.LINKING:
+            self.__ghost.place(self.__place(event))
 
     def __on_release(self, event):
-        if self.__ghost is not None:
-            self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
+        if self.__state == DraggableMixinState.LINKING:
             self.__ghost_line.destroy()
             self.__ghost.destroy()
-            self.__ghost = None
-        self.__mousedown = False
-        self.__moving = False
+            self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
+        self.__state = DraggableMixinState.READY
         self['cursor'] = 'hand1'
 
 
