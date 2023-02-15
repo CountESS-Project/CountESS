@@ -52,6 +52,11 @@ class TkEventState(IntFlag):
     BUTTON4 = 2048
     BUTTON5 = 4096
 
+class TkCursors:
+    HAND = 'hand1'
+    ARROWS = 'fleur'
+    PLUS = 'plus'
+
 DraggableMixinState = Enum('DraggableMixinState', ['READY', 'DRAG_WAIT', 'LINK_WAIT', 'DRAGGING', 'LINKING'])
 
 class DraggableMixin:
@@ -66,7 +71,7 @@ class DraggableMixin:
         self.bind("<B3-Motion>", self.__on_motion, add=True)
         self.bind("<ButtonRelease-1>", self.__on_release, add=True)
         self.bind("<ButtonRelease-3>", self.__on_release, add=True)
-        self['cursor'] = 'hand1'
+        self['cursor'] = TkCursors.HAND
 
     def __on_button(self, event):
         if event.state & TkEventState.CONTROL or event.num == 3:
@@ -85,13 +90,13 @@ class DraggableMixin:
     def __on_timeout(self):
         if self.__state == self.__state.DRAG_WAIT:
             self.__state = self.__state.DRAGGING
-            self['cursor'] = 'fleur'
+            self['cursor'] = TkCursors.ARROWS
         elif self.__state == self.__state.LINK_WAIT:
             self.__state = self.__state.LINKING
             self.__ghost = tk.Frame(self.master)
             self.__ghost.place(self.__place())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, 'red', True)
-            self['cursor'] = 'plus'
+            self['cursor'] = TkCursors.PLUS
 
     def __on_motion(self, event):
         if self.__state == self.__state.DRAGGING:
@@ -105,7 +110,7 @@ class DraggableMixin:
             self.__ghost.destroy()
             self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
         self.__state = self.__state.READY
-        self['cursor'] = 'hand1'
+        self['cursor'] = TkCursors.HAND
 
 
 class FixedUnbindMixin:
@@ -242,6 +247,16 @@ class GraphWrapper:
 
         self.labels = dict([ (node, self.label_for_node(node)) for node in graph.nodes ])
         self.lines = dict([ (node, self.lines_for_node(node)) for node in graph.nodes ])
+        self.lines_lookup = dict([
+            (connecting_line.line, (connecting_line, child_node, parent_node))
+            for child_node, lines_for_child in self.lines.items()
+            for parent_node, connecting_line in lines_for_child.items()
+        ])
+
+        self.canvas.bind('<Button-1>', self.on_canvas_button1)
+        self.canvas.bind('<Button-3>', self.on_canvas_button3)
+        self.canvas.bind('<Motion>', self.on_canvas_motion)
+        self.canvas.bind('<Leave>', self.on_canvas_leave)
 
     def label_for_node(self, node):
         label = DraggableMessage(self.canvas, text=node.name, aspect=200, cursor='hand1', takefocus=True)
@@ -256,6 +271,7 @@ class GraphWrapper:
         label.bind('<Configure>', lambda event, node=node: self.on_configure(event, node), add=True)
         label.bind('<<GhostRelease>>', lambda event, node=node: self.on_ghost_release(event, node), add=True)
         label.bind('<Key-Delete>', lambda event, node=node: self.on_delete(event, node), add=True)
+        label.bind('<Enter>', self.on_canvas_leave, add=True)
 
         return label
 
@@ -283,6 +299,41 @@ class GraphWrapper:
         else:
             node.position = ( float(place_info['rely']), float(place_info['relx']) )
 
+    def find_lines_at(x, y, d=10):
+        items = self.canvas.find_overlapping(x-d, y-d, x+d, y+d)
+        for child_node, lines_for_child in self.lines.items():
+            for parent_node, connecting_line in list(lines_for_child.items()):
+                if connecting_line.line in items:
+                    yield connecting_line
+
+    def on_canvas_motion(self, event):
+        items = self.canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
+        for connecting_line, _, _ in self.lines_lookup.values():
+            color = 'red' if connecting_line.line in items else 'black'
+            self.canvas.itemconfig(connecting_line.line, fill=color)
+
+    def on_canvas_leave(self, event):
+        for connecting_line, _, _ in self.lines_lookup.values():
+            self.canvas.itemconfig(connecting_line.line, fill='black')
+       
+    def on_canvas_button1(self, event):
+        items = self.canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
+
+        position = event.x / self.canvas.winfo_width(), event.y / self.canvas.winfo_height()
+        new_node = self.add_new_node(position)
+
+        for item in items:
+            connecting_line, child_node, parent_node = self.lines_lookup[item]
+            self.del_parent(parent_node, child_node)
+            self.add_parent(new_node, child_node)
+            self.add_parent(parent_node, new_node)
+
+    def on_canvas_button3(self, event):
+        """Button3 on canvas: delete links"""
+        items = self.canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
+        for item in items:
+            connecting_line, child_node, parent_node = self.lines_lookup[item]
+            self.del_parent(parent_node, child_node)
 
     def on_delete(self, event, node):
         """<Delete> disconnects a node from the graph, connects it parents to its children,
@@ -341,12 +392,9 @@ class GraphWrapper:
             return
         elif start_node in other_node.parent_nodes:
             other_node.del_parent(start_node)
-            self.lines[other_node].pop(start_node).destroy()
             return
         elif other_node in start_node.parent_nodes:
             start_node.del_parent(other_node)
-            self.lines[start_node].pop(other_node).destroy()
-            self.node_select_callback(start_node, self.labels[start_node])
             return
 
         if start_node.is_ancestor_of(other_node):
@@ -364,7 +412,15 @@ class GraphWrapper:
     def add_parent(self, parent_node, child_node):
         if parent_node not in child_node.parent_nodes:
             child_node.add_parent(parent_node)
-            self.lines[child_node][parent_node] = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
+            connecting_line = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
+            self.lines[child_node][parent_node] = connecting_line
+            self.lines_lookup[connecting_line.line] = (connecting_line, child_node, parent_node)
+
+    def del_parent(self, parent_node, child_node):
+        connecting_line = self.lines[child_node].pop(parent_node)
+        del self.lines_lookup[connecting_line.line]
+        connecting_line.destroy()
+        child_node.del_parent(parent_node)
 
     def destroy(self):
         for node_lines in self.lines.values():
@@ -550,7 +606,6 @@ class MainWindow:
 
     def on_frame_configure(self, event):
         """Swaps layout around when the window goes from landscape to portrait"""
-        print(f"CONFIGURE {event.width} {event.height}")
         if event.width > event.height:
             x = event.width // 5
             self.canvas.place(x=0, y=0, w=x, h=event.height)
