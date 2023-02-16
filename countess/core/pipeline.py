@@ -45,38 +45,41 @@ class PipelineNode:
                 [(n.name, n.result) for n in self.parent_nodes if n.result is not None]
             )
 
-    def execute(self, callback, row_limit=None):
+    def exception_logger(self, exception, logger):
+        for lines in traceback.format_exception(exception):
+            for line in lines.split('\n'):
+                if not line.strip(): continue
+                logger.error(str(exc), detail=line.strip())
+
+    def execute(self, logger, row_limit=None):
         input_data = self.get_input_data()
         if self.plugin:
             try:
-                self.result = self.plugin.run(input_data, callback, row_limit)
-                self.output = None
+                self.result = self.plugin.run(input_data, logger, row_limit)
             except Exception as exc:
                 self.result = None
-                self.output = traceback.format_exception(exc)
+                self.exception_logger(exc, logger)
         else:
             self.result = input_data
-            self.output = None
 
-    def prepare(self):
+    def prepare(self, logger):
         input_data = self.get_input_data()
         if self.plugin:
             try:
-                self.plugin.prepare(input_data)
+                self.plugin.prepare(input_data, logger)
             except Exception as exc:
                 self.result = None
-                self.output = traceback.format_exception(exc)
+                self.exception_logger(exc, logger)
         else:
             self.result = input_data
-            self.output = None
 
-    def prerun(self, callback=None, row_limit=PRERUN_ROW_LIMIT):
+    def prerun(self, logger, row_limit=PRERUN_ROW_LIMIT):
         if not callback:
             callback = self.default_callback
         if self.is_dirty and self.plugin:
             for parent_node in self.parent_nodes:
-                parent_node.prerun(callback, row_limit)
-            self.execute(callback, row_limit)
+                parent_node.prerun(logger, row_limit)
+            self.execute(logger, row_limit)
             self.is_dirty = False
 
     def mark_dirty(self):

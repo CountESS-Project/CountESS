@@ -2,7 +2,7 @@ import hashlib
 import importlib
 import importlib.metadata
 import logging
-from collections.abc import Callable, Iterable, MutableMapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from typing import Any, List, Optional
 
 import dask.dataframe as dd
@@ -21,20 +21,23 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.utils.dask import concat_dask_dataframes
+from countess.utils.dask import concat_dataframes, crop_dataframe
+from countess.core.logger import Logger
 
 """
 Plugin lifecycle:
-* Selector of plugins calls cls.accepts(previous_data) with the input data
-  which will be provided to this plugin (or None if this is the first plugin)
-  which returns True if a plugin of this class can accept that data.
-  This lets the interface present a list of plausible plugins you might want to
-  use in the pipeline.
-* When plugin is selected, it gets __init__ed.
-* The plugin then gets .prepare()d with a cut-down input.
-  * .prepare() gets run again any time a preceding plugin changes
-  * .prepare() can alter .parameters or throw exceptions, etc.
-* plugin.parameters gets read to get the name of configuration fields.
+  To create a new plugin:
+    * Plugin is __init__()ed
+    * Plugin.prepare(data) gets called with the connected inputs, to let
+      the plugin know what its inputs are.  This method should not do anything
+      CPU intensive, it just checks the type of inputs are suitable.
+    * Plugin.set_parameter(key, value) gets called, potentially many times.
+    * Plugin.prerun() gets called and this should return sample output.
+  When inputs have changed:
+    * Call prepare() again.
+  To change configuration
+    * Call Plugin.set_parameter(), potentially several times.
+    * Call Plugin.prerun() to generate new output
 """
 
 PRERUN_ROW_LIMIT = 100
@@ -70,18 +73,6 @@ class BasePlugin:
 
     parameters: MutableMapping[str, BaseParam] = {}
 
-    @classmethod
-    def accepts(cls, data) -> bool:
-        """Work out if this plugin class can accept `data` as an input by
-        trying it and finding out.  Subclasses should override this if they
-        have an easier way."""
-
-        try:
-            cls().prepare(data)
-            return True
-        except (ImportError, TypeError, ValueError, AssertionError):
-            return False
-
     def __init__(self, plugin_name=None):
         # Parameters store the actual values they are set to, so we copy them
         # so that if the same plugin is used twice in a pipeline it will have
@@ -100,19 +91,16 @@ class BasePlugin:
                 self.parameters[key] = getattr(self, key).copy()
                 setattr(self, key, self.parameters[key])
 
-    def prepare(self, data):
+    def prepare(self, data: Any, logger: Logger):
         """The plugin gets a preview version of its input data so it can
         check types, column names, etc.  Should throw an exception if this
         isn't a suitable data input."""
-        pass
-
-    def update(self):
-        pass
+        return True
 
     def run(
         self,
         obj: Any,
-        callback: Callable[[int, int, Optional[str]], None],
+        logger: Logger,
         row_limit: Optional[int] = None,
     ):
         """Plugins which support progress monitoring should override this
@@ -165,15 +153,15 @@ class FileInputMixin:
         "files": FileArrayParam("Files", FileParam("File"))
     }
 
-    @classmethod
-    def accepts(self, data) -> bool:
-        """Input Plugins can accept anything as their input, since they're
-        getting their data from a file anyway."""
+    def prepare(self, obj: Any, logger: Logger) -> bool:
+        if obj is not None:
+            logger.error("FileInputMixin doesn't take inputs")
+            return False
         return True
 
     def load_files(
         self,
-        callback: Callable[[int, int, Optional[str]], None],
+        logger: Logger,
         row_limit: Optional[int] = None,
     ):
         raise NotImplementedError("FileInputMixin.load_files")
@@ -181,7 +169,7 @@ class FileInputMixin:
     def run(
         self,
         previous: Any,
-        callback: Callable[[int, int, Optional[str]], None],
+        logger: Logger,
         row_limit: Optional[int] = None,
     ):
 
@@ -197,65 +185,59 @@ class FileInputMixin:
 
 
 class DaskProgressCallback(Callback):
-    """Matches Dask's idea of a progress callback to ours."""
+    """Matches Dask's idea of a progress callback to our logger class."""
 
-    def __init__(self, progress_callback: Callable[[int, int, Optional[str]], None]):
-        self.progress_callback = progress_callback
+    def __init__(self, logger: Logger):
+        self.logger = logger
 
     def _start_state(self, dsk, state):
         self.total_tasks = len(state["ready"]) + len(state["waiting"])
         pass
 
     def _posttask(self, key, result, dsk, state, worker_id):
-        self.progress_callback(len(state["finished"]), self.total_tasks)
+        self.logger.progress(100 * len(state["finished"]) // self.total_tasks)
 
     def _finish(self, dsk, state, failed):
         # XXX do something with "failed"
-        self.progress_callback(self.total_tasks, self.total_tasks)
+        self.logger.progress(100, "Done")
 
 
 class DaskBasePlugin(BasePlugin):
-    """Base class for plugins which accept and return dask DataFrames"""
+    """Base class for plugins which accept and return dask/pandas DataFrames"""
 
-    # XXX there's a slight disconnect here: is this plugin class indicating
-    # that the
-    # input and output format are dask dataframes or that the computing done by
-    # this plugin is in Dask?  I mean, if one then probably the other, but it's
-    # possible we'll want to develop a plugin which takes some arbitrary file,
-    # does computation in Dask and then returns a pandas dataframe, at which
-    # point do we implement DaskInputPluginWhichReturnsPandas(DaskBasePlugin)?
+    def prepare_dask(self, df: pd.DataFrame|dd.DataFrame, logger: Logger) -> bool:
+        assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+        return True
 
-    @classmethod
-    def accepts(self, data) -> bool:
-        return (
-            isinstance(data, (dd.DataFrame, pd.DataFrame))
-            or type(data) is list
-            and isinstance(data[0], (dd.DataFrame, pd.DataFrame))
-        )
+    def prepare(self, data: pd.DataFrame|dd.DataFrame|Mapping[str,pd.DataFrame|dd.DataFrame], logger: Logger) -> bool:
+        if isinstance(data, Mapping):
+            data = concat_dataframes(data.values())
 
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+        return self.prepare_dask(self, data, logger)
+
+    def run_dask(self, df: pd.DataFrame|dd.DataFrame, logger: Logger) -> pd.DataFrame|dd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
-
-    def _run_top(self, ddf: dd.DataFrame | pd.DataFrame):
-        new_df = self.run_dask(ddf.copy())
-        if isinstance(new_df, dd.DataFrame):
-            # if len(ddf) > 1000000:
-            #    return new_df.persist(scheduler='multiprocessing')
-            return new_df.persist()
-        return new_df
 
     def run(
         self,
-        data,
-        callback: Callable[[int, int, Optional[str]], None],
+        data: pd.DataFrame|dd.DataFrame|Mapping[str,pd.DataFrame|dd.DataFrame],
+        logger: Logger,
         row_limit: Optional[int] = None,
-    ):
-        with DaskProgressCallback(callback):
-            if type(data) is list:
-                # Horrible hack to apply operation to only the top dataframe
-                return [self._run_top(data[0])] + data[1:]
+    ) -> pd.DataFrame|dd.DataFrame:
+        with DaskProgressCallback(logger):
+            if isinstance(data, Mapping): 
+                dfs = []
+                for key, obj in data.items():
+                    assert isinstance(obj, (pd.DataFrame, dd.DataFrame))
+                    df = self.run_dask(obj, logger)
+                    assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+                    dfs.append(crop_dataframe(df, row_limit))
+                return concat_dataframes(dfs)
             else:
-                return self._run_top(data)
+                assert isinstance(data, (pd.DataFrame, dd.DataFrame))
+                df = self.run_dask(data, logger)
+                assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+                return crop_dataframe(df, row_limit)
 
 
 # XXX Potentially there's a PandasBasePlugin which can use a technique much
@@ -286,7 +268,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
     def load_files(
         self,
-        callback: Callable[[int, int, Optional[str]], None],
+        logger: Logger,
         row_limit: Optional[int] = None,
     ) -> Iterable[dd.DataFrame]:
         assert isinstance(self.parameters["files"], ArrayParam)
@@ -295,7 +277,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             return []
 
         if len(fps) == 1:
-            with DaskProgressCallback(callback):
+            with DaskProgressCallback(logger):
                 file_param = self.parameters["files"].params[0]
                 assert isinstance(file_param, MultiParam)
                 ddf = self.read_file_to_dataframe(file_param, row_limit)
@@ -306,21 +288,21 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             # file, instead of using the Dask progress callback mechanism
             # this uses a simple count of files read."""
             per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-            callback(0, num_files + 1, "Loading")
+            logger.progress(0, "Loading")
             dfs = []
             for num, fp in enumerate(fps):
                 assert isinstance(fp, MultiParam)
-                df = self.read_file_to_dataframe(fp, per_file_row_limit)
+                df = self.read_file_to_dataframe(fp, logger, per_file_row_limit)
                 dfs.append(df)
-                callback(num + 1, num_files + 1, "Loading")
+                logger.progress(100 * (num+1) // (num_files + 1), "Loading")
             callback(num_files, num_files + 1, "Combining")
             ddf = self.combine_dfs(dfs)
-            callback(num_files + 1, num_files + 1, "")
+            logger.progress(100, "Done")
 
         return ddf
 
     def read_file_to_dataframe(
-        self, file_params: MultiParam, row_limit: Optional[int] = None
+            self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None
     ) -> dd.DataFrame | pd.DataFrame:
         raise NotImplementedError(
             f"Implement {self.__class__.__name__}.read_file_to_dataframe"
@@ -346,11 +328,8 @@ class DaskTransformPlugin(DaskBasePlugin):
 
     input_columns: list[str] = []
 
-    def prepare(self, data):
-        if data is None:
-            self.input_columns = []
-        else:
-            self.input_columns = sorted(data.columns)
+    def prepare_dask(self, data: dd.DataFrame|pd.DataFrame, logger):
+        self.input_columns = sorted(data.columns)
 
         for p in self.parameters.values():
             _set_column_choice_params(p, self.input_columns)
@@ -358,6 +337,7 @@ class DaskTransformPlugin(DaskBasePlugin):
 
 class DaskScoringPlugin(DaskTransformPlugin):
     """Specific kind of transform which turns counts into scores"""
+    # XXX not really useful?
 
     max_counts = 5
 
@@ -377,8 +357,8 @@ class DaskScoringPlugin(DaskTransformPlugin):
         )
     }
 
-    def prepare(self, data):
-        super().prepare(data)
+    def prepare_dask(self, data, logger):
+        super().prepare(data, logger)
         for pp in self.parameters["scores"]:
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
@@ -405,6 +385,7 @@ class DaskScoringPlugin(DaskTransformPlugin):
 
 
 class DaskReindexPlugin(DaskTransformPlugin):
+    # XXX not really useful?
 
     translate_type = str
 
@@ -419,39 +400,3 @@ class DaskReindexPlugin(DaskTransformPlugin):
             self.translate_row, axis=1, meta=pd.Series(self.translate_type())
         )
         return ddf.groupby("__reindex").sum()
-
-
-class DaskTranslationPlugin(DaskTransformPlugin):
-
-    translate_type = str
-
-    parameters = {
-        "input": ChoiceParam("Input Column", "", choices=[""]),
-        "output": StringParam("Output Column", ""),
-    }
-
-    def prepare(self, ddf):
-        super().prepare(ddf)
-        self.parameters["input"].choices = [""] + self.input_columns
-
-    def translate(self, value):
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.translate")
-
-    def translate_row(self, row, input_column):
-        return self.translate(row[input_column] if input_column else row.name)
-
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
-        input_column = self.parameters["input"].value
-        output_column = self.parameters["output"].value or "__translate"
-
-        ddf[output_column] = ddf.apply(
-            self.translate_row,
-            axis=1,
-            args=(input_column,),
-            meta=pd.Series(self.translate_type()),
-        )
-
-        if output_column == "__translate":
-            ddf = ddf.groupby("__translate").sum()
-
-        return ddf
