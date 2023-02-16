@@ -5,6 +5,7 @@ import tkinter as tk
 from enum import Enum, IntFlag
 from tkinter import filedialog, messagebox, ttk
 from functools import partial
+import math
 
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
@@ -175,32 +176,26 @@ class ConnectingLine:
         if w2 == 1 and h2 == 1:
             x2, y2, w2, h2 = x2 - 20, y2 - 20, 40, 40
 
+        # Extra control points set up a nice spline, and a little extra padding
+        # on the destination end to allow for the arrow head.
         xc, yc, wc, hc = _geometry(self.canvas)
         if wc > hc:
             if self.switch and x1 > x2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             coords = (
-                x1 + w1 // 2,
-                y1 + h1 // 2,
-                # x1 + w1, y1 + h1 //2,
-                # x1 + w1 + 20, y1 + h1//2,
-                x2 - 50,
-                y2 + h2 // 2,
-                x2,
-                y2 + h2 // 2,
+                x1 + w1 // 2, y1 + h1 // 2,
+                x1 + w1 + 20, y1 + h1 // 2,
+                x2 - 40,      y2 + h2 // 2,
+                x2,           y2 + h2 // 2,
             )
         else:
             if self.switch and y1 > y2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             coords = (
-                x1 + w1 // 2,
-                y1 + h1 // 2,
-                # x1 + w1 // 2, y1 + h1,
-                # x1 + w1 // 2, y1 + h1 + 20,
-                x2 + w2 // 2,
-                y2 - 50,
-                x2 + w2 // 2,
-                y2,
+                x1 + w1 // 2, y1 + h1 // 2,
+                x1 + w1 // 2, y1 + h1 + 20,
+                x2 + w2 // 2, y2 - 40,
+                x2 + w2 // 2, y2,
             )
 
         if self.line:
@@ -276,6 +271,9 @@ class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
             self.__flipped = flipped
 
 
+class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Label):
+    pass
+
 class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
@@ -306,8 +304,8 @@ class GraphWrapper:
         self.canvas.bind("<Leave>", self.on_canvas_leave)
 
     def label_for_node(self, node):
-        label = DraggableMessage(
-            self.canvas, text=node.name, aspect=200, cursor="hand1", takefocus=True
+        label = DraggableLabel(
+            self.canvas, text=node.name, wraplength=125, cursor="hand1", takefocus=True
         )
         if not node.position:
             node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
@@ -357,10 +355,20 @@ class GraphWrapper:
         """Stores the updated position of the label in node.position"""
         place_info = event.widget.place_info()
         # XXX should be more elegant way of answering the question "are we flipped?"
-        if self.canvas.winfo_width() >= self.canvas.winfo_height():
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+        if width > height:
             node.position = (float(place_info["relx"]), float(place_info["rely"]))
         else:
             node.position = (float(place_info["rely"]), float(place_info["relx"]))
+
+        # Adapt label sizes to suit the window size, as best we can ...
+        label_max_width = width // 5
+        label_font_size = int(math.sqrt(width)/math.pi)
+        print(f"{width} {label_width} {label_font_size}")
+        for label in self.labels.values():
+            label['wraplength'] = label_max_width
+            label['font'] = ('TkDefaultFont', label_font_size)
 
     def on_canvas_motion(self, event):
         """Show a preview of line selection when the cursor is over line(s)"""
@@ -537,7 +545,7 @@ class ConfiguratorWrapper:
 
         self.name_var = tk.StringVar(self.frame, value=node.name)
         tk.Entry(
-            self.frame, textvariable=self.name_var, font=("Helvetica", 16, "bold")
+            self.frame, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")
         ).grid(row=0, sticky=tk.EW, padx=10, pady=5)
         self.name_var.trace("w", self.name_changed_callback)
 
@@ -598,7 +606,7 @@ class ButtonMenu:
             tk.Button(self.frame, text=button_label, command=button_command).grid(
                 row=0, column=button_number, sticky=tk.EW
             )
-        tk.Label(self.frame, text=label, font=("Helvetica", 12, "bold")).grid(row=0, column=button_number+1, sticky=tk.E)
+        tk.Label(self.frame, text=label, font=("TkHeadingFont", 14, "bold")).grid(row=0, column=button_number+1, sticky=tk.E)
         self.frame.columnconfigure(button_number+1, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
@@ -720,7 +728,7 @@ class MainWindow:
     def on_frame_configure(self, event):
         """Swaps layout around when the window goes from landscape to portrait"""
         if event.width > event.height:
-            x = event.width // 5
+            x = event.width // 4
             self.canvas.place(x=0, y=0, w=x, h=event.height)
             self.subframe.place(x=x, y=0, w=event.width - x, h=event.height)
         else:
