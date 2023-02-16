@@ -8,7 +8,6 @@ import pandas as pd  # type: ignore
 from countess import VERSION
 from countess.core.parameters import *
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
-from countess.utils.dask import merge_dask_dataframes
 
 # XXX it would be better to do the same this Regex Tool does and get the user to assign
 # data types to each column

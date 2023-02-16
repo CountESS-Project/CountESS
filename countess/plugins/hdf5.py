@@ -4,6 +4,7 @@ from typing import Mapping, Optional
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
+from countess import VERSION
 from countess.core.parameters import (
     BaseParam,
     ChoiceParam,
@@ -13,9 +14,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
-from countess.utils.dask import concat_dask_dataframes, empty_dask_dataframe
-
-VERSION = "0.0.1"
+from countess.utils.dask import empty_dask_dataframe
 
 
 class LoadHdfPlugin(DaskInputPlugin):

@@ -162,7 +162,6 @@ class FileParam(StringParam):
                         if not data:
                             break
                         digest.update(data)
-            print(f"Digest: {self.value} {digest.hexdigest()}")
             return digest.hexdigest()
         except IOError:
             return "0"

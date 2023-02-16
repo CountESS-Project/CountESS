@@ -25,7 +25,7 @@ from ..core.parameters import (
     TextParam,
 )
 from ..core.plugins import BasePlugin
-from ..utils.dask import crop_dask_dataframe
+from ..utils.dask import crop_dataframe
 
 UNICODE_CHECK = "\u2714"
 UNICODE_UNCHECK = "\u2717"
@@ -529,7 +529,7 @@ class DataFramePreview:
 
         if len(ddf) > 1000:
             self.label["text"] = f"DataFrame Preview (1000 rows out of {len(ddf)})"
-            ddf = crop_dask_dataframe(ddf, 1000)
+            ddf = crop_dataframe(ddf, 1000)
         else:
             self.label["text"] = f"DataFrame Preview {len(ddf)} rows"
 

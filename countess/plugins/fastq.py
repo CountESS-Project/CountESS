@@ -8,6 +8,7 @@ import pandas as pd  # type: ignore
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
+from countess import VERSION
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -18,9 +19,8 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dask_dataframes, merge_dask_dataframes
+from countess.utils.dask import concat_dataframes, merge_dataframes
 
-VERSION = "0.0.1"
 
 
 class LoadFastqPlugin(DaskInputPlugin):

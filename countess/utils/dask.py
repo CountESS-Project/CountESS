@@ -13,36 +13,46 @@ def empty_dask_dataframe() -> dd.DataFrame:
     return edf
 
 
-def crop_dask_dataframe(ddf: dd.DataFrame, row_limit: int) -> dd.DataFrame:
+def crop_dataframe(df: pd.DataFrame|dd.DataFrame, row_limit: int) -> pd.DataFrame|dd.DataFrame:
     """Takes a dask dataframe `ddf` and returns a frame with at most `row_limit` rows"""
-    if len(ddf) > row_limit:
-        x, y = islice(ddf.index, 0, row_limit, row_limit - 1)
-        ddf = ddf.loc[x:y]
-    return ddf
+    if row_limit is not None:
+        if isinstance(df, pd.DataFrame):
+            return pd.head(row_limit)
+        elif isinstance(df, dd.DataFrame):
+            return dd.head(row_limit, npartitions=-1, compute=False)
+        else:
+            raise TypeError("Expecting pd.DataFrame or dd.DataFrame")
+    return df
 
 
-def concat_dask_dataframes(ddfs: list[dd.DataFrame]) -> dd.DataFrame:
+def concat_dataframes(dfs: list[pd.DataFrame|dd.DataFrame]) -> pd.DataFrame|dd.DataFrame:
     """Concat dask dataframes, but include special cases for 0 and 1 inputs"""
 
     # extra special case for empty dataframes
-    ddfs = [df for df in ddfs if len(df) > 0]
+    dfs = [df for df in dfs if len(df) > 0]
 
-    if len(ddfs) == 0:
+    if len(dfs) == 0:
         return empty_dask_dataframe()
-    elif len(ddfs) == 1:
-        return ddfs[0].copy()
+    elif len(dfs) == 1:
+        return dfs[0].copy()
     else:
-        return dd.concat(ddfs)
+        return dd.concat(dfs)
 
 
-def merge_dask_dataframes(
+def merge_dataframes(
     dfs: list[dd.DataFrame | pd.DataFrame], how: str = "outer"
 ) -> dd.DataFrame:
     """Merge multiple dask/pandas dataframes together on their index.
     Always returns a new Dask dataframe even if there's one or zero input dataframes."""
 
-    # XXX wrong for inner & left joins
-    left = empty_dask_dataframe()
-    for right in dfs:
+    # XXX should be smarter about merge strategies?
+
+    if not dfs:
+        return empty_dask_dataframe()
+
+    left, *rest = dfs
+    if isinstance(left, pd.Dataframe):
+        left = dd.from_pandas(left, npartitions=1)
+    for right in rest:
         left = left.merge(right, how=how)
     return left
