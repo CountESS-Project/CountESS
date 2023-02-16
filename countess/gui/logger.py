@@ -91,15 +91,15 @@ class TreeviewLogger(Logger):
         values=[self.name, message, row or '', col or '', detail or '']
         self.treeview.insert("", "end", None, text=datetime_now.isoformat(), values=values)
     
-    def progress(self, a: int, b: int, s: Optional[str] = ''):
+    def progress(self, message: str = 'Running', percentage: Optional[int] = None):
         self.progress_bar.grid(sticky=tk.EW)
-        if b:
-            self.progress_bar.config(mode="determinate", value=100 * a // b)
-            self.progress_bar.update_label(f"{self.name}: {s} {a} / {b}")
+        if percentage:
+            self.progress_bar.config(mode="determinate", value=percentage)
+            self.progress_bar.update_label(f"{self.name}: {message} {percentage}%")
         else:
             self.progress_bar.config(mode="indeterminate")
             self.progress_bar.step(5)
-            self.progress_bar.update_label(f"{self.name}: {s} {a}")
+            self.progress_bar.update_label(f"{self.name}: {message}")
 
     def __del__(self):
-        self.progress_bar.after(2500, lambda pbar=self.progress_bar: pbar.destroy())
+        self.progress_bar.after(5000, lambda pbar=self.progress_bar: pbar.destroy())

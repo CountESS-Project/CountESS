@@ -7,7 +7,7 @@ class Logger:
     def __init__(self):
         pass
 
-    def progress(self, a: int, b: int, s: Optional[str] = None):
+    def progress(self, message: str = 'Running', percentage: Optional[int] = None):
         pass
    
     def log(self, level: str, message: str, row: Optional[int] = None, col: Optional[int] = None, detail: Optional[str] = None):
@@ -28,13 +28,15 @@ class ConsoleLogger:
     def __init__(self, stdout=sys.stdout, stderr=sys.stderr, prefix: Optional[str] = None):
         self.stdout = stdout
         self.stderr = stderr
+        self.prefix = prefix
 
-    def progress(self, a: int, b: int, s: Optional[str] = None):
-
-        self.stdout.write(f"{a:4d}/{b:4d} {s}\n")
+    def progress(self, message: str = 'Running', percentage: Optional[int] = None):
+        if self.prefix: message = self.prefix + ": " + message
+        if percentage: message += " [{int(percentage):2d}%]"
+        self.stdout.write(f"{message}\n")
 
     def log(self, level: str, message: str, row: Optional[int] = None, col: Optional[int] = None, detail: Optional[str] = None):
-        if prefix: message = prefix + ": " + message
+        if self.prefix: message = self.prefix + ": " + message
         if row: message = f"{message} [row={row}]"
         if col: message = f"{message} [col={col}]"
         if detail: message += " " + repr(detail)
