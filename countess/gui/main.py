@@ -18,8 +18,9 @@ from countess.core.config import (
 )
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import get_plugin_classes
+from countess.core.logger import ConsoleLogger
 from countess.gui.config import DataFramePreview, PluginConfigurator
-
+from countess.gui.logger import LoggerFrame
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -536,6 +537,7 @@ class ConfiguratorWrapper:
 
     config_subframe = None
     preview_subframe = None
+    config_change_task = None
 
     def __init__(self, frame, node, change_callback):
         self.frame = frame
@@ -547,6 +549,9 @@ class ConfiguratorWrapper:
             self.frame, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")
         ).grid(row=0, sticky=tk.EW, padx=10, pady=5)
         self.name_var.trace("w", self.name_changed_callback)
+
+        self.logger_subframe = LoggerFrame(self.frame)
+        self.logger = self.logger_subframe.get_logger(node.name)
 
         self.show_config_subframe()
         self.show_preview_subframe()
@@ -569,13 +574,15 @@ class ConfiguratorWrapper:
             self.preview_subframe.destroy()
         if isinstance(self.node.result, (dd.DataFrame, pd.DataFrame)):
             self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
-        elif self.node.output:
-            self.preview_subframe = tk.Text(self.frame, bg="indian red")
-            self.preview_subframe.replace("1.0", tk.END, self.node.output)
         else:
             self.preview_subframe = tk.Frame(self.frame)
 
         self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
+
+        if self.logger.count > 0:
+            self.logger_subframe.grid(row=3, sticky=tk.NSEW)
+        else:
+            self.logger_subframe.grid_forget()
 
     def name_changed_callback(self, *_):
         name = self.name_var.get()
@@ -584,7 +591,14 @@ class ConfiguratorWrapper:
 
     def config_change_callback(self, *_):
         self.node.mark_dirty()
-        self.node.prerun()
+        if self.config_change_task:
+            self.frame.after_cancel(self.config_change_task)
+        self.config_change_task = self.frame.after(500, self.config_change_task_callback)
+
+    def config_change_task_callback(self):
+        self.config_change_task = None
+        self.logger.clear()
+        self.node.prerun(self.logger)
         self.show_preview_subframe()
         self.change_callback(self.node)
 
@@ -644,13 +658,16 @@ class MainWindow:
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
         self.subframe.rowconfigure(2, weight=1)
+        self.subframe.rowconfigure(3, weight=0)
 
         self.frame.bind("<Configure>", self.on_frame_configure, add=True)
+
 
         if config_filename:
             self.config_load(config_filename)
         else:
             self.config_new()
+
 
     def config_new(self):
         if self.config_changed:
@@ -716,9 +733,8 @@ class MainWindow:
         for widget in self.subframe.winfo_children():
             widget.destroy()
         if node:
-            node.prepare()
-            node.prerun()
             ConfiguratorWrapper(self.subframe, node, self.node_changed)
+            
 
     def node_changed(self, node):
         self.config_changed=True

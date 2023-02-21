@@ -15,6 +15,7 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import DaskTransformPlugin
 from countess.utils.dask import empty_dask_dataframe
+from countess.core.logger import Logger
 
 VERSION = "0.0.1"
 
@@ -46,7 +47,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
     # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
 
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+    def run_dask(self, ddf: dd.DataFrame, logger: Logger) -> dd.DataFrame:
         assert isinstance(self.parameters["index"], ArrayParam)
         assert isinstance(self.parameters["pivot"], ArrayParam)
         assert isinstance(self.parameters["agg"], ArrayParam)

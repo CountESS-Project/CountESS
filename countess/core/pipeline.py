@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any, Optional
 
 from countess.core.plugins import BasePlugin, get_plugin_classes
+from countess.core.logger import Logger, ConsoleLogger
 
 PRERUN_ROW_LIMIT = 10000
 
@@ -16,7 +17,6 @@ class PipelineNode:
     parent_nodes: set["PipelineNode"] = field(default_factory=set)
     child_nodes: set["PipelineNode"] = field(default_factory=set)
     result: Any = None
-    output: Optional[str] = None
     is_dirty: bool = True
 
     def __hash__(self):
@@ -32,9 +32,6 @@ class PipelineNode:
             (self.is_descendant_of(n) for n in node.child_nodes)
         )
 
-    def default_callback(self, a, b, s=""):
-        print(f"{self.name:40s} {a:4d}/{b:4d} {s}")
-
     def get_input_data(self):
         if len(self.parent_nodes) == 0:
             return None
@@ -45,13 +42,14 @@ class PipelineNode:
                 [(n.name, n.result) for n in self.parent_nodes if n.result is not None]
             )
 
-    def exception_logger(self, exception, logger):
+    def exception_logger(self, exception, logger: Logger):
         for lines in traceback.format_exception(exception):
             for line in lines.split('\n'):
                 if not line.strip(): continue
-                logger.error(str(exc), detail=line.strip())
+                logger.error(str(exception), detail=line.strip())
 
-    def execute(self, logger, row_limit=None):
+    def execute(self, logger: Logger, row_limit=None):
+        assert row_limit is None or type(row_limit) is int
         input_data = self.get_input_data()
         if self.plugin:
             try:
@@ -62,20 +60,20 @@ class PipelineNode:
         else:
             self.result = input_data
 
-    def prepare(self, logger):
+    def prepare(self, logger: Logger):
+        assert isinstance(logger, Logger)
         input_data = self.get_input_data()
         if self.plugin:
             try:
                 self.plugin.prepare(input_data, logger)
             except Exception as exc:
                 self.result = None
-                self.exception_logger(exc, logger)
+                self.exception_logger(exc)
         else:
             self.result = input_data
 
-    def prerun(self, logger, row_limit=PRERUN_ROW_LIMIT):
-        if not callback:
-            callback = self.default_callback
+    def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
+        assert isinstance(logger, Logger)
         if self.is_dirty and self.plugin:
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
@@ -140,9 +138,6 @@ class PipelineGraph:
         node.detatch()
         self.nodes.remove(node)
 
-    def default_callback(self, n, a, b, s=""):
-        print(f"{n:40s} {a:4d}/{b:4d} {s}")
-
     def traverse_nodes(self):
         found_nodes = set(node for node in self.nodes if not node.parent_nodes)
         yield from found_nodes
@@ -153,25 +148,18 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-    def run(self, progress_callback=None, output_callback=None):
+    def run(self):
         # XXX this is the last thing PipelineGraph actually does!
         # might be easier to just keep a set of nodes and sort through
         # them for output nodes, or something.
-        if not progress_callback:
-            progress_callback = self.default_callback
-        if not output_callback:
-            output_callback = print
 
         for node in self.traverse_nodes():
             # XXX TODO there's some opportunity for easy parallelization here,
             # by pushing each node into a pool as soon as its parents are
             # complete.
-            node.execute(partial(progress_callback, node.name))
-            if node.output and output_callback:
-                output_callback(node.output)
+            node.execute()
 
     def reset(self):
         for node in self.nodes:
             node.result = None
-            node.output = None
             node.is_dirty = True

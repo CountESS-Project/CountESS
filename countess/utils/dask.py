@@ -3,6 +3,7 @@ from itertools import islice
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
+from typing import Optional
 """Utility functions for manipulating Dask DataFrames"""
 
 
@@ -13,13 +14,14 @@ def empty_dask_dataframe() -> dd.DataFrame:
     return edf
 
 
-def crop_dataframe(df: pd.DataFrame|dd.DataFrame, row_limit: int) -> pd.DataFrame|dd.DataFrame:
+def crop_dataframe(df: pd.DataFrame|dd.DataFrame, row_limit: Optional[int]) -> pd.DataFrame|dd.DataFrame:
     """Takes a dask dataframe `ddf` and returns a frame with at most `row_limit` rows"""
     if row_limit is not None:
+        assert(type(row_limit) is int)
         if isinstance(df, pd.DataFrame):
-            return pd.head(row_limit)
+            return df.head(row_limit)
         elif isinstance(df, dd.DataFrame):
-            return dd.head(row_limit, npartitions=-1, compute=False)
+            return df.head(row_limit, npartitions=-1, compute=False)
         else:
             raise TypeError("Expecting pd.DataFrame or dd.DataFrame")
     return df

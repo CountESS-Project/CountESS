@@ -11,12 +11,10 @@ class LoggerTreeview(ttk.Treeview):
 
     def __init__(self, tk_parent, *a, **k):
         super().__init__(tk_parent, *a, **k)
-        self['columns'] = ["name", "message", "row", "col", "detail"]
+        self['columns'] = ["name", "message", "detail"]
         self.heading(0, text="name")
         self.heading(1, text="message")
-        self.heading(2, text="row")
-        self.heading(3, text="column")
-        self.heading(4, text="detail")
+        self.heading(2, text="detail")
 
 
 class LabeledProgressbar(ttk.Progressbar):
@@ -85,11 +83,15 @@ class TreeviewLogger(Logger):
         self.progress_bar = LabeledProgressbar(progress_frame, mode="determinate", value=0)
         self.progress_bar.update_label(name)
         self.name = name
+        self.count = 0
+        self.treeview['height'] = 0
 
-    def log(self, level: str, message: str, row: Optional[int] = None, col: Optional[int] = None, detail: Optional[str] = None):
+    def log(self, level: str, message: str, detail: Optional[str] = None):
+        self.count += 1
         datetime_now = datetime.datetime.now()
-        values=[self.name, message, row or '', col or '', detail or '']
-        self.treeview.insert("", "end", None, text=datetime_now.isoformat(), values=values)
+        values=[self.name, message, detail or '']
+        self.treeview.insert("", "end", text=datetime_now.isoformat(), values=values)
+        self.treeview['height'] = min(self.count, 10)
     
     def progress(self, message: str = 'Running', percentage: Optional[int] = None):
         self.progress_bar.grid(sticky=tk.EW)
@@ -101,5 +103,12 @@ class TreeviewLogger(Logger):
             self.progress_bar.step(5)
             self.progress_bar.update_label(f"{self.name}: {message}")
 
+    def clear(self):
+        for row in self.treeview.get_children():
+            self.treeview.delete(row)
+        self.progress_bar.config(mode="determinate", value=0)
+        self.progress_bar.update_label("")
+        self.count = 0
+        
     def __del__(self):
         self.progress_bar.after(5000, lambda pbar=self.progress_bar: pbar.destroy())

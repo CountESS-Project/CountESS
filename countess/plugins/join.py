@@ -15,6 +15,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DaskBasePlugin, DaskProgressCallback
+from countess.core.logger import Logger
 
 INDEX = "— INDEX —"
 
@@ -44,7 +45,7 @@ class DaskJoinPlugin(DaskBasePlugin):
         )
     }
 
-    def prepare(self, data):
+    def prepare(self, data, logger: Logger):
 
         data_items = list(data.items())
         inputs_param = self.parameters["inputs"]
@@ -63,8 +64,8 @@ class DaskJoinPlugin(DaskBasePlugin):
     def run(
         self,
         data,
-        callback: Callable[[int, int, Optional[str]], None],
-        row_limit: Optional[int],
+        logger: Logger,
+        row_limit: Optional[int] = None,
     ):
 
         ip1 = self.parameters["inputs"][0]

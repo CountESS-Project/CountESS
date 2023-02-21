@@ -173,7 +173,7 @@ class FileInputMixin:
         row_limit: Optional[int] = None,
     ):
 
-        df = self.load_files(callback, row_limit)
+        df = self.load_files(logger, row_limit)
 
         return df
         if type(previous) is list:
@@ -195,11 +195,11 @@ class DaskProgressCallback(Callback):
         pass
 
     def _posttask(self, key, result, dsk, state, worker_id):
-        self.logger.progress(100 * len(state["finished"]) // self.total_tasks)
+        self.logger.progress("Running", 100 * len(state["finished"]) // self.total_tasks)
 
     def _finish(self, dsk, state, failed):
         # XXX do something with "failed"
-        self.logger.progress(100, "Done")
+        self.logger.progress("Done", 100)
 
 
 class DaskBasePlugin(BasePlugin):
@@ -213,7 +213,7 @@ class DaskBasePlugin(BasePlugin):
         if isinstance(data, Mapping):
             data = concat_dataframes(data.values())
 
-        return self.prepare_dask(self, data, logger)
+        return self.prepare_dask(data, logger)
 
     def run_dask(self, df: pd.DataFrame|dd.DataFrame, logger: Logger) -> pd.DataFrame|dd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
@@ -224,6 +224,9 @@ class DaskBasePlugin(BasePlugin):
         logger: Logger,
         row_limit: Optional[int] = None,
     ) -> pd.DataFrame|dd.DataFrame:
+        assert isinstance(logger, Logger)
+        assert row_limit is None or type(row_limit) is int
+
         with DaskProgressCallback(logger):
             if isinstance(data, Mapping): 
                 dfs = []
@@ -264,7 +267,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         """First stage: collect all the files together in whatever
         way is appropriate.  Override this to do it differently
         or do more work on the dataframes (eg: counting, renaming, etc)"""
-        return concat_dask_dataframes(dfs)
+        return concat_dataframes(dfs)
 
     def load_files(
         self,
@@ -288,16 +291,16 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             # file, instead of using the Dask progress callback mechanism
             # this uses a simple count of files read."""
             per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-            logger.progress(0, "Loading")
+            logger.progress("Loading", 0)
             dfs = []
             for num, fp in enumerate(fps):
                 assert isinstance(fp, MultiParam)
                 df = self.read_file_to_dataframe(fp, logger, per_file_row_limit)
                 dfs.append(df)
-                logger.progress(100 * (num+1) // (num_files + 1), "Loading")
+                logger.progress("Loading", 100 * (num+1) // (num_files + 1))
             callback(num_files, num_files + 1, "Combining")
             ddf = self.combine_dfs(dfs)
-            logger.progress(100, "Done")
+            logger.progress("Done", 100)
 
         return ddf
 
@@ -363,7 +366,7 @@ class DaskScoringPlugin(DaskTransformPlugin):
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
 
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+    def run_dask(self, ddf: dd.DataFrame, logger: Logger) -> dd.DataFrame:
         assert isinstance(self.parameters["scores"], ArrayParam)
         score_cols = []
         for pp in self.parameters["scores"]:
@@ -395,7 +398,7 @@ class DaskReindexPlugin(DaskTransformPlugin):
     def translate_row(self, row):
         return self.translate(row.name)
 
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+    def run_dask(self, ddf: dd.DataFrame, logger: Logger) -> dd.DataFrame:
         ddf["__reindex"] = ddf.apply(
             self.translate_row, axis=1, meta=pd.Series(self.translate_type())
         )

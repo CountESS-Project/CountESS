@@ -9,7 +9,7 @@ from countess.core.parameters import (
     TextParam,
 )
 from countess.core.plugins import DaskTransformPlugin
-
+from countess.core.logger import Logger
 
 def process(df: pd.DataFrame, codes):
 
@@ -35,7 +35,7 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
 
     parameters = {"code": ArrayParam("Code", TextParam("Code"))}
 
-    def run_dask(self, df) -> dd.DataFrame:
+    def run_dask(self, df, logger: Logger) -> dd.DataFrame:
         assert isinstance(self.parameters["code"], ArrayParam)
 
         codes = [

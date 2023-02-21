@@ -46,7 +46,7 @@ class RegexToolPlugin(DaskTransformPlugin):
         ),
     }
 
-    def run_dask(self, df):
+    def run_dask(self, df, logger):
 
         for regex_parameter in self.parameters["regexes"]:
             column_name = regex_parameter["column"].value
@@ -72,12 +72,14 @@ class RegexToolPlugin(DaskTransformPlugin):
                     return None
 
             def func(row):
-                match = compiled_re.match(row[column_name])
+                value = row[column_name]
+                match = compiled_re.match(value)
                 if match:
                     return [
                         cast(g, output_types[n]) for n, g in enumerate(match.groups())
                     ]
                 else:
+                    logger.warning(f"Didn't Match", detail=repr(value))
                     return [None] * compiled_re.groups
 
             df = df.copy()
