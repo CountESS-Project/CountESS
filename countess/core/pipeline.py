@@ -43,10 +43,7 @@ class PipelineNode:
             )
 
     def exception_logger(self, exception, logger: Logger):
-        for lines in traceback.format_exception(exception):
-            for line in lines.split('\n'):
-                if not line.strip(): continue
-                logger.error(str(exception), detail=line.strip())
+        logger.error(str(exception), detail=''.join(traceback.format_exception(exception)))
 
     def execute(self, logger: Logger, row_limit=None):
         assert row_limit is None or type(row_limit) is int

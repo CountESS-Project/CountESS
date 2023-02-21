@@ -11,10 +11,9 @@ class LoggerTreeview(ttk.Treeview):
 
     def __init__(self, tk_parent, *a, **k):
         super().__init__(tk_parent, *a, **k)
-        self['columns'] = ["name", "message", "detail"]
+        self['columns'] = ["name", "message"]
         self.heading(0, text="name")
         self.heading(1, text="message")
-        self.heading(2, text="detail")
 
 
 class LabeledProgressbar(ttk.Progressbar):
@@ -76,6 +75,20 @@ class LoggerFrame(ttk.Frame):
         return TreeviewLogger(self.treeview, self.progress_frame, name)
 
 
+class TreeviewDetailWindow(tk.Toplevel):
+
+    def __init__(self, detail, *a, **k):
+        super().__init__(*a, **k)
+
+        text = tk.Text(self)
+        text.insert('1.0', detail)
+        text['state'] = 'disabled'
+        text.pack(anchor=tk.CENTER)
+
+        button = tk.Button(self, text="CLOSE", command=self.destroy)
+        button.pack()
+
+
 class TreeviewLogger(Logger):
 
     def __init__(self, treeview: ttk.Treeview, progress_frame: tk.Frame, name: str):
@@ -85,12 +98,20 @@ class TreeviewLogger(Logger):
         self.name = name
         self.count = 0
         self.treeview['height'] = 0
+        self.detail = {}
+
+        self.treeview.bind('<<TreeviewSelect>>', self.on_click)
+
+    def on_click(self, event):
+        # XXX display detail more nicely
+        TreeviewDetailWindow(self.detail[self.treeview.focus()])
 
     def log(self, level: str, message: str, detail: Optional[str] = None):
         self.count += 1
         datetime_now = datetime.datetime.now()
-        values=[self.name, message, detail or '']
-        self.treeview.insert("", "end", text=datetime_now.isoformat(), values=values)
+        values=[self.name, message]
+        iid = self.treeview.insert("", "end", text=datetime_now.isoformat(), values=values)
+        self.detail[iid] = detail
         self.treeview['height'] = min(self.count, 10)
     
     def progress(self, message: str = 'Running', percentage: Optional[int] = None):
@@ -109,6 +130,7 @@ class TreeviewLogger(Logger):
         self.progress_bar.config(mode="determinate", value=0)
         self.progress_bar.update_label("")
         self.count = 0
+        self.detail = {}
         
     def __del__(self):
         self.progress_bar.after(5000, lambda pbar=self.progress_bar: pbar.destroy())

@@ -434,8 +434,6 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
-        #self.plugin.update()
-        #self.plugin.prerun() # XXX 
         self.update()
         if self.change_callback:
             self.change_callback(self)
