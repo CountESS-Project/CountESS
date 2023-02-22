@@ -228,6 +228,7 @@ class DaskBasePlugin(BasePlugin):
         assert row_limit is None or type(row_limit) is int
 
         with DaskProgressCallback(logger):
+            logger.progress("Starting", 0)
             if isinstance(data, Mapping): 
                 dfs = []
                 for key, obj in data.items():
@@ -235,11 +236,13 @@ class DaskBasePlugin(BasePlugin):
                     df = self.run_dask(obj, logger)
                     assert isinstance(df, (pd.DataFrame, dd.DataFrame))
                     dfs.append(crop_dataframe(df, row_limit))
+                logger.progress("Finished", 100)
                 return concat_dataframes(dfs)
             else:
                 assert isinstance(data, (pd.DataFrame, dd.DataFrame))
                 df = self.run_dask(data, logger)
                 assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+                logger.progress("Finished", 100)
                 return crop_dataframe(df, row_limit)
 
 

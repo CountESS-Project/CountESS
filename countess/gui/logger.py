@@ -116,7 +116,7 @@ class TreeviewLogger(Logger):
     
     def progress(self, message: str = 'Running', percentage: Optional[int] = None):
         self.progress_bar.grid(sticky=tk.EW)
-        if percentage:
+        if percentage is not None:
             self.progress_bar.config(mode="determinate", value=percentage)
             self.progress_bar.update_label(f"{self.name}: {message} {percentage}%")
         else:
@@ -124,13 +124,16 @@ class TreeviewLogger(Logger):
             self.progress_bar.step(5)
             self.progress_bar.update_label(f"{self.name}: {message}")
 
+    def progress_hide(self):
+        self.progress_bar.grid_forget()
+
     def clear(self):
-        for row in self.treeview.get_children():
-            self.treeview.delete(row)
         self.progress_bar.config(mode="determinate", value=0)
         self.progress_bar.update_label("")
+        for row in self.treeview.get_children():
+            self.treeview.delete(row)
         self.count = 0
         self.detail = {}
-        
+    
     def __del__(self):
         self.progress_bar.after(5000, lambda pbar=self.progress_bar: pbar.destroy())
