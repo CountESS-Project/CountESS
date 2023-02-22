@@ -177,27 +177,42 @@ class ConnectingLine:
         if w2 == 1 and h2 == 1:
             x2, y2, w2, h2 = x2 - 20, y2 - 20, 40, 40
 
-        # Extra control points set up a nice spline, and a little extra padding
+        # If there's enough room, extra control points set
+        # up a nice spline, and a little extra padding
         # on the destination end to allow for the arrow head.
         xc, yc, wc, hc = _geometry(self.canvas)
+
+ 
         if wc > hc:
             if self.switch and x1 > x2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
-            coords = (
-                x1 + w1 // 2, y1 + h1 // 2,
-                x1 + w1 + 20, y1 + h1 // 2,
-                x2 - 40,      y2 + h2 // 2,
-                x2,           y2 + h2 // 2,
-            )
+            if 0 < x2 - (x1 + w1) < 50:
+                coords = (
+                    x1 + w1, y1 + h1 // 2,
+                    x2,           y2 + h2 // 2,
+                )
+            else:
+                coords = (
+                    x1 + w1 // 2, y1 + h1 // 2,
+                    x1 + w1 + 20, y1 + h1 // 2,
+                    x2 - 40,      y2 + h2 // 2,
+                    x2,           y2 + h2 // 2,
+                )
         else:
             if self.switch and y1 > y2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
-            coords = (
-                x1 + w1 // 2, y1 + h1 // 2,
-                x1 + w1 // 2, y1 + h1 + 20,
-                x2 + w2 // 2, y2 - 40,
-                x2 + w2 // 2, y2,
-            )
+            if 0 < y2 - (y1 + h1) < 50:
+                coords = (
+                    x1 + w1 // 2, y1 + h1,
+                    x2 + w2 // 2, y2,
+                )
+            else:
+                coords = (
+                    x1 + w1 // 2, y1 + h1 // 2,
+                    x1 + w1 // 2, y1 + h1 + 20,
+                    x2 + w2 // 2, y2 - 40,
+                    x2 + w2 // 2, y2,
+                )
 
         if self.line:
             self.canvas.coords(self.line, *coords)
@@ -364,7 +379,7 @@ class GraphWrapper:
             node.position = (float(place_info["rely"]), float(place_info["relx"]))
 
         # Adapt label sizes to suit the window size, as best we can ...
-        label_max_width = width // 5
+        label_max_width = max(width // 10, 25)
         label_font_size = int(math.sqrt(width)/math.pi)
         for label in self.labels.values():
             label['wraplength'] = label_max_width
@@ -598,9 +613,17 @@ class ConfiguratorWrapper:
     def config_change_task_callback(self):
         self.config_change_task = None
         self.logger.clear()
+        self.logger_subframe.grid(row=3, sticky=tk.NSEW)
         self.node.prerun(self.logger)
         self.show_preview_subframe()
+        self.logger_subframe.after(5000, self.config_change_task_callback_2)
         self.change_callback(self.node)
+
+    def config_change_task_callback_2(self):
+        if self.logger.count == 0:
+            self.logger_subframe.grid_forget()
+        else:
+            self.logger.progress_hide()
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
