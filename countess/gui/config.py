@@ -344,7 +344,7 @@ class ParameterWrapper:
 
     def delete_row_callback(self, parameter_wrapper, row=None):
         assert isinstance(self.parameter, ArrayParam)
-        if row:
+        if row is not None:
             self.parameter.del_row(row)
         else:
             self.parameter.del_subparam(parameter_wrapper.parameter)
