@@ -86,6 +86,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
             # `pivot_product` is every combination of every pivot column, so eg: if you're
             # pivoting on a `bin` column with values 1..4 and a `rep` column with values
             # 1..3 you'll end up with 12 elements, [ [1,1],[1,2],[1,3],[1,4],[2,1],[2,2] etc ]
+
             pivot_product = itertools.product(
                 *[list(ddf[c].unique()) for c in pivot_cols]
             )
@@ -115,6 +116,10 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
                 ddfs.append(ddf.query(query).rename(columns=rename_cols))
             ddf = dd.concat(ddfs)
+
+            # XXX because of the way the concat operation collects pivot groups, a bunch of records
+            # end up getting generated with NULLs in integer columns, forcing those columns
+            # to become floats, which looks odd for a 'sum' or 'count' operation.
         else:
             for col, agg_op in agg_cols:
                 aggregate_ops[col].append(agg_op)
