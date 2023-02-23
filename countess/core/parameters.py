@@ -249,12 +249,28 @@ class ChoiceParam(BaseParam):
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
-
     pass
 
+
+class ColumnOrIndexChoiceParam(ColumnChoiceParam):
+
+    INDEX_VALUE = '— INDEX —'
+
+    def set_choices(self, choices: Iterable[str]):
+        super().set_choices([self.INDEX_VALUE] + list(choices))
+
+    def is_index(self):
+        return self.value == self.INDEX_VALUE
 
 class ColumnOrNoneChoiceParam(ColumnChoiceParam):
-    pass
+
+    NONE_VALUE = '— NONE —'
+
+    def set_choices(self, choices: Iterable[str]):
+        super().set_choices([self.NONE_VALUE] + list(choices))
+
+    def is_none(self):
+        return self.value == self.NONE_VALUE
 
 
 class ArrayParam(BaseParam):
