@@ -189,11 +189,12 @@ class ConnectingLine:
             if 0 < x2 - (x1 + w1) < 50:
                 coords = (
                     x1 + w1, y1 + h1 // 2,
+                    x2 - 20,     y2 + h2 // 2,
                     x2,           y2 + h2 // 2,
                 )
             else:
                 coords = (
-                    x1 + w1 // 2, y1 + h1 // 2,
+                    x1 + w1     , y1 + h1 // 2,
                     x1 + w1 + 20, y1 + h1 // 2,
                     x2 - 40,      y2 + h2 // 2,
                     x2,           y2 + h2 // 2,
@@ -204,11 +205,12 @@ class ConnectingLine:
             if 0 < y2 - (y1 + h1) < 50:
                 coords = (
                     x1 + w1 // 2, y1 + h1,
+                    x2 + w2 // 2, y2 - 20,
                     x2 + w2 // 2, y2,
                 )
             else:
                 coords = (
-                    x1 + w1 // 2, y1 + h1 // 2,
+                    x1 + w1 // 2, y1 + h1,
                     x1 + w1 // 2, y1 + h1 + 20,
                     x2 + w2 // 2, y2 - 40,
                     x2 + w2 // 2, y2,
@@ -216,10 +218,11 @@ class ConnectingLine:
 
         if self.line:
             self.canvas.coords(self.line, *coords)
+            self.canvas.itemconfig(self.line, smooth=len(coords) > 6)
         else:
             self.line = self.canvas.create_line(
                 *coords,
-                smooth=True,
+                smooth=len(coords) > 6,
                 width=3,
                 arrow="last",
                 arrowshape=(15, 15, 6),
@@ -575,9 +578,10 @@ class ConfiguratorWrapper:
         if self.config_subframe:
             self.config_subframe.destroy()
         if self.node.plugin:
-            self.config_subframe = PluginConfigurator(
+            self.configurator = PluginConfigurator(
                 self.frame, self.node.plugin, self.config_change_callback
-            ).frame
+            )
+            self.config_subframe = self.configurator.frame
         else:
             self.config_subframe = PluginChooserFrame(
                 self.frame, "Choose Plugin", self.choose_plugin
@@ -616,6 +620,7 @@ class ConfiguratorWrapper:
         self.logger_subframe.grid(row=3, sticky=tk.NSEW)
         self.node.prerun(self.logger)
         self.show_preview_subframe()
+        self.configurator.update()
         self.logger_subframe.after(5000, self.config_change_task_callback_2)
         self.change_callback(self.node)
 
