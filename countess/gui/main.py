@@ -297,11 +297,11 @@ class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
 
-TK_EVENT_STATE_SHIFT = 1
-TK_EVENT_STATE_CONTROL = 4
-
-
 class GraphWrapper:
+
+    selected_node = None
+    highlight_rectangle = None
+
     def __init__(self, canvas, graph, node_select_callback):
         self.canvas = canvas
         self.graph = graph
@@ -342,7 +342,8 @@ class GraphWrapper:
         label.bind("<Configure>", partial(self.on_configure, node), add=True)
         label.bind("<<GhostRelease>>", partial(self.on_ghost_release, node), add=True)
         label.bind("<Key-Delete>", partial(self.on_delete, node), add=True)
-        label.bind("<Enter>", self.on_canvas_leave, add=True)
+        label.bind("<Enter>", partial(self.on_enter, node), add=True)
+        label.bind("<Leave>", partial(self.on_leave, node), add=True)
 
         return label
 
@@ -359,14 +360,17 @@ class GraphWrapper:
 
     def highlight_node(self, node):
         """Highlight the current node in orange"""
+        self.selected_node = node
         for label in self.labels.values():
             label["bg"] = "#DDD"
         if node:
             self.labels[node]["bg"] = "orange"
-            self.labels[node].focus()
 
     def on_mousedown(self, node, event):
         """Button-1 click selects a node to view"""
+        if self.highlight_rectangle is not None:
+            self.canvas.delete(self.highlight_rectangle)
+            self.highlight_rectangle = None
         self.highlight_node(node)
         self.node_select_callback(node)
 
@@ -388,6 +392,22 @@ class GraphWrapper:
             label['wraplength'] = label_max_width
             label['font'] = ('TkDefaultFont', label_font_size)
 
+    def on_enter(self, node, event):
+        """Mouse has entered a label"""
+        # don't outline labels while dragging
+        if event.state & TkEventState.BUTTON1: return
+        self.labels[node].focus()
+        # hide any highlighted lines
+        self.on_canvas_leave(event)
+        x, y, w, h = _geometry(self.labels[node])
+        if self.highlight_rectangle: self.canvas.delete(self.highlight_rectangle)
+        self.highlight_rectangle = self.canvas.create_rectangle(x-3,y-3,x+w+3,y+h+3, fill="red", width=0)
+        
+    def on_leave(self, node, event):
+        if self.highlight_rectangle is not None:
+            self.canvas.delete(self.highlight_rectangle)
+            self.highlight_rectangle = None
+
     def on_canvas_motion(self, event):
         """Show a preview of line selection when the cursor is over line(s)"""
         items = self.canvas.find_overlapping(
@@ -406,9 +426,17 @@ class GraphWrapper:
     def on_canvas_button1(self, event):
         """Click to create a new node, if it is created on top of a line
         that line is broken and the node is included."""
+
         items = self.canvas.find_overlapping(
             event.x - 10, event.y - 10, event.x + 10, event.y + 10
         )
+
+        # XXX creating a new node every time you click on the background
+        # is proving quite annoying.  Lets see how it is to go without it.
+        # (you can still create a new node by button-3-dragging from an 
+        # existing node, and if you really want a disconnected graph you can
+        # delete the link to the new node!)
+        if not items: return
 
         position = (
             event.x / self.canvas.winfo_width(),
@@ -427,6 +455,7 @@ class GraphWrapper:
         items = self.canvas.find_overlapping(
             event.x - 10, event.y - 10, event.x + 10, event.y + 10
         )
+        
         for item in items:
             connecting_line, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
@@ -437,6 +466,8 @@ class GraphWrapper:
         reconnect parents and children.  <Ctrl-Delete> disconnects the node but doesn't
         delete it."""
 
+        self.on_leave(node, event)
+
         parent_nodes = list(node.parent_nodes)
         child_nodes = list(node.child_nodes)
         for line in self.lines[node].values():
@@ -446,23 +477,20 @@ class GraphWrapper:
         for child_node in child_nodes:
             child_node.del_parent(node)
             self.lines[child_node].pop(node).destroy()
-            if not event.state & TK_EVENT_STATE_SHIFT:
+            if not event.state & TkEventState.SHIFT:
                 for parent_node in parent_nodes:
                     self.add_parent(parent_node, child_node)
-        if not event.state & TK_EVENT_STATE_CONTROL:
+        if not event.state & TkEventState.CONTROL:
             self.graph.nodes.remove(node)
             del self.labels[node]
             del self.lines[node]
             event.widget.destroy()
-            self.node_select_callback(None)
-            self.highlight_node(None)
 
         if len(self.graph.nodes) == 0:
             self.add_new_node(select=True)
-        else:
-            # arbitrary choice here ... would maybe be nicer to pick one
-            # related or close by, but it's not too important.
-            new_node = list(self.graph.nodes)[0]
+        elif node == self.selected_node:
+            # arbitrarily pick another node to show
+            new_node = parent_nodes[0] if parent_nodes else child_nodes[0] if child_nodes else list(self.graph.nodes)[0]
             self.highlight_node(new_node)
             self.node_select_callback(new_node)
 
