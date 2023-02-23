@@ -323,8 +323,6 @@ def _set_column_choice_params(parameter, column_names):
     elif isinstance(parameter, MultiParam):
         for p in parameter.params.values():
             _set_column_choice_params(p, column_names)
-    elif isinstance(parameter, ColumnOrNoneChoiceParam):
-        parameter.set_choices(["--"] + column_names)
     elif isinstance(parameter, ColumnChoiceParam):
         parameter.set_choices(column_names)
 
