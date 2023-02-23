@@ -49,24 +49,13 @@ class LoadCsvPlugin(DaskInputPlugin):
                 "Column",
                 {
                     "name": StringParam("Column Name", ""),
-                    "type": ChoiceParam(
-                        "Column Type",
-                        "string",
-                        choices=["string", "number", "integer", "none"],
-                    ),
+                    "type": DataTypeOrNoneChoiceParam("Column Type"),
                     "index": BooleanParam("Index?", False),
                 },
             ),
         ),
         "header": BooleanParam("CSV file has header row?", True),
         "filename_column": StringParam("Filename Column", ""),
-    }
-
-    column_type_translate = {
-        "string": str,
-        "number": float,
-        "integer": int,
-        "none": None,
     }
 
     def read_file_to_dataframe(self, file_param, row_limit=None):
@@ -86,9 +75,8 @@ class LoadCsvPlugin(DaskInputPlugin):
 
             for n, pp in enumerate(self.parameters["columns"]):
                 options["names"].append(pp["name"].value or f"column_{n}")
-                column_type = self.column_type_translate[pp["type"].value]
-                if column_type:
-                    options["dtype"][n] = column_type
+                if not pp["type"].is_none():
+                    options["dtype"][n] = pp["type"].get_selected_type()
                     options["usecols"].append(n)
 
         # XXX dd.read_csv().set_index() is very very slow!

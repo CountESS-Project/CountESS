@@ -246,6 +246,58 @@ class ChoiceParam(BaseParam):
         return self.__class__(self.label, self.value, self.choices)
 
 
+class DataTypeChoiceParam(ChoiceParam):
+
+    DATA_TYPES = {
+        "string": (str, None),
+        "number": (float, None),
+        "integer": (int, 0),
+        "boolean": (bool, None),
+    }
+
+    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
+        if not choices: choices = list(self.DATA_TYPES.keys())
+        super().__init__(label, value, choices)
+
+    def get_selected_type(self):
+        if self.value is None: return None
+        else: return self.DATA_TYPES[self.value][0]
+
+    def cast_value(self, value):
+        if self.value is None: return None
+        if value is None: return self.DATA_TYPES[self.value][1]
+        else: return self.DATA_TYPES[self.value][0](value)
+
+
+class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
+
+    NONE_VALUE = "— NONE —"
+
+    DATA_TYPES = {
+        "string": (str, None),
+        "number": (float, None),
+        "integer": (int, 0),
+        "boolean": (bool, None),
+        NONE_VALUE: None,
+    }
+
+    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
+        if not choices: choices = list(self.DATA_TYPES.keys())
+        if value is None: value = self.NONE_VALUE
+        super().__init__(label, value, choices)
+
+    def get_selected_type(self):
+        if self.value == self.NONE_VALUE: return None
+        else: return super().get_selected_type()
+
+    def cast_value(self, value):
+        if self.value == self.NONE_VALUE: return None
+        else: return super().cast_value(value)
+
+    def is_none(self):
+        return self.value == self.NONE_VALUE
+
+
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
@@ -271,7 +323,6 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
     def is_none(self):
         return self.value == self.NONE_VALUE
-
 
 class ArrayParam(BaseParam):
     """An ArrayParam contains zero or more copies of `param`, which can be a
