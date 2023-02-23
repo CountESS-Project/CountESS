@@ -24,7 +24,7 @@ class RegexToolPlugin(DaskTransformPlugin):
             MultiParam(
                 "Regex",
                 {
-                    "column": ColumnChoiceParam("Input Column"),
+                    "column": ColumnOrIndexChoiceParam("Input Column"),
                     "regex": StringParam("Regular Expression", ".*"),
                     "output": ArrayParam(
                         "Output Columns",
@@ -48,8 +48,17 @@ class RegexToolPlugin(DaskTransformPlugin):
 
     def run_dask(self, df, logger):
 
+        # prevent added columns from propagating backwards in 
+        # the pipeline!
+        df = df.copy()
+
+        # the index doesn't seem to be available from within the applied function,
+        # which is annoying, so we copy it into a column here.
+        if any(rp["column"].is_index() for rp in self.parameters["regexes"]):
+            df['__index'] = df.index
+
         for regex_parameter in self.parameters["regexes"]:
-            column_name = regex_parameter["column"].value
+
             compiled_re = re.compile(regex_parameter["regex"].value)
 
             while compiled_re.groups > len(regex_parameter["output"].params):
@@ -58,6 +67,11 @@ class RegexToolPlugin(DaskTransformPlugin):
             output_params = regex_parameter["output"].params
             output_names = [pp["name"].value for pp in output_params]
             output_types = [pp["datatype"].value for pp in output_params]
+
+            if regex_parameter["column"].is_index():
+                column_name = '__index'
+            else:
+                column_name = regex_parameter["column"].value
 
             def cast(value, datatype):
                 if datatype == "string":
@@ -72,7 +86,7 @@ class RegexToolPlugin(DaskTransformPlugin):
                     return None
 
             def func(row):
-                value = row[column_name]
+                value = str(row[column_name])
                 match = compiled_re.match(value)
                 if match:
                     return [
@@ -82,19 +96,18 @@ class RegexToolPlugin(DaskTransformPlugin):
                     logger.warning(f"Didn't Match", detail=repr(value))
                     return [None] * compiled_re.groups
 
-            df = df.copy()
-            x = df.apply(func, axis=1, result_type="expand")
+            re_groups_df = df.apply(func, axis=1, result_type="expand")
 
             for n in range(0, compiled_re.groups):
-                df[output_names[n]] = x[n]
+                df[output_names[n]] = re_groups_df[n]
 
         drop_columns = set(
+            [ '__index' ] + 
             [
                 rp["column"].value
                 for rp in self.parameters["regexes"]
                 if rp["drop_column"].value
             ]
         )
-        df = df.drop(columns=drop_columns)
 
-        return df
+        return df.drop(columns=drop_columns)
