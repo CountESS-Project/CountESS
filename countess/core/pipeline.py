@@ -65,7 +65,7 @@ class PipelineNode:
                 self.plugin.prepare(input_data, logger)
             except Exception as exc:
                 self.result = None
-                self.exception_logger(exc)
+                self.exception_logger(exc, logger)
         else:
             self.result = input_data
 
