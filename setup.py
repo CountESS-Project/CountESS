@@ -25,7 +25,7 @@ setup(
                 'pivot = countess.plugins.pivot:DaskPivotPlugin',
                 'join = countess.plugins.join:DaskJoinPlugin',
                 'save_csv = countess.plugins.csv:SaveCsvPlugin',
-                'regex_tool = countess.plugins.regex_tool:RegexToolPlugin',
+                'regex_tool = countess.plugins.regex:RegexToolPlugin',
             ],
             'gui_scripts': ['countess_gui = countess.gui.main:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],

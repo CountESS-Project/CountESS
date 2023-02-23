@@ -8,7 +8,7 @@ import pandas as pd  # type: ignore
 
 from countess import VERSION
 from countess.core.parameters import *
-from countess.core.plugins import DaskTransformPlugin
+from countess.core.plugins import DaskTransformPlugin, DaskInputPlugin
 
 
 class RegexToolPlugin(DaskTransformPlugin):
@@ -106,3 +106,9 @@ class RegexToolPlugin(DaskTransformPlugin):
         if '__index__' in df: drop_columns.add('__index')
 
         return df.drop(columns=drop_columns)
+
+
+class RegexReaderPlugin(DaskInputPlugin):
+    pass
+
+
