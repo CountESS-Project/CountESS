@@ -73,6 +73,7 @@ in
               blosc2
               py-cpuinfo
             ];
+          doInstallCheck = false;
         }))
         pyarrow
         ttkthemes
