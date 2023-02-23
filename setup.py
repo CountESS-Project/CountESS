@@ -1,4 +1,7 @@
 from setuptools import setup
+from pathlib import Path
+long_description = (Path(__file__).parent / "README.md").read_text()
+
 from countess import VERSION
 
 setup(
@@ -53,7 +56,7 @@ setup(
             'Operating System :: OS Independent',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
-        long_description = "Constructs pipelines of plugins for bioinformations data processing",
-        long_description_content_type = "text/x-rst",
+        long_description = long_description,
+        long_description_content_type = "text/markdown",
 )
 
