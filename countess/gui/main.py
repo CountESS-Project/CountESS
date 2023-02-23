@@ -781,12 +781,16 @@ def main():
 
         root = ttkthemes.ThemedTk()
         themes = set(root.get_themes())
-        for t in ["winnative", "aqua", "ubuntu", "clam"]:
+        for t in ["winnative", "aqua", "clam"]:
             if t in themes:
                 root.set_theme(t)
     except ImportError:
         root = tk.root()
-        # XXX some kind of ttk style setup goes here
+        # XXX some kind of ttk style setup goes here as a fallback
+
+    # Set up treeview font and row heights.
+    style = ttk.Style()
+    style.configure("Treeview", font=(None, 10), rowheight=25)
 
     root.title(f"CountESS {VERSION}")
     root.rowconfigure(0, weight=0)
