@@ -1,4 +1,4 @@
-# CountESS 0.0.13
+# CountESS 0.0.15
 
 This is CountESS, a modular, Python 3 reimplementation of Enrich2.
 
@@ -25,6 +25,11 @@ pip install git+https://github.com/CountESS-Project/CountESS.git
 git clone https://github.com/CountESS-Project/CountESS.git
 cd CountESS
 pip install -e .
+```
+
+... or run with nix:
+```
+nix run github:CountESS-Project/CountESS
 ```
 
 ## Counting with CountESS
