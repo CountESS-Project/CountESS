@@ -33,20 +33,13 @@ setup(
         install_requires = [
             'dask>=2022.8.0',
             'distributed>=2022.8.0',
-            'fqfa~=1.2.1',
-            'more_itertools~=8.14.0',
-            'Levenshtein==0.20.5',
-            'numpy~=1.23.2',
-            'pandas~=1.5.2',
-            'tables==3.8.0',
-            'pyarrow~=10.0.1',
-            'ttkthemes~=3.2.2',
+            'fqfa~=1.2.3',
+            'more_itertools>=8.14.0',
+            'numpy~=1.23',
+            'pandas~=1.4',
+            'tables~=3.7',
+            'ttkthemes~=3.2',
         ],
-        #extras_require = {
-        #    'r': [
-        #        'rpy2==3.5.1'
-        #    ],
-        #},
         license = 'BSD',
         license_files = ('LICENSE.txt',),
         classifiers = [

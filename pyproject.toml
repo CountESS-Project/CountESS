@@ -10,7 +10,7 @@ maintainers = [
     { name = "Nick Moore", email="nick@zoic.org" },
 ]
 description = "CountESS"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
 classifiers = [
     'Development Status :: 2 - Pre-Alpha',
@@ -22,14 +22,12 @@ classifiers = [
 dependencies = [
     'dask>=2022.8.0',
     'distributed>=2022.8.0',
-    'fqfa~=1.2.1',
-    'more_itertools~=8.14.0',
-    'Levenshtein~=0.20.5',
-    'numpy~=1.23.2',
-    'pandas~=1.5.2',
-    'tables~=3.8.0',
-    'pyarrow~=10.0.1',
-    'ttkthemes~=3.2.2',
+    'fqfa~=1.2.3',
+    'more_itertools>=8.14.0',
+    'numpy~=1.23',
+    'pandas~=1.4',
+    'tables~=3.7',
+    'ttkthemes~=3.2',
 ]
 
 [project.entry-points.countess_plugins]
