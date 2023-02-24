@@ -286,7 +286,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             with DaskProgressCallback(logger):
                 file_param = self.parameters["files"].params[0]
                 assert isinstance(file_param, MultiParam)
-                ddf = self.read_file_to_dataframe(file_param, row_limit)
+                ddf = self.read_file_to_dataframe(file_param, logger, row_limit)
                 ddf = self.combine_dfs([ddf])
         else:
             num_files = len(fps)
