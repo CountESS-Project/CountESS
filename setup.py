@@ -18,8 +18,6 @@ setup(
                 'load_csv = countess.plugins.csv:LoadCsvPlugin',
                 'log_score = countess.plugins.log_score:LogScorePlugin',
                 'group_by = countess.plugins.group_by:GroupByPlugin',
-                #'protein = countess.plugins.protein:ProteinTranslatorPlugin',
-                #'embed_r = countess.plugins.embed_r:EmbeddedRPlugin',
                 'embed_py = countess.plugins.embed_python:EmbeddedPythonPlugin',
                 'pivot = countess.plugins.pivot:DaskPivotPlugin',
                 'join = countess.plugins.join:DaskJoinPlugin',
