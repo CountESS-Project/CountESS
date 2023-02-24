@@ -43,6 +43,7 @@ pivot = "countess.plugins.pivot:DaskPivotPlugin"
 join = "countess.plugins.join:DaskJoinPlugin"
 save_csv = "countess.plugins.csv:SaveCsvPlugin"
 regex_tool = "countess.plugins.regex:RegexToolPlugin"
+regex_reader = "countess.plugins.regex:RegexReaderPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"

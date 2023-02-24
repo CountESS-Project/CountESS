@@ -9,7 +9,7 @@ import pandas as pd  # type: ignore
 from countess import VERSION
 from countess.core.parameters import *
 from countess.core.plugins import DaskTransformPlugin, DaskInputPlugin
-
+from countess.utils.dask import concat_dataframes
 
 class RegexToolPlugin(DaskTransformPlugin):
 
@@ -109,6 +109,78 @@ class RegexToolPlugin(DaskTransformPlugin):
 
 
 class RegexReaderPlugin(DaskInputPlugin):
-    pass
+    name = "Regex Reader"
+    title = "Load arbitrary data from line-delimited files"
+    description = """Loads arbitrary data from line-delimited files, applying a regular expression
+      to each line to extract fields.  If you're trying to read generic CSV or TSV files, use the CSV
+      plugin instead as it handles escaping correctly."""
+    version = VERSION
+
+    file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]
+
+    parameters = {
+        "regex": StringParam("Regular Expression", ".*"),
+        "skip": BooleanParam("Skip First Row", False),
+        "output": ArrayParam(
+            "Output Columns",
+            MultiParam(
+                "Col",
+                {
+                    "name": StringParam("Column Name"),
+                    "datatype": DataTypeChoiceParam(
+                        "Column Type",
+                        "string",
+                    ),
+                    "index": BooleanParam("Index?", False)
+                },
+            ),
+        ),
+    }
+
+    def read_file_to_dataframe(self, file_param, logger, row_limit=None):
+        pdfs = []
+
+        compiled_re = re.compile(self.parameters["regex"].value)
+
+        while compiled_re.groups > len(self.parameters["output"].params):
+            self.parameters["output"].add_row()
+        
+        output_parameters = list(self.parameters["output"])[:compiled_re.groups]
+        columns = [ p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) ]
+        index_columns = [ p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) if p.index.value ] or None
+
+        records = []
+        with open(file_param["filename"].value, "r") as fh:
+            for num, line in enumerate(fh):
+                if num == 0 and self.parameters["skip"].value: continue
+                match = compiled_re.match(line)
+                if match:
+                    records.append((
+                        output_parameters[n].datatype.cast_value(g)
+                        for n, g in enumerate(match.groups())
+                    ))
+                else:
+                    logger.warning(f"Row {num+1} did not match", detail=line)
+                if row_limit is not None:
+                    if len(records) >= row_limit or num > 100 * row_limit: break
+                elif len(records) >= 100000:
+                    pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
+                    records = []
+
+        if len(records):
+            pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
+
+        return concat_dataframes(pdfs)
+
+
+
+
+
+
+
+
+
+
+
 
 
