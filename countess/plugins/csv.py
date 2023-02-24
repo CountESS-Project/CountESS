@@ -43,6 +43,9 @@ class LoadCsvPlugin(DaskInputPlugin):
     file_types = [("CSV", "*.csv"), ("TSV", "*.tsv")]
 
     parameters = {
+        "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
+        "quoting": ChoiceParam("Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]),
+        "comment": ChoiceParam("Comment", "None", choices=["None", "#", ";"]),
         "columns": ArrayParam(
             "Columns",
             MultiParam(
@@ -58,7 +61,7 @@ class LoadCsvPlugin(DaskInputPlugin):
         "filename_column": StringParam("Filename Column", ""),
     }
 
-    def read_file_to_dataframe(self, file_param, row_limit=None):
+    def read_file_to_dataframe(self, file_param, logger, row_limit=None):
 
         filename = file_param["filename"].value
 
@@ -78,6 +81,25 @@ class LoadCsvPlugin(DaskInputPlugin):
                 if not pp["type"].is_none():
                     options["dtype"][n] = pp["type"].get_selected_type()
                     options["usecols"].append(n)
+
+        delimiter = self.parameters["delimiter"].value
+        if delimiter == 'TAB': options['delimiter'] = '\t'
+        elif delimiter == 'WHITESPACE': options['delim_whitespace'] = True
+        else: options['delimiter'] = delimiter
+
+        quoting = self.parameters["quoting"].value
+        if quoting == 'None':
+            options['quoting'] = csv.QUOTE_NONE
+        elif quoting == 'Double-Quote':
+            options['quotechar'] = '"'
+            options['doublequote'] = True
+        elif quoting == 'Quote with Escape':
+            options['quotechar'] = '"'
+            options['doublequote'] = False
+            options['escapechar'] = '\\'
+
+        comment = self.parameters["comment"].value
+        if comment != 'None': options['comment'] = comment
 
         # XXX dd.read_csv().set_index() is very very slow!
         # XXX pd.read_csv(index_col=) is half the speed of pd.read_csv().set_index()
