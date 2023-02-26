@@ -1,10 +1,10 @@
 import itertools
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from typing import Generator, Optional
 
 import dask.dataframe as dd
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -49,6 +49,7 @@ class DaskJoinPlugin(DaskBasePlugin):
 
         data_items = list(data.items())
         inputs_param = self.parameters["inputs"]
+        assert isinstance(inputs_param, ArrayParam)
 
         if len(data_items) != 2 or len(inputs_param) != 2:
             raise NotImplementedError("Only two-way joins supported right now")
@@ -68,8 +69,10 @@ class DaskJoinPlugin(DaskBasePlugin):
         row_limit: Optional[int] = None,
     ):
 
-        ip1 = self.parameters["inputs"][0]
-        ip2 = self.parameters["inputs"][1]
+        inputs_param = self.parameters["inputs"]
+        assert isinstance(inputs_param, ArrayParam)
+        ip1 = inputs_param[0]
+        ip2 = inputs_param[1]
         if ip1["required"].value:
             if ip2["required"].value:
                 join_how = "inner"
@@ -81,7 +84,7 @@ class DaskJoinPlugin(DaskBasePlugin):
             else:
                 join_how = "outer"
 
-        join_params = {
+        join_params : MutableMapping[str, str|bool] = {
             "how": join_how,
         }
         if ip1["join_on"].value == INDEX:

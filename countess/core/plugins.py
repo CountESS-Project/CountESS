@@ -301,7 +301,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
                 df = self.read_file_to_dataframe(fp, logger, per_file_row_limit)
                 dfs.append(df)
                 logger.progress("Loading", 100 * (num+1) // (num_files + 1))
-            callback(num_files, num_files + 1, "Combining")
+            logger.progress("Combining", 100 * num_files // num_files+1)
             ddf = self.combine_dfs(dfs)
             logger.progress("Done", 100)
 

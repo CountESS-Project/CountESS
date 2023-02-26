@@ -36,7 +36,7 @@ class GroupByPlugin(DaskTransformPlugin):
     def update(self):
         self.parameters["column"].choices = ["Index"] + self.input_columns
 
-    def run_dask(self, ddf: dd.DataFrame) -> dd.DataFrame:
+    def run_dask(self, ddf: dd.DataFrame, logger) -> dd.DataFrame:
         col_name = self.parameters["column"].value
         col = ddf.index if col_name == "Index" else ddf[col_name]
         oper = self.parameters["operation"].value

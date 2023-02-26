@@ -43,7 +43,7 @@ class LoadHdfPlugin(DaskInputPlugin):
                 pass
 
     def read_file_to_dataframe(
-        self, fp: MultiParam, column_suffix: str = "", row_limit: Optional[int] = None
+        self, fp: MultiParam, logger, row_limit: Optional[int] = None
     ) -> pd.DataFrame:
 
         if not fp.key.value or fp.key.value not in fp.key.choices:
@@ -58,8 +58,6 @@ class LoadHdfPlugin(DaskInputPlugin):
         with pd.HDFStore(filename) as hs:
             df = hs.select(key, start=0, stop=row_limit)
 
-        if column_suffix:
-            df.columns = (str(c) + "_" + column_suffix for c in df.columns)
         return df
 
 

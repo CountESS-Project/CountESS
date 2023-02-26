@@ -248,7 +248,7 @@ class ChoiceParam(BaseParam):
 
 class DataTypeChoiceParam(ChoiceParam):
 
-    DATA_TYPES = {
+    DATA_TYPES : Mapping[str,Optional[tuple[type, Any]]] = {
         "string": (str, None),
         "number": (float, None),
         "integer": (int, 0),

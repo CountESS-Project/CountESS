@@ -3,7 +3,7 @@ from itertools import islice
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
-from typing import Optional
+from typing import Optional, Collection
 """Utility functions for manipulating Dask DataFrames"""
 
 
@@ -27,7 +27,7 @@ def crop_dataframe(df: pd.DataFrame|dd.DataFrame, row_limit: Optional[int]) -> p
     return df
 
 
-def concat_dataframes(dfs: list[pd.DataFrame|dd.DataFrame]) -> pd.DataFrame|dd.DataFrame:
+def concat_dataframes(dfs: Collection[pd.DataFrame|dd.DataFrame]) -> pd.DataFrame|dd.DataFrame:
     """Concat dask dataframes, but include special cases for 0 and 1 inputs"""
 
     # extra special case for empty dataframes

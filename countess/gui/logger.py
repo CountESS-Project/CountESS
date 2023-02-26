@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from typing import Optional
+from typing import Optional, Mapping, MutableMapping
 
 import datetime
 
@@ -98,7 +98,7 @@ class TreeviewLogger(Logger):
         self.name = name
         self.count = 0
         self.treeview['height'] = 0
-        self.detail = {}
+        self.detail: MutableMapping[str, str] = {}
 
         self.treeview.bind('<<TreeviewSelect>>', self.on_click)
 
@@ -111,7 +111,8 @@ class TreeviewLogger(Logger):
         datetime_now = datetime.datetime.now()
         values=[self.name, message]
         iid = self.treeview.insert("", "end", text=datetime_now.isoformat(), values=values)
-        self.detail[iid] = detail
+        if detail is not None:
+            self.detail[iid] = detail
         self.treeview['height'] = min(self.count, 10)
     
     def progress(self, message: str = 'Running', percentage: Optional[int] = None):

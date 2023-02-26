@@ -145,7 +145,7 @@ class SaveCsvPlugin(DaskBasePlugin):
     def run(
         self,
         obj: Any,
-        callback: Callable[[int, int, Optional[str]], None],
+        logger,
         row_limit: Optional[int] = None,
     ):
         assert isinstance(self.parameters["filename"], StringParam)
