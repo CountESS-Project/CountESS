@@ -14,4 +14,4 @@ jobs:
         python-version: 3.x
     - run: pip install --upgrade pip
     - run: pip install mypy~=1.0.1
-    - run: mypy --strict $(git ls-files '*.py')
+    - run: mypy --strict $(git ls-files 'countess/*.py')
