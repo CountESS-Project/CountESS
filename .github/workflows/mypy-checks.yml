@@ -13,5 +13,6 @@ jobs:
       with:
         python-version: 3.x
     - run: pip install --upgrade pip
+    - run: pip install .
     - run: pip install mypy~=1.0.1
     - run: mypy $(git ls-files 'countess/*.py')
