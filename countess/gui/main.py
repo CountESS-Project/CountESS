@@ -1,26 +1,24 @@
+import math
 import random
 import re
 import sys
 import tkinter as tk
 from enum import Enum, IntFlag
-from tkinter import filedialog, messagebox, ttk
 from functools import partial
-import math
+from tkinter import filedialog, messagebox, ttk
 
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.config import (
-    export_config_graphviz,
-    read_config,
-    write_config,
-)
+from countess.core.config import (export_config_graphviz, read_config,
+                                  write_config)
+from countess.core.logger import ConsoleLogger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import get_plugin_classes
-from countess.core.logger import ConsoleLogger
 from countess.gui.config import DataFramePreview, PluginConfigurator
 from countess.gui.logger import LoggerFrame
+
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -62,7 +60,7 @@ class TkEventState(IntFlag):
     BUTTON5 = 4096
 
 
-class TkCursors:
+class TkCursors(Enum):
     HAND = "hand1"
     ARROWS = "fleur"
     PLUS = "plus"
@@ -73,8 +71,7 @@ DraggableMixinState = Enum(
 )
 
 
-class DraggableMixin:
-
+class DraggableMixin:  # pylint: disable=R0903
     __state = DraggableMixinState.READY
 
     def __init__(self, *a, **k):
@@ -111,9 +108,7 @@ class DraggableMixin:
             self.__state = self.__state.LINKING
             self.__ghost = tk.Frame(self.master)
             self.__ghost.place(self.__place())
-            self.__ghost_line = ConnectingLine(
-                self.master, self, self.__ghost, "red", True
-            )
+            self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, "red", True)
             self["cursor"] = TkCursors.PLUS
 
     def __on_motion(self, event):
@@ -131,7 +126,7 @@ class DraggableMixin:
         self["cursor"] = TkCursors.HAND
 
 
-class FixedUnbindMixin:
+class FixedUnbindMixin:  # pylint: disable=R0903
     def unbind(self, seq, funcid=None):
         # widget.unbind(seq, funcid) doesn't actually work as documented. This is
         # my own take on the horrible hacks found at https://bugs.python.org/issue31485
@@ -180,40 +175,53 @@ class ConnectingLine:
         # If there's enough room, extra control points set
         # up a nice spline, and a little extra padding
         # on the destination end to allow for the arrow head.
-        xc, yc, wc, hc = _geometry(self.canvas)
+        _xc, _yc, wc, hc = _geometry(self.canvas)
 
- 
         if wc > hc:
             if self.switch and x1 > x2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             if 0 < x2 - (x1 + w1) < 50:
                 coords = (
-                    x1 + w1, y1 + h1 // 2,
-                    x2 - 20,     y2 + h2 // 2,
-                    x2,           y2 + h2 // 2,
+                    x1 + w1,
+                    y1 + h1 // 2,
+                    x2 - 20,
+                    y2 + h2 // 2,
+                    x2,
+                    y2 + h2 // 2,
                 )
             else:
                 coords = (
-                    x1 + w1     , y1 + h1 // 2,
-                    x1 + w1 + 20, y1 + h1 // 2,
-                    x2 - 40,      y2 + h2 // 2,
-                    x2,           y2 + h2 // 2,
+                    x1 + w1,
+                    y1 + h1 // 2,
+                    x1 + w1 + 20,
+                    y1 + h1 // 2,
+                    x2 - 40,
+                    y2 + h2 // 2,
+                    x2,
+                    y2 + h2 // 2,
                 )
         else:
             if self.switch and y1 > y2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             if 0 < y2 - (y1 + h1) < 50:
                 coords = (
-                    x1 + w1 // 2, y1 + h1,
-                    x2 + w2 // 2, y2 - 20,
-                    x2 + w2 // 2, y2,
+                    x1 + w1 // 2,
+                    y1 + h1,
+                    x2 + w2 // 2,
+                    y2 - 20,
+                    x2 + w2 // 2,
+                    y2,
                 )
             else:
                 coords = (
-                    x1 + w1 // 2, y1 + h1,
-                    x1 + w1 // 2, y1 + h1 + 20,
-                    x2 + w2 // 2, y2 - 40,
-                    x2 + w2 // 2, y2,
+                    x1 + w1 // 2,
+                    y1 + h1,
+                    x1 + w1 // 2,
+                    y1 + h1 + 20,
+                    x2 + w2 // 2,
+                    y2 - 40,
+                    x2 + w2 // 2,
+                    y2,
                 )
 
         if self.line:
@@ -293,12 +301,12 @@ class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
 class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Label):
     pass
 
+
 class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
     pass
 
 
 class GraphWrapper:
-
     selected_node = None
     highlight_rectangle = None
 
@@ -307,14 +315,12 @@ class GraphWrapper:
         self.graph = graph
         self.node_select_callback = node_select_callback
 
-        self.labels = dict([(node, self.label_for_node(node)) for node in graph.nodes])
-        self.lines = dict([(node, self.lines_for_node(node)) for node in graph.nodes])
+        self.labels = dict((node, self.label_for_node(node)) for node in graph.nodes)
+        self.lines = dict((node, self.lines_for_node(node)) for node in graph.nodes)
         self.lines_lookup = dict(
-            [
                 (connecting_line.line, (connecting_line, child_node, parent_node))
                 for child_node, lines_for_child in self.lines.items()
                 for parent_node, connecting_line in lines_for_child.items()
-            ]
         )
 
         self.canvas.bind("<Button-1>", self.on_canvas_button1)
@@ -330,13 +336,9 @@ class GraphWrapper:
             node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
         # XXX should be more elegant way of answering the question "are we flipped?"
         if self.canvas.winfo_width() >= self.canvas.winfo_height():
-            label.place(
-                {"relx": node.position[0], "rely": node.position[1], "anchor": "c"}
-            )
+            label.place({"relx": node.position[0], "rely": node.position[1], "anchor": "c"})
         else:
-            label.place(
-                {"relx": node.position[1], "rely": node.position[0], "anchor": "c"}
-            )
+            label.place({"relx": node.position[1], "rely": node.position[0], "anchor": "c"})
 
         label.bind("<Button-1>", partial(self.on_mousedown, node), add=True)
         label.bind("<Configure>", partial(self.on_configure, node), add=True)
@@ -351,9 +353,7 @@ class GraphWrapper:
         return dict(
             (
                 parent_node,
-                ConnectingLine(
-                    self.canvas, self.labels[parent_node], self.labels[node]
-                ),
+                ConnectingLine(self.canvas, self.labels[parent_node], self.labels[node]),
             )
             for parent_node in node.parent_nodes
         )
@@ -387,22 +387,26 @@ class GraphWrapper:
 
         # Adapt label sizes to suit the window size, as best we can ...
         label_max_width = max(width // 10, 25)
-        label_font_size = int(math.sqrt(width)/math.pi)
+        label_font_size = int(math.sqrt(width) / math.pi)
         for label in self.labels.values():
-            label['wraplength'] = label_max_width
-            label['font'] = ('TkDefaultFont', label_font_size)
+            label["wraplength"] = label_max_width
+            label["font"] = ("TkDefaultFont", label_font_size)
 
     def on_enter(self, node, event):
         """Mouse has entered a label"""
         # don't outline labels while dragging
-        if event.state & TkEventState.BUTTON1: return
+        if event.state & TkEventState.BUTTON1:
+            return
         self.labels[node].focus()
         # hide any highlighted lines
         self.on_canvas_leave(event)
         x, y, w, h = _geometry(self.labels[node])
-        if self.highlight_rectangle: self.canvas.delete(self.highlight_rectangle)
-        self.highlight_rectangle = self.canvas.create_rectangle(x-3,y-3,x+w+3,y+h+3, fill="red", width=0)
-        
+        if self.highlight_rectangle:
+            self.canvas.delete(self.highlight_rectangle)
+        self.highlight_rectangle = self.canvas.create_rectangle(
+            x - 3, y - 3, x + w + 3, y + h + 3, fill="red", width=0
+        )
+
     def on_leave(self, node, event):
         if self.highlight_rectangle is not None:
             self.canvas.delete(self.highlight_rectangle)
@@ -410,9 +414,7 @@ class GraphWrapper:
 
     def on_canvas_motion(self, event):
         """Show a preview of line selection when the cursor is over line(s)"""
-        items = self.canvas.find_overlapping(
-            event.x - 10, event.y - 10, event.x + 10, event.y + 10
-        )
+        items = self.canvas.find_overlapping(event.x - 10, event.y - 10, event.x + 10, event.y + 10)
         for connecting_line, _, _ in self.lines_lookup.values():
             color = "red" if connecting_line.line in items else "black"
             self.canvas.itemconfig(connecting_line.line, fill=color)
@@ -427,16 +429,15 @@ class GraphWrapper:
         """Click to create a new node, if it is created on top of a line
         that line is broken and the node is included."""
 
-        items = self.canvas.find_overlapping(
-            event.x - 10, event.y - 10, event.x + 10, event.y + 10
-        )
+        items = self.canvas.find_overlapping(event.x - 10, event.y - 10, event.x + 10, event.y + 10)
 
         # XXX creating a new node every time you click on the background
         # is proving quite annoying.  Lets see how it is to go without it.
-        # (you can still create a new node by button-3-dragging from an 
+        # (you can still create a new node by button-3-dragging from an
         # existing node, and if you really want a disconnected graph you can
         # delete the link to the new node!)
-        if not items: return
+        if not items:
+            return
 
         position = (
             event.x / self.canvas.winfo_width(),
@@ -445,19 +446,17 @@ class GraphWrapper:
         new_node = self.add_new_node(position)
 
         for item in items:
-            connecting_line, child_node, parent_node = self.lines_lookup[item]
+            _, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
             self.add_parent(new_node, child_node)
             self.add_parent(parent_node, new_node)
 
     def on_canvas_button3(self, event):
         """Button3 on canvas: delete line(s)."""
-        items = self.canvas.find_overlapping(
-            event.x - 10, event.y - 10, event.x + 10, event.y + 10
-        )
-        
+        items = self.canvas.find_overlapping(event.x - 10, event.y - 10, event.x + 10, event.y + 10)
+
         for item in items:
-            connecting_line, child_node, parent_node = self.lines_lookup[item]
+            _, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
 
     def on_delete(self, node, event):
@@ -490,7 +489,13 @@ class GraphWrapper:
             self.add_new_node(select=True)
         elif node == self.selected_node:
             # arbitrarily pick another node to show
-            new_node = parent_nodes[0] if parent_nodes else child_nodes[0] if child_nodes else list(self.graph.nodes)[0]
+            new_node = (
+                parent_nodes[0]
+                if parent_nodes
+                else child_nodes[0]
+                if child_nodes
+                else list(self.graph.nodes)[0]
+            )
             self.highlight_node(new_node)
             self.node_select_callback(new_node)
 
@@ -499,11 +504,10 @@ class GraphWrapper:
             nx, ny, nw, nh = _geometry(label)
             if (nx <= x <= nx + nw) and (ny <= y <= ny + nh):
                 return node
+        return None
 
     def add_new_node(self, position=(0.5, 0.5), select=True):
-        new_node = PipelineNode(
-            name=f"NEW {len(self.graph.nodes)+1}", position=position
-        )
+        new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
         self.graph.add_node(new_node)
         self.labels[new_node] = self.label_for_node(new_node)
         self.lines[new_node] = {}
@@ -513,7 +517,7 @@ class GraphWrapper:
         return new_node
 
     def on_ghost_release(self, start_node, event):
-        xl, yl, wl, hl = _geometry(event.widget)
+        xl, yl, _wl, _hl = _geometry(event.widget)
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
             position = (event.x + xl) / self.canvas.winfo_width(), (
@@ -567,7 +571,7 @@ class GraphWrapper:
     def node_changed(self, node):
         """Called when something external updates the node's name, status
         or configuration."""
-        self.labels[node]['text'] = node.name
+        self.labels[node]["text"] = node.name
 
     def destroy(self):
         for node_lines in self.lines.values():
@@ -591,9 +595,9 @@ class ConfiguratorWrapper:
         self.change_callback = change_callback
 
         self.name_var = tk.StringVar(self.frame, value=node.name)
-        tk.Entry(
-            self.frame, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")
-        ).grid(row=0, sticky=tk.EW, padx=10, pady=5)
+        tk.Entry(self.frame, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")).grid(
+            row=0, sticky=tk.EW, padx=10, pady=5
+        )
         self.name_var.trace("w", self.name_changed_callback)
 
         self.logger_subframe = LoggerFrame(self.frame)
@@ -663,20 +667,23 @@ class ConfiguratorWrapper:
         self.node.is_dirty = True
         self.show_config_subframe()
         if self.node.name.startswith("NEW "):
-            self.node.name = self.node.plugin.name + self.node.name.removeprefix("NEW") 
+            self.node.name = self.node.plugin.name + self.node.name.removeprefix("NEW")
             self.name_var.set(self.node.name)
         self.change_callback(self.node)
 
 
-class ButtonMenu:
+class ButtonMenu:  # pylint: disable=R0903
     def __init__(self, tk_parent, buttons, label):
         self.frame = tk.Frame(tk_parent)
         for button_number, (button_label, button_command) in enumerate(buttons):
             tk.Button(self.frame, text=button_label, command=button_command).grid(
                 row=0, column=button_number, sticky=tk.EW
             )
-        tk.Label(self.frame, text=label, font=("TkHeadingFont", 14, "bold")).grid(row=0, column=button_number+1, sticky=tk.E)
-        self.frame.columnconfigure(button_number+1, weight=1)
+
+        tk.Label(self.frame, text=label, font=("TkHeadingFont", 14, "bold")).grid(
+            row=0, column=len(buttons), sticky=tk.E
+        )
+        self.frame.columnconfigure(len(buttons), weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
 
@@ -702,7 +709,7 @@ class MainWindow:
                 ("Run", self.program_run),
                 ("Exit", self.program_exit),
             ],
-            f"CountESS {VERSION}"
+            f"CountESS {VERSION}",
         )
 
         self.frame = tk.Frame(tk_parent)
@@ -718,17 +725,15 @@ class MainWindow:
 
         self.frame.bind("<Configure>", self.on_frame_configure, add=True)
 
-
         if config_filename:
             self.config_load(config_filename)
         else:
             self.config_new()
 
-
     def config_new(self):
         if self.config_changed:
             if not messagebox.askokcancel("Clear Config", "Clear unsaved config?"):
-               return
+                return
         self.config_changed = False
         self.config_filename = None
         if self.graph_wrapper:
@@ -739,9 +744,7 @@ class MainWindow:
 
     def config_load(self, filename=None):
         if not filename:
-            filename = filedialog.askopenfilename(
-                filetypes=[(".INI Config File", "*.ini")]
-            )
+            filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
         if not filename:
             return
         self.config_filename = filename
@@ -760,7 +763,7 @@ class MainWindow:
         if not filename:
             return
         write_config(self.graph, filename)
-        self.config_changed=False
+        self.config_changed = False
 
     def config_export(self, filename=None):
         if not filename:
@@ -774,15 +777,16 @@ class MainWindow:
         if not filename:
             return
         export_config_graphviz(self.graph, filename)
-        pass
 
     def program_run(self):
         # XXX should be handled in a different thread
-        self.graph.run()
+        logger = ConsoleLogger()
+        self.graph.run(logger)
 
     def program_exit(self):
-        if not self.config_changed or \
-                messagebox.askokcancel("Exit", "Exit CountESS without saving config?"):
+        if not self.config_changed or messagebox.askokcancel(
+            "Exit", "Exit CountESS without saving config?"
+        ):
             self.tk_parent.quit()
 
     def node_select(self, node):
@@ -790,10 +794,9 @@ class MainWindow:
             widget.destroy()
         if node:
             ConfiguratorWrapper(self.subframe, node, self.node_changed)
-            
 
     def node_changed(self, node):
-        self.config_changed=True
+        self.config_changed = True
         self.graph_wrapper.node_changed(node)
 
     def on_frame_configure(self, event):
@@ -810,7 +813,7 @@ class MainWindow:
 
 def main():
     try:
-        import ttkthemes  # type:ignore
+        import ttkthemes  # type:ignore pylint: disable=C0415
 
         root = ttkthemes.ThemedTk()
         themes = set(root.get_themes())
@@ -818,7 +821,7 @@ def main():
             if t in themes:
                 root.set_theme(t)
     except ImportError:
-        root = tk.root()
+        root = tk.Tk()
         # XXX some kind of ttk style setup goes here as a fallback
 
     # Set up treeview font and row heights.

@@ -68,7 +68,7 @@ class BooleanParam(SimpleParam):
     _value: bool = False
 
     def clean_value(self, value):
-        if type(value) is str:
+        if isinstance(value, str):
             if value in ("true", "True", "1"):
                 return True
             if value in ("false", "False", "0"):
@@ -178,9 +178,7 @@ class FileParam(StringParam):
             return value
 
     def copy(self):
-        return self.__class__(
-            self.label, self.value, self.read_only, file_types=self.file_types
-        )
+        return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
 
     def get_hash_value(self) -> str:
         # For reproducability, we don't actually care about the filename, just
@@ -191,12 +189,9 @@ class FileParam(StringParam):
 
 
 class FileSaveParam(StringParam):
-
     file_types = [("Any", "*")]
 
-    def __init__(
-        self, label: str, value=None, read_only: bool = False, file_types=None
-    ):
+    def __init__(self, label: str, value=None, read_only: bool = False, file_types=None):
         super().__init__(label, value, read_only)
         if file_types is not None:
             self.file_types = file_types
@@ -247,30 +242,36 @@ class ChoiceParam(BaseParam):
 
 
 class DataTypeChoiceParam(ChoiceParam):
-
-    DATA_TYPES : Mapping[str,Optional[tuple[type, Any]]] = {
+    DATA_TYPES: Mapping[str, Optional[tuple[type, Any]]] = {
         "string": (str, None),
         "number": (float, None),
         "integer": (int, 0),
         "boolean": (bool, None),
     }
 
-    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
-        if not choices: choices = list(self.DATA_TYPES.keys())
+    def __init__(
+        self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
+    ):
+        if not choices:
+            choices = list(self.DATA_TYPES.keys())
         super().__init__(label, value, choices)
 
     def get_selected_type(self):
-        if self.value is None: return None
-        else: return self.DATA_TYPES[self.value][0]
+        if self.value is None:
+            return None
+        else:
+            return self.DATA_TYPES[self.value][0]
 
     def cast_value(self, value):
-        if self.value is None: return None
-        if value is None: return self.DATA_TYPES[self.value][1]
-        else: return self.DATA_TYPES[self.value][0](value)
+        if self.value is None:
+            return None
+        if value is None:
+            return self.DATA_TYPES[self.value][1]
+        else:
+            return self.DATA_TYPES[self.value][0](value)
 
 
 class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
-
     NONE_VALUE = "— NONE —"
 
     DATA_TYPES = {
@@ -281,18 +282,26 @@ class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
         NONE_VALUE: None,
     }
 
-    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
-        if not choices: choices = list(self.DATA_TYPES.keys())
-        if value is None: value = self.NONE_VALUE
+    def __init__(
+        self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
+    ):
+        if not choices:
+            choices = list(self.DATA_TYPES.keys())
+        if value is None:
+            value = self.NONE_VALUE
         super().__init__(label, value, choices)
 
     def get_selected_type(self):
-        if self.value == self.NONE_VALUE: return None
-        else: return super().get_selected_type()
+        if self.value == self.NONE_VALUE:
+            return None
+        else:
+            return super().get_selected_type()
 
     def cast_value(self, value):
-        if self.value == self.NONE_VALUE: return None
-        else: return super().cast_value(value)
+        if self.value == self.NONE_VALUE:
+            return None
+        else:
+            return super().cast_value(value)
 
     def is_none(self):
         return self.value == self.NONE_VALUE
@@ -301,12 +310,10 @@ class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
-    pass
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
-
-    INDEX_VALUE = '— INDEX —'
+    INDEX_VALUE = "— INDEX —"
 
     def set_choices(self, choices: Iterable[str]):
         super().set_choices([self.INDEX_VALUE] + list(choices))
@@ -314,15 +321,16 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     def is_index(self):
         return self.value == self.INDEX_VALUE
 
-class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
-    NONE_VALUE = '— NONE —'
+class ColumnOrNoneChoiceParam(ColumnChoiceParam):
+    NONE_VALUE = "— NONE —"
 
     def set_choices(self, choices: Iterable[str]):
         super().set_choices([self.NONE_VALUE] + list(choices))
 
     def is_none(self):
         return self.value == self.NONE_VALUE
+
 
 class ArrayParam(BaseParam):
     """An ArrayParam contains zero or more copies of `param`, which can be a
@@ -358,6 +366,7 @@ class ArrayParam(BaseParam):
             self.params.append(pp)
             self.relabel()
             return pp
+        return None
 
     def del_row(self, position: int):
         assert 0 <= position < len(self.params)
@@ -376,9 +385,7 @@ class ArrayParam(BaseParam):
             param.label = self.param.label + f" {n+1}"
 
     def copy(self) -> "ArrayParam":
-        return self.__class__(
-            self.label, self.param, self.read_only, self.min_size, self.max_size
-        )
+        return self.__class__(self.label, self.param, self.read_only, self.min_size, self.max_size)
 
     def __len__(self):
         return len(self.params)
@@ -400,11 +407,10 @@ class ArrayParam(BaseParam):
 
     @value.setter
     def value(self, value):
-
         # if setting to a dictionary, keep only the values in order
         # and forget about the numbering.
 
-        if type(value) is dict:
+        if isinstance(value, dict):
             values = sorted([(int(k), v) for k, v in value.items()])
             value = [v[1] for v in values]
 
@@ -453,7 +459,6 @@ class FileArrayParam(ArrayParam):
 
 
 class MultiParam(BaseParam):
-
     params: Mapping[str, BaseParam] = {}
 
     def __init__(self, label: str, params: Mapping[str, BaseParam]):
@@ -479,8 +484,8 @@ class MultiParam(BaseParam):
     def __getattr__(self, name):
         try:
             return self.params[name]
-        except KeyError:
-            raise AttributeError(name=name, obj=self)
+        except KeyError as exc:
+            raise AttributeError(name=name, obj=self) from exc
 
     def __contains__(self, item):
         return item in self.params

@@ -2,12 +2,12 @@ import ast
 import re
 import sys
 from configparser import ConfigParser
-from functools import partial
-from typing import Callable, Iterable
+from typing import Iterable
 
+from countess.core.logger import ConsoleLogger, Logger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import load_plugin
-from countess.core.logger import Logger, ConsoleLogger
+
 
 def default_progress_callback(n, a, b, s=""):
     print(f"{n:40s} {a:4d}/{b:4d} {s}")
@@ -89,28 +89,28 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     for node in pipeline_graph.traverse_nodes():
         cp.add_section(node.name)
         if node.plugin:
-            cp[node.name].update({
-                "_module": node.plugin.__module__,
-                "_class": node.plugin.__class__.__name__,
-                "_version": node.plugin.version,
-                "_hash": node.plugin.hash(),
-            })
-        if node.position:
-            cp[node.name]['_position'] = " ".join(
-                str(int(x * 1000)) for x in node.position
+            cp[node.name].update(
+                {
+                    "_module": node.plugin.__module__,
+                    "_class": node.plugin.__class__.__name__,
+                    "_version": node.plugin.version,
+                    "_hash": node.plugin.hash(),
+                }
             )
+        if node.position:
+            cp[node.name]["_position"] = " ".join(str(int(x * 1000)) for x in node.position)
         for n, parent in enumerate(node.parent_nodes):
-            cp[node.name][f'_parent.{n}'] = parent.name
+            cp[node.name][f"_parent.{n}"] = parent.name
         if node.plugin:
             for k, v in node.plugin.get_parameters():
                 cp[node.name][k] = repr(v)
 
-    with open(filename, "w") as fh:
+    with open(filename, "w", encoding="utf-8") as fh:
         cp.write(fh)
 
 
 def export_config_graphviz(pipeline_graph: PipelineGraph, filename: str):
-    with open(filename, "w") as fh:
+    with open(filename, "w", encoding="utf-8") as fh:
         fh.write("digraph {\n")
         for node in pipeline_graph.traverse_nodes():
             label = node.name.replace('"', r"\"")

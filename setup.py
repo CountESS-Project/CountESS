@@ -1,8 +1,13 @@
-from setuptools import setup
+"""CountESS Project"""
+
 from pathlib import Path
-long_description = (Path(__file__).parent / "README.md").read_text()
+
+from setuptools import setup
 
 from countess import VERSION
+
+long_description = (Path(__file__).parent / "README.md").read_text()
+
 
 setup(
         name = 'countess',
@@ -10,7 +15,8 @@ setup(
         author = 'CountESS Developers',
         maintainer = 'Nick Moore',
         maintainer_email = 'nick@zoic.org',
-        packages = [ 'countess', 'countess.utils', 'countess.plugins', 'countess.core', 'countess.gui' ],
+        packages = [ 'countess', 'countess.utils', 'countess.plugins', 'countess.core',
+                    'countess.gui' ],
         entry_points = {
             'countess_plugins': [
                 'load_fastq = countess.plugins.fastq:LoadFastqPlugin',
@@ -38,6 +44,13 @@ setup(
             'tables~=3.7',
             'ttkthemes~=3.2',
         ],
+        extras_require = {
+            'dev': [
+                'black<24',
+                'mypy~=1.01',
+                'pylint~=2.16',
+            ]
+        },
         license = 'BSD',
         license_files = ('LICENSE.txt',),
         classifiers = [
@@ -50,4 +63,3 @@ setup(
         long_description = long_description,
         long_description_content_type = "text/markdown",
 )
-

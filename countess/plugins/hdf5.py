@@ -5,20 +5,13 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import (
-    BaseParam,
-    ChoiceParam,
-    FileArrayParam,
-    FileParam,
-    MultiParam,
-    StringParam,
-)
+from countess.core.parameters import (BaseParam, ChoiceParam, FileArrayParam,
+                                      FileParam, MultiParam, StringParam)
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 from countess.utils.dask import empty_dask_dataframe
 
 
 class LoadHdfPlugin(DaskInputPlugin):
-
     name = "HDF5 Load"
     title = "Load from HDF5"
     description = "Loads counts from HDF5 files"
@@ -45,7 +38,6 @@ class LoadHdfPlugin(DaskInputPlugin):
     def read_file_to_dataframe(
         self, fp: MultiParam, logger, row_limit: Optional[int] = None
     ) -> pd.DataFrame:
-
         if not fp.key.value or fp.key.value not in fp.key.choices:
             with pd.HDFStore(fp.filename.value) as hs:
                 fp.key.choices = sorted(hs.keys())
@@ -62,7 +54,6 @@ class LoadHdfPlugin(DaskInputPlugin):
 
 
 class StoreHdfPlugin(DaskBasePlugin):
-
     name = "HDF Writer"
     title = "HDF Writer"
     description = "Write to HDF5"

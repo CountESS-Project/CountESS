@@ -1,29 +1,18 @@
 # TK based GUI for CountESS
 import math
 import tkinter as tk
-import tkinter.ttk as ttk
 from functools import partial
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from typing import Mapping, Optional
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd  # type: ignore
 
-from ..core.parameters import (
-    ArrayParam,
-    BaseParam,
-    BooleanParam,
-    ChoiceParam,
-    FileArrayParam,
-    FileParam,
-    FileSaveParam,
-    FloatParam,
-    IntegerParam,
-    MultiParam,
-    SimpleParam,
-    TextParam,
-)
+from ..core.parameters import (ArrayParam, BaseParam, BooleanParam,
+                               ChoiceParam, FileArrayParam, FileParam,
+                               FileSaveParam, FloatParam, IntegerParam,
+                               MultiParam, SimpleParam, TextParam)
 from ..core.plugins import BasePlugin
 from ..utils.dask import crop_dataframe
 
@@ -34,18 +23,17 @@ UNICODE_PLUS = "\u2795"
 
 
 def is_nan(v):
-    return v is None or v is np.nan or (type(v) is float and math.isnan(v))
+    return v is None or v is np.nan or (isinstance(v, float) and math.isnan(v))
 
 
 class ParameterWrapper:
-
     # XXX it would probably be better to have ParameterWrapper classes per Parameter class
     # given the ridiculous amount of if/elif going on in here.
 
     # XXX actually refactoring this whole mess of nested wrappers into a single TreeviewEditor
     # might make more sense (now I've worked out how to make a TreeviewEditor)
 
-    def __init__(
+    def __init__(  # pylint: disable=R0912,R0915
         self,
         tk_parent: tk.Widget,
         parameter: BaseParam,
@@ -53,7 +41,6 @@ class ParameterWrapper:
         delete_callback=None,
         level=0,
     ):
-
         self.parameter = parameter
         self.callback = callback
         self.button = None
@@ -77,9 +64,7 @@ class ParameterWrapper:
             self.entry["values"] = parameter.choices
             self.entry.state(["readonly"])
         elif isinstance(parameter, BooleanParam):
-            self.entry = tk.Button(
-                tk_parent, width=2, command=self.toggle_checkbox_callback
-            )
+            self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value(parameter.value)
         elif isinstance(parameter, FileParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
@@ -122,12 +107,8 @@ class ParameterWrapper:
 
         elif isinstance(parameter, ArrayParam) and self.level < 3:
             label_frame_label = tk.Frame(tk_parent)
-            tk.Label(label_frame_label, text=parameter.label).grid(
-                row=0, column=0, padx=5
-            )
-            self.entry = tk.LabelFrame(
-                tk_parent, labelwidget=label_frame_label, padx=10, pady=5
-            )
+            tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
+            self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
             self.button = tk.Button(
                 label_frame_label,
                 text=UNICODE_PLUS,
@@ -139,9 +120,7 @@ class ParameterWrapper:
             drc = self.delete_row_callback if not parameter.read_only else None
             if isinstance(parameter.param, MultiParam):
                 for n, pp in enumerate(parameter.param.values()):
-                    tk.Label(self.entry, text=pp.label).grid(
-                        row=0, column=n, sticky=tk.EW, padx=10
-                    )
+                    tk.Label(self.entry, text=pp.label).grid(row=0, column=n, sticky=tk.EW, padx=10)
                     self.entry.columnconfigure(n, weight=1)
 
                 self.update_subwrappers_tabular(parameter.params, drc)
@@ -188,11 +167,8 @@ class ParameterWrapper:
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def update(self):
-
         if isinstance(self.parameter, ArrayParam) and self.level == 0:
-            self.update_subwrappers_framed(
-                self.parameter.params, self.delete_row_callback
-            )
+            self.update_subwrappers_framed(self.parameter.params, self.delete_row_callback)
             if self.button:
                 self.button.grid(row=len(self.parameter.params) + 1, padx=10)
         elif (
@@ -200,11 +176,8 @@ class ParameterWrapper:
             and isinstance(self.parameter.param, MultiParam)
             and self.level < 3
         ):
-            self.update_subwrappers_tabular(
-                self.parameter.params, self.delete_row_callback
-            )
+            self.update_subwrappers_tabular(self.parameter.params, self.delete_row_callback)
         elif isinstance(self.parameter, ArrayParam):
-
             self.update_subwrappers(self.parameter.params, self.delete_row_callback)
             if self.button:
                 self.button["state"] = (
@@ -229,7 +202,6 @@ class ParameterWrapper:
                 pw.destroy()
 
     def update_subwrappers(self, params, delete_row_callback):
-
         for n, p in enumerate(params):
             if p in self.subwrappers:
                 self.subwrappers[p].update()
@@ -250,7 +222,8 @@ class ParameterWrapper:
             self.subwrapper_buttons.pop().destroy()
 
         for n, p in enumerate(params):
-            for m, pp in enumerate(p.params.values()):
+            subparams = p.params.values()
+            for m, pp in enumerate(subparams):
                 if pp in self.subwrappers:
                     self.subwrappers[pp].update()
                 else:
@@ -261,7 +234,7 @@ class ParameterWrapper:
                         delete_row_callback,
                         level=self.level + 1,
                     )
-                self.subwrappers[pp].entry.grid(row=n + 1, column=m, padx=10)
+                self.subwrappers[pp].entry.grid(row=len(subparams), column=m, padx=10)
             if delete_row_callback:
                 button = tk.Button(
                     self.entry,
@@ -269,27 +242,24 @@ class ParameterWrapper:
                     width=2,
                     command=partial(delete_row_callback, self, n),
                 )
-                button.grid(row=n + 1, column=m + 1, padx=10)
+                button.grid(row=n + 1, column=len(subparams), padx=10)
                 self.subwrapper_buttons.append(button)
 
         self.cull_subwrappers([pp for p in params for pp in p.params.values()])
 
     def update_subwrappers_framed(self, params, delete_row_callback):
-
         for n, p in enumerate(params):
             if p in self.subwrappers:
                 self.subwrappers[p].update()
             else:
                 label_frame_label = tk.Frame(self.entry)
                 tk.Label(label_frame_label, text=p.label).grid(row=0, column=0, padx=10)
-                label_frame = tk.LabelFrame(
-                    self.entry, labelwidget=label_frame_label, padx=10
-                )
+                label_frame = tk.LabelFrame(self.entry, labelwidget=label_frame_label, padx=10)
                 label_frame.grid(sticky=tk.NSEW, padx=10)
                 label_frame.columnconfigure(0, weight=1)
 
-                def _command_drc():
-                    delete_row_callback(self.subwrappers[p])
+                def _command_drc(param, label_frame):
+                    delete_row_callback(self.subwrappers[param])
                     label_frame.destroy()
 
                 self.subwrappers[p] = ParameterWrapper(
@@ -304,7 +274,7 @@ class ParameterWrapper:
                         label_frame_label,
                         text=UNICODE_CROSS,
                         width=2,
-                        command=_command_drc,
+                        command=partial(_command_drc, p, label_frame),
                     )
                     button.grid(row=0, column=1, padx=10)
 
@@ -399,7 +369,6 @@ class ParameterWrapper:
 
 
 class PluginConfigurator:
-
     output_text = None
     preview = None
 
@@ -413,12 +382,6 @@ class PluginConfigurator:
 
         self.wrapper_cache: Mapping[str, ParameterWrapper] = {}
 
-        # tk.Label(self.frame, text=plugin.title).grid(row=0, sticky=tk.EW)
-
-        # self.name_var = tk.StringVar(self.frame, value=self.plugin.name)
-        # tk.Entry(self.frame, textvariable=self.name_var, font=('Helvetica', 16, 'bold')).grid(row=0, sticky=tk.EW)
-        # self.name_var.trace("w", self.name_changed_callback)
-
         self.subframe = ttk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=0)
         self.subframe.columnconfigure(1, weight=0)
@@ -427,11 +390,6 @@ class PluginConfigurator:
 
         self.update()
 
-    def name_changed_callback(self, *_):
-        self.plugin.name = self.name_var.get()
-        if self.change_callback:
-            self.change_callback(self)
-
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
         self.update()
@@ -439,7 +397,6 @@ class PluginConfigurator:
             self.change_callback(self)
 
     def update(self):
-
         # If there's only a single parameter it is presented a little differently.
         top_level = 0 if len(self.plugin.parameters) == 1 else 1
 
@@ -460,7 +417,6 @@ class PluginConfigurator:
                 del self.wrapper_cache[key]
 
     def set_output(self, output):
-
         if output is not None:
             if self.output_text is None:
                 self.output_text = tk.Text(self.frame, height=10)
@@ -476,7 +432,7 @@ class PluginConfigurator:
             self.output_text = None
 
     def set_result(self, result):
-        if type(result) is list:
+        if isinstance(result, list):
             result = result[0]
         if isinstance(result, (dd.DataFrame, pd.DataFrame)):
             if self.preview:
@@ -525,7 +481,6 @@ class DataFramePreview:
             self.update(ddf)
 
     def update(self, ddf: dd.DataFrame):
-
         if len(ddf) > 1000:
             self.label["text"] = f"DataFrame Preview (1000 rows out of {len(ddf)})"
             ddf = crop_dataframe(ddf, 1000)
@@ -534,7 +489,7 @@ class DataFramePreview:
 
         # XXX could handle multiindex columns more elegantly than this
         # (but maybe not in a ttk.Treeview)
-        column_names = [".".join(c) if type(c) is tuple else c for c in ddf.columns]
+        column_names = [".".join(c) if isinstance(c, tuple) else c for c in ddf.columns]
         column_types = [dt.kind for dt in ddf.dtypes]
 
         self.treeview["columns"] = column_names
@@ -547,7 +502,8 @@ class DataFramePreview:
             anchor = tk.E if ct in ("i", "f") else tk.W
             # XXX type signature appears to be wrong, or at least overly restrictive.
             # I think I'm going to replace treeview anyway so I'm ignoring it for now.
-            self.treeview.column(n, anchor=anchor, width=100, minwidth=100, stretch=tk.YES)  # type: ignore
+            self.treeview.column(n, anchor=anchor, width=100,
+                                 minwidth=100, stretch=tk.YES)  # type: ignore
 
         for row in self.treeview.get_children():
             self.treeview.delete(row)

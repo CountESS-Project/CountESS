@@ -2,6 +2,7 @@ import sys
 import time
 
 from .config import read_config
+from .logger import ConsoleLogger
 
 # import dask
 # dask.config.set(scheduler='processes')
@@ -22,12 +23,14 @@ def output_callback(output):
 
 
 def process_ini(config_filename):
+
+    logger = ConsoleLogger()
+
     graph = read_config(
         config_filename,
-        progress_callback=progress_callback,
-        output_callback=output_callback,
+        logger = logger,
     )
-    graph.run(progress_callback, output_callback)
+    graph.run(logger)
 
 
 def main():

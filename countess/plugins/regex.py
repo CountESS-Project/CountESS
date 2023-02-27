@@ -8,11 +8,11 @@ import pandas as pd  # type: ignore
 
 from countess import VERSION
 from countess.core.parameters import *
-from countess.core.plugins import DaskTransformPlugin, DaskInputPlugin
+from countess.core.plugins import DaskInputPlugin, DaskTransformPlugin
 from countess.utils.dask import concat_dataframes
 
-class RegexToolPlugin(DaskTransformPlugin):
 
+class RegexToolPlugin(DaskTransformPlugin):
     name = "Regex Tool"
     title = "Apply regular expressions to column(s) to make new column(s)"
     description = """..."""
@@ -46,21 +46,19 @@ class RegexToolPlugin(DaskTransformPlugin):
     }
 
     def run_dask(self, df, logger):
-
-        # prevent added columns from propagating backwards in 
+        # prevent added columns from propagating backwards in
         # the pipeline!
         df = df.copy()
 
         # the index doesn't seem to be available from within the applied function,
         # which is annoying, so we copy it into a column here.
         if any(rp["column"].is_index() for rp in self.parameters["regexes"]):
-            df['__index'] = df.index
+            df["__index"] = df.index
 
         # XXX this could be made more efficient by running
         # multiple regexs in one 'apply' pass.
 
         for regex_parameter in self.parameters["regexes"]:
-
             compiled_re = re.compile(regex_parameter["regex"].value)
 
             while compiled_re.groups > len(regex_parameter["output"].params):
@@ -71,7 +69,7 @@ class RegexToolPlugin(DaskTransformPlugin):
             output_types = [pp["datatype"].get_selected_type() for pp in output_params]
 
             if regex_parameter["column"].is_index():
-                column_name = '__index'
+                column_name = "__index"
             else:
                 column_name = regex_parameter["column"].value
 
@@ -99,11 +97,10 @@ class RegexToolPlugin(DaskTransformPlugin):
                 df[output_names[n]] = re_groups_df[n]
 
         drop_columns = set(
-            rp["column"].value
-            for rp in self.parameters["regexes"]
-            if rp["drop_column"].value
+            rp["column"].value for rp in self.parameters["regexes"] if rp["drop_column"].value
         )
-        if '__index__' in df: drop_columns.add('__index')
+        if "__index__" in df:
+            drop_columns.add("__index")
 
         return df.drop(columns=drop_columns)
 
@@ -131,7 +128,7 @@ class RegexReaderPlugin(DaskInputPlugin):
                         "Column Type",
                         "string",
                     ),
-                    "index": BooleanParam("Index?", False)
+                    "index": BooleanParam("Index?", False),
                 },
             ),
         ),
@@ -144,43 +141,40 @@ class RegexReaderPlugin(DaskInputPlugin):
 
         while compiled_re.groups > len(self.parameters["output"].params):
             self.parameters["output"].add_row()
-        
-        output_parameters = list(self.parameters["output"])[:compiled_re.groups]
-        columns = [ p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) ]
-        index_columns = [ p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) if p.index.value ] or None
+
+        output_parameters = list(self.parameters["output"])[: compiled_re.groups]
+        columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
+        index_columns = [
+            p.name.value or f"column_{n+1}"
+            for n, p in enumerate(output_parameters)
+            if p.index.value
+        ] or None
 
         records = []
         with open(file_param["filename"].value, "r") as fh:
             for num, line in enumerate(fh):
-                if num == 0 and self.parameters["skip"].value: continue
+                if num == 0 and self.parameters["skip"].value:
+                    continue
                 match = compiled_re.match(line)
                 if match:
-                    records.append((
-                        output_parameters[n].datatype.cast_value(g)
-                        for n, g in enumerate(match.groups())
-                    ))
+                    records.append(
+                        (
+                            output_parameters[n].datatype.cast_value(g)
+                            for n, g in enumerate(match.groups())
+                        )
+                    )
                 else:
                     logger.warning(f"Row {num+1} did not match", detail=line)
                 if row_limit is not None:
-                    if len(records) >= row_limit or num > 100 * row_limit: break
+                    if len(records) >= row_limit or num > 100 * row_limit:
+                        break
                 elif len(records) >= 100000:
-                    pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
+                    pdfs.append(
+                        pd.DataFrame.from_records(records, columns=columns, index=index_columns)
+                    )
                     records = []
 
         if len(records):
             pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
 
         return concat_dataframes(pdfs)
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,10 +1,9 @@
 import traceback
 from dataclasses import dataclass, field
-from functools import partial
 from typing import Any, Optional
 
+from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, get_plugin_classes
-from countess.core.logger import Logger, ConsoleLogger
 
 PRERUN_ROW_LIMIT = 10000
 
@@ -38,20 +37,18 @@ class PipelineNode:
         elif len(self.parent_nodes) == 1:
             return list(self.parent_nodes)[0].result
         else:
-            return dict(
-                [(n.name, n.result) for n in self.parent_nodes if n.result is not None]
-            )
+            return dict((n.name, n.result) for n in self.parent_nodes if n.result is not None)
 
     def exception_logger(self, exception, logger: Logger):
-        logger.error(str(exception), detail=''.join(traceback.format_exception(exception)))
+        logger.error(str(exception), detail="".join(traceback.format_exception(exception)))
 
     def execute(self, logger: Logger, row_limit=None):
-        assert row_limit is None or type(row_limit) is int
+        assert row_limit is None or isinstance(row_limit, int)
         input_data = self.get_input_data()
         if self.plugin:
             try:
                 self.result = self.plugin.run(input_data, logger, row_limit)
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=W0718
                 self.result = None
                 self.exception_logger(exc, logger)
         else:
@@ -63,7 +60,7 @@ class PipelineNode:
         if self.plugin:
             try:
                 self.plugin.prepare(input_data, logger)
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=W0718
                 self.result = None
                 self.exception_logger(exc, logger)
         else:
@@ -120,11 +117,9 @@ class PipelineNode:
 
 
 class PipelineGraph:
-
     # XXX doesn't actually do much except hold a bag of nodes
 
     def __init__(self):
-
         self.plugin_classes = get_plugin_classes()
         self.nodes = []
 
@@ -145,7 +140,7 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-    def run(self):
+    def run(self, logger):
         # XXX this is the last thing PipelineGraph actually does!
         # might be easier to just keep a set of nodes and sort through
         # them for output nodes, or something.
@@ -154,7 +149,7 @@ class PipelineGraph:
             # XXX TODO there's some opportunity for easy parallelization here,
             # by pushing each node into a pool as soon as its parents are
             # complete.
-            node.execute()
+            node.execute(logger)
 
     def reset(self):
         for node in self.nodes:

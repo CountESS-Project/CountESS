@@ -1,21 +1,12 @@
 import itertools
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
-from typing import Generator, Optional
 
 import dask.dataframe as dd
-import numpy as np
-import pandas as pd  # type: ignore
 
-from countess.core.parameters import (
-    ArrayParam,
-    ChoiceParam,
-    ColumnChoiceParam,
-    MultiParam,
-)
-from countess.core.plugins import DaskTransformPlugin
-from countess.utils.dask import empty_dask_dataframe
 from countess.core.logger import Logger
+from countess.core.parameters import (ArrayParam, ChoiceParam,
+                                      ColumnChoiceParam, MultiParam)
+from countess.core.plugins import DaskTransformPlugin
 
 VERSION = "0.0.1"
 
@@ -47,7 +38,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
     # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
 
-    def run_dask(self, ddf: dd.DataFrame, logger: Logger) -> dd.DataFrame:
+    def run_dask(self, df: dd.DataFrame, logger: Logger) -> dd.DataFrame:
         assert isinstance(self.parameters["index"], ArrayParam)
         assert isinstance(self.parameters["pivot"], ArrayParam)
         assert isinstance(self.parameters["agg"], ArrayParam)
@@ -71,25 +62,20 @@ class DaskPivotPlugin(DaskTransformPlugin):
         agg_cols = [
             (p.params["column"].value, p.params["function"].value)
             for p in self.parameters["agg"].params
-            if isinstance(p, MultiParam)
-            and p.params["column"].value
-            and p.params["function"].value
+            if isinstance(p, MultiParam) and p.params["column"].value and p.params["function"].value
         ]
         aggregate_ops = defaultdict(list, [(c, ["first"]) for c in index_cols])
 
         if pivot_cols:
-
             # This won't run on multiindexes, but we're about to trash the indexing
             # anyway so just drop the existing index, we don't care.
-            ddf = ddf.reset_index(drop=True)
+            df = df.reset_index(drop=True)
 
             # `pivot_product` is every combination of every pivot column, so eg: if you're
             # pivoting on a `bin` column with values 1..4 and a `rep` column with values
             # 1..3 you'll end up with 12 elements, [ [1,1],[1,2],[1,3],[1,4],[2,1],[2,2] etc ]
 
-            pivot_product = itertools.product(
-                *[list(ddf[c].unique()) for c in pivot_cols]
-            )
+            pivot_product = itertools.product(*[list(df[c].unique()) for c in pivot_cols])
 
             # `pivot_groups` then reattaches the labels to those values, eg:
             # [[('bin', 1), ('rep', 1)], [('bin', 1), ('rep', 2)] etc
@@ -99,7 +85,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
             # Each pivot group is a set of conditions to filter for in that pivot
             # group.
-            ddfs = []
+            dfs = []
             for pg in pivot_groups:
                 # We first filter the source dataframe using the values in `pivot_group`
                 # then rename the aggregated columns to add a specific suffix for
@@ -114,8 +100,8 @@ class DaskPivotPlugin(DaskTransformPlugin):
                     aggregate_ops[col + suffix].append(agg_op)
                     rename_cols[col] = col + suffix
 
-                ddfs.append(ddf.query(query).rename(columns=rename_cols))
-            ddf = dd.concat(ddfs)
+                dfs.append(df.query(query).rename(columns=rename_cols))
+            df = dd.concat(dfs)
 
             # XXX because of the way the concat operation collects pivot groups, a bunch of records
             # end up getting generated with NULLs in integer columns, forcing those columns
@@ -128,9 +114,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
         # squish to prevent column name mangling.
         # XXX this could be improved to make mangling column specific.
         if all((len(v) == 1) for k, v in aggregate_ops.items()):
-            aggregate_ops = defaultdict(
-                list, [(k, v[0]) for k, v in aggregate_ops.items()]
-            )
+            aggregate_ops = defaultdict(list, [(k, v[0]) for k, v in aggregate_ops.items()])
 
         # Group by the index columns and aggregate.
-        return ddf.groupby(index_cols or ddf.index).agg(aggregate_ops)
+        return df.groupby(index_cols or df.index).agg(aggregate_ops)

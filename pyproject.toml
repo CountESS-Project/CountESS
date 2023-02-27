@@ -52,3 +52,20 @@ countess_cmd = "countess.core.cmd:main"
 [tool.setuptools.dynamic]
 version = { attr = "countess.VERSION" }
 readme = { file = "README.md", content-type="text/markdown" }
+
+[tool.pylint]
+disable = [
+    "fixme",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "unused-argument",
+    "invalid-name",
+    "no-else-return",
+    "too-many-ancestors",
+    "too-many-arguments",
+    "too-many-instance-attributes",
+]
+
+[tool.black]
+line-length = 100

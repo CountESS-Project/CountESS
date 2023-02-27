@@ -7,15 +7,10 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import (
-    ArrayParam,
-    BooleanParam,
-    ChoiceParam,
-    MultiParam,
-    StringParam,
-)
-from countess.core.plugins import DaskBasePlugin, DaskProgressCallback
 from countess.core.logger import Logger
+from countess.core.parameters import (ArrayParam, BooleanParam, ChoiceParam,
+                                      MultiParam, StringParam)
+from countess.core.plugins import DaskBasePlugin, DaskProgressCallback
 
 INDEX = "— INDEX —"
 
@@ -46,16 +41,13 @@ class DaskJoinPlugin(DaskBasePlugin):
     }
 
     def prepare(self, data, logger: Logger):
-
         data_items = list(data.items())
         inputs_param = self.parameters["inputs"]
         assert isinstance(inputs_param, ArrayParam)
 
         if len(data_items) != 2 or len(inputs_param) != 2:
             raise NotImplementedError("Only two-way joins supported right now")
-        if not all(
-            (isinstance(df, (dd.DataFrame, pd.DataFrame)) for _, df in data_items)
-        ):
+        if not all((isinstance(df, (dd.DataFrame, pd.DataFrame)) for _, df in data_items)):
             raise NotImplementedError("Feed me dataframes")
 
         for input_param, (source_name, source_ddf) in zip(inputs_param, data.items()):
@@ -68,7 +60,6 @@ class DaskJoinPlugin(DaskBasePlugin):
         logger: Logger,
         row_limit: Optional[int] = None,
     ):
-
         inputs_param = self.parameters["inputs"]
         assert isinstance(inputs_param, ArrayParam)
         ip1 = inputs_param[0]
@@ -84,7 +75,7 @@ class DaskJoinPlugin(DaskBasePlugin):
             else:
                 join_how = "outer"
 
-        join_params : MutableMapping[str, str|bool] = {
+        join_params: MutableMapping[str, str | bool] = {
             "how": join_how,
         }
         if ip1["join_on"].value == INDEX:

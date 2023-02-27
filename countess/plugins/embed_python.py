@@ -2,17 +2,12 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import (
-    ArrayParam,
-    BooleanParam,
-    StringParam,
-    TextParam,
-)
-from countess.core.plugins import DaskTransformPlugin
 from countess.core.logger import Logger
+from countess.core.parameters import ArrayParam, TextParam
+from countess.core.plugins import DaskTransformPlugin
+
 
 def process(df: pd.DataFrame, codes):
-
     for code in codes:
         result = df.eval(code)
         if isinstance(result, (dd.Series, pd.Series)):
@@ -27,7 +22,6 @@ def process(df: pd.DataFrame, codes):
 
 
 class EmbeddedPythonPlugin(DaskTransformPlugin):
-
     name = "Embedded Python"
     title = "Embedded Python"
     description = "Embed Python code into CountESS"

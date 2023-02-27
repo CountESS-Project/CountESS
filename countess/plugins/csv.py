@@ -44,7 +44,9 @@ class LoadCsvPlugin(DaskInputPlugin):
 
     parameters = {
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
-        "quoting": ChoiceParam("Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]),
+        "quoting": ChoiceParam(
+            "Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]
+        ),
         "comment": ChoiceParam("Comment", "None", choices=["None", "#", ";"]),
         "columns": ArrayParam(
             "Columns",
@@ -62,7 +64,6 @@ class LoadCsvPlugin(DaskInputPlugin):
     }
 
     def read_file_to_dataframe(self, file_param, logger, row_limit=None):
-
         filename = file_param["filename"].value
 
         options = {
@@ -83,23 +84,27 @@ class LoadCsvPlugin(DaskInputPlugin):
                     options["usecols"].append(n)
 
         delimiter = self.parameters["delimiter"].value
-        if delimiter == 'TAB': options['delimiter'] = '\t'
-        elif delimiter == 'WHITESPACE': options['delim_whitespace'] = True
-        else: options['delimiter'] = delimiter
+        if delimiter == "TAB":
+            options["delimiter"] = "\t"
+        elif delimiter == "WHITESPACE":
+            options["delim_whitespace"] = True
+        else:
+            options["delimiter"] = delimiter
 
         quoting = self.parameters["quoting"].value
-        if quoting == 'None':
-            options['quoting'] = csv.QUOTE_NONE
-        elif quoting == 'Double-Quote':
-            options['quotechar'] = '"'
-            options['doublequote'] = True
-        elif quoting == 'Quote with Escape':
-            options['quotechar'] = '"'
-            options['doublequote'] = False
-            options['escapechar'] = '\\'
+        if quoting == "None":
+            options["quoting"] = csv.QUOTE_NONE
+        elif quoting == "Double-Quote":
+            options["quotechar"] = '"'
+            options["doublequote"] = True
+        elif quoting == "Quote with Escape":
+            options["quotechar"] = '"'
+            options["doublequote"] = False
+            options["escapechar"] = "\\"
 
         comment = self.parameters["comment"].value
-        if comment != 'None': options['comment'] = comment
+        if comment != "None":
+            options["comment"] = comment
 
         # XXX dd.read_csv().set_index() is very very slow!
         # XXX pd.read_csv(index_col=) is half the speed of pd.read_csv().set_index()
@@ -119,9 +124,7 @@ class LoadCsvPlugin(DaskInputPlugin):
             df[filename_column] = filename
 
         index_cols = [
-            df.columns[n]
-            for n, pp in enumerate(self.parameters["columns"])
-            if pp["index"].value
+            df.columns[n] for n, pp in enumerate(self.parameters["columns"]) if pp["index"].value
         ]
         if index_cols:
             df = df.set_index(index_cols)
@@ -130,7 +133,6 @@ class LoadCsvPlugin(DaskInputPlugin):
 
 
 class SaveCsvPlugin(DaskBasePlugin):
-
     name = "CSV Save"
     title = "Save to CSV"
     description = "CSV CSV CSV"

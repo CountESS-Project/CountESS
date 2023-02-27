@@ -9,18 +9,11 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
 from countess import VERSION
-from countess.core.parameters import (
-    ArrayParam,
-    BooleanParam,
-    FileArrayParam,
-    FileParam,
-    FloatParam,
-    MultiParam,
-    StringParam,
-)
+from countess.core.parameters import (ArrayParam, BooleanParam, FileArrayParam,
+                                      FileParam, FloatParam, MultiParam,
+                                      StringParam)
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import concat_dataframes, merge_dataframes
-
 
 
 class LoadFastqPlugin(DaskInputPlugin):
@@ -48,14 +41,9 @@ class LoadFastqPlugin(DaskInputPlugin):
 
         with open(file_param["filename"].value, "r") as fh:
             for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
-                if (
-                    fastq_read.average_quality()
-                    >= self.parameters["min_avg_quality"].value
-                ):
+                if fastq_read.average_quality() >= self.parameters["min_avg_quality"].value:
                     records.append((fastq_read.sequence, 1))
-        return pd.DataFrame.from_records(
-            records, columns=("sequence", count_column_name)
-        )
+        return pd.DataFrame.from_records(records, columns=("sequence", count_column_name))
 
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then (optionally) group them by sequence"""

@@ -1,10 +1,10 @@
-from itertools import islice
+"""Utility functions for manipulating Dask DataFrames"""
+
+from typing import Collection, Optional
 
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
-from typing import Optional, Collection
-"""Utility functions for manipulating Dask DataFrames"""
 
 
 def empty_dask_dataframe() -> dd.DataFrame:
@@ -14,10 +14,12 @@ def empty_dask_dataframe() -> dd.DataFrame:
     return edf
 
 
-def crop_dataframe(df: pd.DataFrame|dd.DataFrame, row_limit: Optional[int]) -> pd.DataFrame|dd.DataFrame:
+def crop_dataframe(
+    df: pd.DataFrame | dd.DataFrame, row_limit: Optional[int]
+) -> pd.DataFrame | dd.DataFrame:
     """Takes a dask dataframe `ddf` and returns a frame with at most `row_limit` rows"""
     if row_limit is not None:
-        assert(type(row_limit) is int)
+        assert isinstance(row_limit, int)
         if isinstance(df, pd.DataFrame):
             return df.head(row_limit)
         elif isinstance(df, dd.DataFrame):
@@ -27,7 +29,7 @@ def crop_dataframe(df: pd.DataFrame|dd.DataFrame, row_limit: Optional[int]) -> p
     return df
 
 
-def concat_dataframes(dfs: Collection[pd.DataFrame|dd.DataFrame]) -> pd.DataFrame|dd.DataFrame:
+def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> pd.DataFrame | dd.DataFrame:
     """Concat dask dataframes, but include special cases for 0 and 1 inputs"""
 
     # extra special case for empty dataframes
@@ -41,9 +43,7 @@ def concat_dataframes(dfs: Collection[pd.DataFrame|dd.DataFrame]) -> pd.DataFram
         return dd.concat(dfs)
 
 
-def merge_dataframes(
-    dfs: list[dd.DataFrame | pd.DataFrame], how: str = "outer"
-) -> dd.DataFrame:
+def merge_dataframes(dfs: list[dd.DataFrame | pd.DataFrame], how: str = "outer") -> dd.DataFrame:
     """Merge multiple dask/pandas dataframes together on their index.
     Always returns a new Dask dataframe even if there's one or zero input dataframes."""
 
