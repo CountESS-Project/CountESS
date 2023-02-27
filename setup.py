@@ -48,8 +48,9 @@ setup(
         extras_require = {
             'dev': [
                 'black<24',
-                'mypy~=1.01',
+                'mypy~=1.0.1',
                 'pylint~=2.16',
+                'types-ttkthemes~=3.2',
             ]
         },
         license = 'BSD',

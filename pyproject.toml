@@ -30,6 +30,14 @@ dependencies = [
     'ttkthemes~=3.2',
 ]
 
+[project.optional-dependencies]
+dev = [
+    'black<24',
+    'mypy~=1.0.1',
+    'pylint~=2.16',
+    'types-ttkthemes~=3.2',
+]
+
 [project.entry-points.countess_plugins]
 load_fastq = "countess.plugins.fastq:LoadFastqPlugin"
 load_hdf = "countess.plugins.hdf5:LoadHdfPlugin"

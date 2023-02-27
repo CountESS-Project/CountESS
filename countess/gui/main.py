@@ -813,7 +813,7 @@ class MainWindow:
 
 def main():
     try:
-        import ttkthemes  # type:ignore pylint: disable=C0415
+        import ttkthemes  # pylint: disable=C0415
 
         root = ttkthemes.ThemedTk()
         themes = set(root.get_themes())
