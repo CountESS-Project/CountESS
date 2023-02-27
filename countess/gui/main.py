@@ -60,7 +60,7 @@ class TkEventState(IntFlag):
     BUTTON5 = 4096
 
 
-class TkCursors(Enum):
+class TkCursors:
     HAND = "hand1"
     ARROWS = "fleur"
     PLUS = "plus"
