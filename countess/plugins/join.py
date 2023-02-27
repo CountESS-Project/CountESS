@@ -23,13 +23,14 @@ class DaskJoinPlugin(DaskBasePlugin):
     description = "..."
     version = VERSION
 
+    source_labels = []
+
     parameters = {
         "inputs": ArrayParam(
             "Inputs",
             MultiParam(
                 "Input",
                 {
-                    "source": StringParam("Source", read_only=True),
                     "join_on": ChoiceParam("Join On", INDEX, choices=[INDEX]),
                     "required": BooleanParam("Required", True),
                 },
@@ -50,8 +51,8 @@ class DaskJoinPlugin(DaskBasePlugin):
         if not all((isinstance(df, (dd.DataFrame, pd.DataFrame)) for _, df in data_items)):
             raise NotImplementedError("Feed me dataframes")
 
-        for input_param, (source_name, source_ddf) in zip(inputs_param, data.items()):
-            input_param["source"].value = source_name
+        for number, (input_param, (source_name, source_ddf)) in enumerate(zip(inputs_param, data.items())):
+            input_param.label = f"Input {number+1}: {source_name}"
             input_param["join_on"].choices = [INDEX] + list(source_ddf.columns)
 
     def run(
@@ -87,4 +88,5 @@ class DaskJoinPlugin(DaskBasePlugin):
         else:
             join_params["right_on"] = ip2["join_on"].value
 
-        return data[ip1["source"].value].merge(data[ip2["source"].value], **join_params)
+        dfs = list(data.values())
+        return dfs[0].merge(dfs[1], **join_params)
