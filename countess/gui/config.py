@@ -234,7 +234,7 @@ class ParameterWrapper:
                         delete_row_callback,
                         level=self.level + 1,
                     )
-                self.subwrappers[pp].entry.grid(row=len(subparams), column=m, padx=10)
+                self.subwrappers[pp].entry.grid(row=n+1, column=m, padx=10)
             if delete_row_callback:
                 button = tk.Button(
                     self.entry,
