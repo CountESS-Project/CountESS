@@ -10,7 +10,7 @@ maintainers = [
     { name = "Nick Moore", email="nick@zoic.org" },
 ]
 description = "CountESS"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "BSD-3-Clause" }
 classifiers = [
     'Development Status :: 2 - Pre-Alpha',

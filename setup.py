@@ -34,6 +34,7 @@ setup(
             'gui_scripts': ['countess_gui = countess.gui.main:main'],
             'console_scripts': [ 'countess_cmd = countess.core.cmd:main'],
         },
+        python_requires = '>=3.10',
         install_requires = [
             'dask>=2022.8.0',
             'distributed>=2022.8.0',
