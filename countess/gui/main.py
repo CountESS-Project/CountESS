@@ -244,7 +244,7 @@ class ConnectingLine:
         self.widget2.unbind("<Configure>", self.widget2_bind)
 
 
-plugin_classes = get_plugin_classes()
+plugin_classes = sorted(get_plugin_classes(), key=lambda x: x.name)
 
 
 class PluginChooserFrame(tk.Frame):
@@ -847,6 +847,14 @@ def make_root():
     root.rowconfigure(0, weight=0)
     root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)
+
+    # Try to start off maximized, but this option doesn't exist
+    # in all Tks or all platforms.
+    try:
+        root.state('zoomed')
+    except tk.TclError:
+        pass
+
     return root
 
 def main():

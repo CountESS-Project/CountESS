@@ -38,11 +38,11 @@ PRERUN_ROW_LIMIT = 100
 
 
 def get_plugin_classes():
-    plugin_classes = []
+    plugin_classes = set()
     for ep in importlib.metadata.entry_points(group="countess_plugins"):
         plugin_class = ep.load()
         if issubclass(plugin_class, BasePlugin):
-            plugin_classes.append(plugin_class)
+            plugin_classes.add(plugin_class)
         else:
             # XXX how to warn about this?
             logging.warning("%s is not a valid CountESS plugin", plugin_class)
