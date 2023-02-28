@@ -4,7 +4,7 @@ on:
   push:
 
 jobs:
-  run-tests-ubuntu-3.10:
+  run-tests-ubuntu-3_10:
     runs-on: ubuntu-22.04
     name: Run Tests (Ubuntu 22.04, Python 3.10)
     steps:
@@ -17,7 +17,7 @@ jobs:
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
 
-  run-tests-ubuntu-python-3.11:
+  run-tests-ubuntu-22_04-python-3_11:
     runs-on: ubuntu-22.04
     name: Run Tests (Ubuntu 22.04, Python 3.11)
     steps:
@@ -30,7 +30,7 @@ jobs:
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
 
-  run-tests-ubuntu-pypy3:
+  run-tests-ubuntu-22_04-pypy3:
     runs-on: ubuntu-22.04
     name: Run Tests (Ubuntu 22.04, PyPy 3)
     steps:
