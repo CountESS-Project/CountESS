@@ -90,8 +90,8 @@ class PipelineNode:
         parent.child_nodes.discard(self)
         self.mark_dirty()
 
-    def configure_plugin(self, key, value):
-        self.plugin.set_parameter(key, value)
+    def configure_plugin(self, key, value, base_dir='.'):
+        self.plugin.set_parameter(key, value, base_dir)
         self.mark_dirty()
 
     def final_descendants(self):

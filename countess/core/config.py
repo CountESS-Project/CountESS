@@ -3,6 +3,7 @@ import re
 import sys
 from configparser import ConfigParser
 from typing import Iterable
+import os.path
 
 from countess.core.logger import ConsoleLogger, Logger
 from countess.core.pipeline import PipelineGraph, PipelineNode
@@ -18,13 +19,15 @@ def default_output_callback(output):
 
 
 def read_config(
-    filenames: Iterable[str],
+    filename: str,
     logger: Logger = ConsoleLogger(),
 ) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
     cp = ConfigParser()
-    cp.read(filenames)
+    cp.read(filename)
+
+    base_dir = os.path.dirname(filename)
 
     pipeline_graph = PipelineGraph()
     nodes_by_name: dict[str, PipelineNode] = {}
@@ -74,7 +77,7 @@ def read_config(
             for key, val in config_dict.items():
                 if key.startswith("_"):
                     continue
-                node.configure_plugin(key, ast.literal_eval(val))
+                node.configure_plugin(key, ast.literal_eval(val), base_dir)
 
             node.prerun(logger)
 
@@ -85,6 +88,7 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     """Write `pipeline_graph`'s configuration out to `filename`"""
 
     cp = ConfigParser()
+    base_dir = os.path.dirname(filename)
 
     for node in pipeline_graph.traverse_nodes():
         cp.add_section(node.name)
@@ -102,7 +106,7 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
         for n, parent in enumerate(node.parent_nodes):
             cp[node.name][f"_parent.{n}"] = parent.name
         if node.plugin:
-            for k, v in node.plugin.get_parameters():
+            for k, v in node.plugin.get_parameters(base_dir):
                 cp[node.name][k] = repr(v)
 
     with open(filename, "w", encoding="utf-8") as fh:

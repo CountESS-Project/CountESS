@@ -710,7 +710,7 @@ class MainWindow:
     preview_frame = None
     config_changed = False
 
-    def __init__(self, tk_parent, config_filename=None):
+    def __init__(self, tk_parent: tk.Widget, config_filename : str =None):
         self.tk_parent = tk_parent
 
         ButtonMenu(

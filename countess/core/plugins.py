@@ -20,6 +20,7 @@ import importlib.metadata
 import logging
 from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any, List, Optional
+import os.path
 
 import dask.dataframe as dd
 import numpy as np
@@ -111,16 +112,19 @@ class BasePlugin:
         self.parameters[name] = param.copy()
         return self.parameters[name]
 
-    def set_parameter(self, key: str, value: bool | int | float | str):
+    def set_parameter(self, key: str, value: bool | int | float | str, base_dir: str = '.'):
         param = self.parameters
         for k in key.split("."):
             # XXX types are a mess here
             param = param[k]  # type: ignore
-        param.value = value  # type: ignore
+        if isinstance(param, FileParam):
+            param.value = os.path.join(base_dir, value)
+        else:
+            param.value = value  # type: ignore
 
-    def get_parameters(self):
+    def get_parameters(self, base_dir='.'):
         for key, parameter in self.parameters.items():
-            yield from parameter.get_parameters(key)
+            yield from parameter.get_parameters(key, base_dir)
 
     def get_parameter_hash(self):
         """Build a hash of all configuration parameters"""
