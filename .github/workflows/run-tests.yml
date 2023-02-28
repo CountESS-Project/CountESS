@@ -17,14 +17,53 @@ jobs:
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
 
-  run-tests-ubuntu-22_04-python-3_11:
+  run-tests-ubuntu-22_04-python-3_11_0rc2:
     runs-on: ubuntu-22.04
-    name: Run Tests (Ubuntu 22.04, Python 3.11)
+    name: Run Tests (Ubuntu 22.04, Python 3.11.0rc2)
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with:
-        python-version: "3.11.0rc2"
+        python-version: "3.11.0-rc.2"
+    - run: sudo apt install xvfb
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: xvfb-run pytest tests/
+
+  run-tests-ubuntu-22_04-python-3_11_0:
+    runs-on: ubuntu-22.04
+    name: Run Tests (Ubuntu 22.04, Python 3.11.1)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.0"
+    - run: sudo apt install xvfb
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: xvfb-run pytest tests/
+
+  run-tests-ubuntu-22_04-python-3_11_1:
+    runs-on: ubuntu-22.04
+    name: Run Tests (Ubuntu 22.04, Python 3.11.1)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.1"
+    - run: sudo apt install xvfb
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: xvfb-run pytest tests/
+
+  run-tests-ubuntu-22_04-python-3_11_2:
+    runs-on: ubuntu-22.04
+    name: Run Tests (Ubuntu 22.04, Python 3.11.2)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.11.2"
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
