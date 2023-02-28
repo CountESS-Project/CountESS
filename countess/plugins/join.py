@@ -23,8 +23,6 @@ class DaskJoinPlugin(DaskBasePlugin):
     description = "..."
     version = VERSION
 
-    source_labels = []
-
     parameters = {
         "inputs": ArrayParam(
             "Inputs",
