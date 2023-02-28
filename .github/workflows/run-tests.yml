@@ -4,22 +4,45 @@ on:
   push:
 
 jobs:
-  run-tests-ubuntu:
-    runs-on: ubuntu-latest
-    name: Run Tests (Ubuntu)
+  run-tests-ubuntu-3.10:
+    runs-on: ubuntu-22.04
+    name: Run Tests (Ubuntu 22.04, Python 3.10)
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with:
-        python-version: 3.x
+        python-version: 3.10
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
 
+  run-tests-ubuntu-python-3.11:
+    runs-on: ubuntu-22.04
+    name: Run Tests (Ubuntu 22.04, Python 3.11)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    - run: sudo apt install xvfb
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: xvfb-run pytest tests/
+
+  run-tests-ubuntu-pypy3:
+    runs-on: ubuntu-22.04
+    name: Run Tests (Ubuntu 22.04, PyPy 3)
+    steps:
+    - uses: actions/checkout@v3
+    - run: sudo apt install pypy3 pypy3-tk pypy3-dev xvfb
+    - run: pypy3 -mpip install -U pip wheel
+    - run: pypy3 -mpip install .[dev]
+    - run: xvfb-run pytest tests/
+
   run-tests-windows:
-    runs-on: windows-latest
-    name: Run Tests (Windows)
+    runs-on: windows-2022
+    name: Run Tests (Windows Server 2022)
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
@@ -30,8 +53,8 @@ jobs:
     - run: pytest tests/
 
   run-tests-macos:
-    runs-on: macos-latest
-    name: Run Tests (macOS)
+    runs-on: macos-12
+    name: Run Tests (macOS 12)
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
