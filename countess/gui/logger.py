@@ -105,7 +105,8 @@ class TreeviewLogger(Logger):
 
     def log(self, level: str, message: str, detail: Optional[str] = None):
         # XXX temporary
-        sys.stderr.write(message + "\n" + detail + "\n\n")
+        sys.stderr.write(message + "\n")
+        if detail: sys.stderr.write(detail + "\n\n")
 
         self.count += 1
         datetime_now = datetime.datetime.now()
