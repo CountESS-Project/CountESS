@@ -13,11 +13,9 @@ jobs:
       with:
         python-version: 3.x
     - run: sudo apt install xvfb
-    - run: Xvfb :19 &
-    - run: export DISPLAY=:19
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-    - run: pytest tests/
+    - run: xvfb-run pytest tests/
 
   run-tests-windows:
     runs-on: windows-latest
