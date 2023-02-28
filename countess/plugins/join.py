@@ -82,11 +82,13 @@ class DaskJoinPlugin(DaskBasePlugin):
         join_params: MutableMapping[str, str | bool] = {
             "how": join_how,
         }
-        if ip1["join_on"].value == INDEX:
+        
+        if not ip1.join_on.value or ip1.join_on.value == INDEX:
             join_params["left_index"] = True
         else:
-            join_params["left_on"] = ip1["join_on"].value
-        if ip2["join_on"].value == INDEX:
+            join_params["left_on"] = ip1.join_on.value
+            
+        if not ip2.join_on.value or ip2.join_on.value == INDEX:
             join_params["right_index"] = True
         else:
             join_params["right_on"] = ip2["join_on"].value
