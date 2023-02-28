@@ -20,8 +20,8 @@ from countess.core.plugins import get_plugin_classes
 from countess.gui.config import DataFramePreview, PluginConfigurator
 from countess.gui.logger import LoggerFrame
 
-import faulthandler
-faulthandler.enable(all_threads=True)
+# import faulthandler
+# faulthandler.enable(all_threads=True)
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))

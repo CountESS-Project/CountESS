@@ -24,7 +24,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: "3.11.0rc2"
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
