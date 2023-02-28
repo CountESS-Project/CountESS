@@ -12,8 +12,9 @@ def process(df: pd.DataFrame, codes):
         result = df.eval(code)
         if isinstance(result, (dd.Series, pd.Series)):
             # this was a filter
-            df["_filter"] = result
-            df = df.query("_filter").drop(columns="_filter")
+            df = df.copy()
+            df["__filter"] = result
+            df = df.query("__filter != 0").drop(columns="__filter")
         else:
             # this was a column assignment
             df = result
