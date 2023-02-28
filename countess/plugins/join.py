@@ -49,7 +49,8 @@ class DaskJoinPlugin(DaskBasePlugin):
         if not all((isinstance(df, (dd.DataFrame, pd.DataFrame)) for _, df in data_items)):
             raise NotImplementedError("Feed me dataframes")
 
-        for number, (input_param, (source_name, source_ddf)) in enumerate(zip(inputs_param, data.items())):
+        enumerate_inputs = enumerate(zip(inputs_param, data.items()))
+        for number, (input_param, (source_name, source_ddf)) in enumerate_inputs:
             input_param.label = f"Input {number+1}: {source_name}"
             input_param["join_on"].choices = [INDEX] + list(source_ddf.columns)
 
@@ -61,18 +62,22 @@ class DaskJoinPlugin(DaskBasePlugin):
     ):
         inputs_param = self.parameters["inputs"]
         assert isinstance(inputs_param, ArrayParam)
+        assert len(inputs_param) == 2
+        assert isinstance(data, Mapping)
+        assert len(data) == 2
+        assert all(isinstance(d, (dd.DataFrame, pd.DataFrame)) for d in data.values())
+
         ip1 = inputs_param[0]
         ip2 = inputs_param[1]
-        if ip1["required"].value:
-            if ip2["required"].value:
-                join_how = "inner"
-            else:
-                join_how = "left"
+
+        if ip1.required.value and ip2.required.value:
+            join_how = 'inner'
+        elif ip1.required.value:
+            join_how = 'left'
+        elif ip2.required_value:
+            join_how = 'right'
         else:
-            if ip2["required"].value:
-                join_how = "right"
-            else:
-                join_how = "outer"
+            join_how = 'outer'
 
         join_params: MutableMapping[str, str | bool] = {
             "how": join_how,
