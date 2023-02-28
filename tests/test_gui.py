@@ -1,20 +1,21 @@
 import tkinter as tk
 import time
+import pytest
 
 from countess.gui.main import make_root, MainWindow
 
-root = make_root()
+def test_open_nodes():
 
-mw = MainWindow(root, "simple.ini")
+    root = make_root()
 
-root.update()
+    mw = MainWindow(root, "simple.ini")
 
-nodes = mw.graph_wrapper.graph.nodes
-
-for node in nodes:
-    mw.graph_wrapper.on_mousedown(node, None)
     root.update()
-    time.sleep(0.1)
-time.sleep(1)
 
-root.destroy()
+    nodes = mw.graph_wrapper.graph.nodes
+
+    for node in nodes:
+        mw.graph_wrapper.on_mousedown(node, None)
+        root.update()
+        time.sleep(0.1)
+    time.sleep(1)
