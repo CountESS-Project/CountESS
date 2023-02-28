@@ -1,9 +1,15 @@
 name: "Nix Build"
 on:
+  workflow_run:
+    workflows: ["Run Tests"]
+    branches: [main]
+    types:
+      - completed
   pull_request:
   push:
 jobs:
-  tests:
+  nix_build:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
