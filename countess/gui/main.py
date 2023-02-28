@@ -6,6 +6,7 @@ import tkinter as tk
 from enum import Enum, IntFlag
 from functools import partial
 from tkinter import filedialog, messagebox, ttk
+from typing import Optional
 
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
@@ -720,7 +721,7 @@ class MainWindow:
     config_wrapper = None
     config_changed = False
 
-    def __init__(self, tk_parent: tk.Widget, config_filename : str =None):
+    def __init__(self, tk_parent: tk.Widget, config_filename : Optional[str] =None):
         self.tk_parent = tk_parent
 
         ButtonMenu(

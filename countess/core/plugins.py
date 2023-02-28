@@ -118,6 +118,7 @@ class BasePlugin:
             # XXX types are a mess here
             param = param[k]  # type: ignore
         if isinstance(param, FileParam):
+            assert isinstance(value, str)
             param.value = os.path.join(base_dir, value)
         else:
             param.value = value  # type: ignore
@@ -201,6 +202,8 @@ class DaskBasePlugin(BasePlugin):
     def prepare_dask(self, df: pd.DataFrame | dd.DataFrame, logger: Logger) -> bool:
         assert isinstance(df, (pd.DataFrame, dd.DataFrame))
         return True
+
+    # XXX prepare and run handle multiple inputs differntly?
 
     def prepare(
         self,

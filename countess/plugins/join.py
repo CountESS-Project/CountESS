@@ -74,7 +74,7 @@ class DaskJoinPlugin(DaskBasePlugin):
             join_how = 'inner'
         elif ip1.required.value:
             join_how = 'left'
-        elif ip2.required_value:
+        elif ip2.required.value:
             join_how = 'right'
         else:
             join_how = 'outer'
