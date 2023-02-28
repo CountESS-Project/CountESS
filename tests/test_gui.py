@@ -18,6 +18,7 @@ def test_open_nodes():
     last_node = nodes[-1]
 
     mw.graph_wrapper.on_mousedown(last_node, None)
+
     root.update()
 
     assert(last_node.result)

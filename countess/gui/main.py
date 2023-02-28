@@ -685,6 +685,15 @@ class ConfiguratorWrapper:
             self.name_var.set(self.node.name)
         self.change_callback(self.node)
 
+    def destroy(self):
+        if self.config_change_task:
+            self.frame.after_cancel(self.config_change_task)
+        if self.config_subframe:
+            self.config_subframe.destroy()
+        if self.preview_subframe:
+            self.preview_subframe.destroy()
+        if self.logger_subframe:
+            self.logger_subframe.destroy()
 
 class ButtonMenu:  # pylint: disable=R0903
     def __init__(self, tk_parent, buttons, label):
@@ -708,6 +717,7 @@ class MainWindow:
 
     graph_wrapper = None
     preview_frame = None
+    config_wrapper = None
     config_changed = False
 
     def __init__(self, tk_parent: tk.Widget, config_filename : str =None):
@@ -807,7 +817,8 @@ class MainWindow:
         for widget in self.subframe.winfo_children():
             widget.destroy()
         if node:
-            ConfiguratorWrapper(self.subframe, node, self.node_changed)
+            if self.config_wrapper: self.config_wrapper.destroy()
+            self.config_wrapper = ConfiguratorWrapper(self.subframe, node, self.node_changed)
 
     def node_changed(self, node):
         self.config_changed = True
