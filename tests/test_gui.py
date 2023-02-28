@@ -1,4 +1,3 @@
-import tkinter as tk
 import time
 import pytest
 
@@ -21,12 +20,12 @@ def test_open_nodes():
 
     root.update()
 
-    assert(last_node.result)
+    assert last_node.result
     
     for node in nodes:
         mw.graph_wrapper.on_mousedown(node, None)
         root.update()
-        time.sleep(0.05)
-    time.sleep(0.1)
+        time.sleep(0.1)
+    time.sleep(1)
 
     write_config(mw.graph_wrapper.graph, "tests/simple.ini.output")
