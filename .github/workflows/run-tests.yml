@@ -1,0 +1,41 @@
+name: Run Tests
+on:
+  pull_request:
+  push:
+
+jobs:
+  run-tests-ubuntu:
+    runs-on: ubuntu-latest
+    name: Run Tests (Ubuntu)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: pytest tests/
+
+  run-tests-windows:
+    runs-on: windows-latest
+    name: Run Tests (Windows)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: pytest tests/
+
+  run-tests-macos:
+    runs-on: macos-latest
+    name: Run Tests (macOS)
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: pytest tests/
