@@ -87,7 +87,7 @@ jobs:
     name: Ubuntu 22.04, Python from Apt
     steps:
     - uses: actions/checkout@v3
-    - run: sudo apt install python3.11 xvfb
+    - run: sudo apt install python3.11 python3.11-venv xvfb
     - run: python3.11 -m ensurepip
     - run: python3.11 -m pip install .[dev]
     - run: xvfb-run python3.11 -mpytest tests/
