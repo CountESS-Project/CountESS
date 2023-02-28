@@ -82,7 +82,7 @@ jobs:
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
 
-  run-tests-ubuntu-22_04-python-3_11_2:
+  run-tests-ubuntu-22_04-python-3_11_from_apt:
     runs-on: ubuntu-22.04
     name: Run Tests (Ubuntu 22.04, Python from Apt)
     steps:
