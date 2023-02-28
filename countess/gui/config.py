@@ -416,36 +416,6 @@ class PluginConfigurator:
                 wrapper.destroy()
                 del self.wrapper_cache[key]
 
-    def set_output(self, output):
-        if output is not None:
-            if self.output_text is None:
-                self.output_text = tk.Text(self.frame, height=10)
-                self.output_text.grid(row=3)
-
-            # can't actually replace the text if it is "disabled"
-            self.output_text["state"] = "normal"
-            self.output_text.replace("1.0", tk.END, output)
-            self.output_text["state"] = "disabled"
-
-        elif self.output_text is not None:
-            self.output_text.destroy()
-            self.output_text = None
-
-    def set_result(self, result):
-        if isinstance(result, list):
-            result = result[0]
-        if isinstance(result, (dd.DataFrame, pd.DataFrame)):
-            if self.preview:
-                self.preview.update(result)
-            else:
-                self.preview = DataFramePreview(self.frame, result)
-                self.preview.frame.grid(row=4)
-                self.frame.rowconfigure(4, weight=1)
-        # XXX should display *something* for other results
-        elif self.preview is not None:
-            self.preview.destroy()
-            self.preview = None
-
 
 class DataFramePreview:
     """Provides a visual preview of a Dask dataframe arranged as a table."""
