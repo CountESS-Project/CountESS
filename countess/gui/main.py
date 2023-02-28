@@ -811,7 +811,8 @@ class MainWindow:
             self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
 
 
-def main():
+def make_root():
+
     try:
         import ttkthemes  # pylint: disable=C0415
 
@@ -832,7 +833,10 @@ def main():
     root.rowconfigure(0, weight=0)
     root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)
+    return root
 
+def main():
+    root = make_root()
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 
     root.mainloop()
