@@ -1,8 +1,8 @@
 import csv
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from io import StringIO
 
 import dask.dataframe as dd
-import numpy as np
 import pandas as pd  # type: ignore
 
 from countess import VERSION
@@ -142,6 +142,8 @@ class SaveCsvPlugin(DaskBasePlugin):
     parameters = {
         "header": BooleanParam("CSV header row?", True),
         "filename": FileSaveParam("Filename", file_types=file_types),
+        "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"]),
+        "quoting": BooleanParam("Quote all Strings", False)
     }
 
     def run(
@@ -153,11 +155,26 @@ class SaveCsvPlugin(DaskBasePlugin):
         assert isinstance(self.parameters["filename"], StringParam)
 
         filename = self.parameters["filename"].value
+        sep = self.parameters["delimiter"].value
+        if sep == 'TAB': sep = '\t'
+        elif sep == 'SPACE': sep = ' '
+
+        options = {
+            'sep': sep, 
+            'quoting': csv.QUOTE_NONNUMERIC if self.parameters['quoting'].value else csv.QUOTE_MINIMAL,
+        }
 
         if row_limit is None:
             if isinstance(obj, dd.DataFrame):
-                obj.to_csv(filename, single_file=True, compute=True)
+                obj.to_csv(filename, single_file=True, compute=True, **options)
             else:
-                obj.to_csv(filename)
+                obj.to_csv(filename, **options)
+            return None
+        else:
+            if isinstance(obj, dd.DataFrame):
+                obj = obj.compute()
 
-        return None
+            buf = StringIO()
+            obj.to_csv(buf, **options)
+            return buf.getvalue()
+

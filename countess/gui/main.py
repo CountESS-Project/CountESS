@@ -60,7 +60,7 @@ class TkEventState(IntFlag):
     BUTTON5 = 4096
 
 
-class TkCursors(Enum):
+class TkCursors:
     HAND = "hand1"
     ARROWS = "fleur"
     PLUS = "plus"
@@ -625,8 +625,21 @@ class ConfiguratorWrapper:
             self.preview_subframe.destroy()
         if isinstance(self.node.result, (dd.DataFrame, pd.DataFrame)):
             self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
+        elif isinstance(self.node.result, str):
+            self.preview_subframe = tk.Frame(self.frame)
+            self.preview_subframe.rowconfigure(1,weight=1)
+            n_lines = len(self.node.result.splitlines())
+            tk.Label(
+                self.preview_subframe,
+                text=f"Text Preview {n_lines} Lines"
+            ).grid(sticky=tk.NSEW)
+            text = tk.Text(self.preview_subframe)
+            text.insert("1.0", self.node.result)
+            text["state"] = "disabled"
+            text.grid(sticky=tk.NSEW)
         else:
             self.preview_subframe = tk.Frame(self.frame)
+            tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.NSEW)
 
         self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
 
@@ -651,7 +664,8 @@ class ConfiguratorWrapper:
         self.logger.clear()
         self.logger_subframe.grid(row=3, sticky=tk.NSEW)
         self.node.prerun(self.logger)
-        self.show_preview_subframe()
+        if self.node.result is not None:
+            self.show_preview_subframe()
         self.configurator.update()
         self.logger_subframe.after(5000, self.config_change_task_callback_2)
         self.change_callback(self.node)
@@ -811,7 +825,8 @@ class MainWindow:
             self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
 
 
-def main():
+def make_root():
+
     try:
         import ttkthemes  # pylint: disable=C0415
 
@@ -832,7 +847,10 @@ def main():
     root.rowconfigure(0, weight=0)
     root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)
+    return root
 
+def main():
+    root = make_root()
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 
     root.mainloop()
