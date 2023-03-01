@@ -88,7 +88,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: sudo apt install python3.11-full python3-pip xvfb
-    - run: python3.11 -m pip install .[dev]
+    - run: python3.11 -m pip install --upgrade pip
+    - run: python3.11 -m pip install -e .[dev]
     - run: xvfb-run python3.11 -mpytest tests/
 
 #  run-tests-ubuntu-22_04-pypy3:
