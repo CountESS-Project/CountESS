@@ -17,7 +17,7 @@ jobs:
     - run: mypy $(git ls-files 'countess/*.py')
   pylint:
     runs-on: ubuntu-latest
-    name: MyPy
+    name: PyLint
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4

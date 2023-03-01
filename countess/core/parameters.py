@@ -30,6 +30,9 @@ class BaseParam:
         digest.update(repr(self.value).encode("utf-8"))
         return digest.hexdigest()
 
+    def set_column_choices(self, choices):
+        pass
+
 
 class SimpleParam(BaseParam):
     """A SimpleParam has a single value"""
@@ -303,6 +306,8 @@ class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
 
+    def set_column_choices(self, choices):
+        self.set_choices(list(choices))
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     INDEX_VALUE = "— INDEX —"
@@ -422,6 +427,10 @@ class ArrayParam(BaseParam):
             digest.update(p.get_hash_value().encode("utf-8"))
         return digest.hexdigest()
 
+    def set_column_choices(self, choices):
+        self.param.set_column_choices(choices)
+        for p in self.params:
+            p.set_column_choices(choices)
 
 class FileArrayParam(ArrayParam):
     """FileArrayParam is an ArrayParam arranged per-file.  Using this class
@@ -508,3 +517,7 @@ class MultiParam(BaseParam):
         for k, p in self.params.items():
             digest.update((k + "\0" + p.get_hash_value()).encode("utf-8"))
         return digest.hexdigest()
+
+    def set_column_choices(self, choices):
+        for p in self.params.values():
+            p.set_column_choices(choices)

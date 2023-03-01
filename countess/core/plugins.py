@@ -32,7 +32,6 @@ from countess.core.parameters import (
     ArrayParam,
     BaseParam,
     ChoiceParam,
-    ColumnChoiceParam,
     FileArrayParam,
     FileParam,
     MultiParam,
@@ -204,9 +203,24 @@ class DaskProgressCallback(Callback):
 class DaskBasePlugin(BasePlugin):
     """Base class for plugins which accept and return dask/pandas DataFrames"""
 
-    def prepare_dask(self, df: pd.DataFrame | dd.DataFrame, logger: Logger) -> bool:
+    def run(
+        self,
+        data: Any,
+        logger: Logger,
+        row_limit: Optional[int] = None,
+    ):
+        raise NotImplementedError(f"{self.__class__}.run()")
+
+class DaskTransformPlugin(DaskBasePlugin):
+
+    input_columns: list[str] = []
+
+    def prepare_dask(self, df: dd.DataFrame | pd.DataFrame, logger: Logger):
         assert isinstance(df, (pd.DataFrame, dd.DataFrame))
-        return True
+        self.input_columns = sorted(df.columns)
+
+        for p in self.parameters.values():
+            p.set_column_choices(self.input_columns)
 
     # XXX prepare and run handle multiple inputs differntly?
 
@@ -279,12 +293,6 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         or do more work on the dataframes (eg: counting, renaming, etc)"""
         return concat_dataframes(dfs)
 
-    def run_dask(
-        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
-    ) -> pd.DataFrame | dd.DataFrame:
-        # this exists just to make pylint happy
-        pass
-
     def load_files(
         self,
         logger: Logger,
@@ -324,35 +332,6 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None
     ) -> dd.DataFrame | pd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.read_file_to_dataframe")
-
-
-def _set_column_choice_params(parameter, column_names):
-    if isinstance(parameter, ArrayParam):
-        _set_column_choice_params(parameter.param, column_names)
-        for p in parameter.params:
-            _set_column_choice_params(p, column_names)
-    elif isinstance(parameter, MultiParam):
-        for p in parameter.params.values():
-            _set_column_choice_params(p, column_names)
-    elif isinstance(parameter, ColumnChoiceParam):
-        parameter.set_choices(column_names)
-
-
-class DaskTransformPlugin(DaskBasePlugin):
-    """a Transform plugin takes columns from the input data frame."""
-
-    input_columns: list[str] = []
-
-    def run_dask(
-        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
-    ) -> pd.DataFrame | dd.DataFrame:
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
-
-    def prepare_dask(self, df: dd.DataFrame | pd.DataFrame, logger):
-        self.input_columns = sorted(df.columns)
-
-        for p in self.parameters.values():
-            _set_column_choice_params(p, self.input_columns)
 
 
 class DaskScoringPlugin(DaskTransformPlugin):
