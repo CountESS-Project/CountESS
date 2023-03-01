@@ -23,12 +23,11 @@ def output_callback(output):
 
 
 def process_ini(config_filename):
-
     logger = ConsoleLogger()
 
     graph = read_config(
         config_filename,
-        logger = logger,
+        logger=logger,
     )
     graph.run(logger)
 

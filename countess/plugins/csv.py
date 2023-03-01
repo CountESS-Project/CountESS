@@ -1,6 +1,6 @@
 import csv
-from typing import Any, Optional
 from io import StringIO
+from typing import Any, Optional
 
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
@@ -143,7 +143,7 @@ class SaveCsvPlugin(DaskBasePlugin):
         "header": BooleanParam("CSV header row?", True),
         "filename": FileSaveParam("Filename", file_types=file_types),
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"]),
-        "quoting": BooleanParam("Quote all Strings", False)
+        "quoting": BooleanParam("Quote all Strings", False),
     }
 
     def run(
@@ -156,12 +156,16 @@ class SaveCsvPlugin(DaskBasePlugin):
 
         filename = self.parameters["filename"].value
         sep = self.parameters["delimiter"].value
-        if sep == 'TAB': sep = '\t'
-        elif sep == 'SPACE': sep = ' '
+        if sep == "TAB":
+            sep = "\t"
+        elif sep == "SPACE":
+            sep = " "
 
         options = {
-            'sep': sep, 
-            'quoting': csv.QUOTE_NONNUMERIC if self.parameters['quoting'].value else csv.QUOTE_MINIMAL,
+            "sep": sep,
+            "quoting": csv.QUOTE_NONNUMERIC
+            if self.parameters["quoting"].value
+            else csv.QUOTE_MINIMAL,
         }
 
         if row_limit is None:
@@ -177,4 +181,3 @@ class SaveCsvPlugin(DaskBasePlugin):
             buf = StringIO()
             obj.to_csv(buf, **options)
             return buf.getvalue()
-

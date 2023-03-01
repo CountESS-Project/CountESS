@@ -12,8 +12,11 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.config import (export_config_graphviz, read_config,
-                                  write_config)
+from countess.core.config import (
+    export_config_graphviz,
+    read_config,
+    write_config,
+)
 from countess.core.logger import ConsoleLogger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import get_plugin_classes
@@ -22,6 +25,7 @@ from countess.gui.logger import LoggerFrame
 
 # import faulthandler
 # faulthandler.enable(all_threads=True)
+
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -321,9 +325,9 @@ class GraphWrapper:
         self.labels = dict((node, self.label_for_node(node)) for node in graph.nodes)
         self.lines = dict((node, self.lines_for_node(node)) for node in graph.nodes)
         self.lines_lookup = dict(
-                (connecting_line.line, (connecting_line, child_node, parent_node))
-                for child_node, lines_for_child in self.lines.items()
-                for parent_node, connecting_line in lines_for_child.items()
+            (connecting_line.line, (connecting_line, child_node, parent_node))
+            for child_node, lines_for_child in self.lines.items()
+            for parent_node, connecting_line in lines_for_child.items()
         )
 
         self.canvas.bind("<Button-1>", self.on_canvas_button1)
@@ -630,12 +634,11 @@ class ConfiguratorWrapper:
             self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
         elif isinstance(self.node.result, str):
             self.preview_subframe = tk.Frame(self.frame)
-            self.preview_subframe.rowconfigure(1,weight=1)
+            self.preview_subframe.rowconfigure(1, weight=1)
             n_lines = len(self.node.result.splitlines())
-            tk.Label(
-                self.preview_subframe,
-                text=f"Text Preview {n_lines} Lines"
-            ).grid(sticky=tk.NSEW)
+            tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(
+                sticky=tk.NSEW
+            )
             text = tk.Text(self.preview_subframe)
             text.insert("1.0", self.node.result)
             text["state"] = "disabled"
@@ -698,6 +701,7 @@ class ConfiguratorWrapper:
         if self.logger_subframe:
             self.logger_subframe.destroy()
 
+
 class ButtonMenu:  # pylint: disable=R0903
     def __init__(self, tk_parent, buttons, label):
         self.frame = tk.Frame(tk_parent)
@@ -723,7 +727,7 @@ class MainWindow:
     config_wrapper = None
     config_changed = False
 
-    def __init__(self, tk_parent: tk.Widget, config_filename : Optional[str] =None):
+    def __init__(self, tk_parent: tk.Widget, config_filename: Optional[str] = None):
         self.tk_parent = tk_parent
 
         ButtonMenu(
@@ -820,7 +824,8 @@ class MainWindow:
         for widget in self.subframe.winfo_children():
             widget.destroy()
         if node:
-            if self.config_wrapper: self.config_wrapper.destroy()
+            if self.config_wrapper:
+                self.config_wrapper.destroy()
             self.config_wrapper = ConfiguratorWrapper(self.subframe, node, self.node_changed)
 
     def node_changed(self, node):
@@ -840,7 +845,6 @@ class MainWindow:
 
 
 def make_root():
-
     try:
         import ttkthemes  # pylint: disable=C0415
 
@@ -865,11 +869,12 @@ def make_root():
     # Try to start off maximized, but this option doesn't exist
     # in all Tks or all platforms.
     try:
-        root.state('zoomed')
+        root.state("zoomed")
     except tk.TclError:
         pass
 
     return root
+
 
 def main():
     root = make_root()

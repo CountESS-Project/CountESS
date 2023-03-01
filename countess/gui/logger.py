@@ -1,11 +1,11 @@
 import datetime
+import sys
 import tkinter as tk
 from tkinter import ttk
 from typing import MutableMapping, Optional
 
 from countess.core.logger import Logger
 
-import sys
 
 class LoggerTreeview(ttk.Treeview):
     def __init__(self, tk_parent, *a, **k):
@@ -106,7 +106,8 @@ class TreeviewLogger(Logger):
     def log(self, level: str, message: str, detail: Optional[str] = None):
         # XXX temporary
         sys.stderr.write(message + "\n")
-        if detail: sys.stderr.write(detail + "\n\n")
+        if detail:
+            sys.stderr.write(detail + "\n\n")
 
         self.count += 1
         datetime_now = datetime.datetime.now()

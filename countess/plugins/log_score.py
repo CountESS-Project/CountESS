@@ -5,8 +5,7 @@ import dask.dataframe as dd
 import numpy as np
 
 from countess.core.plugins import DaskScoringPlugin
-
-VERSION = "0.0.1"
+from countess import VERSION
 
 
 class LogScorePlugin(DaskScoringPlugin):

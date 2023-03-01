@@ -6,7 +6,6 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 
-
 def empty_dask_dataframe() -> dd.DataFrame:
     """Returns an empty dask DataFrame for consistency."""
     edf = dd.from_pandas(pd.DataFrame([]), npartitions=1)

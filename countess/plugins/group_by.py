@@ -6,8 +6,7 @@ import numpy as np
 
 from countess.core.parameters import ChoiceParam
 from countess.core.plugins import DaskTransformPlugin
-
-VERSION = "0.0.1"
+from countess import VERSION
 
 
 class GroupByPlugin(DaskTransformPlugin):

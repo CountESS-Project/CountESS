@@ -9,10 +9,20 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd  # type: ignore
 
-from ..core.parameters import (ArrayParam, BaseParam, BooleanParam,
-                               ChoiceParam, FileArrayParam, FileParam,
-                               FileSaveParam, FloatParam, IntegerParam,
-                               MultiParam, SimpleParam, TextParam)
+from ..core.parameters import (
+    ArrayParam,
+    BaseParam,
+    BooleanParam,
+    ChoiceParam,
+    FileArrayParam,
+    FileParam,
+    FileSaveParam,
+    FloatParam,
+    IntegerParam,
+    MultiParam,
+    SimpleParam,
+    TextParam,
+)
 from ..core.plugins import BasePlugin
 from ..utils.dask import crop_dataframe
 
@@ -234,7 +244,7 @@ class ParameterWrapper:
                         delete_row_callback,
                         level=self.level + 1,
                     )
-                self.subwrappers[pp].entry.grid(row=n+1, column=m, padx=10)
+                self.subwrappers[pp].entry.grid(row=n + 1, column=m, padx=10)
             if delete_row_callback:
                 button = tk.Button(
                     self.entry,
@@ -472,8 +482,9 @@ class DataFramePreview:
             anchor = tk.E if ct in ("i", "f") else tk.W
             # XXX type signature appears to be wrong, or at least overly restrictive.
             # I think I'm going to replace treeview anyway so I'm ignoring it for now.
-            self.treeview.column(n, anchor=anchor, width=100,
-                                 minwidth=100, stretch=tk.YES)  # type: ignore
+            self.treeview.column(
+                n, anchor=anchor, width=100, minwidth=100, stretch=tk.YES
+            )  # type: ignore
 
         for row in self.treeview.get_children():
             self.treeview.delete(row)

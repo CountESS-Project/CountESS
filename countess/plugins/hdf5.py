@@ -5,8 +5,14 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import (BaseParam, ChoiceParam, FileArrayParam,
-                                      FileParam, MultiParam, StringParam)
+from countess.core.parameters import (
+    BaseParam,
+    ChoiceParam,
+    FileArrayParam,
+    FileParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 from countess.utils.dask import empty_dask_dataframe
 

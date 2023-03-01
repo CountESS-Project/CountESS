@@ -9,9 +9,15 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from more_itertools import ichunked
 
 from countess import VERSION
-from countess.core.parameters import (ArrayParam, BooleanParam, FileArrayParam,
-                                      FileParam, FloatParam, MultiParam,
-                                      StringParam)
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    FileArrayParam,
+    FileParam,
+    FloatParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import concat_dataframes, merge_dataframes
 

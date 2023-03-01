@@ -22,7 +22,7 @@ class BaseParam:
         self.value = value
         return self
 
-    def get_parameters(self, key, base_dir='.'):
+    def get_parameters(self, key, base_dir="."):
         return ((key, self.value),)
 
     def get_hash_value(self):
@@ -166,7 +166,7 @@ class FileParam(StringParam):
         except IOError:
             return "0"
 
-    def get_parameters(self, key, base_dir='.'):
+    def get_parameters(self, key, base_dir="."):
         return ((key, os.path.relpath(self.value, base_dir)),)
 
     def copy(self):
@@ -412,7 +412,7 @@ class ArrayParam(BaseParam):
     def value(self):
         self.params = []
 
-    def get_parameters(self, key, base_dir='.'):
+    def get_parameters(self, key, base_dir="."):
         for n, p in enumerate(self.params):
             yield from p.get_parameters(f"{key}.{n}", base_dir)
 
@@ -499,7 +499,7 @@ class MultiParam(BaseParam):
         for p in self.params.values():
             del p.value
 
-    def get_parameters(self, key, base_dir='.'):
+    def get_parameters(self, key, base_dir="."):
         for k, p in self.params.items():
             yield from p.get_parameters(f"{key}.{k}", base_dir)
 

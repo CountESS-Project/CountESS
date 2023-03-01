@@ -8,8 +8,13 @@ import pandas as pd  # type: ignore
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import (ArrayParam, BooleanParam, ChoiceParam,
-                                      MultiParam, StringParam)
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    ChoiceParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskBasePlugin, DaskProgressCallback
 
 INDEX = "— INDEX —"
@@ -71,23 +76,23 @@ class DaskJoinPlugin(DaskBasePlugin):
         ip2 = inputs_param[1]
 
         if ip1.required.value and ip2.required.value:
-            join_how = 'inner'
+            join_how = "inner"
         elif ip1.required.value:
-            join_how = 'left'
+            join_how = "left"
         elif ip2.required.value:
-            join_how = 'right'
+            join_how = "right"
         else:
-            join_how = 'outer'
+            join_how = "outer"
 
         join_params: MutableMapping[str, str | bool] = {
             "how": join_how,
         }
-        
+
         if not ip1.join_on.value or ip1.join_on.value == INDEX:
             join_params["left_index"] = True
         else:
             join_params["left_on"] = ip1.join_on.value
-            
+
         if not ip2.join_on.value or ip2.join_on.value == INDEX:
             join_params["right_index"] = True
         else:

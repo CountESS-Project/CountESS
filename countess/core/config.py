@@ -1,9 +1,9 @@
 import ast
+import os.path
 import re
 import sys
 from configparser import ConfigParser
 from typing import Iterable
-import os.path
 
 from countess.core.logger import ConsoleLogger, Logger
 from countess.core.pipeline import PipelineGraph, PipelineNode
