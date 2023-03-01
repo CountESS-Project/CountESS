@@ -16,6 +16,7 @@ jobs:
     - run: pip install --upgrade pip
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
+    - run: tests/cmd_tests.sh
 
 #  run-tests-ubuntu-22_04-python-3_11_0rc2:
 #   runs-on: ubuntu-22.04
@@ -91,6 +92,7 @@ jobs:
     - run: python3.11 -m pip install --upgrade pip
     - run: python3.11 -m pip install -e .[dev]
     - run: xvfb-run python3.11 -mpytest tests/
+    - run: tests/cmd_tests.sh
 
 #  run-tests-ubuntu-22_04-pypy3:
 #    runs-on: ubuntu-22.04
