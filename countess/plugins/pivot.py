@@ -10,6 +10,7 @@ from countess.core.parameters import (
     ChoiceParam,
     ColumnChoiceParam,
     MultiParam,
+    StringParam,
 )
 from countess.core.plugins import DaskTransformPlugin
 
@@ -34,6 +35,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
                 {
                     "column": ColumnChoiceParam("Column"),
                     "function": ChoiceParam("Function", choices=AGG_FUNCTIONS),
+                    "output": StringParam("Output Column Name"),
                 },
             ),
         ),
@@ -63,7 +65,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
         # First, collect all the aggregated columns together in one place.
         agg_cols = [
-            (p.params["column"].value, p.params["function"].value)
+            (p.params["column"].value, p.params["function"].value, p.params["output"].value)
             for p in self.parameters["agg"].params
             if isinstance(p, MultiParam) and p.params["column"].value and p.params["function"].value
         ]
@@ -99,9 +101,10 @@ class DaskPivotPlugin(DaskTransformPlugin):
                 # work out what columns we need to rename and accumulate the
                 # required aggregation operations in `aggregate_ops`.
                 rename_cols = {}
-                for col, agg_op in agg_cols:
-                    aggregate_ops[col + suffix].append(agg_op)
-                    rename_cols[col] = col + suffix
+                for col, agg_op, out_col in agg_cols:
+                    output_column = (out_col or col) + suffix
+                    aggregate_ops[output_column].append(agg_op)
+                    rename_cols[col] = output_column
 
                 dfs.append(df.query(query).rename(columns=rename_cols))
             df = dd.concat(dfs)
@@ -110,8 +113,14 @@ class DaskPivotPlugin(DaskTransformPlugin):
             # end up getting generated with NULLs in integer columns, forcing those columns
             # to become floats, which looks odd for a 'sum' or 'count' operation.
         else:
-            for col, agg_op in agg_cols:
-                aggregate_ops[col].append(agg_op)
+            rename_cols = {}
+            for col, agg_op, out_col in agg_cols:
+                if out_col:
+                    rename_cols[col] = out_col
+                    aggregate_ops[out_col].append(agg_op)
+                else:
+                    aggregate_ops[col].append(agg_op)
+            df = df.rename(columns=rename_cols)
 
         # If there aren't multple aggregations for any one column,
         # squish to prevent column name mangling.
