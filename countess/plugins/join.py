@@ -85,15 +85,18 @@ class DaskJoinPlugin(DaskBasePlugin):
             "how": join_how,
         }
 
+        dfs = list(data.values())
+
         if not ip1.join_on.value or ip1.join_on.value == INDEX:
             join_params["left_index"] = True
         else:
+            dfs[0] = dfs[0].reset_index(drop=True)
             join_params["left_on"] = ip1.join_on.value
 
         if not ip2.join_on.value or ip2.join_on.value == INDEX:
             join_params["right_index"] = True
         else:
+            dfs[1] = dfs[1].reset_index(drop=True)
             join_params["right_on"] = ip2["join_on"].value
 
-        dfs = list(data.values())
         return dfs[0].merge(dfs[1], **join_params)
