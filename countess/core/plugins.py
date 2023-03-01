@@ -34,6 +34,7 @@ from countess.core.parameters import (
     ChoiceParam,
     FileArrayParam,
     FileParam,
+    FileSaveParam,
     MultiParam,
     StringParam,
 )
@@ -121,7 +122,7 @@ class BasePlugin:
         for k in key.split("."):
             # XXX types are a mess here
             param = param[k]  # type: ignore
-        if isinstance(param, FileParam):
+        if isinstance(param, (FileParam, FileSaveParam)):
             assert isinstance(value, str)
             param.value = os.path.join(base_dir, value)
         else:
