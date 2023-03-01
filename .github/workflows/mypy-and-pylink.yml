@@ -1,0 +1,31 @@
+name: MyPy and Pylint Checks
+on:
+  pull_request:
+  push:
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    name: MyPy
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: mypy $(git ls-files 'countess/*.py')
+  pylint:
+    runs-on: ubuntu-latest
+    name: MyPy
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: pylint $(git ls-files 'countess/*.py')
+
+
+

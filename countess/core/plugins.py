@@ -190,13 +190,13 @@ class DaskProgressCallback(Callback):
         self.logger = logger
         self.total_tasks = None
 
-    def _start_state(self, dsk, state):
+    def _start_state(self, dsk, state):  # pylint: disable=method-hidden
         self.total_tasks = len(state["ready"]) + len(state["waiting"])
 
-    def _posttask(self, key, result, dsk, state, worker_id):
+    def _posttask(self, key, result, dsk, state, worker_id):  # pylint: disable=method-hidden
         self.logger.progress("Running", 100 * len(state["finished"]) // self.total_tasks)
 
-    def _finish(self, dsk, state, failed):
+    def _finish(self, dsk, state, failed):  # pylint: disable=method-hidden
         # XXX do something with "failed"
         self.logger.progress("Done", 100)
 
@@ -279,6 +279,12 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         or do more work on the dataframes (eg: counting, renaming, etc)"""
         return concat_dataframes(dfs)
 
+    def run_dask(
+        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
+    ) -> pd.DataFrame | dd.DataFrame:
+        # this exists just to make pylint happy
+        pass
+
     def load_files(
         self,
         logger: Logger,
@@ -337,8 +343,13 @@ class DaskTransformPlugin(DaskBasePlugin):
 
     input_columns: list[str] = []
 
-    def prepare_dask(self, data: dd.DataFrame | pd.DataFrame, logger):
-        self.input_columns = sorted(data.columns)
+    def run_dask(
+        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
+    ) -> pd.DataFrame | dd.DataFrame:
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
+
+    def prepare_dask(self, df: dd.DataFrame | pd.DataFrame, logger):
+        self.input_columns = sorted(df.columns)
 
         for p in self.parameters.values():
             _set_column_choice_params(p, self.input_columns)
@@ -367,13 +378,13 @@ class DaskScoringPlugin(DaskTransformPlugin):
         )
     }
 
-    def prepare_dask(self, data, logger):
-        super().prepare(data, logger)
+    def prepare_dask(self, df, logger):
+        super().prepare(df, logger)
         for pp in self.parameters["scores"]:
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
 
-    def run_dask(self, data: dd.DataFrame, logger: Logger) -> dd.DataFrame:
+    def run_dask(self, df: dd.DataFrame, logger: Logger) -> dd.DataFrame:
         assert isinstance(self.parameters["scores"], ArrayParam)
         score_cols = []
         for pp in self.parameters["scores"]:
@@ -381,10 +392,10 @@ class DaskScoringPlugin(DaskTransformPlugin):
             ccols = [ppp.value for ppp in pp.counts]
 
             if scol and all(ccols):
-                data[scol] = self.score([data[col] for col in ccols])
+                df[scol] = self.score([df[col] for col in ccols])
                 score_cols.append(scol)
 
-        return data.replace([np.inf, -np.inf], np.nan).dropna(how="all", subset=score_cols)
+        return df.replace([np.inf, -np.inf], np.nan).dropna(how="all", subset=score_cols)
 
     def score(self, columns: List[dd.Series]) -> dd.Series:
         raise NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
@@ -401,8 +412,8 @@ class DaskReindexPlugin(DaskTransformPlugin):
     def translate_row(self, row):
         return self.translate(row.name)
 
-    def run_dask(self, data: dd.DataFrame, logger: Logger) -> dd.DataFrame:
-        data["__reindex"] = data.apply(
+    def run_dask(self, df: dd.DataFrame, logger: Logger) -> dd.DataFrame:
+        df["__reindex"] = df.apply(
             self.translate_row, axis=1, meta=pd.Series(self.translate_type())
         )
-        return data.groupby("__reindex").sum()
+        return df.groupby("__reindex").sum()

@@ -67,7 +67,7 @@ class TkEventState(IntFlag):
     BUTTON5 = 4096
 
 
-class TkCursors:
+class TkCursors(Enum):
     HAND = "hand1"
     ARROWS = "fleur"
     PLUS = "plus"
@@ -89,7 +89,7 @@ class DraggableMixin:  # pylint: disable=R0903
         self.bind("<B3-Motion>", self.__on_motion, add=True)
         self.bind("<ButtonRelease-1>", self.__on_release, add=True)
         self.bind("<ButtonRelease-3>", self.__on_release, add=True)
-        self["cursor"] = TkCursors.HAND
+        self["cursor"] = TkCursors.HAND.value
 
     def __on_button(self, event):
         if event.state & TkEventState.CONTROL or event.num == 3:
@@ -110,13 +110,13 @@ class DraggableMixin:  # pylint: disable=R0903
     def __on_timeout(self):
         if self.__state == self.__state.DRAG_WAIT:
             self.__state = self.__state.DRAGGING
-            self["cursor"] = TkCursors.ARROWS
+            self["cursor"] = TkCursors.ARROWS.value
         elif self.__state == self.__state.LINK_WAIT:
             self.__state = self.__state.LINKING
             self.__ghost = tk.Frame(self.master)
             self.__ghost.place(self.__place())
             self.__ghost_line = ConnectingLine(self.master, self, self.__ghost, "red", True)
-            self["cursor"] = TkCursors.PLUS
+            self["cursor"] = TkCursors.PLUS.value
 
     def __on_motion(self, event):
         if self.__state == self.__state.DRAGGING:
@@ -130,7 +130,7 @@ class DraggableMixin:  # pylint: disable=R0903
             self.__ghost.destroy()
             self.event_generate("<<GhostRelease>>", x=event.x, y=event.y)
         self.__state = self.__state.READY
-        self["cursor"] = TkCursors.HAND
+        self["cursor"] = TkCursors.HAND.value
 
 
 class FixedUnbindMixin:  # pylint: disable=R0903

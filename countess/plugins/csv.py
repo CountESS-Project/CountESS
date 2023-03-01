@@ -6,7 +6,15 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import *
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    ChoiceParam,
+    DataTypeOrNoneChoiceParam,
+    FileSaveParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
 
 # XXX it would be better to do the same this Regex Tool does and get the user to assign
@@ -63,8 +71,8 @@ class LoadCsvPlugin(DaskInputPlugin):
         "filename_column": StringParam("Filename Column", ""),
     }
 
-    def read_file_to_dataframe(self, file_param, logger, row_limit=None):
-        filename = file_param["filename"].value
+    def read_file_to_dataframe(self, file_params, logger, row_limit=None):
+        filename = file_params["filename"].value
 
         options = {
             "header": 0 if self.parameters["header"].value else None,
@@ -146,9 +154,13 @@ class SaveCsvPlugin(DaskBasePlugin):
         "quoting": BooleanParam("Quote all Strings", False),
     }
 
+    def run_dask(self, *_):
+        # shoosh pylint
+        pass
+
     def run(
         self,
-        obj: Any,
+        data: Any,
         logger,
         row_limit: Optional[int] = None,
     ):
@@ -169,15 +181,15 @@ class SaveCsvPlugin(DaskBasePlugin):
         }
 
         if row_limit is None:
-            if isinstance(obj, dd.DataFrame):
-                obj.to_csv(filename, single_file=True, compute=True, **options)
+            if isinstance(data, dd.DataFrame):
+                data.to_csv(filename, single_file=True, compute=True, **options)
             else:
-                obj.to_csv(filename, **options)
+                data.to_csv(filename, **options)
             return None
         else:
-            if isinstance(obj, dd.DataFrame):
-                obj = obj.compute()
+            if isinstance(data, dd.DataFrame):
+                data = data.compute()
 
             buf = StringIO()
-            obj.to_csv(buf, **options)
+            data.to_csv(buf, **options)
             return buf.getvalue()

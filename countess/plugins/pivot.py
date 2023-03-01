@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import dask.dataframe as dd
 
+from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
@@ -11,7 +12,6 @@ from countess.core.parameters import (
     MultiParam,
 )
 from countess.core.plugins import DaskTransformPlugin
-from countess import VERSION
 
 AGG_FUNCTIONS = ["first", "sum", "count", "mean"]
 

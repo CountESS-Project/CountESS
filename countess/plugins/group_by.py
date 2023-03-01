@@ -1,12 +1,9 @@
-from collections.abc import Iterable, Mapping
-from typing import Generator, Optional
-
 import dask.dataframe as dd
-import numpy as np
+import pandas as pd  # type: ignore
 
-from countess.core.parameters import ChoiceParam
-from countess.core.plugins import DaskTransformPlugin
 from countess import VERSION
+from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam
+from countess.core.plugins import DaskTransformPlugin
 
 
 class GroupByPlugin(DaskTransformPlugin):
@@ -24,7 +21,7 @@ class GroupByPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "column": ChoiceParam("Group By", "Index", choices=[]),
+        "column": ColumnOrIndexChoiceParam("Group By"),
         "operation": ChoiceParam(
             "Operation",
             "sum",
@@ -32,12 +29,12 @@ class GroupByPlugin(DaskTransformPlugin):
         ),
     }
 
-    def update(self):
-        self.parameters["column"].choices = ["Index"] + self.input_columns
-
-    def run_dask(self, ddf: dd.DataFrame, logger) -> dd.DataFrame:
-        col_name = self.parameters["column"].value
-        col = ddf.index if col_name == "Index" else ddf[col_name]
+    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> dd.DataFrame:
+        assert isinstance(self.parameters["column"], ColumnOrIndexChoiceParam)
+        if self.parameters["column"].is_index():
+            col = df.index
+        else:
+            col = df[self.parameters["column"].value]
         oper = self.parameters["operation"].value
 
-        return ddf.groupby(col).agg(oper)
+        return df.groupby(col).agg(oper)

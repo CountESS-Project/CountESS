@@ -1,11 +1,7 @@
-from collections.abc import Iterable, Mapping
-from typing import Generator, Optional
-
-import dask.dataframe as dd
 import numpy as np
 
-from countess.core.plugins import DaskScoringPlugin
 from countess import VERSION
+from countess.core.plugins import DaskScoringPlugin
 
 
 class LogScorePlugin(DaskScoringPlugin):
@@ -16,5 +12,5 @@ class LogScorePlugin(DaskScoringPlugin):
     description = "calculates log score from counts"
     version = VERSION
 
-    def score(self, cols):
-        return np.log(cols[1] / cols[0])
+    def score(self, columns):
+        return np.log(columns[1] / columns[0])

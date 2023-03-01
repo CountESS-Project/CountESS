@@ -1,25 +1,12 @@
-from collections.abc import Iterable, Mapping
 from itertools import islice
-from typing import Generator, Optional
 
-import dask.dataframe as dd
-import numpy as np
 import pandas as pd  # type: ignore
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
-from more_itertools import ichunked
 
 from countess import VERSION
-from countess.core.parameters import (
-    ArrayParam,
-    BooleanParam,
-    FileArrayParam,
-    FileParam,
-    FloatParam,
-    MultiParam,
-    StringParam,
-)
+from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dataframes, merge_dataframes
+from countess.utils.dask import concat_dataframes
 
 
 class LoadFastqPlugin(DaskInputPlugin):
@@ -39,13 +26,11 @@ class LoadFastqPlugin(DaskInputPlugin):
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
     }
 
-    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
+    def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         records = []
         count_column_name = "count"
-        if column_suffix:
-            count_column_name += "_" + column_suffix
 
-        with open(file_param["filename"].value, "r") as fh:
+        with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
             for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
                 if fastq_read.average_quality() >= self.parameters["min_avg_quality"].value:
                     records.append((fastq_read.sequence, 1))
@@ -54,7 +39,7 @@ class LoadFastqPlugin(DaskInputPlugin):
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then (optionally) group them by sequence"""
 
-        combined_df = concat_dask_dataframes(dfs)
+        combined_df = concat_dataframes(dfs)
 
         if len(combined_df) and self.parameters["group"].value:
             combined_df = combined_df.groupby(by=["sequence"]).sum()

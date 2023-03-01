@@ -1,9 +1,7 @@
-import itertools
-from collections.abc import Callable, Iterable, Mapping, MutableMapping
-from typing import Generator, Optional
+from collections.abc import Mapping, MutableMapping
+from typing import Optional
 
 import dask.dataframe as dd
-import numpy as np
 import pandas as pd  # type: ignore
 
 from countess import VERSION
@@ -13,9 +11,8 @@ from countess.core.parameters import (
     BooleanParam,
     ChoiceParam,
     MultiParam,
-    StringParam,
 )
-from countess.core.plugins import DaskBasePlugin, DaskProgressCallback
+from countess.core.plugins import DaskBasePlugin
 
 INDEX = "— INDEX —"
 

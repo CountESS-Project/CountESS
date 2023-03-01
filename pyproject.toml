@@ -73,7 +73,9 @@ disable = [
     "no-else-return",
     "too-many-ancestors",
     "too-many-arguments",
+    "too-many-branches",
     "too-many-instance-attributes",
+    "too-many-locals",
 ]
 
 [tool.black]

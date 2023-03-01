@@ -7,7 +7,6 @@ from typing import Mapping, Optional
 
 import dask.dataframe as dd
 import numpy as np
-import pandas as pd  # type: ignore
 
 from ..core.parameters import (
     ArrayParam,

@@ -3,7 +3,6 @@ import os.path
 import re
 import sys
 from configparser import ConfigParser
-from typing import Iterable
 
 from countess.core.logger import ConsoleLogger, Logger
 from countess.core.pipeline import PipelineGraph, PipelineNode

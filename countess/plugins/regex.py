@@ -1,13 +1,17 @@
-import math
 import re
-from typing import Optional
-
+from functools import partial
 import dask.dataframe as dd
-import numpy as np
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import *
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    ColumnOrIndexChoiceParam,
+    DataTypeChoiceParam,
+    MultiParam,
+    StringParam,
+)
 from countess.core.plugins import DaskInputPlugin, DaskTransformPlugin
 from countess.utils.dask import concat_dataframes
 
@@ -45,6 +49,18 @@ class RegexToolPlugin(DaskTransformPlugin):
         ),
     }
 
+    def apply_func(self, column_name, compiled_re, output_params, logger, row):
+        value = str(row[column_name])
+        match = compiled_re.match(value)
+        if match:
+            return [
+                output_params[n].datatype.cast_value(g)
+                for n, g in enumerate(match.groups())
+            ]
+        else:
+            logger.warning("Didn't Match", detail=repr(value))
+            return [None] * compiled_re.groups
+
     def run_dask(self, df, logger):
         # prevent added columns from propagating backwards in
         # the pipeline!
@@ -73,17 +89,8 @@ class RegexToolPlugin(DaskTransformPlugin):
             else:
                 column_name = regex_parameter["column"].value
 
-            def func(row):
-                value = str(row[column_name])
-                match = compiled_re.match(value)
-                if match:
-                    return [
-                        output_params[n].datatype.cast_value(g)
-                        for n, g in enumerate(match.groups())
-                    ]
-                else:
-                    logger.warning(f"Didn't Match", detail=repr(value))
-                    return [None] * compiled_re.groups
+            # XXX not totally happy with this
+            func = partial(self.apply_func, column_name, compiled_re, output_params, logger)
 
             if isinstance(df, dd.DataFrame):
                 # dask likes a hint about column types
@@ -134,7 +141,7 @@ class RegexReaderPlugin(DaskInputPlugin):
         ),
     }
 
-    def read_file_to_dataframe(self, file_param, logger, row_limit=None):
+    def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         pdfs = []
 
         compiled_re = re.compile(self.parameters["regex"].value)
@@ -151,7 +158,7 @@ class RegexReaderPlugin(DaskInputPlugin):
         ] or None
 
         records = []
-        with open(file_param["filename"].value, "r") as fh:
+        with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
             for num, line in enumerate(fh):
                 if num == 0 and self.parameters["skip"].value:
                     continue
@@ -174,7 +181,7 @@ class RegexReaderPlugin(DaskInputPlugin):
                     )
                     records = []
 
-        if len(records):
+        if len(records) > 0:
             pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
 
         return concat_dataframes(pdfs)
