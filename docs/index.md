@@ -1,3 +1,1 @@
-# CountESS: Web Documentation
-
 (placeholder)
