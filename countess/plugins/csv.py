@@ -45,10 +45,11 @@ class LoadCsvPlugin(DaskInputPlugin):
 
     name = "CSV Load"
     title = "Load from CSV"
-    description = "Loads columns from CSV files and merges them into the data"
+    description = "Loads data from CSV or similar delimited text files and assigns types to columns"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/plugins/#csv-reader"
 
-    file_types = [("CSV", "*.csv"), ("TSV", "*.tsv")]
+    file_types = [("CSV", "*.csv"), ("TSV", "*.tsv"), ("TXT", "*.txt")]
 
     parameters = {
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
@@ -143,9 +144,10 @@ class LoadCsvPlugin(DaskInputPlugin):
 class SaveCsvPlugin(DaskBasePlugin):
     name = "CSV Save"
     title = "Save to CSV"
-    description = "CSV CSV CSV"
+    description = "Save data as CSV or similar delimited text files"
+    link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
 
-    file_types = [("CSV", "*.csv")]
+    file_types = [("CSV", "*.csv"), ("TSV", "*.tsv"), ("TXT", "*.txt")]
 
     parameters = {
         "header": BooleanParam("CSV header row?", True),
@@ -153,10 +155,6 @@ class SaveCsvPlugin(DaskBasePlugin):
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"]),
         "quoting": BooleanParam("Quote all Strings", False),
     }
-
-    def run_dask(self, *_):
-        # shoosh pylint
-        pass
 
     def run(
         self,

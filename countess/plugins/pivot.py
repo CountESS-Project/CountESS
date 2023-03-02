@@ -24,6 +24,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
     title = "Pivot Tool"
     description = "..."
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/plugins/#pivot-tool"
 
     parameters = {
         "index": ArrayParam("Index By", ColumnChoiceParam("Column")),

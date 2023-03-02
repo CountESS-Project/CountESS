@@ -1,5 +1,6 @@
 import re
 from functools import partial
+
 import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
@@ -21,6 +22,7 @@ class RegexToolPlugin(DaskTransformPlugin):
     title = "Apply regular expressions to column(s) to make new column(s)"
     description = """..."""
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/plugins/#regex-tool"
 
     parameters = {
         "regexes": ArrayParam(
@@ -53,10 +55,7 @@ class RegexToolPlugin(DaskTransformPlugin):
         value = str(row[column_name])
         match = compiled_re.match(value)
         if match:
-            return [
-                output_params[n].datatype.cast_value(g)
-                for n, g in enumerate(match.groups())
-            ]
+            return [output_params[n].datatype.cast_value(g) for n, g in enumerate(match.groups())]
         else:
             logger.warning("Didn't Match", detail=repr(value))
             return [None] * compiled_re.groups
@@ -119,6 +118,7 @@ class RegexReaderPlugin(DaskInputPlugin):
       to each line to extract fields.  If you're trying to read generic CSV or TSV files, use the CSV
       plugin instead as it handles escaping correctly."""
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/plugins/#regex-reader"
 
     file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]
 

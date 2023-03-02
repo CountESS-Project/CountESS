@@ -64,6 +64,7 @@ readme = { file = "README.md", content-type="text/markdown" }
 
 [tool.pylint]
 disable = [
+    "consider-using-f-string",
     "fixme",
     "missing-module-docstring",
     "missing-class-docstring",
