@@ -13,6 +13,7 @@ class PipelineNode:
     name: str
     plugin: Optional[BasePlugin] = None
     position: Optional[tuple[float, float]] = None
+    notes: Optional[str] = None
     parent_nodes: set["PipelineNode"] = field(default_factory=set)
     child_nodes: set["PipelineNode"] = field(default_factory=set)
     result: Any = None

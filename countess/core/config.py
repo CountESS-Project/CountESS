@@ -44,6 +44,7 @@ def read_config(
             plugin = None
 
         position_str = config_dict.get("_position")
+        notes = config_dict.get("_notes")
 
         position = None
         if position_str:
@@ -60,6 +61,7 @@ def read_config(
             name=section_name,
             plugin=plugin,
             position=position,
+            notes=notes,
         )
         pipeline_graph.nodes.append(node)
 
@@ -102,6 +104,8 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
             )
         if node.position:
             cp[node.name]["_position"] = " ".join(str(int(x * 1000)) for x in node.position)
+        if node.notes:
+            cp[node.name]["_notes"] = node.notes
         for n, parent in enumerate(node.parent_nodes):
             cp[node.name][f"_parent.{n}"] = parent.name
         if node.plugin:

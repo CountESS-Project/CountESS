@@ -3,6 +3,7 @@ import random
 import re
 import sys
 import tkinter as tk
+import webbrowser
 from enum import Enum, IntFlag
 from functools import partial
 from tkinter import filedialog, messagebox, ttk
@@ -72,6 +73,8 @@ class TkCursors(Enum):
     ARROWS = "fleur"
     PLUS = "plus"
 
+
+UNICODE_INFO = "\u2139"
 
 DraggableMixinState = Enum(
     "DraggableMixinState", ["READY", "DRAG_WAIT", "LINK_WAIT", "DRAGGING", "LINKING"]
@@ -603,9 +606,17 @@ class ConfiguratorWrapper:
 
         self.name_var = tk.StringVar(self.frame, value=node.name)
         tk.Entry(self.frame, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")).grid(
-            row=0, sticky=tk.EW, padx=10, pady=5
+            row=0, columnspan=2, sticky=tk.EW, padx=10, pady=5
         )
         self.name_var.trace("w", self.name_changed_callback)
+
+        self.label = tk.Label(self.frame, justify=tk.LEFT, wraplength=500)
+        self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
+        self.label.bind("<Configure>", self.on_label_configure)
+
+        self.notes_widget = tk.Text(self.frame, height=5)
+        self.notes_widget.insert("1.0", node.notes or "")
+        self.notes_widget.bind("<<Modified>>", self.notes_modified_callback)
 
         self.logger_subframe = LoggerFrame(self.frame)
         self.logger = self.logger_subframe.get_logger(node.name)
@@ -617,6 +628,17 @@ class ConfiguratorWrapper:
         if self.config_subframe:
             self.config_subframe.destroy()
         if self.node.plugin:
+            self.label['text'] = "%s %s — %s" % (
+                self.node.plugin.name,
+                self.node.plugin.version,
+                self.node.plugin.description,
+            )
+            if self.node.plugin.link:
+                tk.Button(
+                    self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
+                ).grid(row=1, column=1, sticky=tk.SE, padx=10)
+            self.notes_widget.grid(row=2, columnspan=2,
+                                   sticky=tk.EW, padx=10, pady=5)
             self.configurator = PluginConfigurator(
                 self.frame, self.node.plugin, self.config_change_callback
             )
@@ -625,7 +647,13 @@ class ConfiguratorWrapper:
             self.config_subframe = PluginChooserFrame(
                 self.frame, "Choose Plugin", self.choose_plugin
             )
-        self.config_subframe.grid(row=1, sticky=tk.NSEW)
+        self.config_subframe.grid(row=3, columnspan=2, sticky=tk.NSEW)
+
+    def on_label_configure(self, *_):
+        self.label['wraplength'] = self.label.winfo_width() - 20
+
+    def on_info_button_press(self, *_):
+        webbrowser.open_new_tab(self.node.plugin.link)
 
     def show_preview_subframe(self):
         if self.preview_subframe:
@@ -647,10 +675,10 @@ class ConfiguratorWrapper:
             self.preview_subframe = tk.Frame(self.frame)
             tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.NSEW)
 
-        self.preview_subframe.grid(row=2, column=0, sticky=tk.NSEW)
+        self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
         if self.logger.count > 0:
-            self.logger_subframe.grid(row=3, sticky=tk.NSEW)
+            self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
         else:
             self.logger_subframe.grid_forget()
 
@@ -658,6 +686,10 @@ class ConfiguratorWrapper:
         name = self.name_var.get()
         self.node.name = name
         self.change_callback(self.node)
+
+    def notes_modified_callback(self, *_):
+        self.node.notes = self.notes_widget.get("1.0", tk.END)
+        self.notes_widget.edit_modified(False)
 
     def config_change_callback(self, *_):
         self.node.mark_dirty()
@@ -703,17 +735,12 @@ class ConfiguratorWrapper:
 
 
 class ButtonMenu:  # pylint: disable=R0903
-    def __init__(self, tk_parent, buttons, label):
+    def __init__(self, tk_parent, buttons):
         self.frame = tk.Frame(tk_parent)
         for button_number, (button_label, button_command) in enumerate(buttons):
             tk.Button(self.frame, text=button_label, command=button_command).grid(
                 row=0, column=button_number, sticky=tk.EW
             )
-
-        tk.Label(self.frame, text=label, font=("TkHeadingFont", 14, "bold")).grid(
-            row=0, column=len(buttons), sticky=tk.E
-        )
-        self.frame.columnconfigure(len(buttons), weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
 
@@ -740,7 +767,6 @@ class MainWindow:
                 ("Run", self.program_run),
                 ("Exit", self.program_exit),
             ],
-            f"CountESS {VERSION}",
         )
 
         self.frame = tk.Frame(tk_parent)
@@ -751,8 +777,10 @@ class MainWindow:
         self.subframe.columnconfigure(0, weight=1)
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
-        self.subframe.rowconfigure(2, weight=1)
-        self.subframe.rowconfigure(3, weight=0)
+        self.subframe.rowconfigure(2, weight=0)
+        self.subframe.rowconfigure(3, weight=1)
+        self.subframe.rowconfigure(4, weight=2)
+        self.subframe.rowconfigure(5, weight=0)
 
         self.frame.bind("<Configure>", self.on_frame_configure, add=True)
 

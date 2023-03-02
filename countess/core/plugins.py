@@ -19,6 +19,7 @@ import importlib
 import importlib.metadata
 import logging
 import os.path
+import sys
 from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any, List, Optional
 
@@ -70,9 +71,13 @@ class BasePlugin:
     name: str = ""
     title: str = ""
     description: str = ""
-    version: str = "0.0.0"
+    link: Optional[str] = "https://nick.zoic.org/"
 
     parameters: MutableMapping[str, BaseParam] = {}
+
+    @property
+    def version(self):
+        return sys.modules[self.__module__].VERSION
 
     def __init__(self, plugin_name=None):
         # Parameters store the actual values they are set to, so we copy them
@@ -212,8 +217,8 @@ class DaskBasePlugin(BasePlugin):
     ):
         raise NotImplementedError(f"{self.__class__}.run()")
 
-class DaskTransformPlugin(DaskBasePlugin):
 
+class DaskTransformPlugin(DaskBasePlugin):
     input_columns: list[str] = []
 
     def prepare_dask(self, df: dd.DataFrame | pd.DataFrame, logger: Logger):
