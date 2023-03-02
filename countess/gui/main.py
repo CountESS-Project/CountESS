@@ -622,7 +622,8 @@ class ConfiguratorWrapper:
         self.logger = self.logger_subframe.get_logger(node.name)
 
         self.show_config_subframe()
-        self.show_preview_subframe()
+        if self.node.plugin:
+            self.show_preview_subframe()
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -673,7 +674,8 @@ class ConfiguratorWrapper:
             text.grid(sticky=tk.NSEW)
         else:
             self.preview_subframe = tk.Frame(self.frame)
-            tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.NSEW)
+            self.preview_subframe.columnconfigure(0, weight=1)
+            tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
