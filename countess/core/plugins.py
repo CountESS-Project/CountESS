@@ -71,7 +71,7 @@ class BasePlugin:
     name: str = ""
     title: str = ""
     description: str = ""
-    link: Optional[str] = "https://nick.zoic.org/"
+    link: Optional[str] = None
 
     parameters: MutableMapping[str, BaseParam] = {}
 
