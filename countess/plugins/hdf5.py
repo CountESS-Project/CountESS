@@ -1,7 +1,11 @@
 from typing import Optional
 
 import pandas as pd  # type: ignore
-import tables
+
+try:
+    import tables  # type: ignore  # pylint: disable=unused-import
+except ImportError as exc:
+    raise NotImplementedError("HDF5 Plugin needs Pytables") from exc
 
 from countess import VERSION
 from countess.core.parameters import (
