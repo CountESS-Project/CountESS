@@ -47,7 +47,12 @@ PRERUN_ROW_LIMIT = 100
 def get_plugin_classes():
     plugin_classes = set()
     for ep in importlib.metadata.entry_points(group="countess_plugins"):
-        plugin_class = ep.load()
+        try:
+            plugin_class = ep.load()
+        except (ModuleNotFoundError, ImportError) as exc:
+            logging.warning("%s could not be loaded: %s", plugin_class, exc)
+            continue
+
         if issubclass(plugin_class, BasePlugin):
             plugin_classes.add(plugin_class)
         else:

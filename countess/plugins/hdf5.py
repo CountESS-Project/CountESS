@@ -1,6 +1,7 @@
 from typing import Optional
 
 import pandas as pd  # type: ignore
+import tables
 
 from countess import VERSION
 from countess.core.parameters import (
