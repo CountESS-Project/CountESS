@@ -3,17 +3,13 @@ from typing import Optional
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import (
-    ChoiceParam,
-    MultiParam,
-)
+from countess.core.parameters import ChoiceParam, MultiParam
 from countess.core.plugins import DaskInputPlugin
 from countess.utils.dask import empty_dask_dataframe
 
 
 class LoadHdfPlugin(DaskInputPlugin):
     name = "HDF5 Load"
-    title = "Load from HDF5"
     description = "Loads counts from HDF5 files"
     version = VERSION
 
@@ -41,9 +37,8 @@ class LoadHdfPlugin(DaskInputPlugin):
         return df
 
 
-#class StoreHdfPlugin(DaskBasePlugin):
+# class StoreHdfPlugin(DaskBasePlugin):
 #    name = "HDF Writer"
-#    title = "HDF Writer"
 #    description = "Write to HDF5"
 #
 #    params = {

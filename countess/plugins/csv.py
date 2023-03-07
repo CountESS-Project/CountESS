@@ -44,10 +44,9 @@ class LoadCsvPlugin(DaskInputPlugin):
     """Load CSV files"""
 
     name = "CSV Load"
-    title = "Load from CSV"
     description = "Loads data from CSV or similar delimited text files and assigns types to columns"
-    version = VERSION
     link = "https://countess-project.github.io/CountESS/plugins/#csv-reader"
+    version = VERSION
 
     file_types = [("CSV", "*.csv"), ("TSV", "*.tsv"), ("TXT", "*.txt")]
 
@@ -143,9 +142,9 @@ class LoadCsvPlugin(DaskInputPlugin):
 
 class SaveCsvPlugin(DaskBasePlugin):
     name = "CSV Save"
-    title = "Save to CSV"
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
+    version = VERSION
 
     file_types = [("CSV", "*.csv"), ("TSV", "*.tsv"), ("TXT", "*.txt")]
 

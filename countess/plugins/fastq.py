@@ -15,7 +15,6 @@ class LoadFastqPlugin(DaskInputPlugin):
     in multiple columns."""
 
     name = "FASTQ Load"
-    title = "Load from FastQ"
     description = "Loads counts from FASTQ files containing either variant or barcodes"
     version = VERSION
 

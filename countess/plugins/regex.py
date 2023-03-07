@@ -19,10 +19,9 @@ from countess.utils.dask import concat_dataframes
 
 class RegexToolPlugin(DaskTransformPlugin):
     name = "Regex Tool"
-    title = "Apply regular expressions to column(s) to make new column(s)"
-    description = """..."""
-    version = VERSION
+    description = "Apply regular expressions to column(s) to make new column(s)"
     link = "https://countess-project.github.io/CountESS/plugins/#regex-tool"
+    version = VERSION
 
     parameters = {
         "regexes": ArrayParam(
@@ -113,12 +112,11 @@ class RegexToolPlugin(DaskTransformPlugin):
 
 class RegexReaderPlugin(DaskInputPlugin):
     name = "Regex Reader"
-    title = "Load arbitrary data from line-delimited files"
     description = """Loads arbitrary data from line-delimited files, applying a regular expression
       to each line to extract fields.  If you're trying to read generic CSV or TSV files, use the CSV
       plugin instead as it handles escaping correctly."""
-    version = VERSION
     link = "https://countess-project.github.io/CountESS/plugins/#regex-reader"
+    version = VERSION
 
     file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]
 

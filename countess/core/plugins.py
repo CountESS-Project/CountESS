@@ -69,14 +69,13 @@ class BasePlugin:
     as plugins."""
 
     name: str = ""
-    title: str = ""
     description: str = ""
     link: Optional[str] = None
 
     parameters: MutableMapping[str, BaseParam] = {}
 
     @property
-    def version(self):
+    def version(self) -> str:
         return sys.modules[self.__module__].VERSION
 
     def __init__(self, plugin_name=None):
@@ -158,10 +157,6 @@ class FileInputMixin:
     # used by the GUI file dialog
     file_types = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
-
-    parameters: MutableMapping[str, BaseParam] = {
-        "files": FileArrayParam("Files", FileParam("File"))
-    }
 
     def prepare(self, obj: Any, logger: Logger) -> bool:
         if obj is not None:

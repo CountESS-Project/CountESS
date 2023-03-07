@@ -24,7 +24,6 @@ def process(df: pd.DataFrame, codes):
 
 class EmbeddedPythonPlugin(DaskTransformPlugin):
     name = "Embedded Python"
-    title = "Embedded Python"
     description = "Embed Python code into CountESS"
     version = VERSION
 

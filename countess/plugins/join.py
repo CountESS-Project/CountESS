@@ -6,23 +6,17 @@ import pandas as pd  # type: ignore
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import (
-    ArrayParam,
-    BooleanParam,
-    ChoiceParam,
-    MultiParam,
-)
+from countess.core.parameters import ArrayParam, BooleanParam, ChoiceParam, MultiParam
 from countess.core.plugins import DaskBasePlugin
 
 INDEX = "— INDEX —"
 
 
 class DaskJoinPlugin(DaskBasePlugin):
-    """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
+    """Joins Dask Dataframes"""
 
     name = "Join"
-    title = "Join"
-    description = "..."
+    description = "Joins two Dask Dataframes by indexes or columns"
     version = VERSION
 
     parameters = {

@@ -7,7 +7,6 @@ VERSION = "0.0.0"
 class DoNothingPlugin(DaskTransformPlugin):
 
     name: str = 'Do Nothing'
-    title: str = 'Example Plugin: Do Nothing'
     description: str = "An example CountESS plugin which does nothing at all"
     version: str = VERSION
 

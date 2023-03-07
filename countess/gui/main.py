@@ -13,11 +13,7 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.config import (
-    export_config_graphviz,
-    read_config,
-    write_config,
-)
+from countess.core.config import export_config_graphviz, read_config, write_config
 from countess.core.logger import ConsoleLogger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import get_plugin_classes
@@ -267,12 +263,13 @@ class PluginChooserFrame(tk.Frame):
         label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
+            label_text = plugin_class.description.split('. ')[0]
             ttk.Button(
                 label_frame,
                 text=plugin_class.name,
                 command=lambda plugin_class=plugin_class: callback(plugin_class),
             ).grid(row=n + 1, column=0, sticky=tk.EW)
-            ttk.Label(label_frame, text=plugin_class.title).grid(
+            ttk.Label(label_frame, text=label_text).grid(
                 row=n + 1, column=1, sticky=tk.W, padx=10
             )
 
@@ -629,7 +626,7 @@ class ConfiguratorWrapper:
         if self.config_subframe:
             self.config_subframe.destroy()
         if self.node.plugin:
-            self.label['text'] = "%s %s — %s" % (
+            self.label["text"] = "%s %s — %s" % (
                 self.node.plugin.name,
                 self.node.plugin.version,
                 self.node.plugin.description,
@@ -638,8 +635,7 @@ class ConfiguratorWrapper:
                 tk.Button(
                     self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
                 ).grid(row=1, column=1, sticky=tk.SE, padx=10)
-            self.notes_widget.grid(row=2, columnspan=2,
-                                   sticky=tk.EW, padx=10, pady=5)
+            self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
             self.configurator = PluginConfigurator(
                 self.frame, self.node.plugin, self.config_change_callback
             )
@@ -651,7 +647,7 @@ class ConfiguratorWrapper:
         self.config_subframe.grid(row=3, columnspan=2, sticky=tk.NSEW)
 
     def on_label_configure(self, *_):
-        self.label['wraplength'] = self.label.winfo_width() - 20
+        self.label["wraplength"] = self.label.winfo_width() - 20
 
     def on_info_button_press(self, *_):
         webbrowser.open_new_tab(self.node.plugin.link)

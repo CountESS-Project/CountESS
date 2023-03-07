@@ -21,8 +21,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
     """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
-    title = "Pivot Tool"
-    description = "..."
+    description = "Groups a dataframe and pivots column values into columns"
     version = VERSION
     link = "https://countess-project.github.io/CountESS/plugins/#pivot-tool"
 

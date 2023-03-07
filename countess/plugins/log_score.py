@@ -8,7 +8,6 @@ class LogScorePlugin(DaskScoringPlugin):
     """Log Scorer"""
 
     name = "Log Scorer"
-    title = "Log Scores from Counts"
     description = "calculates log score from counts"
     version = VERSION
 
