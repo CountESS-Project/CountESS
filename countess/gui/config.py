@@ -20,6 +20,7 @@ from ..core.parameters import (
     IntegerParam,
     MultiParam,
     SimpleParam,
+    TabularMultiParam,
     TextParam,
 )
 from ..core.plugins import BasePlugin
@@ -71,7 +72,7 @@ class ParameterWrapper:
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices
-            self.entry.state(["readonly"])
+            self.entry.state(["readonly"])  # don't allow other options
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value(parameter.value)
@@ -101,8 +102,9 @@ class ParameterWrapper:
             if parameter.read_only:
                 self.entry.state(["readonly"])
 
-        elif isinstance(parameter, ArrayParam) and self.level == 0:
+        elif isinstance(parameter, ArrayParam) and self.level == 0 and not isinstance(parameter.param, TabularMultiParam):
             self.entry = ttk.Frame(tk_parent)
+            tk.Label(self.entry, text="FNORD").grid()
             self.entry.columnconfigure(0, weight=1)
             drc = self.delete_row_callback if not parameter.read_only else None
             self.update_subwrappers_framed(parameter.params, drc)
@@ -114,17 +116,18 @@ class ParameterWrapper:
                 )
                 self.button.grid(row=len(parameter.params) + 1)
 
-        elif isinstance(parameter, ArrayParam) and self.level < 3:
+        elif isinstance(parameter, ArrayParam) and (self.level < 3 or isinstance(parameter.param, TabularMultiParam)):
             label_frame_label = tk.Frame(tk_parent)
             tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
             self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
-            self.button = tk.Button(
-                label_frame_label,
-                text=UNICODE_PLUS,
-                width=2,
-                command=self.add_row_callback,
-            )
-            self.button.grid(row=0, column=1, padx=10)
+            if not parameter.read_only:
+                self.button = tk.Button(
+                    label_frame_label,
+                    text=UNICODE_PLUS,
+                    width=2,
+                    command=self.add_row_callback,
+                )
+                self.button.grid(row=0, column=1, padx=10)
 
             drc = self.delete_row_callback if not parameter.read_only else None
             if isinstance(parameter.param, MultiParam):
@@ -176,7 +179,8 @@ class ParameterWrapper:
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def update(self):
-        if isinstance(self.parameter, ArrayParam) and self.level == 0:
+        print("UPDATE")
+        if isinstance(self.parameter, ArrayParam) and self.level == 0 and not isinstance(self.parameter.param, TabularMultiParam):
             self.update_subwrappers_framed(self.parameter.params, self.delete_row_callback)
             if self.button:
                 self.button.grid(row=len(self.parameter.params) + 1, padx=10)
@@ -185,9 +189,9 @@ class ParameterWrapper:
             and isinstance(self.parameter.param, MultiParam)
             and self.level < 3
         ):
-            self.update_subwrappers_tabular(self.parameter.params, self.delete_row_callback)
+            self.update_subwrappers_tabular(self.parameter.params, self.delete_row_callback if not self.parameter.read_only else None)
         elif isinstance(self.parameter, ArrayParam):
-            self.update_subwrappers(self.parameter.params, self.delete_row_callback)
+            self.update_subwrappers(self.parameter.params, self.delete_row_callback if not self.parameter.read_only else None)
             if self.button:
                 self.button["state"] = (
                     tk.DISABLED

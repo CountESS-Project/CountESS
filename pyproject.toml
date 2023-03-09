@@ -26,7 +26,6 @@ dependencies = [
     'more_itertools>=8.14.0',
     'numpy~=1.23',
     'pandas~=1.4',
-    'tables~=3.7',
     'ttkthemes~=3.2',
 ]
 

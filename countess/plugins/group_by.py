@@ -2,7 +2,7 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam
+from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam, PerColumnArrayParam, MultiParam, BooleanParam, MultipleChoiceParam, TabularMultiParam
 from countess.core.plugins import DaskTransformPlugin
 
 
@@ -16,25 +16,29 @@ class GroupByPlugin(DaskTransformPlugin):
     # same for every column.
 
     name = "Group By"
-    title = "Groups records by a column"
     description = "Group records by a column"
     version = VERSION
 
     parameters = {
-        "column": ColumnOrIndexChoiceParam("Group By"),
-        "operation": ChoiceParam(
-            "Operation",
-            "sum",
-            choices=["sum", "size", "std", "var", "sem", "min", "max"],
-        ),
+        "columns": PerColumnArrayParam("Columns",
+             TabularMultiParam("Column", {
+                 "index": BooleanParam("Index"),
+                 "sum": BooleanParam("Sum"),
+                 "count": BooleanParam("Count"),
+                 "std": BooleanParam("Std"),
+                 "var": BooleanParam("Var"),
+                 "sem": BooleanParam("Sem"),
+                 "min": BooleanParam("Min"),
+                 "max": BooleanParam("Max"),
+             })
+        )
     }
 
     def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> dd.DataFrame:
-        assert isinstance(self.parameters["column"], ColumnOrIndexChoiceParam)
-        if self.parameters["column"].is_index():
-            col = df.index
-        else:
-            col = df[self.parameters["column"].value]
-        oper = self.parameters["operation"].value
 
-        return df.groupby(col).agg(oper)
+        for p in self.parameters['columns']:
+            if p['index'].value:
+                for k, pp in p.params.items():
+                    pp.value = k == 'index'
+        
+        return df

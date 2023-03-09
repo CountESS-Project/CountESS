@@ -309,6 +309,7 @@ class ColumnChoiceParam(ChoiceParam):
     def set_column_choices(self, choices):
         self.set_choices(list(choices))
 
+
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     INDEX_VALUE = "— INDEX —"
 
@@ -328,6 +329,9 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
     def is_none(self):
         return self.value == self.NONE_VALUE
 
+
+class MultipleChoiceParam(ChoiceParam):
+    pass
 
 class ArrayParam(BaseParam):
     """An ArrayParam contains zero or more copies of `param`, which can be a
@@ -432,6 +436,28 @@ class ArrayParam(BaseParam):
         for p in self.params:
             p.set_column_choices(choices)
 
+
+class PerColumnArrayParam(ArrayParam):
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.params_by_column_name : Mapping[str,BaseParam] = {}
+        self.read_only = True
+
+    def set_column_choices(self, choices):
+        print(f"PCAP:SCC {choices}")
+        self.params = [ None ] * len(choices)
+        for num, name in enumerate(choices):
+            if name not in self.params_by_column_name:
+                self.params_by_column_name[name] = self.param.copy()
+            self.params[num] = self.params_by_column_name[name]
+            self.params[num].label = f'Column {num+1}: "{name}"'
+            self.params[num].set_column_choices(choices)
+        for name in list(self.params_by_column_name.keys()):
+            if name not in choices:
+                del self.params_by_column_name[name]
+
+
 class FileArrayParam(ArrayParam):
     """FileArrayParam is an ArrayParam arranged per-file.  Using this class
     really just marks it as expecting to be populated from an open file
@@ -521,3 +547,6 @@ class MultiParam(BaseParam):
     def set_column_choices(self, choices):
         for p in self.params.values():
             p.set_column_choices(choices)
+
+class TabularMultiParam(MultiParam):
+    pass
