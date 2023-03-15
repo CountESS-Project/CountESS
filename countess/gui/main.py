@@ -263,15 +263,13 @@ class PluginChooserFrame(tk.Frame):
         label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
-            label_text = plugin_class.description.split('. ')[0]
+            label_text = plugin_class.description.split(". ")[0]
             ttk.Button(
                 label_frame,
                 text=plugin_class.name,
                 command=lambda plugin_class=plugin_class: callback(plugin_class),
             ).grid(row=n + 1, column=0, sticky=tk.EW)
-            ttk.Label(label_frame, text=label_text).grid(
-                row=n + 1, column=1, sticky=tk.W, padx=10
-            )
+            ttk.Label(label_frame, text=label_text).grid(row=n + 1, column=1, sticky=tk.W, padx=10)
 
 
 class FlippyCanvas(FixedUnbindMixin, tk.Canvas):

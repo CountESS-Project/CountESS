@@ -2,7 +2,11 @@ import dask.dataframe as dd
 import pandas as pd  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam, PerColumnArrayParam, MultiParam, BooleanParam, MultipleChoiceParam, TabularMultiParam
+from countess.core.parameters import (
+    BooleanParam,
+    PerColumnArrayParam,
+    TabularMultiParam,
+)
 from countess.core.plugins import DaskTransformPlugin
 
 
@@ -20,25 +24,29 @@ class GroupByPlugin(DaskTransformPlugin):
     version = VERSION
 
     parameters = {
-        "columns": PerColumnArrayParam("Columns",
-             TabularMultiParam("Column", {
-                 "index": BooleanParam("Index"),
-                 "sum": BooleanParam("Sum"),
-                 "count": BooleanParam("Count"),
-                 "std": BooleanParam("Std"),
-                 "var": BooleanParam("Var"),
-                 "sem": BooleanParam("Sem"),
-                 "min": BooleanParam("Min"),
-                 "max": BooleanParam("Max"),
-             })
+        "columns": PerColumnArrayParam(
+            "Columns",
+            TabularMultiParam(
+                "Column",
+                {
+                    "index": BooleanParam("Index"),
+                    "sum": BooleanParam("Sum"),
+                    "count": BooleanParam("Count"),
+                    "std": BooleanParam("Std"),
+                    "var": BooleanParam("Var"),
+                    "sem": BooleanParam("Sem"),
+                    "min": BooleanParam("Min"),
+                    "max": BooleanParam("Max"),
+                },
+            ),
         )
     }
 
     def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> dd.DataFrame:
-
-        for p in self.parameters['columns']:
-            if p['index'].value:
+        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
+        for p in self.parameters["columns"]:
+            if p["index"].value:
                 for k, pp in p.params.items():
-                    pp.value = k == 'index'
-        
+                    pp.value = k == "index"
+
         return df

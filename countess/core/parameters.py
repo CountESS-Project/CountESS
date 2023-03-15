@@ -333,6 +333,7 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 class MultipleChoiceParam(ChoiceParam):
     pass
 
+
 class ArrayParam(BaseParam):
     """An ArrayParam contains zero or more copies of `param`, which can be a
     SimpleParam or a MultiParam."""
@@ -438,15 +439,14 @@ class ArrayParam(BaseParam):
 
 
 class PerColumnArrayParam(ArrayParam):
-
-    def __init__(self, *a, **k):
+    def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
-        self.params_by_column_name : Mapping[str,BaseParam] = {}
+        self.params_by_column_name: Mapping[str, BaseParam] = {}
         self.read_only = True
 
     def set_column_choices(self, choices):
         print(f"PCAP:SCC {choices}")
-        self.params = [ None ] * len(choices)
+        self.params = [None] * len(choices)
         for num, name in enumerate(choices):
             if name not in self.params_by_column_name:
                 self.params_by_column_name[name] = self.param.copy()
@@ -547,6 +547,7 @@ class MultiParam(BaseParam):
     def set_column_choices(self, choices):
         for p in self.params.values():
             p.set_column_choices(choices)
+
 
 class TabularMultiParam(MultiParam):
     pass
