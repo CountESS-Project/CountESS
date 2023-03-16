@@ -3,7 +3,7 @@ import math
 import tkinter as tk
 from functools import partial
 from tkinter import filedialog, ttk
-from typing import Mapping, Optional
+from typing import Mapping, MutableMapping, Optional
 
 import dask.dataframe as dd
 import numpy as np
@@ -138,8 +138,10 @@ class ParameterWrapper:
             drc = self.delete_row_callback if not parameter.read_only else None
             if isinstance(parameter.param, MultiParam):
                 for n, pp in enumerate(parameter.param.values()):
-                    tk.Label(self.entry, text=pp.label).grid(row=0, column=n, sticky=tk.EW, padx=10)
-                    self.entry.columnconfigure(n, weight=1)
+                    tk.Label(self.entry, text=pp.label).grid(
+                        row=0, column=n + 1, sticky=tk.EW, padx=10
+                    )
+                    self.entry.columnconfigure(n + 1, weight=1)
 
                 self.update_subwrappers_tabular(parameter.params, drc)
             else:
@@ -185,7 +187,6 @@ class ParameterWrapper:
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def update(self):
-        print("UPDATE")
         if (
             isinstance(self.parameter, ArrayParam)
             and self.level == 0
@@ -217,12 +218,21 @@ class ParameterWrapper:
                 )
         elif isinstance(self.parameter, MultiParam):
             self.update_subwrappers(self.parameter.params.values(), None)
+        elif isinstance(self.parameter, ChoiceParam):
+            self.entry["values"] = self.parameter.choices
+        elif isinstance(self.parameter, BooleanParam):
+            self.set_checkbox_value(self.parameter.value)
+        elif isinstance(self.parameter, TextParam):
+            if self.parameter.read_only:
+                self.entry["state"] = "normal"
+            self.entry.replace("1.0", tk.END, self.parameter.value)
+            if self.parameter.read_only:
+                self.entry["state"] = "disabled"
+        else:
+            self.var.set(self.parameter.value)
 
         if self.label:
             self.label["text"] = self.parameter.label
-
-        if isinstance(self.parameter, ChoiceParam):
-            self.entry["values"] = self.parameter.choices
 
     def cull_subwrappers(self, params):
         params_set = set(params)
@@ -251,6 +261,7 @@ class ParameterWrapper:
             self.subwrapper_buttons.pop().destroy()
 
         for n, p in enumerate(params):
+            tk.Label(self.entry, text=p.label).grid(row=n + 1, column=0, padx=10)
             subparams = p.params.values()
             for m, pp in enumerate(subparams):
                 if pp in self.subwrappers:
@@ -263,7 +274,7 @@ class ParameterWrapper:
                         delete_row_callback,
                         level=self.level + 1,
                     )
-                self.subwrappers[pp].entry.grid(row=n + 1, column=m, padx=10)
+                self.subwrappers[pp].entry.grid(row=n + 1, column=m + 1, padx=10)
             if delete_row_callback:
                 button = tk.Button(
                     self.entry,
@@ -271,7 +282,7 @@ class ParameterWrapper:
                     width=2,
                     command=partial(delete_row_callback, self, n),
                 )
-                button.grid(row=n + 1, column=len(subparams), padx=10)
+                button.grid(row=n + 1, column=len(subparams) + 1, padx=10)
                 self.subwrapper_buttons.append(button)
 
         self.cull_subwrappers([pp for p in params for pp in p.params.values()])
@@ -409,7 +420,7 @@ class PluginConfigurator:
         self.frame.columnconfigure(0, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
-        self.wrapper_cache: Mapping[str, ParameterWrapper] = {}
+        self.wrapper_cache: MutableMapping[str, ParameterWrapper] = {}
 
         self.subframe = ttk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=0)
@@ -421,11 +432,12 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
-        self.update()
+        if self.plugin.update():
+            self.update()
         if self.change_callback:
             self.change_callback(self)
 
-    def update(self):
+    def update(self) -> None:
         # If there's only a single parameter it is presented a little differently.
         top_level = 0 if len(self.plugin.parameters) == 1 else 1
 

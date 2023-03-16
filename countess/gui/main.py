@@ -634,6 +634,8 @@ class ConfiguratorWrapper:
                     self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
                 ).grid(row=1, column=1, sticky=tk.SE, padx=10)
             self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
+            self.node.prepare(self.logger)
+            self.node.plugin.update()
             self.configurator = PluginConfigurator(
                 self.frame, self.node.plugin, self.config_change_callback
             )
