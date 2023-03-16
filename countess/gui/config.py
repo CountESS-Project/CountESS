@@ -62,6 +62,7 @@ class ParameterWrapper:
         self.var: Optional[tk.Variable] = None
         self.entry: Optional[tk.Widget] = None
         self.label: Optional[tk.Widget] = None
+        self.row_labels: list[tk.Widget] = []
 
         if isinstance(parameter, ArrayParam):
             self.label = None
@@ -108,7 +109,6 @@ class ParameterWrapper:
             and not isinstance(parameter.param, TabularMultiParam)
         ):
             self.entry = ttk.Frame(tk_parent)
-            tk.Label(self.entry, text="FNORD").grid()
             self.entry.columnconfigure(0, weight=1)
             drc = self.delete_row_callback if not parameter.read_only else None
             self.update_subwrappers_framed(parameter.params, drc)
@@ -260,8 +260,15 @@ class ParameterWrapper:
         while self.subwrapper_buttons:
             self.subwrapper_buttons.pop().destroy()
 
+        for rl in self.row_labels:
+            rl.destroy()
+        self.row_labels = []
+
         for n, p in enumerate(params):
-            tk.Label(self.entry, text=p.label).grid(row=n + 1, column=0, padx=10)
+            row_label = tk.Label(self.entry, text=p.label)
+            row_label.grid(row=n + 1, column=0, padx=10)
+            self.row_labels.append(row_label)
+
             subparams = p.params.values()
             for m, pp in enumerate(subparams):
                 if pp in self.subwrappers:
@@ -354,6 +361,7 @@ class ParameterWrapper:
 
     def delete_row_callback(self, parameter_wrapper, row=None):
         assert isinstance(self.parameter, ArrayParam)
+
         if row is not None:
             self.parameter.del_row(row)
         else:
