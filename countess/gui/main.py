@@ -618,7 +618,10 @@ class ConfiguratorWrapper:
 
         self.show_config_subframe()
         if self.node.plugin:
-            self.show_preview_subframe()
+            if self.node.is_dirty:
+                self.config_change_callback()
+            else:
+                self.show_preview_subframe()
 
     def show_config_subframe(self):
         if self.config_subframe:
