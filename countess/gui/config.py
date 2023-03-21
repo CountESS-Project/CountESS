@@ -7,7 +7,7 @@ from typing import Mapping, MutableMapping, Optional
 
 import dask.dataframe as dd
 import numpy as np
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_numeric_dtype  # type: ignore
 
 from ..core.parameters import (
     ArrayParam,
