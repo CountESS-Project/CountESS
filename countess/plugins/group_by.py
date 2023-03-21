@@ -4,6 +4,7 @@ import pandas as pd  # type: ignore
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam
 from countess.core.plugins import DaskTransformPlugin
+from countess.utils.dask import empty_dask_dataframe
 
 
 class GroupByPlugin(DaskTransformPlugin):
@@ -22,13 +23,14 @@ class GroupByPlugin(DaskTransformPlugin):
                 "Column",
                 {
                     "index": BooleanParam("Index"),
-                    "sum": BooleanParam("Sum"),
                     "count": BooleanParam("Count"),
+                    "min": BooleanParam("Min"),
+                    "max": BooleanParam("Max"),
+                    "sum": BooleanParam("Sum"),
+                    "mean": BooleanParam("Mean"),
                     "std": BooleanParam("Std"),
                     "var": BooleanParam("Var"),
                     "sem": BooleanParam("Sem"),
-                    "min": BooleanParam("Min"),
-                    "max": BooleanParam("Max"),
                 },
             ),
         )
@@ -58,4 +60,8 @@ class GroupByPlugin(DaskTransformPlugin):
             for col, col_param in column_parameters
             if col not in index_cols
         )
-        return df.groupby(index_cols or df.index).agg(agg_ops)
+        try:
+            return df.groupby(index_cols or df.index).agg(agg_ops)
+        except ValueError as exc:
+            logger.exception(exc)
+            return empty_dask_dataframe()
