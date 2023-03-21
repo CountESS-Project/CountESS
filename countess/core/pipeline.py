@@ -1,4 +1,3 @@
-import traceback
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -40,9 +39,6 @@ class PipelineNode:
         else:
             return dict((n.name, n.result) for n in self.parent_nodes if n.result is not None)
 
-    def exception_logger(self, exception, logger: Logger):
-        logger.error(str(exception), detail="".join(traceback.format_exception(exception)))
-
     def execute(self, logger: Logger, row_limit=None):
         assert row_limit is None or isinstance(row_limit, int)
         input_data = self.get_input_data()
@@ -50,8 +46,7 @@ class PipelineNode:
             try:
                 self.result = self.plugin.run(input_data, logger, row_limit)
             except Exception as exc:  # pylint: disable=W0718
-                self.result = None
-                self.exception_logger(exc, logger)
+                logger.exception(exc)
         else:
             self.result = input_data
 
@@ -62,8 +57,7 @@ class PipelineNode:
             try:
                 self.plugin.prepare(input_data, logger)
             except Exception as exc:  # pylint: disable=W0718
-                self.result = None
-                self.exception_logger(exc, logger)
+                logger.exception(exc)
         else:
             self.result = input_data
 
