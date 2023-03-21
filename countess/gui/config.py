@@ -400,6 +400,9 @@ class ParameterWrapper:
             self.entry["fg"] = "grey"
 
     def toggle_checkbox_callback(self, *_):
+        if self.parameter.read_only:
+            # XXX warn?
+            return
         value = not self.parameter.value
         self.parameter.value = value
         self.set_checkbox_value(value)
