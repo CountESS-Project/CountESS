@@ -104,7 +104,7 @@ class RegexToolPlugin(DaskTransformPlugin):
         drop_columns = set(
             rp["column"].value for rp in self.parameters["regexes"] if rp["drop_column"].value
         )
-        if "__index__" in df:
+        if "__index" in df:
             drop_columns.add("__index")
 
         return df.drop(columns=drop_columns)
