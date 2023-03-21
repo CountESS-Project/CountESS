@@ -6,7 +6,7 @@ import tkinter as tk
 import webbrowser
 from enum import Enum, IntFlag
 from functools import partial
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, font
 from typing import Optional
 
 import dask.dataframe as dd
@@ -887,8 +887,10 @@ def make_root():
         # XXX some kind of ttk style setup goes here as a fallback
 
     # Set up treeview font and row heights.
+    linespace = font.Font(None, 10).metrics()['linespace']
     style = ttk.Style()
-    style.configure("Treeview", font=(None, 10), rowheight=25)
+    style.configure("Treeview", font=(None, 10), rowheight=linespace)
+    style.configure("Treeview.Heading", font=(None, 10, 'bold'), rowheight=linespace)
 
     root.title(f"CountESS {VERSION}")
     root.rowconfigure(0, weight=0)
