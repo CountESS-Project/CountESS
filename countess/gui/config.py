@@ -7,6 +7,7 @@ from typing import Mapping, MutableMapping, Optional
 
 import dask.dataframe as dd
 import numpy as np
+from pandas.api.types import is_numeric_dtype
 
 from ..core.parameters import (
     ArrayParam,
@@ -475,9 +476,10 @@ class DataFramePreview:
     # XXX uses a treeview, which seemed like a good match but actually a grid-layout
     # of custom styled labels might work better.
 
-    def __init__(self, tk_parent, ddf: Optional[dd.DataFrame] = None):
+    def __init__(self, tk_parent, ddf: Optional[dd.DataFrame] = None, max_rows: int = 10000):
         self.frame = ttk.Frame(tk_parent)
         self.label = ttk.Label(self.frame, text="DataFrame Preview")
+        self.max_rows = max_rows
 
         self.treeview = ttk.Treeview(self.frame, selectmode=tk.NONE)
 
@@ -503,25 +505,22 @@ class DataFramePreview:
             self.update(ddf)
 
     def update(self, ddf: dd.DataFrame):
-        if len(ddf) > 1000:
-            self.label["text"] = f"DataFrame Preview (1000 rows out of {len(ddf)})"
-            ddf = crop_dataframe(ddf, 1000)
+        if len(ddf) > self.max_rows:
+            self.label["text"] = f"DataFrame Preview ({self.max_rows} rows out of {len(ddf)})"
+            ddf = crop_dataframe(ddf, self.max_rows)
         else:
             self.label["text"] = f"DataFrame Preview {len(ddf)} rows"
 
         # XXX could handle multiindex columns more elegantly than this
         # (but maybe not in a ttk.Treeview)
-        column_names = [".".join(c) if isinstance(c, tuple) else c for c in ddf.columns]
-        column_types = [dt.kind for dt in ddf.dtypes]
+        column_names = ["__".join(c) if isinstance(c, tuple) else c for c in ddf.columns]
 
         self.treeview["columns"] = column_names
 
-        for n, cn in enumerate(column_names):
-            self.treeview.heading(n, text=cn)
-
-        for n, ct in enumerate(column_types):
+        for n, (column_name, column_dtype) in enumerate(zip(column_names, ddf.dtypes)):
+            self.treeview.heading(n, text=f"{column_name} ({column_dtype.name})")
             # XXX it'd be nicer if we could do "real" decimal point alignment
-            anchor = tk.E if ct in ("i", "f") else tk.W
+            anchor = tk.E if is_numeric_dtype(column_dtype) else tk.W
             # XXX type signature appears to be wrong, or at least overly restrictive.
             # I think I'm going to replace treeview anyway so I'm ignoring it for now.
             self.treeview.column(
