@@ -23,6 +23,7 @@ dependencies = [
     'dask>=2022.8.0',
     'distributed>=2022.8.0',
     'fqfa~=1.2.3',
+    'Levenshtein==0.20.9',
     'more_itertools>=8.14.0',
     'numpy~=1.23',
     'pandas~=1.4',
@@ -54,6 +55,7 @@ join = "countess.plugins.join:DaskJoinPlugin"
 save_csv = "countess.plugins.csv:SaveCsvPlugin"
 regex_tool = "countess.plugins.regex:RegexToolPlugin"
 regex_reader = "countess.plugins.regex:RegexReaderPlugin"
+variants = "countess.plugins.variant:VariantPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
