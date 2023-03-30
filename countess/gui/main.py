@@ -515,6 +515,7 @@ class GraphWrapper:
         new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
         self.graph.add_node(new_node)
         self.labels[new_node] = self.label_for_node(new_node)
+        self.labels[new_node].update()
         self.lines[new_node] = {}
         if select:
             self.highlight_node(new_node)

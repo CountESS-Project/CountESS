@@ -38,6 +38,10 @@ dev = [
     'pytest~=7.2',
 ]
 
+hdf = [
+     'tables~=3.7',
+]
+
 [project.entry-points.countess_plugins]
 load_fastq = "countess.plugins.fastq:LoadFastqPlugin"
 load_hdf = "countess.plugins.hdf5:LoadHdfPlugin"
