@@ -7,6 +7,7 @@ from typing import Mapping, Optional
 
 import dask.dataframe as dd
 import numpy as np
+import pandas as pd
 
 from ..core.parameters import (
     ArrayParam,
@@ -459,7 +460,7 @@ class DataFramePreview:
         if ddf is not None:
             self.update(ddf)
 
-    def update(self, ddf: dd.DataFrame):
+    def update(self, ddf: pd.DataFrame | dd.DataFrame):
         if len(ddf) > 1000:
             self.label["text"] = f"DataFrame Preview (1000 rows out of {len(ddf)})"
             ddf = crop_dataframe(ddf, 1000)

@@ -1,6 +1,6 @@
 from typing import Optional
 
-import pandas as pd  # type: ignore
+import pandas as pd
 
 try:
     import tables  # type: ignore  # pylint: disable=unused-import
@@ -10,7 +10,6 @@ except ImportError as exc:
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, MultiParam
 from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import empty_dask_dataframe
 
 
 class LoadHdfPlugin(DaskInputPlugin):
@@ -34,10 +33,12 @@ class LoadHdfPlugin(DaskInputPlugin):
             kp.set_choices(sorted(hs.keys()))
 
         if kp.value is None:
-            return empty_dask_dataframe()
+            return pd.DataFrame([])
 
         with pd.HDFStore(filename) as hs:
             df = hs.select(kp.value, start=0, stop=row_limit)
+
+        assert isinstance(df, pd.DataFrame)
 
         return df
 

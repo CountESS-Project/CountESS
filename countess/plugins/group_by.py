@@ -1,5 +1,5 @@
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam
@@ -29,7 +29,7 @@ class GroupByPlugin(DaskTransformPlugin):
         ),
     }
 
-    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> dd.DataFrame:
+    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["column"], ColumnOrIndexChoiceParam)
         if self.parameters["column"].is_index():
             col = df.index
@@ -37,4 +37,6 @@ class GroupByPlugin(DaskTransformPlugin):
             col = df[self.parameters["column"].value]
         oper = self.parameters["operation"].value
 
-        return df.groupby(col).agg(oper)
+        df2 = df.groupby(col).agg(oper)
+        assert isinstance(df2, (pd.DataFrame, dd.DataFrame))
+        return df2

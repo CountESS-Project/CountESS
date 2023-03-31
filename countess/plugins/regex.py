@@ -2,7 +2,7 @@ import re
 from functools import partial
 
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import (

@@ -20,12 +20,12 @@ import importlib.metadata
 import logging
 import os.path
 import sys
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping
 from typing import Any, List, Optional
 
 import dask.dataframe as dd
 import numpy as np
-import pandas as pd  # type: ignore
+import pandas as pd
 from dask.callbacks import Callback
 
 from countess.core.logger import Logger
@@ -39,7 +39,7 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.utils.dask import concat_dataframes, crop_dataframe
+from countess.utils.dask import concat_dataframes, crop_dataframe, empty_dask_dataframe
 
 PRERUN_ROW_LIMIT = 100
 
@@ -293,7 +293,7 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             + list(self.parameters.items())
         )
 
-    def combine_dfs(self, dfs: list[dd.DataFrame]) -> dd.DataFrame:
+    def combine_dfs(self, dfs: list[pd.DataFrame | dd.DataFrame]) -> dd.DataFrame | pd.DataFrame:
         """First stage: collect all the files together in whatever
         way is appropriate.  Override this to do it differently
         or do more work on the dataframes (eg: counting, renaming, etc)"""
@@ -303,11 +303,11 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
         self,
         logger: Logger,
         row_limit: Optional[int] = None,
-    ) -> Iterable[dd.DataFrame]:
+    ) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["files"], ArrayParam)
         fps = self.parameters["files"].params
         if not fps:
-            return []
+            return empty_dask_dataframe()
 
         if len(fps) == 1:
             with DaskProgressCallback(logger):
@@ -369,7 +369,9 @@ class DaskScoringPlugin(DaskTransformPlugin):
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
 
-    def run_dask(self, df: dd.DataFrame, logger: Logger) -> dd.DataFrame:
+    def run_dask(
+        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
+    ) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["scores"], ArrayParam)
         score_cols = []
         for pp in self.parameters["scores"]:
@@ -397,7 +399,9 @@ class DaskReindexPlugin(DaskTransformPlugin):
     def translate_row(self, row):
         return self.translate(row.name)
 
-    def run_dask(self, df: dd.DataFrame, logger: Logger) -> dd.DataFrame:
+    def run_dask(
+        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
+    ) -> pd.DataFrame | dd.DataFrame:
         df["__reindex"] = df.apply(
             self.translate_row, axis=1, meta=pd.Series(self.translate_type())
         )

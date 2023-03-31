@@ -3,7 +3,7 @@
 from typing import Collection, Optional
 
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 
 def empty_dask_dataframe() -> dd.DataFrame:
@@ -52,8 +52,12 @@ def merge_dataframes(dfs: list[dd.DataFrame | pd.DataFrame], how: str = "outer")
         return empty_dask_dataframe()
 
     left, *rest = dfs
-    if isinstance(left, pd.Dataframe):
+    if isinstance(left, pd.DataFrame):
         left = dd.from_pandas(left, npartitions=1)
+    assert isinstance(left, dd.DataFrame)
+
     for right in rest:
         left = left.merge(right, how=how)
+        assert isinstance(left, dd.DataFrame)
+
     return left
