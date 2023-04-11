@@ -1,6 +1,6 @@
 from itertools import islice
 
-import pandas as pd  # type: ignore
+import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 
 from countess import VERSION

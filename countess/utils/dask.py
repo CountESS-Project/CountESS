@@ -3,7 +3,7 @@
 from typing import Collection, Optional
 
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 
 def empty_dask_dataframe() -> dd.DataFrame:
@@ -28,7 +28,7 @@ def crop_dataframe(
     return df
 
 
-def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> pd.DataFrame | dd.DataFrame:
+def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> dd.DataFrame:
     """Concat dask dataframes, but include special cases for 0 and 1 inputs"""
 
     # extra special case for empty dataframes
@@ -37,7 +37,10 @@ def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> pd.DataFr
     if len(dfs) == 0:
         return empty_dask_dataframe()
     elif len(dfs) == 1:
-        return dfs[0].copy()
+        if isinstance(dfs[0], dd.DataFrame):
+            return dfs[0].copy()
+        else:
+            return dd.from_pandas(dfs[0], npartitions=1)
     else:
         return dd.concat(dfs)
 
@@ -52,8 +55,12 @@ def merge_dataframes(dfs: list[dd.DataFrame | pd.DataFrame], how: str = "outer")
         return empty_dask_dataframe()
 
     left, *rest = dfs
-    if isinstance(left, pd.Dataframe):
+    if isinstance(left, pd.DataFrame):
         left = dd.from_pandas(left, npartitions=1)
+    assert isinstance(left, dd.DataFrame)
+
     for right in rest:
         left = left.merge(right, how=how)
+        assert isinstance(left, dd.DataFrame)
+
     return left
