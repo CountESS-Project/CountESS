@@ -2,6 +2,7 @@ import itertools
 from collections import defaultdict
 
 import dask.dataframe as dd
+import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
@@ -43,7 +44,9 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
     # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
 
-    def run_dask(self, df: dd.DataFrame, logger: Logger) -> dd.DataFrame:
+    def run_dask(
+        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
+    ) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["index"], ArrayParam)
         assert isinstance(self.parameters["pivot"], ArrayParam)
         assert isinstance(self.parameters["agg"], ArrayParam)

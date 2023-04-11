@@ -309,6 +309,7 @@ class ColumnChoiceParam(ChoiceParam):
     def set_column_choices(self, choices):
         self.set_choices(list(choices))
 
+
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     INDEX_VALUE = "— INDEX —"
 
@@ -431,6 +432,7 @@ class ArrayParam(BaseParam):
         self.param.set_column_choices(choices)
         for p in self.params:
             p.set_column_choices(choices)
+
 
 class FileArrayParam(ArrayParam):
     """FileArrayParam is an ArrayParam arranged per-file.  Using this class
