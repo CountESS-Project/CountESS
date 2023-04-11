@@ -1,5 +1,6 @@
 from typing import Optional
 
+import dask.dataframe as dd
 import pandas as pd
 
 try:
@@ -26,7 +27,7 @@ class LoadHdfPlugin(DaskInputPlugin):
 
     def read_file_to_dataframe(
         self, file_params: MultiParam, logger, row_limit: Optional[int] = None
-    ) -> pd.DataFrame:
+    ) -> pd.DataFrame | dd.DataFrame:
         kp = file_params.key
         filename = file_params.filename.value
         with pd.HDFStore(filename) as hs:

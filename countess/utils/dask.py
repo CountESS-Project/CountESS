@@ -28,7 +28,7 @@ def crop_dataframe(
     return df
 
 
-def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> pd.DataFrame | dd.DataFrame:
+def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> dd.DataFrame:
     """Concat dask dataframes, but include special cases for 0 and 1 inputs"""
 
     # extra special case for empty dataframes
@@ -37,7 +37,10 @@ def concat_dataframes(dfs: Collection[pd.DataFrame | dd.DataFrame]) -> pd.DataFr
     if len(dfs) == 0:
         return empty_dask_dataframe()
     elif len(dfs) == 1:
-        return dfs[0].copy()
+        if isinstance(dfs[0], dd.DataFrame):
+            return dfs[0].copy()
+        else:
+            return dd.from_pandas(dfs[0], npartitions=1)
     else:
         return dd.concat(dfs)
 

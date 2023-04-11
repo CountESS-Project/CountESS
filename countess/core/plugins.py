@@ -382,7 +382,10 @@ class DaskScoringPlugin(DaskTransformPlugin):
                 df[scol] = self.score([df[col] for col in ccols])
                 score_cols.append(scol)
 
-        return df.replace([np.inf, -np.inf], np.nan).dropna(how="all", subset=score_cols)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+        df.dropna(how="all", subset=score_cols, inplace=True)
+        return df
 
     def score(self, columns: List[dd.Series]) -> dd.Series:
         raise NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
