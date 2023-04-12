@@ -1,5 +1,6 @@
 {
   python3Packages,
+  fetchFromGitHub,
   cmake,
 }: let
   fqfa = with python3Packages;
@@ -45,6 +46,22 @@
       dontUseCmakeConfigure = true;
       format = "pyproject";
     };
+
+  rapidfuzz = with python3Packages;
+    buildPythonPackage rec {
+      pname = "rapidfuzz";
+      version = "2.15.1";
+      src = fetchFromGitHub {
+        owner = "maxbachmann";
+        repo = "RapidFuzz";
+        rev = "v2.15.1";
+        sha256 = "sha256-HYHmhlOuQT86pdYviRDMHC48HE+CefCu20a0hkNVy3k=";
+      };
+      nativeBuildInputs = [ scikit-build cmake cython ];
+      dontUseCmakeConfigure = true;
+      format = "pyproject";
+  };
+
 in
   with python3Packages;
     buildPythonApplication {
@@ -60,6 +77,7 @@ in
         pandas
         tables
         ttkthemes
+        rapidfuzz
       ];
 
       nativeBuildInputs = [cython];
