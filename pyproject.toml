@@ -23,10 +23,10 @@ dependencies = [
     'dask>=2022.8.0',
     'distributed>=2022.8.0',
     'fqfa~=1.2.3',
-    'Levenshtein==0.20.9',
     'more_itertools>=8.14.0',
     'numpy~=1.23',
     'pandas~=1.4',
+    'rapidfuzz~=2.13.7',
     'ttkthemes~=3.2',
 ]
 

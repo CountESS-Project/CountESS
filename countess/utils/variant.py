@@ -7,7 +7,7 @@
 import re
 from typing import Iterable, Optional
 
-from Levenshtein import opcodes
+from rapidfuzz.distance.Levenshtein import opcodes
 
 # Insertions shorter than this won't be searched for, just included.
 MIN_SEARCH_LENGTH = 10
@@ -190,7 +190,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     if not re.match("[AGTC]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
-    for opcode, ref_from, ref_to, var_from, var_to in opcodes(ref_seq, var_seq):
+    for opcode, ref_from, ref_to, var_from, var_to in opcodes(ref_seq, var_seq).as_list():
         # Levenshtein algorithm finds the overlapping parts of our reference and
         # variant sequences.
         #
