@@ -190,44 +190,45 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     if not re.match("[AGTC]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
-    for opcode, ref_from, ref_to, var_from, var_to in opcodes(ref_seq, var_seq).as_list():
+    for opcode in opcodes(ref_seq, var_seq):
         # Levenshtein algorithm finds the overlapping parts of our reference and
         # variant sequences.
         #
         # each element is a text substitution operation on the string of symbols.
         # offsets are python-style whereas HGVS offsets are 1-based and inclusive.
         #
-        # ('delete', ref_from, ref_to, n, n) =>
-        #     delete symbols ref_from:ref_to from the reference string
-        # ('insert', ref_ins, ref_ins, var_from, var_to) =>
-        #     insert symbols var_seq[var_from:var_to] into ref_seq[ref_ins]
-        # ('replace', ref_from, ref_to, var_from, var_to) =>
-        #     replace symbols ref_seq[ref_from:ref_to] with symbols var_seq[var_from:var_to]
+        # 'delete' => delete symbols src_start:src_end
+        # 'insert' => insert symbols dest_start:dest_end at src_start
+        # 'replace' => replace symbols src_start:src_end with symbols dest_start:dest_end
 
-        if opcode == "delete":
+        src_start, src_end = opcode.src_start, opcode.src_end
+        src_seq = ref_seq[src_start:src_end]
+        dest_seq = var_seq[opcode.dest_start:opcode.dest_end]
+
+        if opcode.tag == "delete":
+            assert dest_seq == ""
             # 'delete' opcode maps to HGVS 'del' operation
-            if ref_to - ref_from == 1:
-                yield f"{ref_from+1}del"
+            if len(src_seq) == 1:
+                yield f"{src_start+1}del"
             else:
-                yield f"{ref_from+1}_{ref_to}del"
+                yield f"{src_start+1}_{src_end}del"
 
-        elif opcode == "insert":
+        elif opcode.tag == "insert":
+            assert src_seq == ""
             # 'insert' opcode maps to either an HGVS 'dup' or 'ins' operation
-            assert ref_from == ref_to
-            var_len = var_to - var_from
 
-            if ref_seq[ref_from - var_len : ref_from] == var_seq[var_from:var_to]:
+            if ref_seq[src_start - len(dest_seq) : src_start] == dest_seq:
                 # This is a duplication of one or more symbols immediately
                 # preceding this point.
-                if var_len == 1:
-                    yield f"{ref_from}dup"
+                if len(dest_seq) == 1:
+                    yield f"{src_start}dup"
                 else:
-                    yield f"{ref_from - var_len + 1}_{ref_from}dup"
+                    yield f"{src_start - len(dest_seq) + 1}_{src_start}dup"
             else:
-                inserted_sequence = search_for_sequence(ref_seq, var_seq[var_from:var_to])
-                yield f"{ref_from}_{ref_from+1}ins{inserted_sequence}"
+                inserted_sequence = search_for_sequence(ref_seq, dest_seq)
+                yield f"{src_start}_{src_start+1}ins{inserted_sequence}"
 
-        elif opcode == "replace":
+        elif opcode.tag == "replace":
             # 'replace' opcode maps to either an HGVS '>' (single substitution) or
             # 'inv' (inversion) or 'delins' (delete+insert) operation.
 
@@ -235,15 +236,14 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
             # together affecting one amino acid, should be described as a “delins”",
             # as this code has no concept of amino acid alignment.
 
-            if ref_to - ref_from == 1 and var_to - var_from == 1:
-                yield f"{ref_from+1}{ref_seq[ref_from]}>{var_seq[var_from]}"
-            elif var_to - var_from == ref_to - ref_from and var_seq[
-                var_from:var_to
-            ] == invert_dna_sequence(ref_seq[ref_from:ref_to]):
-                yield f"{ref_from+1}_{ref_to}inv"
+            if len(src_seq) == 1 and len(dest_seq) == 1:
+                yield f"{src_start+1}{src_seq}>{dest_seq}"
+            elif len(src_seq) == len(dest_seq) and \
+                    dest_seq == invert_dna_sequence(src_seq):
+                yield f"{src_start+1}_{src_end}inv"
             else:
-                inserted_sequence = search_for_sequence(ref_seq, var_seq[var_from:var_to])
-                yield f"{ref_from+1}_{ref_to}delins{inserted_sequence}"
+                inserted_sequence = search_for_sequence(ref_seq, dest_seq)
+                yield f"{src_start+1}_{src_end}delins{inserted_sequence}"
 
 
 def find_variant_string(
