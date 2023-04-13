@@ -80,6 +80,7 @@ class ParameterWrapper:
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             self.entry.state(["readonly"])
+            self.button = tk.Button(tk_parent, text="Select", width=3, command=self.change_file_callback)
         elif isinstance(parameter, TextParam):
             # tk.Text widget doesn't have a variable, for whatever reason,
             # so we use a different method!
@@ -332,6 +333,12 @@ class ParameterWrapper:
         self.update()
         if self.callback is not None:
             self.callback(self.parameter)
+
+    def change_file_callback(self, *_):
+        file_types = self.parameter.file_types
+        filename = filedialog.askopenfilename(filetypes=file_types)
+        self.parameter.value = filename
+        self.callback(self.parameter)
 
     def set_value(self, value):
         # self.parameter.value is a property, and some cleaning may occur, so we just
