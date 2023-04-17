@@ -5,11 +5,10 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, FloatParam
-from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dataframes
+from countess.core.plugins import PandasInputPlugin
 
 
-class LoadFastqPlugin(DaskInputPlugin):
+class LoadFastqPlugin(PandasInputPlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
     with count=1 and then grouping by sequence and summing counts.  It supports counting
     in multiple columns."""
@@ -38,7 +37,7 @@ class LoadFastqPlugin(DaskInputPlugin):
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then (optionally) group them by sequence"""
 
-        combined_df = concat_dataframes(dfs)
+        combined_df = pd.concat(dfs)
 
         if len(combined_df) and self.parameters["group"].value:
             combined_df = combined_df.groupby(by=["sequence"]).sum()

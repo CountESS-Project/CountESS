@@ -1,10 +1,10 @@
 import numpy as np
 
 from countess import VERSION
-from countess.core.plugins import DaskScoringPlugin
+from countess.core.plugins import PandasScoringPlugin
 
 
-class LogScorePlugin(DaskScoringPlugin):
+class LogScorePlugin(PandasScoringPlugin):
     """Log Scorer"""
 
     name = "Log Scorer"

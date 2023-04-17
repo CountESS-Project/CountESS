@@ -2,7 +2,6 @@ import csv
 from io import StringIO
 from typing import Any, Optional
 
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
@@ -15,7 +14,7 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import DaskBasePlugin, DaskInputPlugin
+from countess.core.plugins import PandasBasePlugin, PandasInputPlugin
 
 # XXX it would be better to do the same this Regex Tool does and get the user to assign
 # data types to each column
@@ -40,7 +39,7 @@ def clean_row(row):
     return [maybe_number(x) for x in row]
 
 
-class LoadCsvPlugin(DaskInputPlugin):
+class LoadCsvPlugin(PandasInputPlugin):
     """Load CSV files"""
 
     name = "CSV Load"
@@ -114,7 +113,6 @@ class LoadCsvPlugin(DaskInputPlugin):
         if comment != "None":
             options["comment"] = comment
 
-        # XXX dd.read_csv().set_index() is very very slow!
         # XXX pd.read_csv(index_col=) is half the speed of pd.read_csv().set_index()
 
         df = pd.read_csv(filename, **options)
@@ -140,7 +138,7 @@ class LoadCsvPlugin(DaskInputPlugin):
         return df
 
 
-class SaveCsvPlugin(DaskBasePlugin):
+class SaveCsvPlugin(PandasBasePlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
@@ -178,15 +176,9 @@ class SaveCsvPlugin(DaskBasePlugin):
         }
 
         if row_limit is None:
-            if isinstance(data, dd.DataFrame):
-                data.to_csv(filename, single_file=True, compute=True, **options)
-            else:
-                data.to_csv(filename, **options)
+            data.to_csv(filename, **options)
             return None
         else:
-            if isinstance(data, dd.DataFrame):
-                data = data.compute()
-
             buf = StringIO()
             data.to_csv(buf, **options)
             return buf.getvalue()

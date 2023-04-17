@@ -1,13 +1,12 @@
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam
-from countess.core.plugins import DaskTransformPlugin
+from countess.core.plugins import PandasTransformPlugin
 
 
-class GroupByPlugin(DaskTransformPlugin):
-    """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
+class GroupByPlugin(PandasTransformPlugin):
+    """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     # XXX should support an operation per column, using
     # dd.Aggregation to supply appropriate chunk/agg/finalize
@@ -29,7 +28,7 @@ class GroupByPlugin(DaskTransformPlugin):
         ),
     }
 
-    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
+    def run_df(self, df: pd.DataFrame, logger) -> pd.DataFrame:
         assert isinstance(self.parameters["column"], ColumnOrIndexChoiceParam)
         if self.parameters["column"].is_index():
             col = df.index
@@ -38,5 +37,5 @@ class GroupByPlugin(DaskTransformPlugin):
         oper = self.parameters["operation"].value
 
         df2 = df.groupby(col).agg(oper)
-        assert isinstance(df2, (pd.DataFrame, dd.DataFrame))
+        assert isinstance(df2, pd.DataFrame)
         return df2

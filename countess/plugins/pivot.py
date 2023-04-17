@@ -1,7 +1,6 @@
 import itertools
 from collections import defaultdict
 
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
@@ -13,13 +12,13 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import DaskTransformPlugin
+from countess.core.plugins import PandasTransformPlugin
 
 AGG_FUNCTIONS = ["first", "sum", "count", "mean"]
 
 
-class DaskPivotPlugin(DaskTransformPlugin):
-    """Groups a Dask Dataframe by an arbitrary column and rolls up rows"""
+class PivotPlugin(PandasTransformPlugin):
+    """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
     description = "Groups a dataframe and pivots column values into columns"
@@ -44,9 +43,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
 
     # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
 
-    def run_dask(
-        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
-    ) -> pd.DataFrame | dd.DataFrame:
+    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["index"], ArrayParam)
         assert isinstance(self.parameters["pivot"], ArrayParam)
         assert isinstance(self.parameters["agg"], ArrayParam)
@@ -110,7 +107,7 @@ class DaskPivotPlugin(DaskTransformPlugin):
                     rename_cols[col] = output_column
 
                 dfs.append(df.query(query).rename(columns=rename_cols))
-            df = dd.concat(dfs)
+            df = pd.concat(dfs)
 
             # XXX because of the way the concat operation collects pivot groups, a bunch of records
             # end up getting generated with NULLs in integer columns, forcing those columns

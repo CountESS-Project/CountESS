@@ -1,6 +1,5 @@
 from typing import Optional
 
-import dask.dataframe as dd
 import pandas as pd
 
 try:
@@ -10,10 +9,10 @@ except ImportError as exc:
 
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, MultiParam
-from countess.core.plugins import DaskInputPlugin
+from countess.core.plugins import PandasInputPlugin
 
 
-class LoadHdfPlugin(DaskInputPlugin):
+class LoadHdfPlugin(PandasInputPlugin):
     name = "HDF5 Load"
     description = "Loads counts from HDF5 files"
     version = VERSION
@@ -27,7 +26,7 @@ class LoadHdfPlugin(DaskInputPlugin):
 
     def read_file_to_dataframe(
         self, file_params: MultiParam, logger, row_limit: Optional[int] = None
-    ) -> pd.DataFrame | dd.DataFrame:
+    ) -> pd.DataFrame:
         kp = file_params.key
         filename = file_params.filename.value
         with pd.HDFStore(filename) as hs:
@@ -44,7 +43,7 @@ class LoadHdfPlugin(DaskInputPlugin):
         return df
 
 
-# class StoreHdfPlugin(DaskBasePlugin):
+# class StoreHdfPlugin(PandasBasePlugin):
 #    name = "HDF Writer"
 #    description = "Write to HDF5"
 #

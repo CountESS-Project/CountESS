@@ -1,7 +1,6 @@
 import re
 from functools import partial
 
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
@@ -13,11 +12,10 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import DaskInputPlugin, DaskTransformPlugin
-from countess.utils.dask import concat_dataframes
+from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
 
 
-class RegexToolPlugin(DaskTransformPlugin):
+class RegexToolPlugin(PandasTransformPlugin):
     name = "Regex Tool"
     description = "Apply regular expressions to column(s) to make new column(s)"
     link = "https://countess-project.github.io/CountESS/plugins/#regex-tool"
@@ -54,15 +52,12 @@ class RegexToolPlugin(DaskTransformPlugin):
         value = str(row[column_name])
         match = compiled_re.match(value)
         if match:
-            return [
-                output_params[n].datatype.cast_value(g)
-                for n, g in enumerate(match.groups())
-            ]
+            return [output_params[n].datatype.cast_value(g) for n, g in enumerate(match.groups())]
         else:
             logger.warning("Didn't Match", detail=repr(value))
             return [None] * compiled_re.groups
 
-    def run_dask(self, df, logger):
+    def run_df(self, df, logger):
         # prevent added columns from propagating backwards in
         # the pipeline!
         df = df.copy()
@@ -83,7 +78,6 @@ class RegexToolPlugin(DaskTransformPlugin):
 
             output_params = regex_parameter["output"].params
             output_names = [pp["name"].value for pp in output_params]
-            output_types = [pp["datatype"].get_selected_type() for pp in output_params]
 
             if regex_parameter["column"].is_index():
                 column_name = "__index"
@@ -93,13 +87,7 @@ class RegexToolPlugin(DaskTransformPlugin):
             # XXX not totally happy with this
             func = partial(self.apply_func, column_name, compiled_re, output_params, logger)
 
-            if isinstance(df, dd.DataFrame):
-                # dask likes a hint about column types
-                meta = dict(enumerate(output_types))
-                re_groups_df = df.apply(func, axis=1, result_type="expand", meta=meta)
-            else:
-                # pandas infers the column types
-                re_groups_df = df.apply(func, axis=1, result_type="expand")
+            re_groups_df = df.apply(func, axis=1, result_type="expand")
 
             for n in range(0, compiled_re.groups):
                 df[output_names[n]] = re_groups_df[n]
@@ -107,13 +95,13 @@ class RegexToolPlugin(DaskTransformPlugin):
         drop_columns = set(
             rp["column"].value for rp in self.parameters["regexes"] if rp["drop_column"].value
         )
-        if "__index__" in df:
+        if "__index" in df:
             drop_columns.add("__index")
 
-        return df.drop(columns=drop_columns)
+        return df.drop(columns=drop_columns) if drop_columns else df
 
 
-class RegexReaderPlugin(DaskInputPlugin):
+class RegexReaderPlugin(PandasInputPlugin):
     name = "Regex Reader"
     description = """Loads arbitrary data from line-delimited files, applying a regular expression
       to each line to extract fields.  If you're trying to read generic CSV or TSV files, use the CSV
@@ -185,4 +173,4 @@ class RegexReaderPlugin(DaskInputPlugin):
         if len(records) > 0:
             pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
 
-        return concat_dataframes(pdfs)
+        return pd.concat(pdfs)

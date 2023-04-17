@@ -1,16 +1,15 @@
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, TextParam
-from countess.core.plugins import DaskTransformPlugin
+from countess.core.plugins import PandasTransformPlugin
 
 
 def process(df: pd.DataFrame, codes):
     for code in codes:
         result = df.eval(code)
-        if isinstance(result, (dd.Series, pd.Series)):
+        if isinstance(result, pd.Series):
             # this was a filter
             df = df.copy()
             df["__filter"] = result
@@ -22,14 +21,14 @@ def process(df: pd.DataFrame, codes):
     return df
 
 
-class EmbeddedPythonPlugin(DaskTransformPlugin):
+class EmbeddedPythonPlugin(PandasTransformPlugin):
     name = "Embedded Python"
     description = "Embed Python code into CountESS"
     version = VERSION
 
     parameters = {"code": ArrayParam("Code", TextParam("Code"))}
 
-    def run_dask(self, df, logger: Logger) -> dd.DataFrame:
+    def run_df(self, df, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["code"], ArrayParam)
 
         codes = [
@@ -38,7 +37,4 @@ class EmbeddedPythonPlugin(DaskTransformPlugin):
             if isinstance(p, TextParam) and p.value.strip()
         ]
 
-        if isinstance(df, dd.DataFrame):
-            return df.map_partitions(process, codes)
-        else:
-            return process(df, codes)
+        return process(df, codes)

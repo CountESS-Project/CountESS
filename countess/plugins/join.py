@@ -1,22 +1,21 @@
 from collections.abc import Mapping, MutableMapping
 from typing import Optional
 
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, BooleanParam, ChoiceParam, MultiParam
-from countess.core.plugins import DaskBasePlugin
+from countess.core.plugins import PandasBasePlugin
 
 INDEX = "— INDEX —"
 
 
-class DaskJoinPlugin(DaskBasePlugin):
-    """Joins Dask Dataframes"""
+class JoinPlugin(PandasBasePlugin):
+    """Joins Pandas Dataframes"""
 
     name = "Join"
-    description = "Joins two Dask Dataframes by indexes or columns"
+    description = "Joins two Pandas Dataframes by indexes or columns"
     version = VERSION
 
     parameters = {
@@ -42,7 +41,7 @@ class DaskJoinPlugin(DaskBasePlugin):
 
         if len(data_items) != 2 or len(inputs_param) != 2:
             raise NotImplementedError("Only two-way joins supported right now")
-        if not all((isinstance(df, (dd.DataFrame, pd.DataFrame)) for _, df in data_items)):
+        if not all((isinstance(df, pd.DataFrame) for _, df in data_items)):
             raise NotImplementedError("Feed me dataframes")
 
         enumerate_inputs = enumerate(zip(inputs_param, data.items()))
@@ -61,7 +60,7 @@ class DaskJoinPlugin(DaskBasePlugin):
         assert len(inputs_param) == 2
         assert isinstance(data, Mapping)
         assert len(data) == 2
-        assert all(isinstance(d, (dd.DataFrame, pd.DataFrame)) for d in data.values())
+        assert all(isinstance(d, pd.DataFrame) for d in data.values())
 
         ip1 = inputs_param[0]
         ip2 = inputs_param[1]
