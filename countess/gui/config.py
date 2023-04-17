@@ -5,7 +5,6 @@ from functools import partial
 from tkinter import filedialog, ttk
 from typing import Mapping, Optional
 
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
@@ -24,7 +23,6 @@ from ..core.parameters import (
     TextParam,
 )
 from ..core.plugins import BasePlugin
-from ..utils.dask import crop_dataframe
 
 UNICODE_CHECK = "\u2714"
 UNICODE_UNCHECK = "\u2717"
@@ -443,7 +441,7 @@ class DataFramePreview:
     # XXX uses a treeview, which seemed like a good match but actually a grid-layout
     # of custom styled labels might work better.
 
-    def __init__(self, tk_parent, ddf: Optional[dd.DataFrame] = None):
+    def __init__(self, tk_parent, ddf: Optional[pd.DataFrame] = None):
         self.frame = ttk.Frame(tk_parent)
         self.label = ttk.Label(self.frame, text="DataFrame Preview")
 
@@ -470,10 +468,10 @@ class DataFramePreview:
         if ddf is not None:
             self.update(ddf)
 
-    def update(self, ddf: pd.DataFrame | dd.DataFrame):
+    def update(self, ddf: pd.DataFrame):
         if len(ddf) > 1000:
             self.label["text"] = f"DataFrame Preview (1000 rows out of {len(ddf)})"
-            ddf = crop_dataframe(ddf, 1000)
+            ddf = ddf[0:1000]
         else:
             self.label["text"] = f"DataFrame Preview {len(ddf)} rows"
 

@@ -138,6 +138,7 @@ class TreeviewLogger(Logger):
         self.treeview.after(1000, self.on_poll)
 
     def log(self, level: str, message: str, detail: Optional[str] = None):
+        print(level, message, detail)
         self.queue.put((level, message, detail))
 
     def progress(self, message: str = "Running", percentage: Optional[int] = None):

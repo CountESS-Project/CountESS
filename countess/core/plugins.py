@@ -23,10 +23,8 @@ import sys
 from collections.abc import Mapping, MutableMapping
 from typing import Any, List, Optional
 
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
-from dask.callbacks import Callback
 
 from countess.core.logger import Logger
 from countess.core.parameters import (
@@ -39,7 +37,6 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.utils.dask import concat_dataframes, crop_dataframe, empty_dask_dataframe
 
 PRERUN_ROW_LIMIT = 100
 
@@ -187,27 +184,13 @@ class FileInputMixin:
         return df
 
 
-class DaskProgressCallback(Callback):
-    """Matches Dask's idea of a progress callback to our logger class."""
+def crop_dataframe(df: pd.DataFrame, row_limit: Optional[int]):
+    if row_limit is None:
+        return df
+    return df[0:row_limit]
 
-    def __init__(self, logger: Logger):
-        super().__init__()
-        self.logger = logger
-        self.total_tasks = None
-
-    def _start_state(self, dsk, state):  # pylint: disable=method-hidden
-        self.total_tasks = len(state["ready"]) + len(state["waiting"])
-
-    def _posttask(self, key, result, dsk, state, worker_id):  # pylint: disable=method-hidden
-        self.logger.progress("Running", 100 * len(state["finished"]) // self.total_tasks)
-
-    def _finish(self, dsk, state, failed):  # pylint: disable=method-hidden
-        # XXX do something with "failed"
-        self.logger.progress("Done", 100)
-
-
-class DaskBasePlugin(BasePlugin):
-    """Base class for plugins which accept and return dask/pandas DataFrames"""
+class PandasBasePlugin(BasePlugin):
+    """Base class for plugins which accept and return pandas DataFrames"""
 
     def run(
         self,
@@ -218,11 +201,11 @@ class DaskBasePlugin(BasePlugin):
         raise NotImplementedError(f"{self.__class__}.run()")
 
 
-class DaskTransformPlugin(DaskBasePlugin):
+class PandasTransformPlugin(PandasBasePlugin):
     input_columns: list[str] = []
 
-    def prepare_dask(self, df: dd.DataFrame | pd.DataFrame, logger: Logger):
-        assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+    def prepare_df(self, df: pd.DataFrame, logger: Logger):
+        assert isinstance(df, pd.DataFrame)
         self.input_columns = sorted(df.columns)
 
         for p in self.parameters.values():
@@ -232,45 +215,42 @@ class DaskTransformPlugin(DaskBasePlugin):
 
     def prepare(
         self,
-        data: pd.DataFrame | dd.DataFrame | Mapping[str, pd.DataFrame | dd.DataFrame],
+        data: pd.DataFrame | Mapping[str, pd.DataFrame],
         logger: Logger,
     ) -> bool:
         if isinstance(data, Mapping):
-            data = concat_dataframes(data.values())
+            data = pd.concat(data.values())
 
-        return self.prepare_dask(data, logger)
+        return self.prepare_df(data, logger)
 
-    def run_dask(
-        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
-    ) -> pd.DataFrame | dd.DataFrame:
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_dask()")
+    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_df()")
 
     def run(
         self,
-        data: pd.DataFrame | dd.DataFrame | Mapping[str, pd.DataFrame | dd.DataFrame],
+        data: pd.DataFrame | Mapping[str, pd.DataFrame],
         logger: Logger,
         row_limit: Optional[int] = None,
-    ) -> pd.DataFrame | dd.DataFrame:
+    ) -> pd.DataFrame:
         assert isinstance(logger, Logger)
         assert row_limit is None or isinstance(row_limit, int)
 
-        with DaskProgressCallback(logger):
-            logger.progress("Starting", 0)
-            if isinstance(data, Mapping):
-                dfs = []
-                for obj in data.values():
-                    assert isinstance(obj, (pd.DataFrame, dd.DataFrame))
-                    df = self.run_dask(obj, logger)
-                    assert isinstance(df, (pd.DataFrame, dd.DataFrame))
-                    dfs.append(crop_dataframe(df, row_limit))
-                logger.progress("Finished", 100)
-                return concat_dataframes(dfs)
-            else:
-                assert isinstance(data, (pd.DataFrame, dd.DataFrame))
-                df = self.run_dask(data, logger)
-                assert isinstance(df, (pd.DataFrame, dd.DataFrame))
-                logger.progress("Finished", 100)
-                return crop_dataframe(df, row_limit)
+        logger.progress("Starting", 0)
+        if isinstance(data, Mapping):
+            dfs = []
+            for obj in data.values():
+                assert isinstance(obj, pd.DataFrame)
+                df = self.run_df(obj, logger)
+                assert isinstance(df, pd.DataFrame)
+                dfs.append(crop_dataframe(df, row_limit))
+            logger.progress("Finished", 100)
+            return pd.concat(dfs)
+        else:
+            assert isinstance(data, pd.DataFrame)
+            df = self.run_df(data, logger)
+            assert isinstance(df, pd.DataFrame)
+            logger.progress("Finished", 100)
+            return crop_dataframe(df, row_limit)
 
 
 # XXX Potentially there's a PandasBasePlugin which can use a technique much
@@ -278,8 +258,8 @@ class DaskTransformPlugin(DaskBasePlugin):
 # provide progress feedback.
 
 
-class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
-    """A specialization of the DaskBasePlugin to allow it to follow nothing,
+class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
+    """A specialization of the PandasBasePlugin to allow it to follow nothing,
     eg: come first."""
 
     def __init__(self, *a, **k):
@@ -293,32 +273,31 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
             + list(self.parameters.items())
         )
 
-    def combine_dfs(self, dfs: list[pd.DataFrame | dd.DataFrame]) -> dd.DataFrame | pd.DataFrame:
+    def combine_dfs(self, dfs: list[pd.DataFrame]) -> pd.DataFrame:
         """First stage: collect all the files together in whatever
         way is appropriate.  Override this to do it differently
         or do more work on the dataframes (eg: counting, renaming, etc)"""
-        return concat_dataframes(dfs)
+        return pd.concat(dfs)
 
     def load_files(
         self,
         logger: Logger,
         row_limit: Optional[int] = None,
-    ) -> pd.DataFrame | dd.DataFrame:
+    ) -> pd.DataFrame:
         assert isinstance(self.parameters["files"], ArrayParam)
         fps = self.parameters["files"].params
         if not fps:
-            return empty_dask_dataframe()
+            return pd.DataFrame()
 
         if len(fps) == 1:
-            with DaskProgressCallback(logger):
-                file_param = self.parameters["files"].params[0]
-                assert isinstance(file_param, MultiParam)
-                ddf = self.read_file_to_dataframe(file_param, logger, row_limit)
-                ddf = self.combine_dfs([ddf])
+            file_param = self.parameters["files"].params[0]
+            assert isinstance(file_param, MultiParam)
+            ddf = self.read_file_to_dataframe(file_param, logger, row_limit)
+            ddf = self.combine_dfs([ddf])
         else:
             num_files = len(fps)
             # Input plugins are likely I/O bound so if there's more than one
-            # file, instead of using the Dask progress callback mechanism
+            # file, instead of using the Pandas progress callback mechanism
             # this uses a simple count of files read."""
             per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
             logger.progress("Loading", 0)
@@ -336,11 +315,11 @@ class DaskInputPlugin(FileInputMixin, DaskBasePlugin):
 
     def read_file_to_dataframe(
         self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None
-    ) -> dd.DataFrame | pd.DataFrame:
+    ) -> pd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.read_file_to_dataframe")
 
 
-class DaskScoringPlugin(DaskTransformPlugin):
+class PandasScoringPlugin(PandasTransformPlugin):
     """Specific kind of transform which turns counts into scores"""
 
     # XXX not really useful?
@@ -363,15 +342,13 @@ class DaskScoringPlugin(DaskTransformPlugin):
         )
     }
 
-    def prepare_dask(self, df, logger):
+    def prepare_df(self, df, logger):
         super().prepare(df, logger)
         for pp in self.parameters["scores"]:
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
 
-    def run_dask(
-        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
-    ) -> pd.DataFrame | dd.DataFrame:
+    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["scores"], ArrayParam)
         score_cols = []
         for pp in self.parameters["scores"]:
@@ -383,15 +360,15 @@ class DaskScoringPlugin(DaskTransformPlugin):
                 score_cols.append(scol)
 
         df = df.replace([np.inf, -np.inf], np.nan)
-        assert isinstance(df, (pd.DataFrame, dd.DataFrame))
+        assert isinstance(df, pd.DataFrame)
         df.dropna(how="all", subset=score_cols, inplace=True)
         return df
 
-    def score(self, columns: List[dd.Series]) -> dd.Series:
-        raise NotImplementedError("Subclass DaskScoringPlugin and provide a score() method")
+    def score(self, columns: List[pd.Series]) -> pd.Series:
+        raise NotImplementedError("Subclass PandasScoringPlugin and provide a score() method")
 
 
-class DaskReindexPlugin(DaskTransformPlugin):
+class PandasReindexPlugin(PandasTransformPlugin):
     # XXX not really useful?
 
     translate_type = str
@@ -402,9 +379,7 @@ class DaskReindexPlugin(DaskTransformPlugin):
     def translate_row(self, row):
         return self.translate(row.name)
 
-    def run_dask(
-        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
-    ) -> pd.DataFrame | dd.DataFrame:
+    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         df["__reindex"] = df.apply(
             self.translate_row, axis=1, meta=pd.Series(self.translate_type())
         )

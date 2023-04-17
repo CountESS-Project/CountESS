@@ -9,7 +9,6 @@ from functools import partial
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
 
-import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
@@ -655,7 +654,7 @@ class ConfiguratorWrapper:
     def show_preview_subframe(self):
         if self.preview_subframe:
             self.preview_subframe.destroy()
-        if isinstance(self.node.result, (dd.DataFrame, pd.DataFrame)):
+        if isinstance(self.node.result, pd.DataFrame):
             self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
         elif isinstance(self.node.result, str):
             self.preview_subframe = tk.Frame(self.frame)
@@ -675,10 +674,11 @@ class ConfiguratorWrapper:
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
-        if self.logger.count > 0:
-            self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
-        else:
-            self.logger_subframe.grid_forget()
+        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
+        # if self.logger.count > 0:
+        #    self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
+        # else:
+        #    self.logger_subframe.grid_forget()
 
     def name_changed_callback(self, *_):
         name = self.name_var.get()
