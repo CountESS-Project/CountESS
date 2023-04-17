@@ -61,7 +61,9 @@ class GroupByPlugin(DaskTransformPlugin):
             if col not in index_cols
         )
         try:
-            return df.groupby(index_cols or df.index).agg(agg_ops)
+            df = df.groupby(index_cols or df.index).agg(agg_ops)
+            df.columns = [ '__'.join(col) if isinstance(col, tuple) else col for col in df.columns.values ]
+            return df
         except ValueError as exc:
             logger.exception(exc)
             return empty_dask_dataframe()
