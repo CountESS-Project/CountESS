@@ -1,5 +1,5 @@
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam
@@ -62,7 +62,9 @@ class GroupByPlugin(DaskTransformPlugin):
         )
         try:
             df = df.groupby(index_cols or df.index).agg(agg_ops)
-            df.columns = [ '__'.join(col) if isinstance(col, tuple) else col for col in df.columns.values ]
+            df.columns = [
+                "__".join(col) if isinstance(col, tuple) else col for col in df.columns.values
+            ]
             return df
         except ValueError as exc:
             logger.exception(exc)

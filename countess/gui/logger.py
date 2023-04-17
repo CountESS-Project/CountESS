@@ -1,5 +1,5 @@
 import datetime
-import sys
+import queue
 import tkinter as tk
 from tkinter import ttk
 from typing import MutableMapping, Optional
@@ -102,33 +102,49 @@ class TreeviewLogger(Logger):
 
         self.treeview.bind("<<TreeviewSelect>>", self.on_click)
 
+        self.queue: queue.Queue = queue.Queue()
+        self.on_poll()
+
     def on_click(self, event):
         # XXX display detail more nicely
         TreeviewDetailWindow(self.detail[self.treeview.focus()])
 
-    def log(self, level: str, message: str, detail: Optional[str] = None):
-        # XXX temporary
-        sys.stderr.write(message + "\n")
-        if detail:
-            sys.stderr.write(detail + "\n\n")
+    def on_poll(self):
+        # XXX dask apply etc don't seem to be thread safe when updating Tk, so
+        # this adds in a queue to separate the two.
+        try:
+            while True:
+                level, message, detail = self.queue.get_nowait()
+                if level == "progress":
+                    self.progress_bar.grid(sticky=tk.EW)
+                    if detail is not None:
+                        self.progress_bar.config(mode="determinate", value=detail)
+                        self.progress_bar.update_label(f"{self.name}: {message} {detail}%")
+                    else:
+                        self.progress_bar.config(mode="indeterminate")
+                        self.progress_bar.step(5)
+                        self.progress_bar.update_label(f"{self.name}: {message}")
+                else:
+                    self.count += 1
+                    datetime_now = datetime.datetime.now()
+                    values = [self.name, message]
+                    iid = self.treeview.insert(
+                        "", "end", text=datetime_now.isoformat(), values=values
+                    )
+                    if detail is not None:
+                        self.detail[iid] = detail
+                    self.treeview["height"] = min(self.count, 10)
 
-        self.count += 1
-        datetime_now = datetime.datetime.now()
-        values = [self.name, message]
-        iid = self.treeview.insert("", "end", text=datetime_now.isoformat(), values=values)
-        if detail is not None:
-            self.detail[iid] = detail
-        self.treeview["height"] = min(self.count, 10)
+        except queue.Empty:
+            pass
+
+        self.treeview.after(1000, self.on_poll)
+
+    def log(self, level: str, message: str, detail: Optional[str] = None):
+        self.queue.put((level, message, detail))
 
     def progress(self, message: str = "Running", percentage: Optional[int] = None):
-        self.progress_bar.grid(sticky=tk.EW)
-        if percentage is not None:
-            self.progress_bar.config(mode="determinate", value=percentage)
-            self.progress_bar.update_label(f"{self.name}: {message} {percentage}%")
-        else:
-            self.progress_bar.config(mode="indeterminate")
-            self.progress_bar.step(5)
-            self.progress_bar.update_label(f"{self.name}: {message}")
+        self.queue.put(("progress", message, percentage))
 
     def progress_hide(self):
         self.progress_bar.grid_forget()

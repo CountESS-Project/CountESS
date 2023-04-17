@@ -10,7 +10,7 @@ from tkinter import filedialog, font, messagebox, ttk
 from typing import Optional
 
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
@@ -627,6 +627,7 @@ class ConfiguratorWrapper:
     def show_config_subframe(self):
         if self.config_subframe:
             self.config_subframe.destroy()
+        self.node.prepare(self.logger)
         if self.node.plugin:
             self.label["text"] = "%s %s — %s" % (
                 self.node.plugin.name,

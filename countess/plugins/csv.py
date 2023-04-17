@@ -3,7 +3,7 @@ from io import StringIO
 from typing import Any, Optional
 
 import dask.dataframe as dd
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import (
