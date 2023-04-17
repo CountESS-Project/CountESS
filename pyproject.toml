@@ -20,14 +20,12 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Bio-Informatics',
 ]
 dependencies = [
-    'dask>=2022.8.0',
-    'distributed>=2022.8.0',
     'fqfa~=1.2.3',
-    'more_itertools>=8.14.0',
-    'numpy~=1.23',
-    'pandas~=1.4',
-    'rapidfuzz~=2.13',
-    'ttkthemes~=3.2',
+    'more_itertools~=9.1.0',
+    'numpy~=1.24.2',
+    'pandas~=2.0.0',
+    'rapidfuzz~=2.15.1',
+    'ttkthemes~=3.2.2',
 ]
 
 [project.optional-dependencies]
@@ -41,7 +39,7 @@ dev = [
 ]
 
 hdf = [
-     'tables~=3.7',
+     'tables~=3.8.0',
 ]
 
 [project.entry-points.countess_plugins]
@@ -51,8 +49,8 @@ load_csv = "countess.plugins.csv:LoadCsvPlugin"
 log_score = "countess.plugins.log_score:LogScorePlugin"
 group_by = "countess.plugins.group_by:GroupByPlugin"
 embed_py = "countess.plugins.embed_python:EmbeddedPythonPlugin"
-pivot = "countess.plugins.pivot:DaskPivotPlugin"
-join = "countess.plugins.join:DaskJoinPlugin"
+pivot = "countess.plugins.pivot:PivotPlugin"
+join = "countess.plugins.join:JoinPlugin"
 save_csv = "countess.plugins.csv:SaveCsvPlugin"
 regex_tool = "countess.plugins.regex:RegexToolPlugin"
 regex_reader = "countess.plugins.regex:RegexReaderPlugin"
