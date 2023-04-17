@@ -203,7 +203,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
 
         src_start, src_end = opcode.src_start, opcode.src_end
         src_seq = ref_seq[src_start:src_end]
-        dest_seq = var_seq[opcode.dest_start:opcode.dest_end]
+        dest_seq = var_seq[opcode.dest_start : opcode.dest_end]
 
         if opcode.tag == "delete":
             assert dest_seq == ""
@@ -238,8 +238,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
 
             if len(src_seq) == 1 and len(dest_seq) == 1:
                 yield f"{src_start+1}{src_seq}>{dest_seq}"
-            elif len(src_seq) == len(dest_seq) and \
-                    dest_seq == invert_dna_sequence(src_seq):
+            elif len(src_seq) == len(dest_seq) and dest_seq == invert_dna_sequence(src_seq):
                 yield f"{src_start+1}_{src_end}inv"
             else:
                 inserted_sequence = search_for_sequence(ref_seq, dest_seq)

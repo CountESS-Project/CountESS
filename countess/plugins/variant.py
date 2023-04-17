@@ -39,7 +39,9 @@ class VariantPlugin(DaskTransformPlugin):
         "max_mutations": IntegerParam("Max Mutations", 10),
     }
 
-    def run_dask(self, df: pd.DataFrame|dd.DataFrame, logger: Logger) -> pd.DataFrame|dd.DataFrame:
+    def run_dask(
+        self, df: pd.DataFrame | dd.DataFrame, logger: Logger
+    ) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["column"], ColumnChoiceParam)
         assert isinstance(self.parameters["sequence"], StringParam)
         assert isinstance(self.parameters["output"], StringParam)

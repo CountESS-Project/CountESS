@@ -54,10 +54,7 @@ class RegexToolPlugin(DaskTransformPlugin):
         value = str(row[column_name])
         match = compiled_re.match(value)
         if match:
-            return [
-                output_params[n].datatype.cast_value(g)
-                for n, g in enumerate(match.groups())
-            ]
+            return [output_params[n].datatype.cast_value(g) for n, g in enumerate(match.groups())]
         else:
             logger.warning("Didn't Match", detail=repr(value))
             return [None] * compiled_re.groups

@@ -50,7 +50,7 @@ class GroupByPlugin(DaskTransformPlugin):
                 self.index_cols.discard(p)
         return True
 
-    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> dd.DataFrame:
+    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
 

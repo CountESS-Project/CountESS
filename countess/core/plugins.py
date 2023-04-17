@@ -229,7 +229,7 @@ class DaskTransformPlugin(DaskBasePlugin):
 
     def prepare_dask(self, df: dd.DataFrame | pd.DataFrame, logger: Logger):
         assert isinstance(df, (pd.DataFrame, dd.DataFrame))
-        self.input_columns = df.columns
+        self.input_columns = list(df.columns)
 
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns)

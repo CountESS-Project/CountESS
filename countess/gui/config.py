@@ -517,7 +517,9 @@ class DataFramePreview:
     def update(self, ddf: dd.DataFrame):
         if len(ddf) > self.max_rows:
             self.label["text"] = f"DataFrame Preview ({self.max_rows} rows out of {len(ddf)})"
-            ddf = crop_dataframe(ddf, self.max_rows)
+            ddfx = crop_dataframe(ddf, self.max_rows)
+            assert isinstance(ddfx, dd.DataFrame)
+            ddf = ddfx
         else:
             self.label["text"] = f"DataFrame Preview {len(ddf)} rows"
 
