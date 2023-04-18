@@ -2,7 +2,7 @@ import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
-from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam
+from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam, TextParam
 from countess.core.plugins import DaskTransformPlugin
 from countess.utils.dask import empty_dask_dataframe
 
@@ -34,7 +34,8 @@ class GroupByPlugin(DaskTransformPlugin):
                 },
             ),
         ),
-        "join": BooleanParam("Join Back?")
+        "expr": TextParam("Expression"),
+        "join": BooleanParam("Join Back?"),
     }
 
     def update(self):
@@ -61,6 +62,7 @@ class GroupByPlugin(DaskTransformPlugin):
             for col, col_param in column_parameters
             if col not in index_cols
         )
+
         try:
             dfo = df.groupby(index_cols or df.index).agg(agg_ops)
             dfo.columns = [
@@ -70,7 +72,32 @@ class GroupByPlugin(DaskTransformPlugin):
             logger.exception(exc)
             return empty_dask_dataframe()
 
-        if self.parameters['join'].value:
-            return df.merge(dfo, how='left', left_on=index_cols, right_on=index_cols)
+        if self.parameters["join"].value:
+            return df.merge(dfo, how="left", left_on=index_cols, right_on=index_cols)
         else:
             return dfo
+
+
+class GroupByExprPlugin(DaskTransformPlugin):
+    """Groups a Dask Dataframe by an column(s) and calcualtes aggregates"""
+
+    name = "Group By Expr"
+    description = "Group records by column(s) and apply expression"
+    version = VERSION
+
+    parameters = {
+        "groupby": PerColumnArrayParam("Group By", BooleanParam("Index")),
+        "expr": TextParam("Expression"),
+    }
+
+    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
+        index_cols = [col_name for col_name, col_param in zip(df.columns, self.parameters["groupby"].params) if col_param.value]
+
+        expr = self.parameters['expr'].value
+
+        try:
+            dfg = df.groupby(index_cols or df.index)
+            return dfg.apply(lambda df: df.eval(expr))
+        except ValueError as exc:
+            logger.exception(exc)
+            return empty_dask_dataframe()
