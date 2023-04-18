@@ -445,7 +445,6 @@ class PerColumnArrayParam(ArrayParam):
         self.read_only = True
 
     def set_column_choices(self, choices):
-        print(f"PCAP:SCC {choices}")
         self.params = [None] * len(choices)
         for num, name in enumerate(choices):
             if name not in self.params_by_column_name:

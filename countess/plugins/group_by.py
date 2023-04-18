@@ -33,7 +33,8 @@ class GroupByPlugin(DaskTransformPlugin):
                     "sem": BooleanParam("Sem"),
                 },
             ),
-        )
+        ),
+        "join": BooleanParam("Join Back?")
     }
 
     def update(self):
@@ -61,11 +62,15 @@ class GroupByPlugin(DaskTransformPlugin):
             if col not in index_cols
         )
         try:
-            df = df.groupby(index_cols or df.index).agg(agg_ops)
-            df.columns = [
-                "__".join(col) if isinstance(col, tuple) else col for col in df.columns.values
+            dfo = df.groupby(index_cols or df.index).agg(agg_ops)
+            dfo.columns = [
+                "__".join(col) if isinstance(col, tuple) else col for col in dfo.columns.values
             ]
-            return df
         except ValueError as exc:
             logger.exception(exc)
             return empty_dask_dataframe()
+
+        if self.parameters['join'].value:
+            return df.merge(dfo, how='left', left_on=index_cols, right_on=index_cols)
+        else:
+            return dfo
