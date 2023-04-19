@@ -2,7 +2,13 @@ import dask.dataframe as dd
 import pandas as pd
 
 from countess import VERSION
-from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam, TextParam
+from countess.core.parameters import (
+    BaseParam,
+    BooleanParam,
+    PerColumnArrayParam,
+    TabularMultiParam,
+    TextParam,
+)
 from countess.core.plugins import DaskTransformPlugin
 from countess.utils.dask import empty_dask_dataframe
 
@@ -91,13 +97,18 @@ class GroupByExprPlugin(DaskTransformPlugin):
     }
 
     def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
-        index_cols = [col_name for col_name, col_param in zip(df.columns, self.parameters["groupby"].params) if col_param.value]
+        assert isinstance(self.parameters["groupby"], PerColumnArrayParam)
+        index_cols = [
+            col_name
+            for col_name, col_param in zip(df.columns, self.parameters["groupby"].params)
+            if col_param.value
+        ]
 
-        expr = self.parameters['expr'].value
+        expr = self.parameters["expr"].value
 
         try:
             dfg = df.groupby(index_cols or df.index)
-            return dfg.apply(lambda df: df.eval(expr))
+            return dfg.apply(lambda df: df.eval(expr))  # type: ignore
         except ValueError as exc:
             logger.exception(exc)
             return empty_dask_dataframe()
