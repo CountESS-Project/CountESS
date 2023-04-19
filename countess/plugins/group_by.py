@@ -1,5 +1,6 @@
 import dask.dataframe as dd
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -34,13 +35,9 @@ class GroupByPlugin(DaskTransformPlugin):
                     "max": BooleanParam("Max"),
                     "sum": BooleanParam("Sum"),
                     "mean": BooleanParam("Mean"),
-                    "std": BooleanParam("Std"),
-                    "var": BooleanParam("Var"),
-                    "sem": BooleanParam("Sem"),
                 },
             ),
         ),
-        "expr": TextParam("Expression"),
         "join": BooleanParam("Join Back?"),
     }
 
@@ -57,6 +54,17 @@ class GroupByPlugin(DaskTransformPlugin):
                 p["index"].value = False
                 self.index_cols.discard(p)
         return True
+
+    def prepare_dask(self, df: pd.DataFrame | dd.DataFrame, logger):
+        super().prepare_dask(df, logger)
+        for num, dtype in enumerate(df.dtypes):
+            col_param = self.parameters["columns"][num]
+            is_numeric_col = is_numeric_dtype(dtype)
+            for key, param in col_param.items():
+                if key in ('sum', 'mean'):
+                    param.hide = not is_numeric_col
+                    if not is_numeric_col:
+                        param.value = False
 
     def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)

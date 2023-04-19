@@ -11,6 +11,7 @@ class BaseParam:
 
     label: str = ""
     value: Any = None
+    hide: bool = False
 
     def copy(self):
         """Plugins declare their parameters with instances of BaseParam, these

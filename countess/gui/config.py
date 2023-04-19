@@ -77,7 +77,7 @@ class ParameterWrapper:
             self.entry.state(["readonly"])  # don't allow other options
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
-            self.set_checkbox_value(parameter.value)
+            self.set_checkbox_value()
         elif isinstance(parameter, FileParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
@@ -191,6 +191,12 @@ class ParameterWrapper:
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def update(self):
+        print(f"UPDATE {self} {self.parameter.label} {self.parameter.hide}")
+        if self.parameter.hide:
+            self.entry['fg'] = self.entry['bg']
+        else:
+            self.entry['fg'] = None
+
         if (
             isinstance(self.parameter, ArrayParam)
             and self.level == 0
@@ -225,7 +231,7 @@ class ParameterWrapper:
         elif isinstance(self.parameter, ChoiceParam):
             self.entry["values"] = self.parameter.choices
         elif isinstance(self.parameter, BooleanParam):
-            self.set_checkbox_value(self.parameter.value)
+            self.set_checkbox_value()
         elif isinstance(self.parameter, TextParam):
             if self.parameter.read_only:
                 self.entry["state"] = "normal"
@@ -402,21 +408,30 @@ class ParameterWrapper:
         self.entry.edit_modified(False)
         self.set_value(value)
 
-    def set_checkbox_value(self, value):
-        if value:
+    def set_checkbox_value(self):
+        if self.parameter.hide:
+            self.entry["text"] = ""
+            self.entry["fg"] = self.entry["bg"]
+            self.entry["state"] = tk.DISABLED
+            self.entry["bd"] = 0
+        elif self.parameter.value:
             self.entry["text"] = UNICODE_CHECK
             self.entry["fg"] = "black"
+            self.entry["state"] = tk.NORMAL
+            self.entry["bd"] = 1
         else:
             self.entry["text"] = UNICODE_UNCHECK
             self.entry["fg"] = "grey"
+            self.entry["state"] = tk.NORMAL
+            self.entry["bd"] = 1
 
     def toggle_checkbox_callback(self, *_):
-        if self.parameter.read_only:
+        if self.parameter.read_only or self.parameter.hide:
             # XXX warn?
             return
         value = not self.parameter.value
         self.parameter.value = value
-        self.set_checkbox_value(value)
+        self.set_checkbox_value()
         if self.callback is not None:
             self.callback(self.parameter)
 
