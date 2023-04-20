@@ -1,6 +1,7 @@
 """Logger base classes"""
 
 import sys
+import traceback
 from typing import Optional
 
 
@@ -29,6 +30,9 @@ class Logger:
     def error(self, message: str, detail: Optional[str] = None):
         """Log a message at level error"""
         self.log("error", message, detail)
+
+    def exception(self, exception: Exception):
+        self.error(str(exception), detail="".join(traceback.format_exception(exception)))
 
     def clear(self):
         """Clear logs (if possible)"""

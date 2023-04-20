@@ -6,7 +6,7 @@ import tkinter as tk
 import webbrowser
 from enum import Enum, IntFlag
 from functools import partial
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, font, messagebox, ttk
 from typing import Optional
 
 import pandas as pd
@@ -618,7 +618,10 @@ class ConfiguratorWrapper:
 
         self.show_config_subframe()
         if self.node.plugin:
-            self.show_preview_subframe()
+            if self.node.is_dirty:
+                self.config_change_callback()
+            else:
+                self.show_preview_subframe()
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -635,6 +638,8 @@ class ConfiguratorWrapper:
                     self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
                 ).grid(row=1, column=1, sticky=tk.SE, padx=10)
             self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
+            self.node.prepare(self.logger)
+            self.node.plugin.update()
             self.configurator = PluginConfigurator(
                 self.frame, self.node.plugin, self.config_change_callback
             )
@@ -884,8 +889,10 @@ def make_root():
         # XXX some kind of ttk style setup goes here as a fallback
 
     # Set up treeview font and row heights.
+    linespace = font.Font(None, 10).metrics()["linespace"]
     style = ttk.Style()
-    style.configure("Treeview", font=(None, 10), rowheight=25)
+    style.configure("Treeview", font=(None, 10), rowheight=linespace)
+    style.configure("Treeview.Heading", font=(None, 10, "bold"), rowheight=linespace)
 
     root.title(f"CountESS {VERSION}")
     root.rowconfigure(0, weight=0)

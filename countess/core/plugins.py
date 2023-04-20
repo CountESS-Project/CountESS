@@ -104,6 +104,12 @@ class BasePlugin:
         isn't a suitable data input."""
         return True
 
+    def update(self):
+        """Notify the plugin that one or more of its parameters have been changed.
+        If this change affects other parameters, it can return True to indicate that
+        all parameters should be re-displayed"""
+        return False
+
     def run(
         self,
         data: Any,
@@ -206,7 +212,7 @@ class PandasTransformPlugin(PandasBasePlugin):
 
     def prepare_df(self, df: pd.DataFrame, logger: Logger):
         assert isinstance(df, pd.DataFrame)
-        self.input_columns = sorted(df.columns)
+        self.input_columns = list(df.columns)
 
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns)
