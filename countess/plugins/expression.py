@@ -3,7 +3,7 @@ import pandas as pd
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import TextParam
-from countess.core.plugins import DaskTransformPlugin
+from countess.core.plugins import PandasTransformPlugin
 
 
 def process(df: pd.DataFrame, codes, logger: Logger):
@@ -13,7 +13,7 @@ def process(df: pd.DataFrame, codes, logger: Logger):
         except Exception as exc:  # pylint: disable=W0718
             logger.error(str(exc))
 
-        if isinstance(result, (dd.Series, pd.Series)):
+        if isinstance(result, pd.Series):
             # this was a filter
             df = df.copy()
             df["__filter"] = result
@@ -25,14 +25,14 @@ def process(df: pd.DataFrame, codes, logger: Logger):
     return df
 
 
-class ExpressionPlugin(DaskTransformPlugin):
+class ExpressionPlugin(PandasTransformPlugin):
     name = "Expression"
     description = "Apply simple expressions"
     version = VERSION
 
     parameters = {"code": TextParam("Expressions")}
 
-    def run_dask(self, df, logger: Logger) -> pd.DataFrame:
+    def run_df(self, df, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["code"], TextParam)
 
         codes = [c.replace("\n", " ").strip() for c in self.parameters["code"].value.split("\n\n")]

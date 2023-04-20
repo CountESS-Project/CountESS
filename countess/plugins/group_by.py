@@ -2,7 +2,14 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from countess import VERSION
-from countess.core.parameters import ChoiceParam, ColumnOrIndexChoiceParam
+from countess.core.parameters import (
+    BaseParam,
+    BooleanParam,
+    ColumnOrIndexChoiceParam,
+    PerColumnArrayParam,
+    TabularMultiParam,
+    TextParam,
+)
 from countess.core.plugins import PandasTransformPlugin
 
 
@@ -47,8 +54,8 @@ class GroupByPlugin(PandasTransformPlugin):
                 self.index_cols.discard(p)
         return True
 
-    def prepare_dask(self, df: pd.DataFrame | dd.DataFrame, logger):
-        super().prepare_dask(df, logger)
+    def prepare_df(self, df: pd.DataFrame, logger):
+        super().prepare_df(df, logger)
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         for num, dtype in enumerate(df.dtypes):
             col_param = self.parameters["columns"][num]
@@ -59,7 +66,7 @@ class GroupByPlugin(PandasTransformPlugin):
                     if not is_numeric_col:
                         param.value = False
 
-    def run_dask(self, df: pd.DataFrame | dd.DataFrame, logger) -> pd.DataFrame | dd.DataFrame:
+    def run_df(self, df: pd.DataFrame, logger) -> pd.DataFrame:
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
 
@@ -74,10 +81,10 @@ class GroupByPlugin(PandasTransformPlugin):
             dfo = df.groupby(index_cols or df.index).agg(agg_ops)
             dfo.columns = [
                 "__".join(col) if isinstance(col, tuple) else col for col in dfo.columns.values
-            ]
+            ] # type: ignore
         except ValueError as exc:
             logger.exception(exc)
-            return empty_dask_dataframe()
+            return pd.DataFrame()
 
         if self.parameters["join"].value:
             return df.merge(dfo, how="left", left_on=index_cols, right_on=index_cols)
@@ -85,7 +92,7 @@ class GroupByPlugin(PandasTransformPlugin):
             return dfo
 
 
-class GroupByExprPlugin(DaskTransformPlugin):
+class GroupByExprPlugin(PandasTransformPlugin):
     """Groups a Dask Dataframe by an column(s) and calcualtes aggregates"""
 
     name = "Group By Expr"

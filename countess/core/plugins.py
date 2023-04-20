@@ -195,6 +195,7 @@ def crop_dataframe(df: pd.DataFrame, row_limit: Optional[int]):
         return df
     return df[0:row_limit]
 
+
 class PandasBasePlugin(BasePlugin):
     """Base class for plugins which accept and return pandas DataFrames"""
 

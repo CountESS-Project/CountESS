@@ -6,6 +6,7 @@ from tkinter import filedialog, ttk
 from typing import Mapping, MutableMapping, Optional
 
 import numpy as np
+import pandas as pd
 from pandas.api.types import is_numeric_dtype  # type: ignore
 
 from ..core.parameters import (
@@ -498,7 +499,7 @@ class DataFramePreview:
     # XXX uses a treeview, which seemed like a good match but actually a grid-layout
     # of custom styled labels might work better.
 
-    def __init__(self, tk_parent, ddf: Optional[dd.DataFrame] = None, max_rows: int = 10000):
+    def __init__(self, tk_parent, ddf: Optional[pd.DataFrame] = None, max_rows: int = 10000):
         self.frame = ttk.Frame(tk_parent)
         self.label = ttk.Label(self.frame, text="DataFrame Preview")
         self.max_rows = max_rows
