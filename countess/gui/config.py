@@ -193,9 +193,9 @@ class ParameterWrapper:
     def update(self):
         print(f"UPDATE {self} {self.parameter.label} {self.parameter.hide}")
         if self.parameter.hide:
-            self.entry['fg'] = self.entry['bg']
+            self.entry["fg"] = self.entry["bg"]
         else:
-            self.entry['fg'] = None
+            self.entry["fg"] = None
 
         if (
             isinstance(self.parameter, ArrayParam)

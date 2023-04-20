@@ -57,11 +57,12 @@ class GroupByPlugin(DaskTransformPlugin):
 
     def prepare_dask(self, df: pd.DataFrame | dd.DataFrame, logger):
         super().prepare_dask(df, logger)
+        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         for num, dtype in enumerate(df.dtypes):
             col_param = self.parameters["columns"][num]
             is_numeric_col = is_numeric_dtype(dtype)
             for key, param in col_param.items():
-                if key in ('sum', 'mean'):
+                if key in ("sum", "mean"):
                     param.hide = not is_numeric_col
                     if not is_numeric_col:
                         param.value = False
