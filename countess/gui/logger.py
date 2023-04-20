@@ -78,13 +78,16 @@ class TreeviewDetailWindow(tk.Toplevel):
     def __init__(self, detail, *a, **k):
         super().__init__(*a, **k)
 
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+
         text = tk.Text(self)
         text.insert("1.0", detail)
         text["state"] = "disabled"
-        text.pack(anchor=tk.CENTER)
+        text.grid(sticky=tk.NSEW)
 
         button = tk.Button(self, text="CLOSE", command=self.destroy)
-        button.pack()
+        button.grid(sticky=tk.EW)
 
 
 class TreeviewLogger(Logger):
