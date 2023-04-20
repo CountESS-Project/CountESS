@@ -180,6 +180,11 @@ class ParameterWrapper:
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def update(self):
+        if self.parameter.hide:
+            self.entry["fg"] = self.entry["bg"]
+        else:
+            self.entry["fg"] = None
+
         if isinstance(self.parameter, ArrayParam) and self.level == 0:
             self.update_subwrappers_framed(self.parameter.params, self.delete_row_callback)
             if self.button:
