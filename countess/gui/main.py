@@ -404,7 +404,7 @@ class GraphWrapper:
             self.canvas.itemconfig(connecting_line.line, fill="black")
 
     def new_node_position(self, x, y):
-        flipped = self.canvas.winfo_height() / self.canvas.winfo_width()
+        flipped = self.canvas.winfo_height() > self.canvas.winfo_width()
         xp = _limit(x / self.canvas.winfo_width(), 0.05, 0.95)
         yp = _limit(y / self.canvas.winfo_height(), 0.05, 0.95)
         return (yp, xp) if flipped else (xp,yp)
