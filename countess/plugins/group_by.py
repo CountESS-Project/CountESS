@@ -81,7 +81,7 @@ class GroupByPlugin(PandasTransformPlugin):
             dfo = df.groupby(index_cols or df.index).agg(agg_ops)
             dfo.columns = [
                 "__".join(col) if isinstance(col, tuple) else col for col in dfo.columns.values
-            ] # type: ignore
+            ]  # type: ignore
         except ValueError as exc:
             logger.exception(exc)
             return pd.DataFrame()

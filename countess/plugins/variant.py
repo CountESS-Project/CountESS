@@ -1,7 +1,5 @@
 import pandas as pd
 
-from collections import Counter
-
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ColumnOrIndexChoiceParam, IntegerParam, StringParam
@@ -43,8 +41,8 @@ class VariantPlugin(PandasTransformPlugin):
         output = self.parameters["output"].value
 
         if self.parameters["column"].is_index():
-            dfo['__index'] = df.index
-            column_name = '__index'
+            dfo["__index"] = df.index
+            column_name = "__index"
         else:
             column_name = self.parameters["column"].value
 
@@ -57,6 +55,6 @@ class VariantPlugin(PandasTransformPlugin):
         dfo[output] = dfo[column_name].apply(process_row, args=(sequence, max_mutations, logger))
 
         if self.parameters["column"].is_index():
-            return dfo.drop(columns=['__index'])
+            return dfo.drop(columns=["__index"])
         else:
             return dfo
