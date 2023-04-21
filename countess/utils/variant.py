@@ -259,6 +259,6 @@ def find_variant_string(
         return prefix + "="
 
     if max_mutations is not None and len(variations) > max_mutations:
-        raise ValueError("Too many variations")
+        raise ValueError("Too many variations (%d) in {var_seq}" % len(variations))
 
     return prefix + "(;)".join(variations)
