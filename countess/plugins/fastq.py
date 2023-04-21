@@ -20,19 +20,22 @@ class LoadFastqPlugin(PandasInputPlugin):
     file_types = [("FASTQ", "*.fastq"), ("FASTQ (gzipped)", "*.fastq.gz")]
 
     parameters = {
-        "group": BooleanParam("Group by Sequence?", True),
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
+        "group": BooleanParam("Group by Sequence?", True),
     }
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
+        # XXX this should be a bit smarter than building up the entire
+        # structure in an array ...
         records = []
-        count_column_name = "count"
 
-        with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
+        filename = file_params["filename"].value
+        with open(filename, "r", encoding="utf-8") as fh:
             for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
                 if fastq_read.average_quality() >= self.parameters["min_avg_quality"].value:
-                    records.append((fastq_read.sequence, 1))
-        return pd.DataFrame.from_records(records, columns=("sequence", count_column_name))
+                    records.append((fastq_read.sequence, fastq_read.header, filename))
+
+        return pd.DataFrame.from_records(records, columns=("sequence", "header", "filename"))
 
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then (optionally) group them by sequence"""
@@ -40,6 +43,7 @@ class LoadFastqPlugin(PandasInputPlugin):
         combined_df = pd.concat(dfs)
 
         if len(combined_df) and self.parameters["group"].value:
-            combined_df = combined_df.groupby(by=["sequence"]).sum()
+            combined_df = combined_df.groupby(by=["sequence", "filename"]).agg({'sequence': 'first', 'filename': 'first', 'header': 'count'})
+            combined_df.rename({'header': 'count'}, axis=1)
 
         return combined_df
