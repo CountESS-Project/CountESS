@@ -97,11 +97,12 @@ class DraggableMixin:  # pylint: disable=R0903
         self.after(500, self.__on_timeout)
 
     def __place(self, event=None):
+        x, y, w, h = _geometry(self)
+        x = x + (event.x if event else (w // 2))
+        y = y + (event.y if event else (h // 2))
         return {
-            "relx": (self.winfo_x() + (event.x if event else self.winfo_width() // 2))
-            / self.master.winfo_width(),
-            "rely": (self.winfo_y() + (event.y if event else self.winfo_height() // 2))
-            / self.master.winfo_height(),
+            "relx": _limit( x / self.master.winfo_width(), 0.05, 0.95),
+            "rely": _limit( y / self.master.winfo_height(), 0.05, 0.95),
             "anchor": "c",
         }
 
@@ -359,16 +360,10 @@ class GraphWrapper:
 
     def on_configure(self, node, event):
         """Stores the updated position of the label in node.position"""
-        place_info = event.widget.place_info()
-        # XXX should be more elegant way of answering the question "are we flipped?"
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-        if width > height:
-            node.position = (float(place_info["relx"]), float(place_info["rely"]))
-        else:
-            node.position = (float(place_info["rely"]), float(place_info["relx"]))
+        node.position = self.new_node_position(event.x, event.y)
 
         # Adapt label sizes to suit the window size, as best we can ...
+        width = self.canvas.winfo_width()
         label_max_width = max(width // 10, 25)
         label_font_size = int(math.sqrt(width) / math.pi)
         for label in self.labels.values():
@@ -408,6 +403,12 @@ class GraphWrapper:
         for connecting_line, _, _ in self.lines_lookup.values():
             self.canvas.itemconfig(connecting_line.line, fill="black")
 
+    def new_node_position(self, x, y):
+        flipped = self.canvas.winfo_height() / self.canvas.winfo_width()
+        xp = _limit(x / self.canvas.winfo_width(), 0.05, 0.95)
+        yp = _limit(y / self.canvas.winfo_height(), 0.05, 0.95)
+        return (yp, xp) if flipped else (xp,yp)
+
     def on_canvas_button1(self, event):
         """Click to create a new node, if it is created on top of a line
         that line is broken and the node is included."""
@@ -422,10 +423,7 @@ class GraphWrapper:
         if not items:
             return
 
-        position = (
-            event.x / self.canvas.winfo_width(),
-            event.y / self.canvas.winfo_height(),
-        )
+        position = self.new_node_position(event.x, event.y)
         new_node = self.add_new_node(position)
 
         for item in items:
@@ -502,11 +500,10 @@ class GraphWrapper:
 
     def on_ghost_release(self, start_node, event):
         xl, yl, _wl, _hl = _geometry(event.widget)
+        flipped = self.canvas.winfo_height() > self.canvas.winfo_width()
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
-            position = (event.x + xl) / self.canvas.winfo_width(), (
-                event.y + yl
-            ) / self.canvas.winfo_height()
+            position = self.new_node_position(event.x+xl,event.y+yl)
             other_node = self.add_new_node(position)
         elif other_node == start_node:
             return
@@ -521,11 +518,7 @@ class GraphWrapper:
             self.add_parent(start_node, other_node)
         elif other_node.is_ancestor_of(start_node):
             self.add_parent(other_node, start_node)
-        elif (
-            (event.x > 0)
-            if self.canvas.winfo_width() > self.canvas.winfo_height()
-            else (event.y > 0)
-        ):
+        elif (flipped and event.y > 0) or (not flipped and event.x > 0):
             self.add_parent(start_node, other_node)
         else:
             self.add_parent(other_node, start_node)
