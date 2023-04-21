@@ -43,6 +43,7 @@ class RegexToolPlugin(PandasTransformPlugin):
                         ),
                     ),
                     "drop_column": BooleanParam("Drop Column", False),
+                    "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
                 },
             ),
         ),
@@ -52,10 +53,10 @@ class RegexToolPlugin(PandasTransformPlugin):
         value = str(row[column_name])
         match = compiled_re.match(value)
         if match:
-            return [output_params[n].datatype.cast_value(g) for n, g in enumerate(match.groups())]
+            return [ 1 ] + [output_params[n].datatype.cast_value(g) for n, g in enumerate(match.groups())]
         else:
             logger.warning("Didn't Match", detail=repr(value))
-            return [None] * compiled_re.groups
+            return [ 0 ] + [None] * compiled_re.groups
 
     def run_df(self, df, logger):
         # prevent added columns from propagating backwards in
@@ -90,14 +91,18 @@ class RegexToolPlugin(PandasTransformPlugin):
             re_groups_df = df.apply(func, axis=1, result_type="expand")
 
             for n in range(0, compiled_re.groups):
-                df[output_names[n]] = re_groups_df[n]
+                df[output_names[n]] = re_groups_df[n+1]
+
+            if regex_parameter['drop_unmatch'].value:
+                df['__filter'] = re_groups_df[0]
+                df = df.query('__filter != 0').drop(columns="__filter")
 
         drop_columns = set(
             rp["column"].value for rp in self.parameters["regexes"] if rp["drop_column"].value
         )
         if "__index" in df:
             drop_columns.add("__index")
-
+        
         return df.drop(columns=drop_columns) if drop_columns else df
 
 
