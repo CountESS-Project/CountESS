@@ -177,57 +177,36 @@ class ConnectingLine:
         if w2 == 1 and h2 == 1:
             x2, y2, w2, h2 = x2 - 20, y2 - 20, 40, 40
 
-        # If there's enough room, extra control points set
-        # up a nice spline, and a little extra padding
+        # Control points set up a nice spline, and a little extra padding
         # on the destination end to allow for the arrow head.
         _xc, _yc, wc, hc = _geometry(self.canvas)
 
         if wc > hc:
             if self.switch and x1 > x2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
-            if 0 < x2 - (x1 + w1) < 50:
-                coords = (
-                    x1 + w1,
-                    y1 + h1 // 2,
-                    x2 - 20,
-                    y2 + h2 // 2,
-                    x2,
-                    y2 + h2 // 2,
-                )
-            else:
-                coords = (
-                    x1 + w1,
-                    y1 + h1 // 2,
-                    x1 + w1 + 20,
-                    y1 + h1 // 2,
-                    x2 - 40,
-                    y2 + h2 // 2,
-                    x2,
-                    y2 + h2 // 2,
-                )
+            coords = (
+                x1 + w1,
+                y1 + h1 // 2,
+                x1 + w1 + 20,
+                y1 + h1 // 2,
+                x2 - 40,
+                y2 + h2 // 2,
+                x2,
+                y2 + h2 // 2,
+            )
         else:
             if self.switch and y1 > y2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
-            if 0 < y2 - (y1 + h1) < 50:
-                coords = (
-                    x1 + w1 // 2,
-                    y1 + h1,
-                    x2 + w2 // 2,
-                    y2 - 20,
-                    x2 + w2 // 2,
-                    y2,
-                )
-            else:
-                coords = (
-                    x1 + w1 // 2,
-                    y1 + h1,
-                    x1 + w1 // 2,
-                    y1 + h1 + 20,
-                    x2 + w2 // 2,
-                    y2 - 40,
-                    x2 + w2 // 2,
-                    y2,
-                )
+            coords = (
+                x1 + w1 // 2,
+                y1 + h1,
+                x1 + w1 // 2,
+                y1 + h1 + 20,
+                x2 + w2 // 2,
+                y2 - 40,
+                x2 + w2 // 2,
+                y2,
+            )
 
         if self.line:
             self.canvas.coords(self.line, *coords)
@@ -235,7 +214,7 @@ class ConnectingLine:
         else:
             self.line = self.canvas.create_line(
                 *coords,
-                smooth=len(coords) > 6,
+                smooth=True,
                 width=3,
                 arrow="last",
                 arrowshape=(15, 15, 6),
