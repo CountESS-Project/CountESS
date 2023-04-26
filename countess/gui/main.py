@@ -94,7 +94,7 @@ class DraggableMixin:  # pylint: disable=R0903
             self.__state = self.__state.LINK_WAIT
         else:
             self.__state = self.__state.DRAG_WAIT
-        self.after(500, self.__on_timeout)
+        self.after(100, self.__on_timeout)
 
     def __place(self, event=None):
         x, y, w, h = _geometry(self)
@@ -311,6 +311,7 @@ class GraphWrapper:
         self.canvas.bind("<Button-3>", self.on_canvas_button3)
         self.canvas.bind("<Motion>", self.on_canvas_motion)
         self.canvas.bind("<Leave>", self.on_canvas_leave)
+        self.canvas.bind("<Key-Delete>", self.on_canvas_delete)
 
     def label_for_node(self, node):
         label = DraggableLabel(
@@ -389,6 +390,7 @@ class GraphWrapper:
         if self.highlight_rectangle is not None:
             self.canvas.delete(self.highlight_rectangle)
             self.highlight_rectangle = None
+        self.canvas.focus_set()
 
     def on_canvas_motion(self, event):
         """Show a preview of line selection when the cursor is over line(s)"""
@@ -410,6 +412,9 @@ class GraphWrapper:
         return (yp, xp) if flipped else (xp,yp)
 
     def on_canvas_button1(self, event):
+        pass
+
+    def on_canvas_button3(self, event):
         """Click to create a new node, if it is created on top of a line
         that line is broken and the node is included."""
 
@@ -420,8 +425,8 @@ class GraphWrapper:
         # (you can still create a new node by button-3-dragging from an
         # existing node, and if you really want a disconnected graph you can
         # delete the link to the new node!)
-        if not items:
-            return
+        #if not items:
+        #    return
 
         position = self.new_node_position(event.x, event.y)
         new_node = self.add_new_node(position)
@@ -432,10 +437,9 @@ class GraphWrapper:
             self.add_parent(new_node, child_node)
             self.add_parent(parent_node, new_node)
 
-    def on_canvas_button3(self, event):
+    def on_canvas_delete(self, event):
         """Button3 on canvas: delete line(s)."""
         items = self.canvas.find_overlapping(event.x - 10, event.y - 10, event.x + 10, event.y + 10)
-
         for item in items:
             _, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
