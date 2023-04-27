@@ -1,0 +1,17 @@
+#!/bin/bash
+set -eu
+
+VERSION=`echo -e 'import countess\nprint(countess.VERSION)' | python -`
+git tag -f v$VERSION
+
+mkdir -p dist-old
+
+if [ -n "$(ls -A dist)" ]; then
+    mv dist/* dist-old/
+fi
+python -m build
+
+# XXX run tests
+
+twine upload dist/*
+
