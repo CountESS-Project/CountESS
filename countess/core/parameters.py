@@ -85,10 +85,29 @@ class IntegerParam(SimpleParam):
     var_type = int
     _value: int = 0
 
+    def clean_value(self, value):
+        if isinstance(value, str):
+            return super().clean_value(
+                ''.join(re.split(r'\D+', value))
+            )
+        else:
+            return super().clean_value(value)
+
 
 class FloatParam(SimpleParam):
     var_type = float
     _value: float = 0.0
+
+    def clean_value(self, value):
+        if isinstance(value, str):
+            try:
+                a, b = value.split('.', 1)
+                s = re.split(r'\D+', a) + ["."] + re.split(r'\D+', b)
+            except ValueError:
+                s = re.split(r'\D+', value)
+            return super().clean_value(''.join(s))
+        else:
+            return super().clean_value(value)
 
 
 class StringParam(SimpleParam):
@@ -239,10 +258,10 @@ class ChoiceParam(BaseParam):
 
 class DataTypeChoiceParam(ChoiceParam):
     DATA_TYPES: Mapping[str, Optional[tuple[type, Any]]] = {
-        "string": (str, None),
-        "number": (float, None),
-        "integer": (int, 0),
-        "boolean": (bool, None),
+        "string": (str, None, StringParam),
+        "number": (float, None, FloatParam),
+        "integer": (int, 0, IntegerParam),
+        "boolean": (bool, None, BooleanParam),
     }
 
     def __init__(
@@ -265,6 +284,9 @@ class DataTypeChoiceParam(ChoiceParam):
             return self.DATA_TYPES[self.value][1]
         else:
             return self.DATA_TYPES[self.value][0](value)
+
+    def get_parameter(self, label: str, value = None) -> BaseParam:
+        return self.DATA_TYPES[self.value][2](label, value)
 
 
 class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
@@ -541,7 +563,7 @@ class MultiParam(BaseParam):
     def get_hash_value(self):
         digest = hashlib.new(PARAM_DIGEST_HASH)
         for k, p in self.params.items():
-            digest.update((k + "\0" + p.get_hash_value()).encode("utf-8"))
+            digest.update((str(k) + "\0" + p.get_hash_value()).encode("utf-8"))
         return digest.hexdigest()
 
     def set_column_choices(self, choices):
