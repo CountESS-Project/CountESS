@@ -58,6 +58,8 @@ save_csv = "countess.plugins.csv:SaveCsvPlugin"
 regex_tool = "countess.plugins.regex:RegexToolPlugin"
 regex_reader = "countess.plugins.regex:RegexReaderPlugin"
 variants = "countess.plugins.variant:VariantPlugin"
+mutagenize = "countess.plugins.mutagenize:MutagenizePlugin"
+data_table = "countess.plugins.data_table:DataTablePlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
