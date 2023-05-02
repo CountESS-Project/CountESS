@@ -56,6 +56,7 @@ class ParameterWrapper:
         self.button = None
         self.level = level
         self.subwrapper_buttons: list[tk.Button] = []
+        self.column_labels: list[tk.Label] = []
 
         self.subwrappers: Mapping[BaseParam, ParameterWrapper] = {}
 
@@ -95,12 +96,12 @@ class ParameterWrapper:
             else:
                 self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, SimpleParam):
-            if isinstance(parameter, FloatParam):
-                self.var = tk.DoubleVar(tk_parent, value=parameter.value)
-            elif isinstance(parameter, IntegerParam):
-                self.var = tk.IntVar(tk_parent, value=parameter.value)
-            else:
-                self.var = tk.StringVar(tk_parent, value=parameter.value)
+            #if isinstance(parameter, FloatParam):
+            #    self.var = tk.DoubleVar(tk_parent, value=parameter.value)
+            #elif isinstance(parameter, IntegerParam):
+            #    self.var = tk.IntVar(tk_parent, value=parameter.value)
+            #else:
+            self.var = tk.StringVar(tk_parent, value=parameter.value)
 
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
@@ -140,12 +141,6 @@ class ParameterWrapper:
 
             drc = self.delete_row_callback if not parameter.read_only else None
             if isinstance(parameter.param, MultiParam):
-                for n, pp in enumerate(parameter.param.values()):
-                    tk.Label(self.entry, text=pp.label).grid(
-                        row=0, column=n + 1, sticky=tk.EW, padx=10
-                    )
-                    self.entry.columnconfigure(n + 1, weight=1)
-
                 self.update_subwrappers_tabular(parameter.params, drc)
             else:
                 self.entry.columnconfigure(0, weight=0)
@@ -267,10 +262,18 @@ class ParameterWrapper:
     def update_subwrappers_tabular(self, params, delete_row_callback):
         while self.subwrapper_buttons:
             self.subwrapper_buttons.pop().destroy()
+        while self.row_labels:
+            self.row_labels.pop().destroy()
+        while self.column_labels:
+            self.column_labels.pop().destroy()
 
-        for rl in self.row_labels:
-            rl.destroy()
-        self.row_labels = []
+        for n, pp in enumerate(self.parameter.param.values()):
+            column_label = tk.Label(self.entry, text=pp.label)
+            self.column_labels.append(column_label)
+            column_label.grid(
+                row=0, column=n + 1, sticky=tk.EW, padx=10
+            )
+            self.entry.columnconfigure(n + 1, weight=1)
 
         for n, p in enumerate(params):
             row_label = tk.Label(self.entry, text=p.label)
