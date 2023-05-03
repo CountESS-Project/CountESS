@@ -36,7 +36,7 @@ dev = [
     'pylint~=2.16',
     'types-ttkthemes~=3.2',
     'twine==4.0.2',
-    'pandas-stubs~=1.4',
+    'pandas-stubs~=2.0.0',
     'pytest~=7.2',
 ]
 
@@ -86,6 +86,8 @@ disable = [
     "too-many-branches",
     "too-many-instance-attributes",
     "too-many-locals",
+    "too-many-public-methods",
+    "unidiomatic-typecheck",
 ]
 
 [tool.black]
