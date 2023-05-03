@@ -1,7 +1,7 @@
 import hashlib
 import os.path
 import re
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional, Type
 
 PARAM_DIGEST_HASH = "sha256"
 
@@ -87,9 +87,7 @@ class IntegerParam(SimpleParam):
 
     def clean_value(self, value):
         if isinstance(value, str):
-            return super().clean_value(
-                ''.join(re.split(r'\D+', value))
-            )
+            return super().clean_value("".join(re.split(r"\D+", value)))
         else:
             return super().clean_value(value)
 
@@ -101,11 +99,11 @@ class FloatParam(SimpleParam):
     def clean_value(self, value):
         if isinstance(value, str):
             try:
-                a, b = value.split('.', 1)
-                s = re.split(r'\D+', a) + ["."] + re.split(r'\D+', b)
+                a, b = value.split(".", 1)
+                s = re.split(r"\D+", a) + ["."] + re.split(r"\D+", b)
             except ValueError:
-                s = re.split(r'\D+', value)
-            return super().clean_value(''.join(s))
+                s = re.split(r"\D+", value)
+            return super().clean_value("".join(s))
         else:
             return super().clean_value(value)
 
@@ -257,7 +255,7 @@ class ChoiceParam(BaseParam):
 
 
 class DataTypeChoiceParam(ChoiceParam):
-    DATA_TYPES: Mapping[str, Optional[tuple[type, Any]]] = {
+    DATA_TYPES: Mapping[str, tuple[type, Any, Type[SimpleParam]]] = {
         "string": (str, None, StringParam),
         "number": (float, None, FloatParam),
         "integer": (int, 0, IntegerParam),
@@ -285,26 +283,18 @@ class DataTypeChoiceParam(ChoiceParam):
         else:
             return self.DATA_TYPES[self.value][0](value)
 
-    def get_parameter(self, label: str, value = None) -> BaseParam:
+    def get_parameter(self, label: str, value=None) -> BaseParam:
         return self.DATA_TYPES[self.value][2](label, value)
 
 
 class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
     NONE_VALUE = "— NONE —"
 
-    DATA_TYPES = {
-        "string": (str, None),
-        "number": (float, None),
-        "integer": (int, 0),
-        "boolean": (bool, None),
-        NONE_VALUE: None,
-    }
-
     def __init__(
         self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
     ):
         if not choices:
-            choices = list(self.DATA_TYPES.keys())
+            choices = list(self.DATA_TYPES.keys()) + [self.NONE_VALUE]
         if value is None:
             value = self.NONE_VALUE
         super().__init__(label, value, choices)
