@@ -43,9 +43,10 @@ class LoadFastqPlugin(PandasInputPlugin):
         combined_df = pd.concat(dfs)
 
         if len(combined_df) and self.parameters["group"].value:
-            combined_df = combined_df.groupby(by=["sequence", "filename"]).agg(
-                {"sequence": "first", "filename": "first", "header": "count"}
+            combined_df = (
+                combined_df.groupby(by=["sequence"])
+                .agg({"sequence": "first", "header": "count"})
+                .rename({"header": "count"}, axis=1)
             )
-            combined_df.rename({"header": "count"}, axis=1)
 
         return combined_df
