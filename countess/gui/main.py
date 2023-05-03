@@ -101,8 +101,8 @@ class DraggableMixin:  # pylint: disable=R0903
         x = x + (event.x if event else (w // 2))
         y = y + (event.y if event else (h // 2))
         return {
-            "relx": _limit( x / self.master.winfo_width(), 0.05, 0.95),
-            "rely": _limit( y / self.master.winfo_height(), 0.05, 0.95),
+            "relx": _limit(x / self.master.winfo_width(), 0.05, 0.95),
+            "rely": _limit(y / self.master.winfo_height(), 0.05, 0.95),
             "anchor": "c",
         }
 
@@ -409,7 +409,7 @@ class GraphWrapper:
         flipped = self.canvas.winfo_height() > self.canvas.winfo_width()
         xp = _limit(x / self.canvas.winfo_width(), 0.05, 0.95)
         yp = _limit(y / self.canvas.winfo_height(), 0.05, 0.95)
-        return (yp, xp) if flipped else (xp,yp)
+        return (yp, xp) if flipped else (xp, yp)
 
     def on_canvas_button1(self, event):
         pass
@@ -425,7 +425,7 @@ class GraphWrapper:
         # (you can still create a new node by button-3-dragging from an
         # existing node, and if you really want a disconnected graph you can
         # delete the link to the new node!)
-        #if not items:
+        # if not items:
         #    return
 
         position = self.new_node_position(event.x, event.y)
@@ -507,7 +507,7 @@ class GraphWrapper:
         flipped = self.canvas.winfo_height() > self.canvas.winfo_width()
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
-            position = self.new_node_position(event.x+xl,event.y+yl)
+            position = self.new_node_position(event.x + xl, event.y + yl)
             other_node = self.add_new_node(position)
         elif other_node == start_node:
             return
@@ -566,9 +566,12 @@ class ConfiguratorWrapper:
     """Wraps up the PluginConfigurator or PluginChooserFrame, plus a
     DataFramePreview, to make up the larger part of the main window"""
 
+    config_canvas = None
     config_subframe = None
+    config_subframe_id = None
     preview_subframe = None
     config_change_task = None
+    notes_widget = None
 
     def __init__(self, frame, node, change_callback):
         self.frame = frame
@@ -585,10 +588,6 @@ class ConfiguratorWrapper:
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
 
-        self.notes_widget = tk.Text(self.frame, height=5)
-        self.notes_widget.insert("1.0", node.notes or "")
-        self.notes_widget.bind("<<Modified>>", self.notes_modified_callback)
-
         self.logger_subframe = LoggerFrame(self.frame)
         self.logger = self.logger_subframe.get_logger(node.name)
 
@@ -600,10 +599,27 @@ class ConfiguratorWrapper:
                 self.show_preview_subframe()
 
     def show_config_subframe(self):
-        if self.config_subframe:
-            self.config_subframe.destroy()
+        if self.config_canvas:
+            self.config_canvas.destroy()
+        self.config_canvas = tk.Canvas(self.frame)
+        self.config_scrollbar = ttk.Scrollbar(
+            self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview
+        )
+        self.config_canvas.configure(yscrollcommand=self.config_scrollbar.set, bd=0)
+        self.config_canvas.grid(row=3, sticky=tk.NSEW)
+        self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
+
         self.node.prepare(self.logger)
+
         if self.node.plugin:
+            if self.node.notes:
+                self.show_notes_widget(self.node.notes)
+            else:
+                self.notes_widget = tk.Button(
+                    self.frame, text="add notes", command=self.on_add_notes
+                )
+                self.notes_widget.grid(row=2, columnspan=2, padx=10, pady=5)
+
             self.label["text"] = "%s %s — %s" % (
                 self.node.plugin.name,
                 self.node.plugin.version,
@@ -613,24 +629,45 @@ class ConfiguratorWrapper:
                 tk.Button(
                     self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
                 ).grid(row=1, column=1, sticky=tk.SE, padx=10)
-            self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
             self.node.prepare(self.logger)
             self.node.plugin.update()
             self.configurator = PluginConfigurator(
-                self.frame, self.node.plugin, self.config_change_callback
+                self.config_canvas, self.node.plugin, self.config_change_callback
             )
             self.config_subframe = self.configurator.frame
         else:
             self.config_subframe = PluginChooserFrame(
                 self.frame, "Choose Plugin", self.choose_plugin
             )
-        self.config_subframe.grid(row=3, columnspan=2, sticky=tk.NSEW)
+        self.config_subframe_id = self.config_canvas.create_window(
+            (0, 0), window=self.config_subframe, anchor=tk.NW
+        )
+        self.config_subframe.bind(
+            "<Configure>",
+            lambda e: self.config_canvas.configure(scrollregion=self.config_canvas.bbox("all")),
+        )
+        self.config_canvas.bind("<Configure>", self.on_config_canvas_configure)
+
+    def on_config_canvas_configure(self, *_):
+        self.config_canvas.itemconfigure(
+            self.config_subframe_id, width=self.config_canvas.winfo_width()
+        )
 
     def on_label_configure(self, *_):
         self.label["wraplength"] = self.label.winfo_width() - 20
 
     def on_info_button_press(self, *_):
         webbrowser.open_new_tab(self.node.plugin.link)
+
+    def on_add_notes(self, *_):
+        self.notes_widget.destroy()
+        self.show_notes_widget()
+
+    def show_notes_widget(self, notes=""):
+        self.notes_widget = tk.Text(self.frame, height=5)
+        self.notes_widget.insert("1.0", notes)
+        self.notes_widget.bind("<<Modified>>", self.notes_modified_callback)
+        self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
 
     def show_preview_subframe(self):
         if self.preview_subframe:
@@ -667,7 +704,7 @@ class ConfiguratorWrapper:
         self.change_callback(self.node)
 
     def notes_modified_callback(self, *_):
-        self.node.notes = self.notes_widget.get("1.0", tk.END)
+        self.node.notes = self.notes_widget.get("1.0", tk.END).strip()
         self.notes_widget.edit_modified(False)
 
     def config_change_callback(self, *_):
