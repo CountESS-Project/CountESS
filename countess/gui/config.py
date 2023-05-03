@@ -17,8 +17,6 @@ from ..core.parameters import (
     FileArrayParam,
     FileParam,
     FileSaveParam,
-    FloatParam,
-    IntegerParam,
     MultiParam,
     SimpleParam,
     TabularMultiParam,
@@ -96,13 +94,7 @@ class ParameterWrapper:
             else:
                 self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, SimpleParam):
-            #if isinstance(parameter, FloatParam):
-            #    self.var = tk.DoubleVar(tk_parent, value=parameter.value)
-            #elif isinstance(parameter, IntegerParam):
-            #    self.var = tk.IntVar(tk_parent, value=parameter.value)
-            #else:
             self.var = tk.StringVar(tk_parent, value=parameter.value)
-
             self.entry = ttk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
                 self.entry.state(["readonly"])
@@ -270,9 +262,7 @@ class ParameterWrapper:
         for n, pp in enumerate(self.parameter.param.values()):
             column_label = tk.Label(self.entry, text=pp.label)
             self.column_labels.append(column_label)
-            column_label.grid(
-                row=0, column=n + 1, sticky=tk.EW, padx=10
-            )
+            column_label.grid(row=0, column=n + 1, sticky=tk.EW, padx=10)
             self.entry.columnconfigure(n + 1, weight=1)
 
         for n, p in enumerate(params):
