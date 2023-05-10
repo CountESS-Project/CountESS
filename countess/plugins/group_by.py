@@ -13,6 +13,15 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasTransformPlugin
 
 
+def _column_renamer(col):
+    print(f"CR {col}")
+    if isinstance(col, tuple):
+        if col[-1] == 'first':
+            return '__'.join(col[:-1])
+        else:
+            return '__'.join(col)
+    return col
+
 class GroupByPlugin(PandasTransformPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
@@ -45,10 +54,11 @@ class GroupByPlugin(PandasTransformPlugin):
         for p in self.parameters["columns"]:
             if p["index"].value and p not in self.index_cols:
                 for k, pp in p.params.items():
-                    pp.value = k == "index"
+                    if k not in ('index', 'count'):
+                        pp.value = False
                 self.index_cols.add(p)
             elif p in self.index_cols and any(
-                pp.value != (k == "index") for k, pp in p.params.items()
+                pp.value for k, pp in p.params.items() if k not in ('index', 'count')
             ):
                 p["index"].value = False
                 self.index_cols.discard(p)
@@ -72,16 +82,15 @@ class GroupByPlugin(PandasTransformPlugin):
 
         index_cols = [col for col, col_param in column_parameters if col_param["index"].value]
         agg_ops = dict(
-            (col, [k for k, pp in col_param.params.items() if k != "index" and pp.value])
+            (col, [k if k != 'index' else 'first' for k, pp in col_param.params.items() if pp.value])
             for col, col_param in column_parameters
-            if col not in index_cols
         )
 
         try:
             dfo = df.groupby(index_cols or df.index).agg(agg_ops)
             dfo.columns = [
-                "__".join(col) if isinstance(col, tuple) else col for col in dfo.columns.values
-            ]  # type: ignore
+                _column_renamer(col) for col in dfo.columns.values
+            ]
         except ValueError as exc:
             logger.exception(exc)
             return pd.DataFrame()
