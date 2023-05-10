@@ -184,10 +184,10 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     ref_seq = ref_seq.strip().upper()
     var_seq = var_seq.strip().upper()
 
-    if not re.match("[AGTC]+$", ref_seq):
+    if not re.match("[AGTCN]+$", ref_seq):
         raise ValueError("Invalid reference sequence")
 
-    if not re.match("[AGTC]+$", var_seq):
+    if not re.match("[AGTCN]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
     for opcode in opcodes(ref_seq, var_seq):
