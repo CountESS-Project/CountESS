@@ -1,4 +1,5 @@
 from itertools import islice
+import gzip
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -6,6 +7,12 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from countess import VERSION
 from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputPlugin
+
+
+def _file_reader(file_handle, min_avg_quality, row_limit=None):
+    for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
+        if fastq_read.average_quality() >= min_avg_quality:
+            yield { "sequence": fastq_read.sequence, "header": fastq_read.header }
 
 
 class LoadFastqPlugin(PandasInputPlugin):
@@ -25,17 +32,15 @@ class LoadFastqPlugin(PandasInputPlugin):
     }
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
-        # XXX this should be a bit smarter than building up the entire
-        # structure in an array ...
-        records = []
-
         filename = file_params["filename"].value
-        with open(filename, "r", encoding="utf-8") as fh:
-            for fastq_read in islice(parse_fastq_reads(fh), 0, row_limit):
-                if fastq_read.average_quality() >= self.parameters["min_avg_quality"].value:
-                    records.append((fastq_read.sequence, fastq_read.header, filename))
+        min_avg_quality = self.parameters["min_avg_quality"].value
 
-        return pd.DataFrame.from_records(records, columns=("sequence", "header", "filename"))
+        if filename.endswith(".gz"):
+            with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
+                return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+        else:
+            with open(filename, "r", encoding="utf-8"):
+                return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
 
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then (optionally) group them by sequence"""
