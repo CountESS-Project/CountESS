@@ -9,21 +9,22 @@ from countess.core.parameters import BooleanParam, StringCharacterSetParam
 from countess.core.plugins import PandasBasePlugin
 
 
-def mutagenize(sequence: str, mutate: bool, delete: bool, insert: bool):
+def mutagenize(sequence: str, mutate: bool, delete: bool, insert: bool) -> tuple[str, int, str, str]:
     # XXX it'd be faster, but less neat, to include logic for duplicate
     # removal here instead of producing duplicates and then removing them
     # later.
     for n, b1 in enumerate(sequence):
         for b2 in "ACGT":
             if mutate and b1 != b2:
-                yield sequence[0:n] + b2 + sequence[n + 1 :]
+                yield sequence[0:n] + b2 + sequence[n + 1 :], n+1, b1, b2
             if insert:
-                yield sequence[0:n] + b2 + sequence[n:]
+                yield sequence[0:n] + b2 + sequence[n:], n+1, None, b2
         if delete:
-            yield sequence[0:n] + sequence[n + 1 :]
+            yield sequence[0:n] + sequence[n + 1 :], n+1, b1, None
     if insert:
+        ll = len(sequence)
         for b2 in "ACGT":
-            yield sequence + b2
+            yield sequence + b2, ll, None, b2
 
 
 class MutagenizePlugin(PandasBasePlugin):
@@ -62,8 +63,8 @@ class MutagenizePlugin(PandasBasePlugin):
                 0,
                 row_limit,
             ),
-            columns=["sequence"],
+            columns=["sequence", "position", "reference", "variation"],
         )
         if self.parameters["remove"].value:
-            df = df.groupby("sequence").agg("first")
+            df = df.drop(columns="hgvs").groupby("sequence").agg("first")
         return df
