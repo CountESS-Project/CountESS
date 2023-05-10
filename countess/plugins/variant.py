@@ -2,7 +2,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import ColumnOrIndexChoiceParam, IntegerParam, StringParam
+from countess.core.parameters import BooleanParam, ColumnOrIndexChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformPlugin
 from countess.utils.variant import find_variant_string
 
@@ -28,6 +28,7 @@ class VariantPlugin(PandasTransformPlugin):
         "sequence": StringParam("Reference Sequence"),
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
+        "drop": BooleanParam("Drop unidentified variants", False),
     }
 
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
@@ -47,12 +48,16 @@ class VariantPlugin(PandasTransformPlugin):
             column_name = self.parameters["column"].value
 
         if self.parameters["sequence"].value == "":
-            self.parameters["sequence"].value = dfo[column_name][0]
+            value = pd.Series.mode(dfo[column_name])[0]
+            self.parameters["sequence"].value = value
 
         sequence = self.parameters["sequence"].value
         max_mutations = self.parameters["max_mutations"].value
 
         dfo[output] = dfo[column_name].apply(process_row, args=(sequence, max_mutations, logger))
+
+        if self.parameters["drop"].value:
+            dfo = dfo.query("variant.notnull()")
 
         if self.parameters["column"].is_index():
             return dfo.drop(columns=["__index"])
