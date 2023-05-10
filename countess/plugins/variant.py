@@ -26,6 +26,7 @@ class VariantPlugin(PandasTransformPlugin):
     parameters = {
         "column": ColumnOrIndexChoiceParam("Input Column"),
         "sequence": StringParam("Reference Sequence"),
+        "auto": BooleanParam("Automatic Reference Sequence?", False),
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
         "drop": BooleanParam("Drop unidentified variants", False),
@@ -47,7 +48,7 @@ class VariantPlugin(PandasTransformPlugin):
         else:
             column_name = self.parameters["column"].value
 
-        if self.parameters["sequence"].value == "":
+        if self.parameters["auto"].value:
             value = pd.Series.mode(dfo[column_name])[0]
             self.parameters["sequence"].value = value
 
