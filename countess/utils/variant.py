@@ -179,6 +179,17 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     ['5del']
     >>> list(find_variant_dna("AGAAGTAGAGG", "AGAAAGAGG"))
     ['5_6del']
+
+    MULTIPLE VARIATIONS
+
+    >>> find_variant_string("g.", "GATTACA", "GATTACA")
+    'g.='
+    >>> find_variant_string("g.", "GATTACA", "GTTTACA")
+    'g.2A>T'
+    >>> find_variant_string("g.", "GATTACA", "GTTTAGA")
+    'g.[2A>T;6C>G]'
+    >>> find_variant_string("g.", "GATTACA", "GTTCAGA")
+    'g.[2A>T;4T>C;6C>G]'
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -261,4 +272,7 @@ def find_variant_string(
     if max_mutations is not None and len(variations) > max_mutations:
         raise ValueError("Too many variations (%d) in {var_seq}" % len(variations))
 
-    return prefix + "(;)".join(variations)
+    if len(variations) == 1:
+        return prefix + variations[0]
+    else:
+        return prefix + "[" + ";".join(variations) + "]"
