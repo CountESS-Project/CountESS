@@ -114,6 +114,13 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     >>> list(find_variant_dna("AAAACTGAAAA", "AAAACTGTGAAAA"))
     ['6_7dup']
 
+    It should always pick the 3'-most copy to identify as
+    a duplicate
+
+    >>> list(find_variant_dna("ATGGCCGCCAGCCAA", "ATGGCCGCCGCCAGCCAA"))
+    ['7_9dup']
+
+
     INSERTION OF NUCLEOTIDES
 
     >>> list(find_variant_dna("AGAAGTAGAGG", "AGAAGTCAGAGG"))
@@ -190,6 +197,19 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     'g.[2A>T;6C>G]'
     >>> find_variant_string("g.", "GATTACA", "GTTCAGA")
     'g.[2A>T;4T>C;6C>G]'
+
+    >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTC")
+    'g.7_9dup'
+    >>> find_variant_string("g.", "ATGGTTGGTTCG", "ATGGTTGGTGGTTC")
+    'g.[9_10insGG;10dup;12del]'
+
+    # XXX correct but 'g.[7_9dup;12del]' would be better
+    >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTCG")
+    'g.[9_10insGG;10dup;11_12insG]'
+
+    # XXX correct but 'g.[7_9dup;11_12insG]' would be better
+
+
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -227,8 +247,20 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
         elif opcode.tag == "insert":
             assert src_seq == ""
             # 'insert' opcode maps to either an HGVS 'dup' or 'ins' operation
+            
+            if ref_seq[src_start : src_start + len(dest_seq)] == dest_seq:
 
-            if ref_seq[src_start - len(dest_seq) : src_start] == dest_seq:
+                # This is a duplication of one or more symbols immediately
+                # following this point.
+                src_offset = src_start
+                while ref_seq[src_offset + len(dest_seq) : src_offset + len(dest_seq) * 2] == dest_seq:
+                    src_offset += len(dest_seq)
+
+                if len(dest_seq) == 1:
+                    yield f"{src_offset + 1}dup"
+                else:
+                    yield f"{src_offset + 1}_{src_offset + len(dest_seq)}dup"
+            elif ref_seq[src_start - len(dest_seq) : src_start] == dest_seq:
                 # This is a duplication of one or more symbols immediately
                 # preceding this point.
                 if len(dest_seq) == 1:
