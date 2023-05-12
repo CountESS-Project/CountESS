@@ -620,7 +620,7 @@ class ConfiguratorWrapper:
                 )
                 self.notes_widget.grid(row=2, columnspan=2, padx=10, pady=5)
 
-            descr = re.sub(r'\s+', ' ', self.node.plugin.description)
+            descr = re.sub(r"\s+", " ", self.node.plugin.description)
 
             self.label["text"] = "%s %s — %s" % (
                 self.node.plugin.name,

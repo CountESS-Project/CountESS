@@ -2,7 +2,12 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnOrIndexChoiceParam, IntegerParam, StringParam, StringCharacterSetParam
+from countess.core.parameters import (
+    BooleanParam,
+    ColumnOrIndexChoiceParam,
+    IntegerParam,
+    StringParam,
+)
 from countess.core.plugins import PandasTransformPlugin
 from countess.utils.variant import invert_dna_sequence
 
@@ -26,7 +31,6 @@ class SequencePlugin(PandasTransformPlugin):
     }
 
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-
         def _process(seq):
             if self.parameters["invert"].value:
                 seq = invert_dna_sequence(seq)
@@ -42,9 +46,9 @@ class SequencePlugin(PandasTransformPlugin):
             if self.parameters["stop"].value:
                 offset = seq.find(self.parameters["stop"].value)
                 if offset >= 0:
-                    seq = seq[0:offset+len(self.parameters["stop"].value)]
+                    seq = seq[0 : offset + len(self.parameters["stop"].value)]
             if self.parameters["length"].value:
-                seq = seq[0:self.parameters["length"].value]
+                seq = seq[0 : self.parameters["length"].value]
             return seq
 
         dfo = df.copy()

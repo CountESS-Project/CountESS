@@ -1,5 +1,5 @@
 from itertools import islice
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import pandas as pd
 
@@ -9,18 +9,20 @@ from countess.core.parameters import BooleanParam, StringCharacterSetParam
 from countess.core.plugins import PandasBasePlugin
 
 
-def mutagenize(sequence: str, mutate: bool, delete: bool, insert: bool) -> tuple[str, int, str, str]:
+def mutagenize(
+    sequence: str, mutate: bool, delete: bool, insert: bool
+) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
     # XXX it'd be faster, but less neat, to include logic for duplicate
     # removal here instead of producing duplicates and then removing them
     # later.
     for n, b1 in enumerate(sequence):
         for b2 in "ACGT":
             if mutate and b1 != b2:
-                yield sequence[0:n] + b2 + sequence[n + 1 :], n+1, b1, b2
+                yield sequence[0:n] + b2 + sequence[n + 1 :], n + 1, b1, b2
             if insert:
-                yield sequence[0:n] + b2 + sequence[n:], n+1, None, b2
+                yield sequence[0:n] + b2 + sequence[n:], n + 1, None, b2
         if delete:
-            yield sequence[0:n] + sequence[n + 1 :], n+1, b1, None
+            yield sequence[0:n] + sequence[n + 1 :], n + 1, b1, None
     if insert:
         ll = len(sequence)
         for b2 in "ACGT":

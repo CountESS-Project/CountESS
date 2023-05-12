@@ -1,5 +1,5 @@
-from itertools import islice
 import gzip
+from itertools import islice
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -12,7 +12,7 @@ from countess.core.plugins import PandasInputPlugin
 def _file_reader(file_handle, min_avg_quality, row_limit=None):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
-            yield { "sequence": fastq_read.sequence, "header": fastq_read.header }
+            yield {"sequence": fastq_read.sequence, "header": fastq_read.header}
 
 
 class LoadFastqPlugin(PandasInputPlugin):
@@ -39,7 +39,7 @@ class LoadFastqPlugin(PandasInputPlugin):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
                 return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
         else:
-            with open(filename, "r", encoding="utf-8"):
+            with open(filename, "r", encoding="utf-8") as fh:
                 return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
 
     def combine_dfs(self, dfs):

@@ -2,7 +2,12 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnOrIndexChoiceParam, IntegerParam, StringParam
+from countess.core.parameters import (
+    BooleanParam,
+    ColumnOrIndexChoiceParam,
+    IntegerParam,
+    StringParam,
+)
 from countess.core.plugins import PandasTransformPlugin
 from countess.utils.variant import find_variant_string
 

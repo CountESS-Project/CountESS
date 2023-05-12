@@ -5,9 +5,9 @@ from countess.core.logger import Logger
 from countess.core.parameters import TextParam
 from countess.core.plugins import PandasTransformPlugin
 
-
 # XXX pretty sure this is a job for ast.parse rather than just
 # running compile() and exec() but that can wait.
+
 
 class PythonPlugin(PandasTransformPlugin):
     name = "Python Code"
@@ -17,7 +17,7 @@ class PythonPlugin(PandasTransformPlugin):
         If you assign to a variable called "__filter", only rows where that
         value is True will be kept.
     """
-    
+
     version = VERSION
 
     parameters = {"code": TextParam("Python Code")}
@@ -32,12 +32,12 @@ class PythonPlugin(PandasTransformPlugin):
             return dict((k, v) for k, v in row_dict.items() if type(v) in (bool, int, float, str))
 
         dfo = df.assign(__index=df.index)
-        dfo = dfo.apply(_process, axis=1, result_type="expand") 
+        dfo = dfo.apply(_process, axis=1, result_type="expand")
 
-        if '__index' in dfo.columns:
-            dfo = dfo.drop(columns='__index')
+        if "__index" in dfo.columns:
+            dfo = dfo.drop(columns="__index")
 
-        if '__filter' in dfo.columns:
-            dfo = dfo.query('__filter').drop(columns='__filter')
+        if "__filter" in dfo.columns:
+            dfo = dfo.query("__filter").drop(columns="__filter")
 
         return dfo
