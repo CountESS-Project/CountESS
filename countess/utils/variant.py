@@ -7,7 +7,7 @@
 import re
 from typing import Iterable, Optional
 
-from rapidfuzz.distance.Levenshtein import opcodes
+from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
 
 # Insertions shorter than this won't be searched for, just included.
 MIN_SEARCH_LENGTH = 10
@@ -201,15 +201,9 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTC")
     'g.7_9dup'
     >>> find_variant_string("g.", "ATGGTTGGTTCG", "ATGGTTGGTGGTTC")
-    'g.[9_10insGG;10dup;12del]'
-
-    # XXX correct but 'g.[7_9dup;12del]' would be better
+    'g.[7_9dup;12del]'
     >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTCG")
-    'g.[9_10insGG;10dup;11_12insG]'
-
-    # XXX correct but 'g.[7_9dup;11_12insG]' would be better
-
-
+    'g.[7_9dup;11_12insG]'
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -221,17 +215,49 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     if not re.match("[AGTCN]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
-    for opcode in opcodes(ref_seq, var_seq):
-        # Levenshtein algorithm finds the overlapping parts of our reference and
-        # variant sequences.
-        #
-        # each element is a text substitution operation on the string of symbols.
-        # offsets are python-style whereas HGVS offsets are 1-based and inclusive.
-        #
-        # 'delete' => delete symbols src_start:src_end
-        # 'insert' => insert symbols dest_start:dest_end at src_start
-        # 'replace' => replace symbols src_start:src_end with symbols dest_start:dest_end
+    # Levenshtein algorithm finds the overlapping parts of our reference and
+    # variant sequences.
+    #
+    # each element is a text substitution operation on the string of symbols.
+    # offsets are python-style whereas HGVS offsets are 1-based and inclusive.
+    #
+    # 'delete' => delete symbols src_start:src_end
+    # 'insert' => insert symbols dest_start:dest_end at src_start
+    # 'replace' => replace symbols src_start:src_end with symbols dest_start:dest_end
 
+    opcodes = list(levenshtein_opcodes(ref_seq, var_seq))
+
+    # Sometimes, Levenshtein tries a little too hard to
+    # find an "equal" operation between inserts, so this
+    # looks for that specific case and fixes it.
+    #
+    # example: find_variant_string("g.", "ATGGTTGGTTCG", "ATGGTTGGTGGTTC")"
+    # before: "g.[9_10insGG;10dup;12del]"
+    # after: "g.[7_9dup;12del]"
+    #
+    # this code recognizes that if there's an "equal" sequence
+    # followed by an "insert" of the same sequence, then we
+    # can swap them, and *if* there's an "insert" before them
+    # then we can reduce the complexity of the output by
+    # swapping them and merging the two inserts.
+
+    for n in range(0, len(opcodes)-2):
+        op0, op1, op2 = opcodes[n:n+3]
+        if (
+            op0.tag == 'insert' and
+            op1.tag == 'equal' and
+            op2.tag == 'insert'
+        ):
+            seq1 = var_seq[op1.dest_start:op1.dest_end]
+            seq2 = var_seq[op2.dest_start:op2.dest_end]
+            if seq1 == seq2:
+                # extend the first insert and remove the
+                # second insert (the following code ignores
+                # 'equal's, so it's effectively a NOP)
+                op0.dest_end = op1.dest_end
+                op2.tag = 'equal'
+
+    for opcode in opcodes:
         src_start, src_end = opcode.src_start, opcode.src_end
         src_seq = ref_seq[src_start:src_end]
         dest_seq = var_seq[opcode.dest_start : opcode.dest_end]
