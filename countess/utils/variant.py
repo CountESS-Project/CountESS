@@ -240,6 +240,16 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     # can swap them, and *if* there's an "insert" before them
     # then we can reduce the complexity of the output by
     # swapping them and merging the two inserts.
+    #
+    # XXX can do something similar to turn aligned replace/equal/replace
+    # sequences into a single whole-codon replace (delins) as per
+    # https://varnomen.hgvs.org/recommendations/DNA/variant/substitution/
+    # "two variants separated by one nucleotide, together affecting one
+    # amino acid, should be described as a “delins”"
+    #
+    # example: find_variant_string("c.", "ATGTACAAA", "ATGGATAAA")
+    # before: "c.[4T>G;6C>T]"
+    # after: "c.[4_6delinsGAT]"
 
     for n in range(0, len(opcodes) - 2):
         op0, op1, op2 = opcodes[n : n + 3]
