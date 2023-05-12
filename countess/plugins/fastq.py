@@ -50,7 +50,7 @@ class LoadFastqPlugin(PandasInputPlugin):
         if len(combined_df) and self.parameters["group"].value:
             combined_df = (
                 combined_df.groupby(by=["sequence"])
-                .agg({"sequence": "first", "header": "count"})
+                .agg("count")
                 .rename({"header": "count"}, axis=1)
             )
 
