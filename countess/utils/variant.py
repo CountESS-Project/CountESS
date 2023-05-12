@@ -241,21 +241,17 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     # then we can reduce the complexity of the output by
     # swapping them and merging the two inserts.
 
-    for n in range(0, len(opcodes)-2):
-        op0, op1, op2 = opcodes[n:n+3]
-        if (
-            op0.tag == 'insert' and
-            op1.tag == 'equal' and
-            op2.tag == 'insert'
-        ):
-            seq1 = var_seq[op1.dest_start:op1.dest_end]
-            seq2 = var_seq[op2.dest_start:op2.dest_end]
+    for n in range(0, len(opcodes) - 2):
+        op0, op1, op2 = opcodes[n : n + 3]
+        if op0.tag == "insert" and op1.tag == "equal" and op2.tag == "insert":
+            seq1 = var_seq[op1.dest_start : op1.dest_end]
+            seq2 = var_seq[op2.dest_start : op2.dest_end]
             if seq1 == seq2:
                 # extend the first insert and remove the
                 # second insert (the following code ignores
                 # 'equal's, so it's effectively a NOP)
                 op0.dest_end = op1.dest_end
-                op2.tag = 'equal'
+                op2.tag = "equal"
 
     for opcode in opcodes:
         src_start, src_end = opcode.src_start, opcode.src_end
@@ -273,13 +269,14 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
         elif opcode.tag == "insert":
             assert src_seq == ""
             # 'insert' opcode maps to either an HGVS 'dup' or 'ins' operation
-            
-            if ref_seq[src_start : src_start + len(dest_seq)] == dest_seq:
 
+            if ref_seq[src_start : src_start + len(dest_seq)] == dest_seq:
                 # This is a duplication of one or more symbols immediately
                 # following this point.
                 src_offset = src_start
-                while ref_seq[src_offset + len(dest_seq) : src_offset + len(dest_seq) * 2] == dest_seq:
+                while (
+                    ref_seq[src_offset + len(dest_seq) : src_offset + len(dest_seq) * 2] == dest_seq
+                ):
                     src_offset += len(dest_seq)
 
                 if len(dest_seq) == 1:
