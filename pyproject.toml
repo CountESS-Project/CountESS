@@ -69,6 +69,9 @@ countess_gui = "countess.gui.main:main"
 [project.entry-points.console_scripts]
 countess_cmd = "countess.core.cmd:main"
 
+[tool.setuptools]
+packages = [ 'countess' ]
+
 [tool.setuptools.dynamic]
 version = { attr = "countess.VERSION" }
 readme = { file = "README.md", content-type="text/markdown" }
