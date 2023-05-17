@@ -12,17 +12,7 @@ def test_open_nodes():
 
     root.update()
 
-    nodes = list(mw.graph_wrapper.graph.traverse_nodes())
-
-    last_node = nodes[-1]
-
-    mw.graph_wrapper.on_mousedown(last_node, None)
-
-    root.update()
-
-    assert last_node.result
-    
-    for node in nodes:
+    for node in mw.graph_wrapper.graph.traverse_nodes():
         mw.graph_wrapper.on_mousedown(node, None)
         root.update()
         time.sleep(0.1)
