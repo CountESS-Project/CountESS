@@ -70,7 +70,13 @@ countess_gui = "countess.gui.main:main"
 countess_cmd = "countess.core.cmd:main"
 
 [tool.setuptools]
-packages = [ 'countess' ]
+packages = [
+    'countess',
+    'countess.core',
+    'countess.gui',
+    'countess.plugins',
+    'countess.utils',
+]
 
 [tool.setuptools.dynamic]
 version = { attr = "countess.VERSION" }
