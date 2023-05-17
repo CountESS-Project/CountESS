@@ -50,7 +50,7 @@ class RegexToolPlugin(PandasTransformPlugin):
     }
 
     def apply_func(self, column_name, compiled_re, output_params, logger, row):
-        value = str(row[column_name])
+        value = str(row.get(column_name, ""))
         match = compiled_re.match(value)
         if match:
             return [1] + [

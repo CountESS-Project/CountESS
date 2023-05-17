@@ -68,5 +68,5 @@ class MutagenizePlugin(PandasBasePlugin):
             columns=["sequence", "position", "reference", "variation"],
         )
         if self.parameters["remove"].value:
-            df = df.drop(columns="hgvs").groupby("sequence").agg("first")
+            df = df.groupby("sequence").agg("first")
         return df
