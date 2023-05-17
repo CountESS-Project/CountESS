@@ -62,6 +62,7 @@ def read_config(
             plugin=plugin,
             position=position,
             notes=notes,
+            is_dirty=True,
         )
         pipeline_graph.nodes.append(node)
 
@@ -69,18 +70,13 @@ def read_config(
             if key.startswith("_parent."):
                 node.add_parent(nodes_by_name[val])
 
+        node.config = [
+            (key, ast.literal_eval(val), base_dir)
+            for key, val in config_dict.items()
+            if not key.startswith("_")
+        ]
+
         nodes_by_name[section_name] = node
-
-        if plugin:
-            # XXX progress callback for preruns.
-            node.prepare(logger)
-
-            for key, val in config_dict.items():
-                if key.startswith("_"):
-                    continue
-                node.configure_plugin(key, ast.literal_eval(val), base_dir)
-
-            node.prerun(logger)
 
     return pipeline_graph
 
@@ -103,7 +99,8 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
                 }
             )
         if node.position:
-            cp[node.name]["_position"] = " ".join(str(int(x * 1000)) for x in node.position)
+            xx, yy = node.position
+            cp[node.name]["_position"] = "%d %d" % (xx * 1000, yy * 1000)
         if node.notes:
             cp[node.name]["_notes"] = node.notes
         for n, parent in enumerate(node.parent_nodes):

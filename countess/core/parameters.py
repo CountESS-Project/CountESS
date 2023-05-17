@@ -188,7 +188,12 @@ class FileParam(StringParam):
             return "0"
 
     def get_parameters(self, key, base_dir="."):
-        return ((key, os.path.relpath(self.value, base_dir)),)
+        if self.value:
+            relpath = os.path.relpath(self.value, base_dir)
+        else:
+            relpath = None
+
+        return [(key, relpath)]
 
     def copy(self):
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)

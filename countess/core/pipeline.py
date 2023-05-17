@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, get_plugin_classes
@@ -15,8 +15,13 @@ class PipelineNode:
     notes: Optional[str] = None
     parent_nodes: set["PipelineNode"] = field(default_factory=set)
     child_nodes: set["PipelineNode"] = field(default_factory=set)
+    config: Optional[list[tuple[str,str,str]]] = None
     result: Any = None
     is_dirty: bool = True
+
+    # XXX config is a cache for config loaded from the file
+    # at config load time, if it is present it is loaded the
+    # first time the plugin is prerun.
 
     def __hash__(self):
         return id(self)
@@ -52,6 +57,7 @@ class PipelineNode:
 
     def prepare(self, logger: Logger):
         assert isinstance(logger, Logger)
+
         input_data = self.get_input_data()
         if self.plugin:
             try:
@@ -63,11 +69,25 @@ class PipelineNode:
 
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
         assert isinstance(logger, Logger)
+
         if self.is_dirty and self.plugin:
+            logger.info(f"Prerun {self.name} Start")
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
+            self.prepare(logger)
+
+            if self.config:
+                for key, val, base_dir in self.config:
+                    try:
+                        self.plugin.set_parameter(key, val, base_dir)
+                    except (KeyError, ValueError) as exc:
+                        logger.warning(f"Parameter {key}={val} Not Found")
+                        print(exc)
+                self.config = None
+
             self.execute(logger, row_limit)
             self.is_dirty = False
+            logger.info(f"Prerun {self.name} Done")
 
     def mark_dirty(self):
         self.is_dirty = True
