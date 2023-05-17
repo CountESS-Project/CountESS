@@ -1,0 +1,5 @@
+#!/bin/bash
+
+mypy countess/
+
+pylint countess/

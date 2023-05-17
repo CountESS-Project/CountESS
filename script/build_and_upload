@@ -1,0 +1,12 @@
+#!/bin/bash
+set -eu
+
+VERSION=`git describe --tags --exact-match`
+
+rm -rf dist/
+python -m build
+
+# XXX run tests
+
+#twine upload dist/*
+

@@ -3,6 +3,9 @@ __pycache__/
 dist/
 build/
 .*.sw?
+*~
 *.csv
+.envrc
 .direnv/
 result*
+junk/
