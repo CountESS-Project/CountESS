@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, get_plugin_classes
@@ -15,7 +15,7 @@ class PipelineNode:
     notes: Optional[str] = None
     parent_nodes: set["PipelineNode"] = field(default_factory=set)
     child_nodes: set["PipelineNode"] = field(default_factory=set)
-    config: Optional[list[tuple[str,str,str]]] = None
+    config: Optional[list[tuple[str, str, str]]] = None
     result: Any = None
     is_dirty: bool = True
 
