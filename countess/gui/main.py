@@ -16,7 +16,8 @@ from countess.core.config import export_config_graphviz, read_config, write_conf
 from countess.core.logger import ConsoleLogger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import get_plugin_classes
-from countess.gui.config import DataFramePreview, PluginConfigurator
+from countess.gui.config import PluginConfigurator
+from countess.gui.tabular import TabularDataFrame
 from countess.gui.logger import LoggerFrame
 
 # import faulthandler
@@ -675,7 +676,8 @@ class ConfiguratorWrapper:
         if self.preview_subframe:
             self.preview_subframe.destroy()
         if isinstance(self.node.result, pd.DataFrame):
-            self.preview_subframe = DataFramePreview(self.frame, self.node.result).frame
+            self.preview_subframe = TabularDataFrame(self.frame)
+            self.preview_subframe.set_dataframe(self.node.result)
         elif isinstance(self.node.result, str):
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.rowconfigure(1, weight=1)

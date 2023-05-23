@@ -60,14 +60,19 @@ class TabularDataFrame(tk.Frame):
         # Refreshes the column widgets.
         # XXX not in a clever way.
         for num, col in enumerate(self.dataframe.columns):
+            print("REFRESH {num}")
             cw = self.columns[num]
             cw['state'] = tk.NORMAL
             cw.delete("1.0", tk.END)
-            for rownum in range(self.offset, self.offset+self.height):
-                cw.insert(tk.END, str(self.dataframe[col][rownum]) + "\n")
+            for _, row in self.dataframe.iloc[self.offset:self.offset+self.height+1].iterrows():
+                cw.insert(tk.END, str(row[col]) + "\n")
+
             cw['state'] = tk.DISABLED
 
-        self.scrollbar.set(self.offset/self.length, (self.offset+self.height)/self.length)
+        if self.length:
+            self.scrollbar.set(self.offset/self.length, (self.offset+self.height)/self.length)
+        else:
+            self.scrollbar.set(0, 1)
 
     def scrollto(self, new_offset):
         self.offset = min(max(int(new_offset), 0), self.length - self.height)
