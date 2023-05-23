@@ -3,8 +3,25 @@ from tkinter import ttk
 import io
 from functools import partial
 
+# XXX I'm pretty sure there's some subtle off-by-one errors
+# in the scrolling behaviour.
+# 
+# XXX columns should automatically resize based on information
+# from __column_xscrollcommand which can tell if they're
+# overflowing
+# 
+# XXX column formatting (numeric, etc)
+# 
+# XXX display indexes as well as columns.
+# 
+# XXX Display types in column headings
 
 class TabularDataFrame(tk.Frame):
+    """A frame for displaying a pandas (or similar) 
+    dataframe.  Columns are displayed as individual tk.Text
+    widgets which seems to be relatively efficient as they
+    only hold the currently displayed rows.
+    Tested up to a million or so rows."""
 
     subframe = None
     dataframe = None
@@ -56,19 +73,38 @@ class TabularDataFrame(tk.Frame):
         self.scrollbar['command'] = self.__scrollbar_command
         self.refresh()
 
-    def refresh(self):
+    def refresh(self, new_offset=0):
         # Refreshes the column widgets.
-        # XXX not in a clever way.
+        new_offset = max(0, min(self.length - self.height, int(new_offset)))
+        offset_diff = new_offset - self.offset
         for num, col in enumerate(self.dataframe.columns):
-            print("REFRESH {num}")
             cw = self.columns[num]
             cw['state'] = tk.NORMAL
-            cw.delete("1.0", tk.END)
-            for _, row in self.dataframe.iloc[self.offset:self.offset+self.height+1].iterrows():
-                cw.insert(tk.END, str(row[col]) + "\n")
+            if 1 <= offset_diff < self.height:
+                # delete rows at start, add new rows on the end
+                cw.delete("1.0", f"{offset_diff+1}.0")
+                df = self.dataframe.iloc[self.offset+self.height:self.offset+self.height+offset_diff]
+                insert_at = tk.END
+            elif 1 <= -offset_diff < self.height:
+                # delete rows at end, insert new rows at start
+                # offset_diff is negative!  Note we have to 
+                # restore the deleted final "\n".  Sigh.
+                cw.delete(f"{self.height+offset_diff+2}.0", tk.END)
+                cw.insert(tk.END, "\n")
+                df = self.dataframe.iloc[self.offset-1:new_offset-1 if new_offset else None:-1]
+                insert_at = "1.0"
+            else:
+                # delete everything & add all new rows
+                cw.delete("1.0", tk.END)
+                df = self.dataframe.iloc[new_offset:new_offset+self.height+1]
+                insert_at = tk.END
+
+            for _, row in df.iterrows():
+                cw.insert(insert_at, str(row[col]) + "\n")
 
             cw['state'] = tk.DISABLED
 
+        self.offset = new_offset
         if self.length:
             self.scrollbar.set(self.offset/self.length, (self.offset+self.height)/self.length)
         else:
@@ -99,11 +135,11 @@ class TabularDataFrame(tk.Frame):
         # Detect scrollbar movement and move self.offset
         # to compensate.
         if command == 'moveto':
-            self.scrollto(float(parameters[0])*(self.length-self.height))
+            self.refresh(float(parameters[0])*(self.length-self.height))
         elif command == 'scroll':
-            self.scrollto(self.offset + int(parameters[0]))
+            self.refresh(self.offset + int(parameters[0]))
         else:
-            self.scrollto(0)
+            self.refresh()
 
     def __column_xscrollcommand(self, num, x1, x2):
         # XXX if x2 < 1.0 this column is partly hidden.
@@ -133,9 +169,9 @@ class TabularDataFrame(tk.Frame):
     def __column_scroll(self, event):
         # Detect scrollwheel motion on any of the columns
         if event.num == 4:
-            self.scrollto(self.offset - 5)
+            self.refresh(self.offset - 5)
         elif event.num == 5:
-            self.scrollto(self.offset + 5)
+            self.refresh(self.offset + 5)
 
     def __column_selection(self, num, _):
         # If there's a multi-row selection, then mark the
