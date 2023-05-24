@@ -46,7 +46,6 @@ class TabularDataFrame(tk.Frame):
         self.subframe.rowconfigure(1, weight=0)
         self.subframe.rowconfigure(2, weight=1)
         self.subframe.grid(sticky=tk.NSEW)
-        self.subframe.bind('<Configure>', self.__frame_configure)
 
     def set_dataframe(self, dataframe):
         self.reset()
@@ -87,6 +86,8 @@ class TabularDataFrame(tk.Frame):
             column.bind('<<Selection>>', partial(self.__column_selection, num))
             column.bind('<Control-C>', self.__column_copy)
             column.bind('<<Copy>>', self.__column_copy)
+        if self.columns:
+            self.columns[0].bind('<Configure>', self.__column_configure)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
         self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
@@ -199,12 +200,12 @@ class TabularDataFrame(tk.Frame):
             self.height = span
             self.refresh()
 
-    def __frame_configure(self, *_):
+    def __column_configure(self, *_):
         # If we've resized the window, start with a huge
         # number of rows and let __cw_yscrollcommand trim
         # it back down again.  Probably could be more
         # sensible.
-        self.height = 1000
+        self.height = min(self.length, 1000)
         self.refresh()
 
     def __column_scroll(self, event):
