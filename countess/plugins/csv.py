@@ -55,6 +55,8 @@ class LoadCsvPlugin(PandasInputPlugin):
             "Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]
         ),
         "comment": ChoiceParam("Comment", "None", choices=["None", "#", ";"]),
+        "header": BooleanParam("CSV file has header row?", True),
+        "filename_column": StringParam("Filename Column", ""),
         "columns": ArrayParam(
             "Columns",
             MultiParam(
@@ -66,8 +68,6 @@ class LoadCsvPlugin(PandasInputPlugin):
                 },
             ),
         ),
-        "header": BooleanParam("CSV file has header row?", True),
-        "filename_column": StringParam("Filename Column", ""),
     }
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
@@ -79,6 +79,8 @@ class LoadCsvPlugin(PandasInputPlugin):
         if row_limit is not None:
             options["nrows"] = row_limit
 
+        index_col_numbers = []
+
         if len(self.parameters["columns"]):
             options["names"] = []
             options["dtype"] = {}
@@ -87,8 +89,14 @@ class LoadCsvPlugin(PandasInputPlugin):
             for n, pp in enumerate(self.parameters["columns"]):
                 options["names"].append(pp["name"].value or f"column_{n}")
                 if not pp["type"].is_none():
-                    options["dtype"][n] = pp["type"].get_selected_type()
+                    if pp["index"].value:
+                        index_col_numbers.append(len(options["usecols"]))
                     options["usecols"].append(n)
+                    options["dtype"][n] = pp["type"].get_selected_type()
+
+        if not options["dtype"]:
+            logger.warning("No Columns Selected")
+            return pd.DataFrame()
 
         delimiter = self.parameters["delimiter"].value
         if delimiter == "TAB":
@@ -129,11 +137,8 @@ class LoadCsvPlugin(PandasInputPlugin):
         if filename_column:
             df[filename_column] = filename
 
-        index_cols = [
-            df.columns[n] for n, pp in enumerate(self.parameters["columns"]) if pp["index"].value
-        ]
-        if index_cols:
-            df = df.set_index(index_cols)
+        if index_col_numbers:
+            df = df.set_index([ df.columns[n] for n in index_col_numbers ])
 
         return df
 
