@@ -444,13 +444,13 @@ class PluginConfigurator:
         self.plugin = plugin
         self.change_callback = change_callback
 
-        self.frame = ttk.Frame(tk_parent)
+        self.frame = tk.Frame(tk_parent)
         self.frame.columnconfigure(0, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
         self.wrapper_cache: MutableMapping[str, ParameterWrapper] = {}
 
-        self.subframe = ttk.Frame(self.frame)
+        self.subframe = tk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=0)
         self.subframe.columnconfigure(1, weight=0)
         self.subframe.columnconfigure(2, weight=1)

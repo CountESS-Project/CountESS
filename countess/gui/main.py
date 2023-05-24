@@ -607,7 +607,7 @@ class ConfiguratorWrapper:
             self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview
         )
         self.config_canvas.configure(yscrollcommand=self.config_scrollbar.set, bd=0)
-        self.config_canvas.grid(row=3, sticky=tk.NSEW)
+        self.config_canvas.grid(row=3, column=0, sticky=tk.NSEW)
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
         self.node.prepare(self.logger)
@@ -631,7 +631,7 @@ class ConfiguratorWrapper:
             if self.node.plugin.link:
                 tk.Button(
                     self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
-                ).grid(row=1, column=1, sticky=tk.SE, padx=10)
+                ).place(anchor=tk.NE, relx=1, y=50)
             self.node.prepare(self.logger)
             self.node.plugin.update()
             self.configurator = PluginConfigurator(
@@ -795,6 +795,7 @@ class MainWindow:
         self.canvas = FlippyCanvas(self.frame, bg="skyblue")
         self.subframe = tk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=1)
+        self.subframe.columnconfigure(1, weight=0)
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
         self.subframe.rowconfigure(2, weight=0)
