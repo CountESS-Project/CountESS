@@ -43,7 +43,8 @@ class TabularDataFrame(tk.Frame):
         self.columnconfigure(0, weight=1)
         self.subframe = tk.Frame(self)
         self.subframe.rowconfigure(0, weight=0)
-        self.subframe.rowconfigure(1, weight=1)
+        self.subframe.rowconfigure(1, weight=0)
+        self.subframe.rowconfigure(2, weight=1)
         self.subframe.grid(sticky=tk.NSEW)
         self.subframe.bind('<Configure>', self.__frame_configure)
 
@@ -59,6 +60,9 @@ class TabularDataFrame(tk.Frame):
             column_names = [ self.dataframe.index.name or "__index" ] + list(self.dataframe.columns)
             column_dtypes = [ self.dataframe.index.dtype ] + list(self.dataframe.dtypes)
 
+        title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
+        title.grid(row=0, column=0, columnspan=len(column_names), sticky=tk.NSEW, pady=5)
+
         self.labels = [
             tk.Label(self.subframe, text=f"{name}\n{dtype}")
             for name, dtype in zip(column_names, column_dtypes)
@@ -67,14 +71,14 @@ class TabularDataFrame(tk.Frame):
             self.labels[label_num]['fg'] = 'darkred'
 
         for num, label in enumerate(self.labels):
-            label.grid(row=0, column=num, sticky=tk.EW)
+            label.grid(row=1, column=num, sticky=tk.EW)
             #label.bind("<Button-1>", partial(self.__label_button_1, num))
             label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
 
         self.columns = [ tk.Text(self.subframe) for _ in column_names ]
         for num, column in enumerate(self.columns):
-            column.grid(sticky=tk.NSEW, row=1, column=num)
+            column.grid(sticky=tk.NSEW, row=2, column=num)
             column['wrap'] = tk.NONE
             column['xscrollcommand'] = partial(self.__column_xscrollcommand, num)
             column['yscrollcommand'] = self.__column_yscrollcommand
@@ -85,12 +89,15 @@ class TabularDataFrame(tk.Frame):
             column.bind('<<Copy>>', self.__column_copy)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=1, column=len(self.columns))
+        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
         self.scrollbar['command'] = self.__scrollbar_command
         self.refresh()
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
+        # XXX should handle new_height as well, as this changes a fair bit
+        # with some window managers
+
         new_offset = max(0, min(self.length - self.height, int(new_offset)))
         offset_diff = new_offset - self.offset
 
