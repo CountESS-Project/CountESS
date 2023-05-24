@@ -3,17 +3,20 @@ from tkinter import ttk
 import io
 from functools import partial
 
+import pandas as pd
+
+
 # XXX I'm pretty sure there's some subtle off-by-one errors
 # in the scrolling behaviour.
-# 
+#
 # XXX columns should automatically resize based on information
 # from __column_xscrollcommand which can tell if they're
 # overflowing
-# 
+#
 # XXX column formatting (numeric, etc)
-# 
+#
 # XXX display indexes as well as columns.
-# 
+#
 # XXX Display types in column headings
 
 class TabularDataFrame(tk.Frame):
@@ -49,14 +52,27 @@ class TabularDataFrame(tk.Frame):
         self.dataframe = dataframe
         self.length = len(dataframe)
 
-        self.labels = [ tk.Label(self.subframe, text=str(col)) for col in dataframe.columns ]
+        if isinstance(self.dataframe.index, pd.MultiIndex):
+            column_names = list(self.dataframe.index.names) + list(self.dataframe.columns)
+            column_dtypes = list(self.dataframe.index.dtypes) + list(self.dataframe.dtypes)
+        else:
+            column_names = [ self.dataframe.index.name or "__index" ] + list(self.dataframe.columns)
+            column_dtypes = [ self.dataframe.index.dtype ] + list(self.dataframe.dtypes)
+
+        self.labels = [
+            tk.Label(self.subframe, text=f"{name}\n{dtype}")
+            for name, dtype in zip(column_names, column_dtypes)
+        ]
+        for label_num in range(0, len(self.dataframe.index.names)):
+            self.labels[label_num]['fg'] = 'darkred'
+
         for num, label in enumerate(self.labels):
             label.grid(row=0, column=num, sticky=tk.EW)
             #label.bind("<Button-1>", partial(self.__label_button_1, num))
             label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
 
-        self.columns = [ tk.Text(self.subframe) for _ in dataframe.columns ]
+        self.columns = [ tk.Text(self.subframe) for _ in column_names ]
         for num, column in enumerate(self.columns):
             column.grid(sticky=tk.NSEW, row=1, column=num)
             column['wrap'] = tk.NONE
@@ -77,31 +93,47 @@ class TabularDataFrame(tk.Frame):
         # Refreshes the column widgets.
         new_offset = max(0, min(self.length - self.height, int(new_offset)))
         offset_diff = new_offset - self.offset
-        for num, col in enumerate(self.dataframe.columns):
-            cw = self.columns[num]
+
+        # get the new rows as an iterator
+        if 1 <= offset_diff < self.height:
+            df = self.dataframe.iloc[self.offset+self.height:self.offset+self.height+offset_diff]
+            insert_at = tk.END
+        elif 1 <= -offset_diff < self.height:
+            # Get rows in reverse order so they can be inserted at the start
+            # note offset_diff is negative!
+            # XXX check this isn't horribly inefficient with pandas indexes
+            if new_offset:
+                df = self.dataframe.iloc[self.offset-1:new_offset-1:-1]
+            else:
+                df = self.dataframe.iloc[self.offset-1::-1]
+            insert_at = "1.0"
+        else:
+            df = self.dataframe.iloc[new_offset:new_offset+self.height+1]
+            insert_at = tk.END
+
+        # then unlock the columns and delete unnecessary rows
+        for cw in self.columns:
             cw['state'] = tk.NORMAL
             if 1 <= offset_diff < self.height:
                 # delete rows at start, add new rows on the end
                 cw.delete("1.0", f"{offset_diff+1}.0")
-                df = self.dataframe.iloc[self.offset+self.height:self.offset+self.height+offset_diff]
-                insert_at = tk.END
             elif 1 <= -offset_diff < self.height:
                 # delete rows at end, insert new rows at start
-                # offset_diff is negative!  Note we have to 
+                # note offset_diff is negative!  Note we have to
                 # restore the deleted final "\n".  Sigh.
                 cw.delete(f"{self.height+offset_diff+2}.0", tk.END)
                 cw.insert(tk.END, "\n")
-                df = self.dataframe.iloc[self.offset-1:new_offset-1 if new_offset else None:-1]
-                insert_at = "1.0"
             else:
                 # delete everything & add all new rows
                 cw.delete("1.0", tk.END)
-                df = self.dataframe.iloc[new_offset:new_offset+self.height+1]
-                insert_at = tk.END
 
-            for _, row in df.iterrows():
-                cw.insert(insert_at, str(row[col]) + "\n")
+        for idx, row in df.iterrows():
+            if type(idx) is not tuple:
+                idx = ( idx, )
+            for value, column in zip(list(idx) + list(row), self.columns):
+                column.insert(insert_at, str(value) + "\n")
 
+        for cw in self.columns:
             cw['state'] = tk.DISABLED
 
         self.offset = new_offset
@@ -142,11 +174,13 @@ class TabularDataFrame(tk.Frame):
             self.refresh()
 
     def __column_xscrollcommand(self, num, x1, x2):
-        # XXX if x2 < 1.0 this column is partly hidden.
+        # XXX this gets called as the table is displayed
+        # if x2 < 1.0 this column is partially hidden.
         pass
 
     # XXX the following two functions are clever but not
-    # efficient!
+    # very efficient!  There's got to be a nicer way of
+    # detecting this surely?
 
     def __column_yscrollcommand(self, y1, y2):
         # All this actually does is to detect if there's
