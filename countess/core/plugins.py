@@ -350,7 +350,7 @@ class PandasScoringPlugin(PandasTransformPlugin):
     }
 
     def prepare_df(self, df, logger):
-        super().prepare(df, logger)
+        super().prepare_df(df, logger)
         for pp in self.parameters["scores"]:
             for ppp in pp.counts:
                 ppp.choices = self.input_columns
