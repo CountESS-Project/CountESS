@@ -1,8 +1,7 @@
-import tkinter as tk
-from tkinter import ttk
 import io
+import tkinter as tk
 from functools import partial
-
+from tkinter import ttk
 
 # XXX I'm pretty sure there's some subtle off-by-one errors
 # in the scrolling behaviour.
@@ -17,8 +16,9 @@ from functools import partial
 #
 # XXX Display types in column headings
 
+
 class TabularDataFrame(tk.Frame):
-    """A frame for displaying a pandas (or similar) 
+    """A frame for displaying a pandas (or similar)
     dataframe.  Columns are displayed as individual tk.Text
     widgets which seems to be relatively efficient as they
     only hold the currently displayed rows.
@@ -30,8 +30,8 @@ class TabularDataFrame(tk.Frame):
     height = 1000
     length = 0
     select_rows = None
-    labels = []
-    columns = []
+    labels : list[tk.Label] = []
+    columns : list[tk.Text] = []
     scrollbar = None
 
     def reset(self):
@@ -50,18 +50,23 @@ class TabularDataFrame(tk.Frame):
         self.dataframe = dataframe
         self.length = len(dataframe)
 
-        if hasattr(self.dataframe.index, 'names') and hasattr(self.dataframe.index, 'dtypes'):
+        if hasattr(self.dataframe.index, "names") and hasattr(self.dataframe.index, "dtypes"):
             column_names = list(self.dataframe.index.names) + list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.index.dtypes) + list(self.dataframe.dtypes)
             index_cols = len(self.dataframe.index.names)
         elif self.dataframe.index.name:
-            column_names = [ self.dataframe.index.name ] + list(self.dataframe.columns)
-            column_dtypes = [ self.dataframe.index.dtype ] + list(self.dataframe.dtypes)
+            column_names = [self.dataframe.index.name] + list(self.dataframe.columns)
+            column_dtypes = [self.dataframe.index.dtype] + list(self.dataframe.dtypes)
             index_cols = 1
         else:
             column_names = list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.dtypes)
             index_cols = 0
+
+        if len(column_names) == 0:
+            label = tk.Label(self.subframe, text="Dataframe Preview\n\nno data")
+            label.grid(row=0, column=0, sticky=tk.NSEW)
+            return
 
         title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
         title.grid(row=0, column=0, columnspan=len(column_names), sticky=tk.NSEW, pady=5)
@@ -69,32 +74,37 @@ class TabularDataFrame(tk.Frame):
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
             if type(name) is tuple:
-                name = '\n'.join(name)
+                name = "\n".join(name)
             is_index = " (index)" if num < index_cols else ""
             label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
             label.grid(row=1, column=num, sticky=tk.EW)
-            #label.bind("<Button-1>", partial(self.__label_button_1, num))
+            # label.bind("<Button-1>", partial(self.__label_button_1, num))
             label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
             self.labels.append(label)
 
-        self.columns = [ tk.Text(self.subframe) for _ in column_names ]
+        if len(self.dataframe) == 0:
+            label = tk.Label(self.subframe, text="no data")
+            label.grid(row=2, column=0, columnspan=len(column_names), sticky=tk.NSEW)
+            return
+
+        self.columns = [tk.Text(self.subframe) for _ in column_names]
         for num, column in enumerate(self.columns):
             column.grid(sticky=tk.NSEW, row=2, column=num)
-            column['wrap'] = tk.NONE
-            column['xscrollcommand'] = partial(self.__column_xscrollcommand, num)
-            column['yscrollcommand'] = self.__column_yscrollcommand
-            column.bind('<Button-4>', self.__column_scroll)
-            column.bind('<Button-5>', self.__column_scroll)
-            column.bind('<<Selection>>', partial(self.__column_selection, num))
-            column.bind('<Control-C>', self.__column_copy)
-            column.bind('<<Copy>>', self.__column_copy)
+            column["wrap"] = tk.NONE
+            column["xscrollcommand"] = partial(self.__column_xscrollcommand, num)
+            column["yscrollcommand"] = self.__column_yscrollcommand
+            column.bind("<Button-4>", self.__column_scroll)
+            column.bind("<Button-5>", self.__column_scroll)
+            column.bind("<<Selection>>", partial(self.__column_selection, num))
+            column.bind("<Control-C>", self.__column_copy)
+            column.bind("<<Copy>>", self.__column_copy)
         if self.columns:
-            self.columns[0].bind('<Configure>', self.__column_configure)
+            self.columns[0].bind("<Configure>", self.__column_configure)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
         self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
-        self.scrollbar['command'] = self.__scrollbar_command
+        self.scrollbar["command"] = self.__scrollbar_command
         self.refresh()
 
     def refresh(self, new_offset=0):
@@ -107,24 +117,26 @@ class TabularDataFrame(tk.Frame):
 
         # get the new rows as an iterator
         if 1 <= offset_diff < self.height:
-            df = self.dataframe.iloc[self.offset+self.height:self.offset+self.height+offset_diff]
+            df = self.dataframe.iloc[
+                self.offset + self.height : self.offset + self.height + offset_diff
+            ]
             insert_at = tk.END
         elif 1 <= -offset_diff < self.height:
             # Get rows in reverse order so they can be inserted at the start
             # note offset_diff is negative!
             # XXX check this isn't horribly inefficient with pandas indexes
             if new_offset:
-                df = self.dataframe.iloc[self.offset-1:new_offset-1:-1]
+                df = self.dataframe.iloc[self.offset - 1 : new_offset - 1 : -1]
             else:
-                df = self.dataframe.iloc[self.offset-1::-1]
+                df = self.dataframe.iloc[self.offset - 1 :: -1]
             insert_at = "1.0"
         else:
-            df = self.dataframe.iloc[new_offset:new_offset+self.height+1]
+            df = self.dataframe.iloc[new_offset : new_offset + self.height + 1]
             insert_at = tk.END
 
         # then unlock the columns and delete unnecessary rows
         for cw in self.columns:
-            cw['state'] = tk.NORMAL
+            cw["state"] = tk.NORMAL
             if 1 <= offset_diff < self.height:
                 # delete rows at start, add new rows on the end
                 cw.delete("1.0", f"{offset_diff+1}.0")
@@ -142,7 +154,7 @@ class TabularDataFrame(tk.Frame):
             if type(idx) is tuple:
                 values = list(idx) + list(row)
             elif self.dataframe.index.name:
-                values = [ idx ] + list(row)
+                values = [idx] + list(row)
             else:
                 values = list(row)
 
@@ -150,11 +162,11 @@ class TabularDataFrame(tk.Frame):
                 column.insert(insert_at, str(value) + "\n")
 
         for cw in self.columns:
-            cw['state'] = tk.DISABLED
+            cw["state"] = tk.DISABLED
 
         self.offset = new_offset
         if self.length:
-            self.scrollbar.set(self.offset/self.length, (self.offset+self.height)/self.length)
+            self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
         else:
             self.scrollbar.set(0, 1)
 
@@ -169,22 +181,22 @@ class TabularDataFrame(tk.Frame):
         label_width = label.winfo_width()
 
         if num < len(self.labels) - 1 and event.x > label_width:
-            next_label = self.labels[num+1]
+            next_label = self.labels[num + 1]
             next_label_width = next_label.winfo_width()
             self.subframe.columnconfigure(num, minsize=event.x)
-            self.subframe.columnconfigure(num+1, minsize=next_label_width+label_width-event.x)
+            self.subframe.columnconfigure(num + 1, minsize=next_label_width + label_width - event.x)
         elif num != 0 and event.x < 0:
-            prev_label = self.labels[num-1]
+            prev_label = self.labels[num - 1]
             prev_label_width = prev_label.winfo_width()
-            self.subframe.columnconfigure(num-1, minsize=prev_label_width+event.x)
-            self.subframe.columnconfigure(num, minsize=label_width+event.x)
+            self.subframe.columnconfigure(num - 1, minsize=prev_label_width + event.x)
+            self.subframe.columnconfigure(num, minsize=label_width + event.x)
 
     def __scrollbar_command(self, command, *parameters):
         # Detect scrollbar movement and move self.offset
         # to compensate.
-        if command == 'moveto':
-            self.refresh(float(parameters[0])*(self.length-self.height))
-        elif command == 'scroll':
+        if command == "moveto":
+            self.refresh(float(parameters[0]) * (self.length - self.height))
+        elif command == "scroll":
             self.refresh(self.offset + int(parameters[0]))
         else:
             self.refresh()
@@ -228,7 +240,7 @@ class TabularDataFrame(tk.Frame):
         # whole rows and set self.select_rows so we know
         # to copy the whole rows if <<Copy>> occurs.
         try:
-            i1, i2 = self.columns[num].tag_ranges('sel')
+            i1, i2 = self.columns[num].tag_ranges("sel")
             r1 = int(float(str(i1)))
             r2 = int(float(str(i2)))
         except ValueError:
@@ -236,13 +248,13 @@ class TabularDataFrame(tk.Frame):
             r2 = 0
 
         for cw in self.columns:
-            cw.tag_delete('xsel')
+            cw.tag_delete("xsel")
 
         if r1 != r2:
             self.select_rows = (r1, r2)
             for cw in self.columns:
-                cw.tag_add('xsel', f"{r1}.0", f"{r2}.end")
-                cw.tag_config('xsel', background='lightgrey')
+                cw.tag_add("xsel", f"{r1}.0", f"{r2}.end")
+                cw.tag_config("xsel", background="lightgrey")
         else:
             self.select_rows = None
 
@@ -250,12 +262,12 @@ class TabularDataFrame(tk.Frame):
         # If this was a multi-row selection, then replace
         # the copy buffer with a copy of those whole rows.
         if not self.select_rows:
-            return # not multi-row, keep it.
+            return  # not multi-row, keep it.
 
         r1, r2 = self.select_rows
-        df = self.dataframe.iloc[self.offset+r1-1 : self.offset + r2]
+        df = self.dataframe.iloc[self.offset + r1 - 1 : self.offset + r2]
         buf = io.StringIO()
-        df.to_csv(buf, sep='\t', newline='\n')
+        df.to_csv(buf, sep="\t", newline="\n")
 
         # XXX very cheesy, but self.clipboard_append() etc didn't
         # seem to work, so this is a terrible workaround ... dump the
@@ -264,6 +276,6 @@ class TabularDataFrame(tk.Frame):
         top = tk.Toplevel()
         text = tk.Text(top)
         text.insert(tk.END, buf)
-        text.tag_add('sel', '1.0', tk.END)
-        text.event_generate('<<Copy>>')
+        text.tag_add("sel", "1.0", tk.END)
+        text.event_generate("<<Copy>>")
         top.destroy()

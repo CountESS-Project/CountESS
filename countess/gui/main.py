@@ -6,7 +6,7 @@ import tkinter as tk
 import webbrowser
 from enum import Enum, IntFlag
 from functools import partial
-from tkinter import filedialog, font, messagebox, ttk
+from tkinter import filedialog, messagebox
 from typing import Optional
 
 import pandas as pd
@@ -17,8 +17,8 @@ from countess.core.logger import ConsoleLogger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
-from countess.gui.tabular import TabularDataFrame
 from countess.gui.logger import LoggerFrame
+from countess.gui.tabular import TabularDataFrame
 
 # import faulthandler
 # faulthandler.enable(all_threads=True)
@@ -243,13 +243,13 @@ class PluginChooserFrame(tk.Frame):
         label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
-            label_text = plugin_class.description.split(". ")[0]
-            ttk.Button(
+            label_text = plugin_class.description.split(". ")[0].strip()
+            tk.Button(
                 label_frame,
                 text=plugin_class.name,
                 command=lambda plugin_class=plugin_class: callback(plugin_class),
             ).grid(row=n + 1, column=0, sticky=tk.EW)
-            ttk.Label(label_frame, text=label_text).grid(row=n + 1, column=1, sticky=tk.W, padx=10)
+            tk.Label(label_frame, text=label_text).grid(row=n + 1, column=1, sticky=tk.W, padx=10)
 
 
 class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
@@ -603,7 +603,7 @@ class ConfiguratorWrapper:
         if self.config_canvas:
             self.config_canvas.destroy()
         self.config_canvas = tk.Canvas(self.frame)
-        self.config_scrollbar = ttk.Scrollbar(
+        self.config_scrollbar = tk.Scrollbar(
             self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview
         )
         self.config_canvas.configure(yscrollcommand=self.config_scrollbar.set, bd=0)
@@ -640,7 +640,7 @@ class ConfiguratorWrapper:
             self.config_subframe = self.configurator.frame
         else:
             self.config_subframe = PluginChooserFrame(
-                self.frame, "Choose Plugin", self.choose_plugin
+                self.config_canvas, "Choose Plugin", self.choose_plugin
             )
         self.config_subframe_id = self.config_canvas.create_window(
             (0, 0), window=self.config_subframe, anchor=tk.NW
@@ -697,10 +697,10 @@ class ConfiguratorWrapper:
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
         self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
-        # if self.logger.count > 0:
-        #    self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
-        # else:
-        #    self.logger_subframe.grid_forget()
+        if self.logger.count > 0:
+            self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
+        else:
+            self.logger_subframe.grid_forget()
 
     def name_changed_callback(self, *_):
         name = self.name_var.get()

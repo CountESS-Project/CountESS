@@ -138,7 +138,7 @@ class LoadCsvPlugin(PandasInputPlugin):
             df[filename_column] = filename
 
         if index_col_numbers:
-            df = df.set_index([ df.columns[n] for n in index_col_numbers ])
+            df = df.set_index([df.columns[n] for n in index_col_numbers])
 
         return df
 

@@ -6,8 +6,6 @@ from tkinter import filedialog
 from typing import Mapping, MutableMapping, Optional
 
 import numpy as np
-import pandas as pd
-from pandas.api.types import is_numeric_dtype  # type: ignore
 
 from ..core.parameters import (
     ArrayParam,
@@ -71,8 +69,8 @@ class ParameterWrapper:
 
         if isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
-            choices = self.parameter.choices or ['']
-            self.entry = tk.OptionMenu(self.tk_parent, self.var, *choices)
+            choices = parameter.choices or ['']
+            self.entry = tk.OptionMenu(tk_parent, self.var, *choices)
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
