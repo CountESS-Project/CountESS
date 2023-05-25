@@ -25,7 +25,6 @@ dependencies = [
     'numpy~=1.24.2',
     'pandas~=2.0.0',
     'rapidfuzz~=2.15.1',
-    'ttkthemes~=3.2.2',
 ]
 
 [project.optional-dependencies]
@@ -34,7 +33,6 @@ dev = [
     'build==0.10.0',
     'mypy~=1.0.1',
     'pylint~=2.16',
-    'types-ttkthemes~=3.2',
     'twine==4.0.2',
     'pandas-stubs~=2.0.0',
     'pytest~=7.2',

@@ -894,24 +894,7 @@ class MainWindow:
 
 
 def make_root():
-    try:
-        import ttkthemes  # pylint: disable=C0415
-
-        root = ttkthemes.ThemedTk()
-        themes = set(root.get_themes())
-        for t in ["winnative", "aqua", "clam"]:
-            if t in themes:
-                root.set_theme(t)
-    except ImportError:
-        root = tk.Tk()
-        # XXX some kind of ttk style setup goes here as a fallback
-
-    # Set up treeview font and row heights.
-    linespace = font.Font(None, 10).metrics()["linespace"]
-    style = ttk.Style()
-    style.configure("Treeview", font=(None, 10), rowheight=linespace)
-    style.configure("Treeview.Heading", font=(None, 10, "bold"), rowheight=linespace)
-
+    root = tk.Tk()
     root.title(f"CountESS {VERSION}")
     root.rowconfigure(0, weight=0)
     root.rowconfigure(1, weight=1)
