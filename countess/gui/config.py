@@ -66,7 +66,7 @@ class ParameterWrapper:
         if isinstance(parameter, ArrayParam):
             self.label = None
         else:
-            self.label = ttk.Label(tk_parent, text=parameter.label)
+            self.label = tk.Label(tk_parent, text=parameter.label)
 
         if isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
@@ -77,9 +77,7 @@ class ParameterWrapper:
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
         elif isinstance(parameter, FileParam):
-            self.var = tk.StringVar(tk_parent, value=parameter.value)
-            self.entry = ttk.Entry(tk_parent, textvariable=self.var)
-            self.entry.state(["readonly"])
+            self.entry = tk.Label(tk_parent, text=parameter.value)
             self.button = tk.Button(
                 tk_parent, text="Select", width=3, command=self.change_file_callback
             )
@@ -90,21 +88,21 @@ class ParameterWrapper:
             self.entry = tk.Text(tk_parent, height=10)
             self.entry.insert("1.0", parameter.value)
             if parameter.read_only:
-                self.entry["state"] = "disabled"
+                self.entry["state"] = tk.DISABLED
             else:
                 self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, SimpleParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
-            self.entry = ttk.Entry(tk_parent, textvariable=self.var)
+            self.entry = tk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
-                self.entry.state(["readonly"])
+                self.entry['state'] = tk.DISABLED
 
         elif (
             isinstance(parameter, ArrayParam)
             and self.level == 0
             and not isinstance(parameter.param, TabularMultiParam)
         ):
-            self.entry = ttk.Frame(tk_parent)
+            self.entry = tk.Frame(tk_parent)
             self.entry.columnconfigure(0, weight=1)
             drc = self.delete_row_callback if not parameter.read_only else None
             self.update_subwrappers_framed(parameter.params, drc)
@@ -146,7 +144,7 @@ class ParameterWrapper:
                 self.update_subwrappers(parameter.params, drc)
 
         elif isinstance(parameter, (ArrayParam, MultiParam)):
-            self.entry = ttk.Frame(tk_parent)
+            self.entry = tk.Frame(tk_parent)
             self.entry.columnconfigure(0, weight=0)
             self.entry.columnconfigure(1, weight=0)
             self.entry.columnconfigure(2, weight=1)
@@ -223,6 +221,8 @@ class ParameterWrapper:
             self.entry.replace("1.0", tk.END, self.parameter.value)
             if self.parameter.read_only:
                 self.entry["state"] = "disabled"
+        elif isinstance(self.parameter, FileParam):
+            self.entry['text'] = self.parameter.value
         else:
             self.var.set(self.parameter.value)
 
@@ -318,7 +318,7 @@ class ParameterWrapper:
                     level=self.level + 1,
                 )
                 if delete_row_callback:
-                    button = ttk.Button(
+                    button = tk.Button(
                         label_frame_label,
                         text=UNICODE_CROSS,
                         width=2,
