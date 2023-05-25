@@ -3,8 +3,6 @@ from tkinter import ttk
 import io
 from functools import partial
 
-import pandas as pd
-
 
 # XXX I'm pretty sure there's some subtle off-by-one errors
 # in the scrolling behaviour.
@@ -52,28 +50,33 @@ class TabularDataFrame(tk.Frame):
         self.dataframe = dataframe
         self.length = len(dataframe)
 
-        if isinstance(self.dataframe.index, pd.MultiIndex):
+        if hasattr(self.dataframe.index, 'names') and hasattr(self.dataframe.index, 'dtypes'):
             column_names = list(self.dataframe.index.names) + list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.index.dtypes) + list(self.dataframe.dtypes)
-        else:
-            column_names = [ self.dataframe.index.name or "__index" ] + list(self.dataframe.columns)
+            index_cols = len(self.dataframe.index.names)
+        elif self.dataframe.index.name:
+            column_names = [ self.dataframe.index.name ] + list(self.dataframe.columns)
             column_dtypes = [ self.dataframe.index.dtype ] + list(self.dataframe.dtypes)
+            index_cols = 1
+        else:
+            column_names = list(self.dataframe.columns)
+            column_dtypes = list(self.dataframe.dtypes)
+            index_cols = 0
 
         title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
         title.grid(row=0, column=0, columnspan=len(column_names), sticky=tk.NSEW, pady=5)
 
-        self.labels = [
-            tk.Label(self.subframe, text=f"{name}\n{dtype}")
-            for name, dtype in zip(column_names, column_dtypes)
-        ]
-        for label_num in range(0, len(self.dataframe.index.names)):
-            self.labels[label_num]['fg'] = 'darkred'
-
-        for num, label in enumerate(self.labels):
+        self.labels = []
+        for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
+            if type(name) is tuple:
+                name = '\n'.join(name)
+            is_index = " (index)" if num < index_cols else ""
+            label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
             label.grid(row=1, column=num, sticky=tk.EW)
             #label.bind("<Button-1>", partial(self.__label_button_1, num))
             label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
+            self.labels.append(label)
 
         self.columns = [ tk.Text(self.subframe) for _ in column_names ]
         for num, column in enumerate(self.columns):
@@ -97,7 +100,7 @@ class TabularDataFrame(tk.Frame):
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
         # XXX should handle new_height as well, as this changes a fair bit
-        # with some window managers
+        # with some window managers. Needs refactoring.
 
         new_offset = max(0, min(self.length - self.height, int(new_offset)))
         offset_diff = new_offset - self.offset
@@ -136,9 +139,14 @@ class TabularDataFrame(tk.Frame):
                 cw.delete("1.0", tk.END)
 
         for idx, row in df.iterrows():
-            if type(idx) is not tuple:
-                idx = ( idx, )
-            for value, column in zip(list(idx) + list(row), self.columns):
+            if type(idx) is tuple:
+                values = list(idx) + list(row)
+            elif self.dataframe.index.name:
+                values = [ idx ] + list(row)
+            else:
+                values = list(row)
+
+            for value, column in zip(values, self.columns):
                 column.insert(insert_at, str(value) + "\n")
 
         for cw in self.columns:
