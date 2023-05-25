@@ -71,7 +71,8 @@ class ParameterWrapper:
 
         if isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
-            self.entry = tk.OptionMenu(self.tk_parent, self.var, *self.parameter.choices)
+            choices = self.parameter.choices or ['']
+            self.entry = tk.OptionMenu(self.tk_parent, self.var, *choices)
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
@@ -94,7 +95,7 @@ class ParameterWrapper:
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = tk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:
-                self.entry['state'] = tk.DISABLED
+                self.entry["state"] = tk.DISABLED
 
         elif (
             isinstance(parameter, ArrayParam)
@@ -212,7 +213,8 @@ class ParameterWrapper:
             self.update_subwrappers(self.parameter.params.values(), None)
         elif isinstance(self.parameter, ChoiceParam):
             self.entry.destroy()
-            self.entry = tk.OptionMenu(self.tk_parent, self.var, *self.parameter.choices)
+            choices = self.parameter.choices or ['']
+            self.entry = tk.OptionMenu(self.tk_parent, self.var, *choices)
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
@@ -223,7 +225,7 @@ class ParameterWrapper:
             if self.parameter.read_only:
                 self.entry["state"] = "disabled"
         elif isinstance(self.parameter, FileParam):
-            self.entry['text'] = self.parameter.value
+            self.entry["text"] = self.parameter.value
         else:
             self.var.set(self.parameter.value)
 
