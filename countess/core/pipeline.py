@@ -55,6 +55,16 @@ class PipelineNode:
         else:
             self.result = input_data
 
+    def load_config(self, logger: Logger):
+        if self.config:
+            for key, val, base_dir in self.config:
+                try:
+                    self.plugin.set_parameter(key, val, base_dir)
+                except (KeyError, ValueError) as exc:
+                    logger.warning(f"Parameter {key}={val} Not Found")
+                    print(exc)
+            self.config = None
+
     def prepare(self, logger: Logger):
         assert isinstance(logger, Logger)
 
@@ -62,8 +72,10 @@ class PipelineNode:
         if self.plugin:
             try:
                 self.plugin.prepare(input_data, logger)
+                self.load_config(logger)
             except Exception as exc:  # pylint: disable=W0718
                 logger.exception(exc)
+
         else:
             self.result = input_data
 
@@ -75,15 +87,7 @@ class PipelineNode:
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
             self.prepare(logger)
-
-            if self.config:
-                for key, val, base_dir in self.config:
-                    try:
-                        self.plugin.set_parameter(key, val, base_dir)
-                    except (KeyError, ValueError) as exc:
-                        logger.warning(f"Parameter {key}={val} Not Found")
-                        print(exc)
-                self.config = None
+            self.load_config(logger)
 
             self.execute(logger, row_limit)
             self.is_dirty = False
@@ -164,6 +168,7 @@ class PipelineGraph:
             # XXX TODO there's some opportunity for easy parallelization here,
             # by pushing each node into a pool as soon as its parents are
             # complete.
+            node.prepare(logger)
             node.execute(logger)
 
     def reset(self):
