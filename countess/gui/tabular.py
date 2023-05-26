@@ -1,20 +1,40 @@
 import io
 import tkinter as tk
 from functools import partial
+from math import ceil, floor
 from tkinter import ttk
 
-# XXX I'm pretty sure there's some subtle off-by-one errors
-# in the scrolling behaviour.
-#
+from pandas.api.types import is_integer_dtype, is_numeric_dtype
+
 # XXX columns should automatically resize based on information
 # from __column_xscrollcommand which can tell if they're
-# overflowing
-#
-# XXX column formatting (numeric, etc)
-#
-# XXX display indexes as well as columns.
-#
-# XXX Display types in column headings
+# overflowing.  Or maybe use
+#    df['seq'].str.len().max() to get max length of a string column
+# etc etc.
+
+
+def column_format_for(df_column):
+    if is_numeric_dtype(df_column.dtype):
+        # Work out the maximum width required to represent the integer part in this
+        # column, so we can pad values to that width.
+        width = max(len(str(floor(df_column.min()))), len(str(ceil(df_column.max()))))
+        if is_integer_dtype(df_column.dtype):
+            return f"%{width}d"
+        else:
+            return f"%{width+12}.12f"
+    else:
+        return "%s"
+
+
+def format_value(value, column_format):
+    # remove trailing 0's from floats (%g doesn't align correctly)
+    try:
+        if column_format.endswith("f"):
+            return (column_format % value).rstrip("0")
+        else:
+            return column_format % value
+    except TypeError:
+        return str(value)
 
 
 class TabularDataFrame(tk.Frame):
@@ -30,8 +50,9 @@ class TabularDataFrame(tk.Frame):
     height = 1000
     length = 0
     select_rows = None
-    labels : list[tk.Label] = []
-    columns : list[tk.Text] = []
+    labels: list[tk.Label] = []
+    columns: list[tk.Text] = []
+    column_formats: list[str] = []
     scrollbar = None
 
     def reset(self):
@@ -51,16 +72,27 @@ class TabularDataFrame(tk.Frame):
         self.length = len(dataframe)
 
         if hasattr(self.dataframe.index, "names") and hasattr(self.dataframe.index, "dtypes"):
+            # MultiIndex case
             column_names = list(self.dataframe.index.names) + list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.index.dtypes) + list(self.dataframe.dtypes)
-            index_cols = len(self.dataframe.index.names)
+            index_frame = self.dataframe.index.to_frame()
+            self.column_formats = [
+                column_format_for(index_frame[name]) for name in dataframe.index.names
+            ] + [column_format_for(dataframe[name]) for name in dataframe.columns]
         elif self.dataframe.index.name:
+            # a simple Index, with a name
             column_names = [self.dataframe.index.name] + list(self.dataframe.columns)
             column_dtypes = [self.dataframe.index.dtype] + list(self.dataframe.dtypes)
+            self.column_formats = [column_format_for(dataframe.index)] + [
+                column_format_for(dataframe[name]) for name in dataframe.columns
+            ]
             index_cols = 1
         else:
+            # if it doesn't have a name, don't bother displaying it
+            # XXX it's probably just a RangeIndex, should we display it anyway?
             column_names = list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.dtypes)
+            self.column_formats = [column_format_for(dataframe[name]) for name in dataframe.columns]
             index_cols = 0
 
         if len(column_names) == 0:
@@ -158,8 +190,8 @@ class TabularDataFrame(tk.Frame):
             else:
                 values = list(row)
 
-            for value, column in zip(values, self.columns):
-                column.insert(insert_at, str(value) + "\n")
+            for value, column, column_format in zip(values, self.columns, self.column_formats):
+                column.insert(insert_at, format_value(value, column_format) + "\n")
 
         for cw in self.columns:
             cw["state"] = tk.DISABLED
