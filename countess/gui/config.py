@@ -69,7 +69,7 @@ class ParameterWrapper:
 
         if isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
-            choices = parameter.choices or ['']
+            choices = parameter.choices or [""]
             self.entry = tk.OptionMenu(tk_parent, self.var, *choices)
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
@@ -211,7 +211,7 @@ class ParameterWrapper:
             self.update_subwrappers(self.parameter.params.values(), None)
         elif isinstance(self.parameter, ChoiceParam):
             self.entry.destroy()
-            choices = self.parameter.choices or ['']
+            choices = self.parameter.choices or [""]
             self.entry = tk.OptionMenu(self.tk_parent, self.var, *choices)
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
         elif isinstance(self.parameter, BooleanParam):

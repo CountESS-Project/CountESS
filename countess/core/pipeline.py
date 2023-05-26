@@ -56,6 +56,7 @@ class PipelineNode:
             self.result = input_data
 
     def load_config(self, logger: Logger):
+        assert isinstance(self.plugin, BasePlugin)
         if self.config:
             for key, val, base_dir in self.config:
                 try:

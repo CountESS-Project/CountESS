@@ -95,6 +95,7 @@ disable = [
     "too-many-branches",
     "too-many-instance-attributes",
     "too-many-locals",
+    "too-many-statements",
     "too-many-public-methods",
     "unidiomatic-typecheck",
 ]
