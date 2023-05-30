@@ -1,7 +1,7 @@
 import io
 import tkinter as tk
 from functools import partial
-from math import ceil, floor
+from math import ceil, floor, isnan
 from tkinter import ttk
 
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
@@ -17,7 +17,13 @@ def column_format_for(df_column):
     if is_numeric_dtype(df_column.dtype):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
-        width = max(len(str(floor(df_column.min()))), len(str(ceil(df_column.max()))))
+        column_min = df_column.min()
+        if isnan(column_min):
+            column_min = 0
+        column_max = df_column.max()
+        if isnan(column_max):
+            column_max = 0
+        width = max(len(str(floor(column_min))), len(str(ceil(column_max))))
         if is_integer_dtype(df_column.dtype):
             return f"%{width}d"
         else:
@@ -27,6 +33,8 @@ def column_format_for(df_column):
 
 
 def format_value(value, column_format):
+    if isnan(value):
+        return "—"
     # remove trailing 0's from floats (%g doesn't align correctly)
     try:
         if column_format.endswith("f"):
