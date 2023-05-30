@@ -27,7 +27,9 @@ def column_format_for(df_column):
         if is_integer_dtype(df_column.dtype):
             return f"%{width}d"
         else:
-            return f"%{width+12}.12f"
+            # leave room for the point and 12 decimals.
+            # format_value will remove trailing 0s.
+            return f"%{width+13}.12f"
     else:
         return "%s"
 
@@ -35,6 +37,7 @@ def column_format_for(df_column):
 def format_value(value, column_format):
     if value is None or (type(value) is float and isnan(value)):
         return "—"
+
     # remove trailing 0's from floats (%g doesn't align correctly)
     try:
         if column_format.endswith("f"):
@@ -87,6 +90,7 @@ class TabularDataFrame(tk.Frame):
             self.column_formats = [
                 column_format_for(index_frame[name]) for name in dataframe.index.names
             ] + [column_format_for(dataframe[name]) for name in dataframe.columns]
+            index_cols = len(self.dataframe.index.names)
         elif self.dataframe.index.name:
             # a simple Index, with a name
             column_names = [self.dataframe.index.name] + list(self.dataframe.columns)
@@ -122,6 +126,7 @@ class TabularDataFrame(tk.Frame):
             label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
             self.labels.append(label)
+
 
         if len(self.dataframe) == 0:
             label = tk.Label(self.subframe, text="no data")
