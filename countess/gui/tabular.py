@@ -18,10 +18,10 @@ def column_format_for(df_column):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
         column_min = df_column.min()
-        if isnan(column_min):
+        if type(column_min) is float and isnan(column_min):
             column_min = 0
         column_max = df_column.max()
-        if isnan(column_max):
+        if type(column_max) is float and isnan(column_max):
             column_max = 0
         width = max(len(str(floor(column_min))), len(str(ceil(column_max))))
         if is_integer_dtype(df_column.dtype):
@@ -33,7 +33,7 @@ def column_format_for(df_column):
 
 
 def format_value(value, column_format):
-    if isnan(value):
+    if value is None or (type(value) is float and isnan(value)):
         return "—"
     # remove trailing 0's from floats (%g doesn't align correctly)
     try:
