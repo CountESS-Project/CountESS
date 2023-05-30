@@ -17,36 +17,29 @@ from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
 
 class RegexToolPlugin(PandasTransformPlugin):
     name = "Regex Tool"
-    description = "Apply regular expressions to column(s) to make new column(s)"
+    description = "Apply regular expressions to a column to make new column(s)"
     link = "https://countess-project.github.io/CountESS/plugins/#regex-tool"
     version = VERSION
 
     parameters = {
-        "regexes": ArrayParam(
-            "Regexes",
+        "column": ColumnOrIndexChoiceParam("Input Column"),
+        "regex": StringParam("Regular Expression", ".*"),
+        "output": ArrayParam(
+            "Output Columns",
             MultiParam(
-                "Regex",
+                "Col",
                 {
-                    "column": ColumnOrIndexChoiceParam("Input Column"),
-                    "regex": StringParam("Regular Expression", ".*"),
-                    "output": ArrayParam(
-                        "Output Columns",
-                        MultiParam(
-                            "Col",
-                            {
-                                "name": StringParam("Column Name"),
-                                "datatype": DataTypeChoiceParam(
-                                    "Column Type",
-                                    "string",
-                                ),
-                            },
-                        ),
+                    "name": StringParam("Column Name"),
+                    "datatype": DataTypeChoiceParam(
+                        "Column Type",
+                        "string",
                     ),
-                    "drop_column": BooleanParam("Drop Column", False),
-                    "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
                 },
             ),
         ),
+        "multi": BooleanParam("Multi Match", False),
+        "drop_column": BooleanParam("Drop Column", False),
+        "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
     }
 
     def apply_func(self, column_name, compiled_re, output_params, logger, row):
@@ -60,6 +53,21 @@ class RegexToolPlugin(PandasTransformPlugin):
             logger.warning("Didn't Match", detail=repr(value))
             return [0] + [None] * compiled_re.groups
 
+    def apply_func_multi(self, column_name, compiled_re, output_params, logger, row):
+        value = str(row.get(column_name, ""))
+        matches = compiled_re.findall(value)
+        if len(matches) == 0:
+            return [ [ 0 ] ] + [ [ None ] ] * len(output_params)
+        if compiled_re.groups > 1:
+            return [ [ 1 ] * len(matches) ] + [
+                [ op.datatype.cast_value(x) for x in match[num] for match in matches ]
+                for num, op in enumerate(output_params)
+            ]
+        else:
+            return [ [ 1 ] * len(matches) ] + [
+                [ output_params[0].datatype.cast_value(x) for x in matches ]
+            ]
+
     def run_df(self, df, logger):
         # prevent added columns from propagating backwards in
         # the pipeline!
@@ -67,45 +75,49 @@ class RegexToolPlugin(PandasTransformPlugin):
 
         # the index doesn't seem to be available from within the applied function,
         # which is annoying, so we copy it into a column here.
-        if any(rp["column"].is_index() for rp in self.parameters["regexes"]):
+
+        compiled_re = re.compile(self.parameters["regex"].value)
+
+        while compiled_re.groups > len(self.parameters["output"].params):
+            self.parameters["output"].add_row()
+
+        output_params = self.parameters["output"].params
+        output_names = [pp["name"].value for pp in output_params]
+
+        if self.parameters["column"].is_index():
+            # XXX would it make more sense to do .reset_index() here which would
+            # make the index column(s) just appear like normal columns?
             df["__index"] = df.index
+            column_name = "__index"
+        else:
+            column_name = self.parameters["column"].value
 
-        # XXX this could be made more efficient by running
-        # multiple regexs in one 'apply' pass.
-
-        for regex_parameter in self.parameters["regexes"]:
-            compiled_re = re.compile(regex_parameter["regex"].value)
-
-            while compiled_re.groups > len(regex_parameter["output"].params):
-                regex_parameter["output"].add_row()
-
-            output_params = regex_parameter["output"].params
-            output_names = [pp["name"].value for pp in output_params]
-
-            if regex_parameter["column"].is_index():
-                column_name = "__index"
-            else:
-                column_name = regex_parameter["column"].value
-
-            # XXX not totally happy with this
+        if self.parameters['multi'].value:
+            func = partial(self.apply_func_multi, column_name, compiled_re, output_params, logger)
+        else:
             func = partial(self.apply_func, column_name, compiled_re, output_params, logger)
 
-            re_groups_df = df.apply(func, axis=1, result_type="expand")
+        # XXX should this be result_type="broadcast"?
+        re_groups_df = df.apply(func, axis=1, result_type="expand")
+        for n in range(0, compiled_re.groups):
+            df[output_names[n]] = re_groups_df[n + 1]
 
-            for n in range(0, compiled_re.groups):
-                df[output_names[n]] = re_groups_df[n + 1]
+        if self.parameters["drop_unmatch"].value:
+            df["__filter"] = re_groups_df[0]
+            if self.parameters['multi'].value:
+                df = df.explode(['__filter'] + output_names)
+            df = df.query("__filter != 0").drop(columns="__filter")
+        else:
+            if self.parameters['multi'].value:
+                df = df.explode(output_names)
 
-            if regex_parameter["drop_unmatch"].value:
-                df["__filter"] = re_groups_df[0]
-                df = df.query("__filter != 0").drop(columns="__filter")
+        if self.parameters["drop_column"].value:
+            df = df.drop(columns=column_name)
 
-        drop_columns = set(
-            rp["column"].value for rp in self.parameters["regexes"] if rp["drop_column"].value
-        )
         if "__index" in df:
-            drop_columns.add("__index")
+            df = df.drop(columns='__index')
 
-        return df.drop(columns=drop_columns) if drop_columns else df
+        return df
 
 
 class RegexReaderPlugin(PandasInputPlugin):
