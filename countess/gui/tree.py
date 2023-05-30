@@ -1,3 +1,10 @@
+"""countess/gui/tree.py: handle presentation of the datagraph
+tree diagram in a canvas."""
+
+# XXX there is much here which should be rewritten. See:
+# https://github.com/CountESS-Project/CountESS/issues/19
+# for more discussion etc.
+
 import math
 import random
 import re
@@ -15,7 +22,7 @@ def _limit(value, min_value, max_value):
 def _snap(value, scale, steps=21):
     step_size = scale / steps
     value = _limit(value, 0, scale)
-    return ((value // step_size) + 0.5) * step_size
+    return ((round(value / step_size)) + 0.5) * step_size
 
 
 def _geometry(widget):
