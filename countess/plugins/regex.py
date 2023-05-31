@@ -16,7 +16,7 @@ from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
 
 
 def _process_row(value: str, compiled_re, output_params, logger) -> pd.Series:
-    match = compiled_re.match(value)
+    match = compiled_re.match(str(value))
     if match:
         return pd.Series(
             dict(
@@ -30,7 +30,7 @@ def _process_row(value: str, compiled_re, output_params, logger) -> pd.Series:
 
 
 def _process_row_multi(value: str, compiled_re, output_params, logger) -> pd.Series:
-    matches = compiled_re.findall(value)
+    matches = compiled_re.findall(str(value))
     if len(matches) == 0:
         return pd.Series({})
     if compiled_re.groups > 1:
@@ -88,7 +88,8 @@ class RegexToolPlugin(PandasTransformPlugin):
         else:
             func = _process_row
 
-        df = df.join(column.apply(func, args=(compiled_re, output_params, logger)))
+        dfx = column.apply(func, args=(compiled_re, output_params, logger))
+        df = df.assign(**dict( (name, dfx[name]) for name in dfx.columns))
 
         if self.parameters["drop_unmatch"].value:
             df = df.dropna(subset=output_names)

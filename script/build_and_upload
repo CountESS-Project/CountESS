@@ -8,5 +8,5 @@ python -m build
 
 # XXX run tests
 
-#twine upload dist/*
+twine upload dist/*
 
