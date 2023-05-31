@@ -332,7 +332,7 @@ class ColumnChoiceParam(ChoiceParam):
             return df[self.value]
         elif self.value == df.index.name:
             return df.index
-        elif hasattr(df.index, 'names') and self.value in df.index.names:
+        elif hasattr(df.index, "names") and self.value in df.index.names:
             return df.index.to_frame()[self.value]
         else:
             raise ValueError(f"Column {self.value} not found")

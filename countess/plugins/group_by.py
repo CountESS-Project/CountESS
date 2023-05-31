@@ -123,15 +123,13 @@ class GroupByExprPlugin(PandasTransformPlugin):
     # plugin, or something.
 
     def run_df(self, df: pd.DataFrame, logger) -> pd.DataFrame:
+        assert isinstance(self.parameters["groupby"], PerColumnArrayParam)
         cols = [
-            col for col, param in zip(
-                self.input_columns,
-                self.parameters["groupby"]
-            ) if param.value
+            col for col, param in zip(self.input_columns, self.parameters["groupby"]) if param.value
         ]
         expr = self.parameters["expr"].value
 
-        if cols:
-            df = df.reset_index().groupby(cols)
+        if not cols:
+            return df
 
-        return df.agg(expr.strip())
+        return df.reset_index().groupby(cols).agg(expr.strip())

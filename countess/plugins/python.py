@@ -14,6 +14,7 @@ from countess.core.plugins import PandasTransformPlugin
 
 SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 
+
 class PythonPlugin(PandasTransformPlugin):
     name = "Python Code"
     description = """
@@ -26,8 +27,7 @@ class PythonPlugin(PandasTransformPlugin):
 
     version = VERSION
 
-    parameters = {
-        "code": TextParam("Python Code")}
+    parameters = {"code": TextParam("Python Code")}
 
     def run_df(self, df, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["code"], TextParam)
@@ -36,11 +36,7 @@ class PythonPlugin(PandasTransformPlugin):
         def _process(row):
             row_dict = dict(row)
             exec(code_object, {}, row_dict)  # pylint: disable=exec-used
-            return dict(
-                (k, v)
-                for k, v in row_dict.items()
-                if type(v) in SIMPLE_TYPES
-            )
+            return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
 
         dfo = df.assign(__index=df.index)
         dfo = dfo.apply(_process, axis=1, result_type="expand")

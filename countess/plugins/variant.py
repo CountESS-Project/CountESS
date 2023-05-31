@@ -1,18 +1,15 @@
+from typing import Optional
+
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import (
-    BooleanParam,
-    ColumnChoiceParam,
-    IntegerParam,
-    StringParam,
-)
+from countess.core.parameters import BooleanParam, ColumnChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformPlugin
 from countess.utils.variant import find_variant_string
 
 
-def process_row(var_seq: str, ref_seq: str, max_mutations: int, logger: Logger):
+def process_row(var_seq: str, ref_seq: str, max_mutations: int, logger: Logger) -> Optional[str]:
     try:
         return find_variant_string("g.", ref_seq, var_seq, max_mutations)
     except ValueError as exc:

@@ -378,7 +378,7 @@ class ParameterWrapper:
         file_types = self.parameter.file_types
         filename = filedialog.askopenfilename(filetypes=file_types)
         self.parameter.value = filename
-        self.entry['text'] = self.parameter.value
+        self.entry["text"] = self.parameter.value
         self.callback(self.parameter)
 
     def set_value(self, value):
