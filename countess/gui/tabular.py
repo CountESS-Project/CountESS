@@ -65,6 +65,9 @@ class TabularDataFrame(tk.Frame):
     columns: list[tk.Text] = []
     column_formats: list[str] = []
     scrollbar = None
+    index_cols = 0
+    sort_by_col = None
+    sort_ascending = True
 
     def reset(self):
         if self.subframe:
@@ -90,7 +93,7 @@ class TabularDataFrame(tk.Frame):
             self.column_formats = [
                 column_format_for(index_frame[name]) for name in dataframe.index.names
             ] + [column_format_for(dataframe[name]) for name in dataframe.columns]
-            index_cols = len(self.dataframe.index.names)
+            self.index_cols = len(self.dataframe.index.names)
         elif self.dataframe.index.name:
             # a simple Index, with a name
             column_names = [self.dataframe.index.name] + list(self.dataframe.columns)
@@ -98,14 +101,14 @@ class TabularDataFrame(tk.Frame):
             self.column_formats = [column_format_for(dataframe.index)] + [
                 column_format_for(dataframe[name]) for name in dataframe.columns
             ]
-            index_cols = 1
+            self.index_cols = 1
         else:
             # if it doesn't have a name, don't bother displaying it
             # XXX it's probably just a RangeIndex, should we display it anyway?
             column_names = list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.dtypes)
             self.column_formats = [column_format_for(dataframe[name]) for name in dataframe.columns]
-            index_cols = 0
+            self.index_cols = 0
 
         if len(column_names) == 0:
             label = tk.Label(self.subframe, text="Dataframe Preview\n\nno data")
@@ -119,10 +122,10 @@ class TabularDataFrame(tk.Frame):
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
             if type(name) is tuple:
                 name = "\n".join(name)
-            is_index = " (index)" if num < index_cols else ""
+            is_index = " (index)" if num < self.index_cols else ""
             label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
             label.grid(row=1, column=num, sticky=tk.EW)
-            # label.bind("<Button-1>", partial(self.__label_button_1, num))
+            label.bind("<Button-1>", partial(self.__label_button_1, num))
             label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
             self.labels.append(label)
@@ -217,6 +220,20 @@ class TabularDataFrame(tk.Frame):
     def scrollto(self, new_offset):
         self.offset = min(max(int(new_offset), 0), self.length - self.height)
         self.refresh()
+
+    def __label_button_1(self, num, event):
+        label_width = self.labels[num].winfo_width()
+        if 2*label_width/5 < event.x < 3*label_width/5:
+            self.sort_ascending = (num != self.sort_by_col) or not self.sort_ascending
+            self.sort_by_col = num
+            if num < self.index_cols:
+                self.dataframe = self.dataframe.sort_index(level=num, ascending=self.sort_ascending)
+            else:
+                self.dataframe = self.dataframe.sort_values(
+                    self.dataframe.columns[num-self.index_cols],
+                    ascending=self.sort_ascending
+                )
+            self.refresh()
 
     def __label_b1_motion(self, num, event):
         # Detect label drags left and right.

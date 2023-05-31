@@ -92,7 +92,7 @@ class RegexToolPlugin(PandasTransformPlugin):
         df = df.assign(**dict( (name, dfx[name]) for name in dfx.columns))
 
         if self.parameters["drop_unmatch"].value:
-            df = df.dropna(subset=output_names)
+            df = df.dropna(subset=output_names, how="all")
 
         if self.parameters["multi"].value:
             df = df.explode(output_names)
