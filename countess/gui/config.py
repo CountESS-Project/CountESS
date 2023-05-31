@@ -212,6 +212,7 @@ class ParameterWrapper:
         elif isinstance(self.parameter, ChoiceParam):
             self.entry.destroy()
             choices = self.parameter.choices or [""]
+            self.var.set(self.parameter.value)
             self.entry = tk.OptionMenu(self.tk_parent, self.var, *choices)
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
         elif isinstance(self.parameter, BooleanParam):
