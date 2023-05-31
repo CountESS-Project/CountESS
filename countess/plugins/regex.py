@@ -1,5 +1,4 @@
 import re
-from functools import partial
 
 import pandas as pd
 
@@ -9,10 +8,41 @@ from countess.core.parameters import (
     BooleanParam,
     ColumnChoiceParam,
     DataTypeChoiceParam,
+    IntegerParam,
     MultiParam,
     StringParam,
 )
 from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
+
+
+def _process_row(value: str, compiled_re, output_params, logger) -> pd.Series:
+    match = compiled_re.match(value)
+    if match:
+        return pd.Series(
+            dict(
+                (output_params[n]["name"].value, output_params[n].datatype.cast_value(g))
+                for n, g in enumerate(match.groups())
+            )
+        )
+    else:
+        logger.warning("Didn't Match", detail=repr(value))
+        return pd.Series({})
+
+
+def _process_row_multi(value: str, compiled_re, output_params, logger) -> pd.Series:
+    matches = compiled_re.findall(value)
+    if len(matches) == 0:
+        return pd.Series({})
+    if compiled_re.groups > 1:
+        return pd.Series(
+            dict(
+                (op["name"].value, [op.datatype.cast_value(match[num]) for match in matches])
+                for num, op in enumerate(output_params)
+            )
+        )
+    else:
+        op = output_params[0]
+        return pd.Series({op["name"].value: [op.datatype.cast_value(match) for match in matches]})
 
 
 class RegexToolPlugin(PandasTransformPlugin):
@@ -42,40 +72,7 @@ class RegexToolPlugin(PandasTransformPlugin):
         "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
     }
 
-    def apply_func(self, column_name, compiled_re, output_params, logger, row):
-        value = str(row.get(column_name, ""))
-        match = compiled_re.match(value)
-        if match:
-            return [1] + [
-                output_params[n].datatype.cast_value(g) for n, g in enumerate(match.groups())
-            ]
-        else:
-            logger.warning("Didn't Match", detail=repr(value))
-            return [0] + [None] * compiled_re.groups
-
-    def apply_func_multi(self, column_name, compiled_re, output_params, logger, row):
-        value = str(row.get(column_name, ""))
-        matches = compiled_re.findall(value)
-        if len(matches) == 0:
-            return [[0]] + [[None]] * len(output_params)
-        if compiled_re.groups > 1:
-            return [[1] * len(matches)] + [
-                [op.datatype.cast_value(x) for x in match[num] for match in matches]
-                for num, op in enumerate(output_params)
-            ]
-        else:
-            return [[1] * len(matches)] + [
-                [output_params[0].datatype.cast_value(x) for x in matches]
-            ]
-
     def run_df(self, df, logger):
-        # prevent added columns from propagating backwards in
-        # the pipeline!
-        df = df.copy()
-
-        # the index doesn't seem to be available from within the applied function,
-        # which is annoying, so we copy it into a column here.
-
         compiled_re = re.compile(self.parameters["regex"].value)
 
         while compiled_re.groups > len(self.parameters["output"].params):
@@ -84,43 +81,26 @@ class RegexToolPlugin(PandasTransformPlugin):
         output_params = self.parameters["output"].params
         output_names = [pp["name"].value for pp in output_params]
 
-        # XXX should probably be grabbing the column,
-        # using Series.apply() and then joining it back.
-        # that'd be a bit more flexible with index columns
-        # as well.
-
-        column_name = self.parameters["column"].value
-        if column_name not in df.columns:
-            df["__column"] = df.index.to_frame()[column_name]
-            column_name = "__column"
+        column = self.parameters["column"].get_column(df)
 
         if self.parameters["multi"].value:
-            func = partial(self.apply_func_multi, column_name, compiled_re, output_params, logger)
+            func = _process_row_multi
         else:
-            func = partial(self.apply_func, column_name, compiled_re, output_params, logger)
+            func = _process_row
 
-        # XXX should this be result_type="broadcast"?
-        # XXX or maybe just get the column names right and
-        # then we can use df = df.join(re_groups_df)
-
-        re_groups_df = df.apply(func, axis=1, result_type="expand")
-        for n in range(0, compiled_re.groups):
-            df[output_names[n]] = re_groups_df[n + 1]
+        df = df.join(column.apply(func, args=(compiled_re, output_params, logger)))
 
         if self.parameters["drop_unmatch"].value:
-            df["__filter"] = re_groups_df[0]
-            if self.parameters["multi"].value:
-                df = df.explode(["__filter"] + output_names)
-            df = df.query("__filter != 0").drop(columns="__filter")
-        else:
-            if self.parameters["multi"].value:
-                df = df.explode(output_names)
+            df = df.dropna(subset=output_names)
+
+        if self.parameters["multi"].value:
+            df = df.explode(output_names)
 
         if self.parameters["drop_column"].value:
+            column_name = self.parameters["column"].value
+            if column_name not in df.columns:
+                df = df.reset_index()
             df = df.drop(columns=column_name)
-
-        if "__column" in df:
-            df = df.drop(columns="__column")
 
         return df
 
@@ -136,8 +116,8 @@ class RegexReaderPlugin(PandasInputPlugin):
     file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]
 
     parameters = {
-        "regex": StringParam("Regular Expression", ".*"),
-        "skip": BooleanParam("Skip First Row", False),
+        "regex": StringParam("Regular Expression", "(.*)"),
+        "skip": IntegerParam("Skip Lines", 0),
         "output": ArrayParam(
             "Output Columns",
             MultiParam(
@@ -173,7 +153,7 @@ class RegexReaderPlugin(PandasInputPlugin):
         records = []
         with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
             for num, line in enumerate(fh):
-                if num == 0 and self.parameters["skip"].value:
+                if num < self.parameters["skip"].value:
                     continue
                 match = compiled_re.match(line)
                 if match:
@@ -197,4 +177,7 @@ class RegexReaderPlugin(PandasInputPlugin):
         if len(records) > 0:
             pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
 
-        return pd.concat(pdfs)
+        if len(pdfs) > 0:
+            return pd.concat(pdfs)
+
+        return pd.DataFrame([], columns=columns)
