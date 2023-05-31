@@ -91,7 +91,7 @@ class GroupByPlugin(PandasTransformPlugin):
 
         try:
             if agg_ops:
-                dfo = df.groupby(index_cols or df.index).agg(agg_ops)
+                dfo = df.reset_index().groupby(index_cols or df.index).agg(agg_ops)
                 dfo.columns = [_column_renamer(col) for col in dfo.columns.values]  # type: ignore
             else:
                 # defaults to just a 'count' column.

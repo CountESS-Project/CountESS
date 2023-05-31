@@ -47,7 +47,13 @@ class JoinPlugin(PandasBasePlugin):
         enumerate_inputs = enumerate(zip(inputs_param, data.items()))
         for number, (input_param, (source_name, source_ddf)) in enumerate_inputs:
             input_param.label = f"Input {number+1}: {source_name}"
-            input_param["join_on"].choices = [INDEX] + list(source_ddf.columns)
+            if hasattr(source_ddf.index, "names"):
+                input_columns = [n for n in source_ddf.index.names if n] + list(source_ddf.columns)
+            elif source_ddf.index.name:
+                input_columns = [source_ddf.index.name] + list(source_ddf.columns)
+            else:
+                input_columns = list(source_ddf.columns)
+            input_param["join_on"].choices = [INDEX] + input_columns
 
     def run(
         self,
@@ -83,13 +89,13 @@ class JoinPlugin(PandasBasePlugin):
         if not ip1.join_on.value or ip1.join_on.value == INDEX:
             join_params["left_index"] = True
         else:
-            dfs[0] = dfs[0].reset_index(drop=True)
+            dfs[0] = dfs[0].reset_index()
             join_params["left_on"] = ip1.join_on.value
 
         if not ip2.join_on.value or ip2.join_on.value == INDEX:
             join_params["right_index"] = True
         else:
-            dfs[1] = dfs[1].reset_index(drop=True)
+            dfs[1] = dfs[1].reset_index()
             join_params["right_on"] = ip2["join_on"].value
 
         return dfs[0].merge(dfs[1], **join_params)

@@ -64,6 +64,7 @@ class RegexToolPlugin(PandasTransformPlugin):
                         "Column Type",
                         "string",
                     ),
+                    "index": BooleanParam("Index?"),
                 },
             ),
         ),
@@ -80,6 +81,7 @@ class RegexToolPlugin(PandasTransformPlugin):
 
         output_params = self.parameters["output"].params
         output_names = [pp["name"].value for pp in output_params]
+        index_names = [pp["name"].value for pp in output_params if pp["index"].value]
 
         column = self.parameters["column"].get_column(df)
 
@@ -103,6 +105,9 @@ class RegexToolPlugin(PandasTransformPlugin):
                 df = df.reset_index()
             df = df.drop(columns=column_name)
 
+        if index_names:
+            df = df.set_index(index_names)
+        
         return df
 
 
