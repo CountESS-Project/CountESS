@@ -5,7 +5,6 @@ from countess import VERSION
 from countess.core.parameters import (
     BaseParam,
     BooleanParam,
-    ColumnOrIndexChoiceParam,
     PerColumnArrayParam,
     TabularMultiParam,
     TextParam,
@@ -14,7 +13,6 @@ from countess.core.plugins import PandasTransformPlugin
 
 
 def _column_renamer(col):
-    print(f"CR {col}")
     if isinstance(col, tuple):
         if col[-1] == "first":
             return "__".join(col[:-1])
@@ -85,14 +83,19 @@ class GroupByPlugin(PandasTransformPlugin):
         agg_ops = dict(
             (
                 col,
-                [k if k != "index" else "first" for k, pp in col_param.params.items() if pp.value],
+                [k for k, pp in col_param.params.items() if pp.value and k != "index"],
             )
             for col, col_param in column_parameters
+            if any(pp.value for k, pp in col_param.params.items() if k != "index")
         )
 
         try:
-            dfo = df.groupby(index_cols or df.index).agg(agg_ops)
-            dfo.columns = [_column_renamer(col) for col in dfo.columns.values]  # type: ignore
+            if agg_ops:
+                dfo = df.groupby(index_cols or df.index).agg(agg_ops)
+                dfo.columns = [_column_renamer(col) for col in dfo.columns.values]  # type: ignore
+            else:
+                # defaults to just a 'count' column.
+                dfo = df.assign(count=1).groupby(index_cols or df.index).count()
         except ValueError as exc:
             logger.exception(exc)
             return pd.DataFrame()
@@ -115,14 +118,20 @@ class GroupByExprPlugin(PandasTransformPlugin):
         "expr": TextParam("Expression"),
     }
 
-    def run_df(self, df: pd.DataFrame, logger) -> pd.DataFrame:
-        assert isinstance(self.parameters["column"], ColumnOrIndexChoiceParam)
-        if self.parameters["column"].is_index():
-            col = df.index
-        else:
-            col = df[self.parameters["column"].value]
-        oper = self.parameters["operation"].value
+    # XXX not very useful in its current form.
+    # probably better off making this part of Expression
+    # plugin, or something.
 
-        df2 = df.groupby(col).agg(oper)
-        assert isinstance(df2, pd.DataFrame)
-        return df2
+    def run_df(self, df: pd.DataFrame, logger) -> pd.DataFrame:
+        cols = [
+            col for col, param in zip(
+                self.input_columns,
+                self.parameters["groupby"]
+            ) if param.value
+        ]
+        expr = self.parameters["expr"].value
+
+        if cols:
+            df = df.reset_index().groupby(cols)
+
+        return df.agg(expr.strip())

@@ -4,7 +4,7 @@ from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import (
     BooleanParam,
-    ColumnOrIndexChoiceParam,
+    ColumnChoiceParam,
     IntegerParam,
     StringParam,
 )
@@ -29,7 +29,7 @@ class VariantPlugin(PandasTransformPlugin):
     link = "https://countess-project.github.io/CountESS/plugins/#variant"
 
     parameters = {
-        "column": ColumnOrIndexChoiceParam("Input Column"),
+        "column": ColumnChoiceParam("Input Column", "sequence"),
         "sequence": StringParam("Reference Sequence"),
         "auto": BooleanParam("Automatic Reference Sequence?", False),
         "output": StringParam("Output Column", "variant"),
@@ -38,34 +38,26 @@ class VariantPlugin(PandasTransformPlugin):
     }
 
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        assert isinstance(self.parameters["column"], ColumnOrIndexChoiceParam)
+        assert isinstance(self.parameters["column"], ColumnChoiceParam)
         assert isinstance(self.parameters["sequence"], StringParam)
         assert isinstance(self.parameters["output"], StringParam)
         assert isinstance(self.parameters["max_mutations"], IntegerParam)
 
         dfo = df.copy()
 
+        column = self.parameters["column"].get_column(df)
         output = self.parameters["output"].value
 
-        if self.parameters["column"].is_index():
-            dfo["__index"] = df.index
-            column_name = "__index"
-        else:
-            column_name = self.parameters["column"].value
-
         if self.parameters["auto"].value:
-            value = pd.Series.mode(dfo[column_name])[0]
+            value = pd.Series.mode(column)[0]
             self.parameters["sequence"].value = value
 
         sequence = self.parameters["sequence"].value
         max_mutations = self.parameters["max_mutations"].value
 
-        dfo[output] = dfo[column_name].apply(process_row, args=(sequence, max_mutations, logger))
+        dfo[output] = column.apply(process_row, args=(sequence, max_mutations, logger))
 
         if self.parameters["drop"].value:
             dfo = dfo.query("variant.notnull()")
 
-        if self.parameters["column"].is_index():
-            return dfo.drop(columns=["__index"])
-        else:
-            return dfo
+        return dfo

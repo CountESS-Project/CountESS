@@ -4,7 +4,7 @@ from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import (
     BooleanParam,
-    ColumnOrIndexChoiceParam,
+    ColumnChoiceParam,
     IntegerParam,
     StringParam,
 )
@@ -21,7 +21,7 @@ class SequencePlugin(PandasTransformPlugin):
     link = "https://countess-project.github.io/CountESS/plugins/#sequence"
 
     parameters = {
-        "column": ColumnOrIndexChoiceParam("Input Column"),
+        "column": ColumnChoiceParam("Input Column"),
         "invert": BooleanParam("Invert", False),
         "offset": IntegerParam("Offset", 0),
         "start": StringParam("Start at ...", ""),
@@ -51,6 +51,12 @@ class SequencePlugin(PandasTransformPlugin):
                 seq = seq[0 : self.parameters["length"].value]
             return seq
 
-        dfo = df.copy()
-        dfo[self.parameters["output"].value] = dfo[self.parameters["column"].value].apply(_process)
-        return dfo
+        column_name = self.parameters["column"].value
+        output_column_name = self.parameters["output"].value
+
+        if column_name in df.columns:
+            column = df[column_name]
+        else:
+            column = df.index.to_frame()[column_name]
+
+        return df.assign(**{output_column_name: column.apply(_process)})

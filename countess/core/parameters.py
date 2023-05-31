@@ -327,15 +327,15 @@ class ColumnChoiceParam(ChoiceParam):
     def set_column_choices(self, choices):
         self.set_choices(list(choices))
 
-
-class ColumnOrIndexChoiceParam(ColumnChoiceParam):
-    INDEX_VALUE = "— INDEX —"
-
-    def set_choices(self, choices: Iterable[str]):
-        super().set_choices([self.INDEX_VALUE] + list(choices))
-
-    def is_index(self):
-        return self.value == self.INDEX_VALUE
+    def get_column(self, df):
+        if self.value in df.columns:
+            return df[self.value]
+        elif self.value == df.index.name:
+            return df.index
+        elif hasattr(df.index, 'names') and self.value in df.index.names:
+            return df.index.to_frame()[self.value]
+        else:
+            raise ValueError(f"Column {self.value} not found")
 
 
 class ColumnOrNoneChoiceParam(ColumnChoiceParam):

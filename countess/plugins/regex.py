@@ -7,7 +7,7 @@ from countess import VERSION
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
-    ColumnOrIndexChoiceParam,
+    ColumnChoiceParam,
     DataTypeChoiceParam,
     MultiParam,
     StringParam,
@@ -22,7 +22,7 @@ class RegexToolPlugin(PandasTransformPlugin):
     version = VERSION
 
     parameters = {
-        "column": ColumnOrIndexChoiceParam("Input Column"),
+        "column": ColumnChoiceParam("Input Column"),
         "regex": StringParam("Regular Expression", ".*"),
         "output": ArrayParam(
             "Output Columns",
@@ -57,15 +57,15 @@ class RegexToolPlugin(PandasTransformPlugin):
         value = str(row.get(column_name, ""))
         matches = compiled_re.findall(value)
         if len(matches) == 0:
-            return [ [ 0 ] ] + [ [ None ] ] * len(output_params)
+            return [[0]] + [[None]] * len(output_params)
         if compiled_re.groups > 1:
-            return [ [ 1 ] * len(matches) ] + [
-                [ op.datatype.cast_value(x) for x in match[num] for match in matches ]
+            return [[1] * len(matches)] + [
+                [op.datatype.cast_value(x) for x in match[num] for match in matches]
                 for num, op in enumerate(output_params)
             ]
         else:
-            return [ [ 1 ] * len(matches) ] + [
-                [ output_params[0].datatype.cast_value(x) for x in matches ]
+            return [[1] * len(matches)] + [
+                [output_params[0].datatype.cast_value(x) for x in matches]
             ]
 
     def run_df(self, df, logger):
@@ -84,38 +84,43 @@ class RegexToolPlugin(PandasTransformPlugin):
         output_params = self.parameters["output"].params
         output_names = [pp["name"].value for pp in output_params]
 
-        if self.parameters["column"].is_index():
-            # XXX would it make more sense to do .reset_index() here which would
-            # make the index column(s) just appear like normal columns?
-            df["__index"] = df.index
-            column_name = "__index"
-        else:
-            column_name = self.parameters["column"].value
+        # XXX should probably be grabbing the column,
+        # using Series.apply() and then joining it back.
+        # that'd be a bit more flexible with index columns
+        # as well.
 
-        if self.parameters['multi'].value:
+        column_name = self.parameters["column"].value
+        if column_name not in df.columns:
+            df["__column"] = df.index.to_frame()[column_name]
+            column_name = "__column"
+
+        if self.parameters["multi"].value:
             func = partial(self.apply_func_multi, column_name, compiled_re, output_params, logger)
         else:
             func = partial(self.apply_func, column_name, compiled_re, output_params, logger)
 
         # XXX should this be result_type="broadcast"?
+        # XXX or maybe just get the column names right and
+        # then we can use df = df.join(re_groups_df)
+
         re_groups_df = df.apply(func, axis=1, result_type="expand")
         for n in range(0, compiled_re.groups):
             df[output_names[n]] = re_groups_df[n + 1]
 
         if self.parameters["drop_unmatch"].value:
             df["__filter"] = re_groups_df[0]
-            if self.parameters['multi'].value:
-                df = df.explode(['__filter'] + output_names)
+            if self.parameters["multi"].value:
+                df = df.explode(["__filter"] + output_names)
             df = df.query("__filter != 0").drop(columns="__filter")
         else:
-            if self.parameters['multi'].value:
+            if self.parameters["multi"].value:
                 df = df.explode(output_names)
 
         if self.parameters["drop_column"].value:
             df = df.drop(columns=column_name)
 
-        if "__index" in df:
-            df = df.drop(columns='__index')
+        if "__column" in df:
+            df = df.drop(columns="__column")
 
         return df
 

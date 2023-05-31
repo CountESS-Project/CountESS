@@ -213,7 +213,12 @@ class PandasTransformPlugin(PandasBasePlugin):
 
     def prepare_df(self, df: pd.DataFrame, logger: Logger):
         assert isinstance(df, pd.DataFrame)
-        self.input_columns = list(df.columns)
+        if hasattr(df.index, "names"):
+            self.input_columns = [n for n in df.index.names if n] + list(df.columns)
+        elif df.index.name:
+            self.input_columns = [df.index.name] + list(df.columns)
+        else:
+            self.input_columns = list(df.columns)
 
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns)

@@ -127,7 +127,6 @@ class TabularDataFrame(tk.Frame):
             self.subframe.columnconfigure(num, minsize=10, weight=1)
             self.labels.append(label)
 
-
         if len(self.dataframe) == 0:
             label = tk.Label(self.subframe, text="no data")
             label.grid(row=2, column=0, columnspan=len(column_names), sticky=tk.NSEW)
