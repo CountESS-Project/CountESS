@@ -264,7 +264,7 @@ class DataTypeChoiceParam(ChoiceParam):
         "string": (str, None, StringParam),
         "number": (float, None, FloatParam),
         "integer": (int, 0, IntegerParam),
-        "boolean": (bool, None, BooleanParam),
+        "boolean": (bool, False, BooleanParam),
     }
 
     def __init__(

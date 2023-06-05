@@ -37,6 +37,10 @@ def column_format_for(df_column):
 def format_value(value, column_format):
     if value is None or (type(value) is float and isnan(value)):
         return "—"
+    if value is True:
+        return "—T"
+    if value is False:
+        return "—F"
 
     # remove trailing 0's from floats (%g doesn't align correctly)
     try:
