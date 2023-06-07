@@ -91,7 +91,7 @@ class RegexToolPlugin(PandasTransformPlugin):
             func = _process_row
 
         dfx = column.apply(func, args=(compiled_re, output_params, logger))
-        df = df.assign(**dict( (name, dfx[name]) for name in dfx.columns))
+        df = df.assign(**dict((name, dfx[name]) for name in dfx.columns))
 
         if self.parameters["drop_unmatch"].value:
             df = df.dropna(subset=output_names, how="all")
@@ -107,7 +107,7 @@ class RegexToolPlugin(PandasTransformPlugin):
 
         if index_names:
             df = df.set_index(index_names)
-        
+
         return df
 
 
@@ -183,7 +183,8 @@ class RegexReaderPlugin(PandasInputPlugin):
         if len(records) > 0:
             pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
 
-        if len(pdfs) > 0:
-            return pd.concat(pdfs)
+        if len(pdfs) == 0:
+            return pd.DataFrame([], columns=columns)
 
-        return pd.DataFrame([], columns=columns)
+        df = pd.concat(pdfs)
+        return df

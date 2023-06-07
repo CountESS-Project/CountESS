@@ -227,15 +227,14 @@ class TabularDataFrame(tk.Frame):
 
     def __label_button_1(self, num, event):
         label_width = self.labels[num].winfo_width()
-        if 2*label_width/5 < event.x < 3*label_width/5:
+        if 2 * label_width / 5 < event.x < 3 * label_width / 5:
             self.sort_ascending = (num != self.sort_by_col) or not self.sort_ascending
             self.sort_by_col = num
             if num < self.index_cols:
                 self.dataframe = self.dataframe.sort_index(level=num, ascending=self.sort_ascending)
             else:
                 self.dataframe = self.dataframe.sort_values(
-                    self.dataframe.columns[num-self.index_cols],
-                    ascending=self.sort_ascending
+                    self.dataframe.columns[num - self.index_cols], ascending=self.sort_ascending
                 )
             self.refresh()
 
