@@ -266,6 +266,7 @@ class MainWindow:
                 ("Load Config", self.config_load),
                 ("Save Config", self.config_save),
                 ("Export Config", self.config_export),
+                ("Tidy Graph", self.graph_tidy),
                 ("Run", self.program_run),
                 ("Exit", self.program_exit),
             ],
@@ -339,6 +340,12 @@ class MainWindow:
         if not filename:
             return
         export_config_graphviz(self.graph, filename)
+
+    def graph_tidy(self):
+        self.graph.tidy()
+        # XXX there should be a self.graph_wrapper.refresh()
+        self.graph_wrapper.destroy()
+        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
 
     def program_run(self):
         # XXX should be handled in a different thread

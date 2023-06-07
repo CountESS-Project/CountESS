@@ -176,3 +176,50 @@ class PipelineGraph:
         for node in self.nodes:
             node.result = None
             node.is_dirty = True
+
+    def tidy(self):
+        """Tidies the graph (sets all the node positions)"""
+
+        # XXX This is very arbitrary and not particularly efficient.
+        # Some kind of FDP-like algorithm might be nice.
+
+        nodes = list(self.traverse_nodes())
+
+        # first calculate a stratum for each node.
+
+        stratum = {}
+        for node in nodes:
+            if not node.parent_nodes:
+                stratum[node] = 0
+            else:
+                stratum[node] = max(stratum[n] for n in node.parent_nodes) + 1
+        for node in nodes[::-1]:
+            if node.child_nodes:
+                stratum[node] = min(stratum[n] for n in node.child_nodes) - 1
+        max_stratum = max(stratum.values())
+
+        position = {}
+        for s in range(0, max_stratum + 1):
+            y = (s + 0.5) / (max_stratum + 1)
+
+            # now sort all the nodes by the average position of their parents,
+            # to try and stop them forming a big tangle
+
+            snodes = [
+                (
+                    sum(position[p] for p in node.parent_nodes) / len(node.parent_nodes)
+                    if node.parent_nodes
+                    else 0.5,
+                    n,
+                )
+                for n, node in enumerate(nodes)
+                if stratum[node] == s
+            ]
+            snodes.sort()
+
+            # Assign node positions
+
+            for p, (_, n) in enumerate(snodes):
+                x = (p + 0.5) / len(snodes)
+                nodes[n].position = (y, x)
+                position[nodes[n]] = x
