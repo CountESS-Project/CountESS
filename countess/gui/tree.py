@@ -162,27 +162,31 @@ class ConnectingLine:
         self.update_line()
 
     def update_line(self, event=None):
+        _xc, _yc, wc, hc = _geometry(self.canvas)
+
+        # size factor to allow for different screen geometries.
+        k = (wc + hc) / 100
+
         x1, y1, w1, h1 = _geometry(self.widget1)
         x2, y2, w2, h2 = _geometry(self.widget2)
 
         # special case for dragging invisible frames
         # XXX bit of a hack just to get it to look nice
+        # based on the cursor size not `k`.
         if w2 == 1 and h2 == 1:
-            x2, y2, w2, h2 = x2 - 20, y2 - 20, 40, 40
+            x2, y2, w2, h2 = x2 - 16, y2 - 16, 32, 32
 
         # Control points set up a nice spline, and a little extra padding
         # on the destination end to allow for the arrow head.
-        _xc, _yc, wc, hc = _geometry(self.canvas)
-
         if wc > hc:
             if self.switch and x1 > x2:
                 x1, y1, w1, h1, x2, y2, w2, h2 = x2, y2, w2, h2, x1, y1, w1, h1
             coords = (
                 x1 + w1,
                 y1 + h1 // 2,
-                x1 + w1 + 20,
+                x1 + w1 + k,
                 y1 + h1 // 2,
-                x2 - 40,
+                x2 - k * 2,
                 y2 + h2 // 2,
                 x2,
                 y2 + h2 // 2,
@@ -194,23 +198,24 @@ class ConnectingLine:
                 x1 + w1 // 2,
                 y1 + h1,
                 x1 + w1 // 2,
-                y1 + h1 + 20,
+                y1 + h1 + k,
                 x2 + w2 // 2,
-                y2 - 40,
+                y2 - k * 2,
                 x2 + w2 // 2,
                 y2,
             )
 
+        arrowshape = (15, 20, 6) if k > 20 else (k * 2 / 3, k, k / 3)
         if self.line:
             self.canvas.coords(self.line, *coords)
-            self.canvas.itemconfig(self.line, smooth=len(coords) > 6)
+            self.canvas.itemconfig(self.line, smooth=True, arrowshape=arrowshape)
         else:
             self.line = self.canvas.create_line(
                 *coords,
                 smooth=True,
                 width=3,
                 arrow="last",
-                arrowshape=(15, 15, 6),
+                arrowshape=arrowshape,
                 fill=self.color,
             )
 
