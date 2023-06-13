@@ -1,16 +1,13 @@
 import itertools
-from collections import defaultdict
 
+import numpy as np
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import (
-    ArrayParam,
     ChoiceParam,
-    ColumnChoiceParam,
-    MultiParam,
-    StringParam,
+    PerColumnArrayParam,
 )
 from countess.core.plugins import PandasTransformPlugin
 
@@ -26,107 +23,82 @@ class PivotPlugin(PandasTransformPlugin):
     link = "https://countess-project.github.io/CountESS/plugins/#pivot-tool"
 
     parameters = {
-        "index": ArrayParam("Index By", ColumnChoiceParam("Column")),
-        "pivot": ArrayParam("Pivot By", ColumnChoiceParam("Column")),
-        "agg": ArrayParam(
-            "Aggregates",
-            MultiParam(
-                "Aggregate",
-                {
-                    "column": ColumnChoiceParam("Column"),
-                    "function": ChoiceParam("Function", choices=AGG_FUNCTIONS),
-                    "output": StringParam("Output Column Name"),
-                },
-            ),
-        ),
+        "columns": PerColumnArrayParam(
+            "Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"])
+        )
     }
 
-    # XXX It'd be nice to also have "non pivoted" aggregated columns as well.
-
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        assert isinstance(self.parameters["index"], ArrayParam)
-        assert isinstance(self.parameters["pivot"], ArrayParam)
-        assert isinstance(self.parameters["agg"], ArrayParam)
+        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
+        column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
+        index_cols = [col for col, col_param in column_parameters if col_param.value == "Index"]
+        pivot_cols = [col for col, col_param in column_parameters if col_param.value == "Pivot"]
+        expand_cols = [col for col, col_param in column_parameters if col_param.value == "Expand"]
+        drop_cols = [col for col, col_param in column_parameters if col_param.value == "Drop"]
 
-        index_cols = [
-            p.value
-            for p in self.parameters["index"].params
-            if isinstance(p, ChoiceParam) and p.value
-        ]
-        pivot_cols = [
-            p.value
-            for p in self.parameters["pivot"].params
-            if isinstance(p, ChoiceParam) and p.value
-        ]
+        # XXX friendly error messages please
+        assert pivot_cols
+
+        if isinstance(df, pd.DataFrame):
+            df = pd.pivot_table(
+                df,
+                values=expand_cols,
+                index=index_cols,
+                columns=pivot_cols,
+                aggfunc=np.sum,
+                fill_value=0,
+            )
+            if isinstance(df.columns, pd.MultiIndex):
+                # Clean up MultiIndex names ... XXX until such time as CountESS supports them
+                df.columns = [
+                    "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)])
+                    for cc in df.columns
+                    ] # type: ignore
+            return df
 
         # dask's built-in "dd.pivot_table" can only handle one index column
         # and one pivot column which is too limiting.  So this is a slightly
         # cheesy replacement.
+        #
+        # XXX this is maybe not actually necessary any more?
 
-        # First, collect all the aggregated columns together in one place.
-        agg_cols = [
-            (p.params["column"].value, p.params["function"].value, p.params["output"].value)
-            for p in self.parameters["agg"].params
-            if isinstance(p, MultiParam) and p.params["column"].value and p.params["function"].value
-        ]
-        aggregate_ops = defaultdict(list, [(c, ["first"]) for c in index_cols])
+        # zorch the existing indexing
+        df = df.reset_index().drop(columns=drop_cols)
 
-        if pivot_cols:
-            # This won't run on multiindexes, but we're about to trash the indexing
-            # anyway so just drop the existing index, we don't care.
-            df = df.reset_index(drop=True)
+        # `pivot_product` is every combination of every pivot column, so eg: if you're
+        # pivoting on a `bin` column with values 1..4 and a `rep` column with values
+        # 1..3 you'll end up with 12 elements, [ [1,1],[1,2],[1,3],[1,4],[2,1],[2,2] etc ]
 
-            # `pivot_product` is every combination of every pivot column, so eg: if you're
-            # pivoting on a `bin` column with values 1..4 and a `rep` column with values
-            # 1..3 you'll end up with 12 elements, [ [1,1],[1,2],[1,3],[1,4],[2,1],[2,2] etc ]
+        pivot_product = list(itertools.product(*[list(df[c].unique()) for c in pivot_cols]))
+        # XXX friendly error messages please
+        assert len(pivot_product) <= 100
 
-            pivot_product = itertools.product(*[list(df[c].unique()) for c in pivot_cols])
+        # `pivot_groups` then reattaches the labels to those values, eg:
+        # [[('bin', 1), ('rep', 1)], [('bin', 1), ('rep', 2)] etc
+        pivot_groups = sorted(
+            [list(zip(pivot_cols, pivot_values)) for pivot_values in pivot_product]
+        )
 
-            # `pivot_groups` then reattaches the labels to those values, eg:
-            # [[('bin', 1), ('rep', 1)], [('bin', 1), ('rep', 2)] etc
-            pivot_groups = sorted(
-                [list(zip(pivot_cols, pivot_values)) for pivot_values in pivot_product]
-            )
+        def _column_name(col, pg):
+            return "`" + col + "".join([f"__{pc}_{pv}" for pc, pv in pg]) + "`"
 
-            # Each pivot group is a set of conditions to filter for in that pivot
-            # group.
-            dfs = []
-            for pg in pivot_groups:
-                # We first filter the source dataframe using the values in `pivot_group`
-                # then rename the aggregated columns to add a specific suffix for
-                # this group.
-                suffix = "".join([f"__{pc}_{pv}" for pc, pv in pg])
-                query = " and ".join(f"`{col}` == {repr(val)}" for col, val in pg)
+        def _column_condition(col, pg):
+            return " and ".join([f"`{pc}` == {repr(pv)}" for pc, pv in pg])
 
-                # work out what columns we need to rename and accumulate the
-                # required aggregation operations in `aggregate_ops`.
-                rename_cols = {}
-                for col, agg_op, out_col in agg_cols:
-                    output_column = (out_col or col) + suffix
-                    aggregate_ops[output_column].append(agg_op)
-                    rename_cols[col] = output_column
+        # XXX note that even though numexpr supports a where() function
+        # https://numexpr.readthedocs.io/en/latest/user_guide.html#supported-functions
+        # which would be useful here, pandas can't parse this:
+        # https://stackoverflow.com/questions/65427413/pandas-eval-not-supporting-where
+        # it'd be an easy patch to pandas, mind you.
 
-                dfs.append(df.query(query).rename(columns=rename_cols))
-            df = pd.concat(dfs)
+        expr = "\n".join(
+            [
+                f"{_column_name(col, pg)} = `{col}` * ({_column_condition(col, pg)})"
+                for col in expand_cols
+                for pg in pivot_groups
+            ]
+        )
 
-            # XXX because of the way the concat operation collects pivot groups, a bunch of records
-            # end up getting generated with NULLs in integer columns, forcing those columns
-            # to become floats, which looks odd for a 'sum' or 'count' operation.
-        else:
-            rename_cols = {}
-            for col, agg_op, out_col in agg_cols:
-                if out_col:
-                    rename_cols[col] = out_col
-                    aggregate_ops[out_col].append(agg_op)
-                else:
-                    aggregate_ops[col].append(agg_op)
-            df = df.rename(columns=rename_cols)
+        df.eval(expr, inplace=True, engine="numexpr")
 
-        # If there aren't multple aggregations for any one column,
-        # squish to prevent column name mangling.
-        # XXX this could be improved to make mangling column specific.
-        if all((len(v) == 1) for k, v in aggregate_ops.items()):
-            aggregate_ops = defaultdict(list, [(k, v[0]) for k, v in aggregate_ops.items()])
-
-        # Group by the index columns and aggregate.
-        return df.groupby(index_cols or df.index).agg(aggregate_ops)
+        return df.drop(columns=pivot_cols + expand_cols).groupby(index_cols).agg("sum")
