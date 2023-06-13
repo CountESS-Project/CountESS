@@ -122,10 +122,14 @@ class TabularDataFrame(tk.Frame):
         title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
         title.grid(row=0, column=0, columnspan=len(column_names), sticky=tk.NSEW, pady=5)
 
+        ### XXX add in proper handling for MultiIndexes here
+
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
             if type(name) is tuple:
-                name = "\n".join(name)
+                name = "\n".join([str(n) for n in name])
+            else:
+                name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
             label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
             label.grid(row=1, column=num, sticky=tk.EW)
