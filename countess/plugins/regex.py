@@ -15,36 +15,6 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
 
 
-def _process_row(value: str, compiled_re, output_params, logger) -> pd.Series:
-    match = compiled_re.match(str(value))
-    if match:
-        return pd.Series(
-            dict(
-                (output_params[n]["name"].value, output_params[n].datatype.cast_value(g))
-                for n, g in enumerate(match.groups())
-            )
-        )
-    else:
-        logger.warning("Didn't Match", detail=repr(value))
-        return pd.Series({})
-
-
-def _process_row_multi(value: str, compiled_re, output_params, logger) -> pd.Series:
-    matches = compiled_re.findall(str(value))
-    if len(matches) == 0:
-        return pd.Series({})
-    if compiled_re.groups > 1:
-        return pd.Series(
-            dict(
-                (op["name"].value, [op.datatype.cast_value(match[num]) for match in matches])
-                for num, op in enumerate(output_params)
-            )
-        )
-    else:
-        op = output_params[0]
-        return pd.Series({op["name"].value: [op.datatype.cast_value(match) for match in matches]})
-
-
 class RegexToolPlugin(PandasTransformPlugin):
     name = "Regex Tool"
     description = "Apply regular expressions to a column to make new column(s)"
@@ -86,18 +56,43 @@ class RegexToolPlugin(PandasTransformPlugin):
         column = self.parameters["column"].get_column(df)
 
         if self.parameters["multi"].value:
-            func = _process_row_multi
+            def func(value):
+                matches = compiled_re.findall(str(value))
+                if matches:
+                    return [
+                        [ m[n] for m in matches ]
+                        for n in range(0, compiled_re.groups)
+                    ]
+                else:
+                    return [[None]] * compiled_re.groups
         else:
-            func = _process_row
+            def func(value):
+                if match := compiled_re.match(value):
+                    return [
+                        op.datatype.cast_value(g)
+                        for op, g in zip(output_params, match.groups())
+                    ]
+                else:
+                    logger.info("Didn't Match: " + repr(value))
+                    return [None] * compiled_re.groups
 
-        dfx = column.apply(func, args=(compiled_re, output_params, logger))
-        df = df.assign(**dict((name, dfx[name]) for name in dfx.columns))
+        # make a series of tuples, then turn those back into a dataframe,
+        # then copy those new columns over.
+        # XXX this isn't particularly elegant but it does seem to be fairly quick
+        # XXX should be a special case for a single output column
 
-        if self.parameters["drop_unmatch"].value:
-            df = df.dropna(subset=output_names, how="all")
+        series = column.apply(func)
+        output_df = pd.DataFrame(series.tolist(), columns=output_names, index=series.index)
+        df = df.assign(**{
+            column_name: output_df[column_name]
+            for column_name in output_names
+        })
 
         if self.parameters["multi"].value:
             df = df.explode(output_names)
+
+        if self.parameters["drop_unmatch"].value:
+            df = df.dropna(subset=output_names, how="all")
 
         if self.parameters["drop_column"].value:
             column_name = self.parameters["column"].value
