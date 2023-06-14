@@ -94,10 +94,6 @@ class LoadCsvPlugin(PandasInputPlugin):
                     options["usecols"].append(n)
                     options["dtype"][n] = pp["type"].get_selected_type()
 
-        if not options["dtype"]:
-            logger.warning("No Columns Selected")
-            return pd.DataFrame()
-
         delimiter = self.parameters["delimiter"].value
         if delimiter == "TAB":
             options["delimiter"] = "\t"
