@@ -331,7 +331,7 @@ class ColumnChoiceParam(ChoiceParam):
         if self.value in df.columns:
             return df[self.value]
         elif self.value == df.index.name:
-            return df.index
+            return df.index.to_series()
         elif hasattr(df.index, "names") and self.value in df.index.names:
             return df.index.to_frame()[self.value]
         else:
