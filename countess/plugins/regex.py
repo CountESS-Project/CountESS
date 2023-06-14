@@ -67,13 +67,14 @@ class RegexToolPlugin(PandasTransformPlugin):
         else:
 
             def func(value):
-                if match := compiled_re.match(value):
-                    return [
-                        op.datatype.cast_value(g) for op, g in zip(output_params, match.groups())
-                    ]
-                else:
-                    logger.info("Didn't Match: " + repr(value))
-                    return [None] * compiled_re.groups
+                if value is not None:
+                    if match := compiled_re.match(value):
+                        return [
+                            op.datatype.cast_value(g)
+                            for op, g in zip(output_params, match.groups())
+                        ]
+                logger.info("Didn't Match: " + repr(value))
+                return [None] * compiled_re.groups
 
         # make a series of tuples, then turn those back into a dataframe,
         # then copy those new columns over.
