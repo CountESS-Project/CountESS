@@ -66,7 +66,8 @@ class GroupByPlugin(PandasTransformPlugin):
     def prepare_df(self, df: pd.DataFrame, logger):
         super().prepare_df(df, logger)
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
-        for num, dtype in enumerate(df.dtypes):
+
+        for num, dtype in enumerate(self.input_dtypes):
             col_param = self.parameters["columns"][num]
             is_numeric_col = is_numeric_dtype(dtype)
             for key, param in col_param.items():

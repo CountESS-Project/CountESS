@@ -210,15 +210,19 @@ class PandasBasePlugin(BasePlugin):
 
 class PandasTransformPlugin(PandasBasePlugin):
     input_columns: list[str] = []
+    input_dtypes: list[str] = []
 
     def prepare_df(self, df: pd.DataFrame, logger: Logger):
         assert isinstance(df, pd.DataFrame)
-        if hasattr(df.index, "names"):
+        if hasattr(df.index, "dtypes"):
             self.input_columns = [n for n in df.index.names if n] + list(df.columns)
+            self.input_dtypes = [d for d, n in zip(df.index.dtypes, df.index.names) if n] + list(df.dtypes)
         elif df.index.name:
             self.input_columns = [df.index.name] + list(df.columns)
+            self.input_dtypes = [df.index.dtype] + list(df.dtypes)
         else:
             self.input_columns = list(df.columns)
+            self.input_dtypes = list(df.dtypes)
 
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns)
