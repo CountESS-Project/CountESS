@@ -56,21 +56,20 @@ class RegexToolPlugin(PandasTransformPlugin):
         column = self.parameters["column"].get_column(df)
 
         if self.parameters["multi"].value:
+
             def func(value):
                 matches = compiled_re.findall(str(value))
                 if matches:
-                    return [
-                        [ m[n] for m in matches ]
-                        for n in range(0, compiled_re.groups)
-                    ]
+                    return [[m[n] for m in matches] for n in range(0, compiled_re.groups)]
                 else:
                     return [[None]] * compiled_re.groups
+
         else:
+
             def func(value):
                 if match := compiled_re.match(value):
                     return [
-                        op.datatype.cast_value(g)
-                        for op, g in zip(output_params, match.groups())
+                        op.datatype.cast_value(g) for op, g in zip(output_params, match.groups())
                     ]
                 else:
                     logger.info("Didn't Match: " + repr(value))
@@ -83,10 +82,7 @@ class RegexToolPlugin(PandasTransformPlugin):
 
         series = column.apply(func)
         output_df = pd.DataFrame(series.tolist(), columns=output_names, index=series.index)
-        df = df.assign(**{
-            column_name: output_df[column_name]
-            for column_name in output_names
-        })
+        df = df.assign(**{column_name: output_df[column_name] for column_name in output_names})
 
         if self.parameters["multi"].value:
             df = df.explode(output_names)

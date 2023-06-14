@@ -5,10 +5,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import (
-    ChoiceParam,
-    PerColumnArrayParam,
-)
+from countess.core.parameters import ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import PandasTransformPlugin
 
 AGG_FUNCTIONS = ["first", "sum", "count", "mean"]
@@ -53,7 +50,7 @@ class PivotPlugin(PandasTransformPlugin):
                 df.columns = [
                     "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)])
                     for cc in df.columns
-                    ] # type: ignore
+                ]  # type: ignore
             return df
 
         # dask's built-in "dd.pivot_table" can only handle one index column
