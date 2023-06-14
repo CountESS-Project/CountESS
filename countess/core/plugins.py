@@ -216,7 +216,9 @@ class PandasTransformPlugin(PandasBasePlugin):
         assert isinstance(df, pd.DataFrame)
         if hasattr(df.index, "dtypes"):
             self.input_columns = [n for n in df.index.names if n] + list(df.columns)
-            self.input_dtypes = [d for d, n in zip(df.index.dtypes, df.index.names) if n] + list(df.dtypes)
+            self.input_dtypes = [d for d, n in zip(df.index.dtypes, df.index.names) if n] + list(
+                df.dtypes
+            )
         elif df.index.name:
             self.input_columns = [df.index.name] + list(df.columns)
             self.input_dtypes = [df.index.dtype] + list(df.dtypes)
