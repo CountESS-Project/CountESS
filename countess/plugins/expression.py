@@ -2,7 +2,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import TextParam
+from countess.core.parameters import TextParam, PerColumnArrayParam, BooleanParam
 from countess.core.plugins import PandasTransformPlugin
 
 
@@ -33,11 +33,25 @@ class ExpressionPlugin(PandasTransformPlugin):
     description = "Apply simple expressions"
     version = VERSION
 
-    parameters = {"code": TextParam("Expressions")}
+    parameters = {
+        "code": TextParam("Expressions"),
+        "drop": PerColumnArrayParam("Drop Columns",
+            BooleanParam("Drop")
+        ),
+    }
 
     def run_df(self, df, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["code"], TextParam)
 
         codes = [c.replace("\n", " ").strip() for c in self.parameters["code"].value.split("\n\n")]
 
-        return process(df, codes, logger)
+        df = process(df, codes, logger)
+
+        drop_columns = [
+            col
+            for col, param in zip(self.input_columns, self.parameters["drop"])
+            if param.value
+        ]
+
+        print(drop_columns)
+        return df.drop(columns=drop_columns)
