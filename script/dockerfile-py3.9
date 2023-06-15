@@ -1,0 +1,13 @@
+FROM python:3.9 as countess-test-3.9
+RUN apt update && apt upgrade -y
+RUN apt install -y xvfb
+RUN pip install --upgrade pip
+WORKDIR /app/countess
+COPY pyproject.toml .
+COPY countess countess
+COPY script script
+COPY tests tests
+RUN pip install -e .[dev]
+RUN script/code-check
+RUN tests/cmd_tests.sh
+RUN xvfb-run pytest tests/

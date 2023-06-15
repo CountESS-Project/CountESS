@@ -1,7 +1,7 @@
 import hashlib
 import os.path
 import re
-from typing import Any, Iterable, Mapping, Optional, Type
+from typing import Any, Iterable, Mapping, Optional, Type, Union
 
 PARAM_DIGEST_HASH = "sha256"
 
@@ -214,7 +214,7 @@ class FileSaveParam(StringParam):
         if file_types is not None:
             self.file_types = file_types
 
-    def clean_value(self, value: str | tuple | list, file_types=None):
+    def clean_value(self, value: Union[str, tuple, list], file_types=None):
         try:
             return os.path.relpath(str(value))
         except ValueError:
