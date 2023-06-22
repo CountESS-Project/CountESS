@@ -17,8 +17,8 @@ SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 
 class PythonPlugin(PandasTransformPlugin):
     name = "Python Code"
-    description = """
-        Apply python code to each row.
+    description = "Apply python code to each row."
+    additional = """
         Columns are mapped to local variables and back.
         "__index" is set to the index value.
         If you assign to a variable called "__filter",

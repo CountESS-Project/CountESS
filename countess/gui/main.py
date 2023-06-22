@@ -36,7 +36,7 @@ class PluginChooserFrame(tk.Frame):
         label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
-            label_text = plugin_class.description.split(". ")[0].strip()
+            label_text = plugin_class.description
             tk.Button(
                 label_frame,
                 text=plugin_class.name,
@@ -104,6 +104,8 @@ class ConfiguratorWrapper:
                 self.notes_widget.grid(row=2, columnspan=2, padx=10, pady=5)
 
             descr = re.sub(r"\s+", " ", self.node.plugin.description)
+            if self.node.plugin.additional:
+                descr += "\n" + re.sub(r"\s+", " ", self.node.plugin.additional)
 
             self.label["text"] = "%s %s — %s" % (
                 self.node.plugin.name,

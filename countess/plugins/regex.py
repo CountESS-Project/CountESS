@@ -105,9 +105,8 @@ class RegexToolPlugin(PandasTransformPlugin):
 
 class RegexReaderPlugin(PandasInputPlugin):
     name = "Regex Reader"
-    description = """Loads arbitrary data from line-delimited files, applying a regular expression
-      to each line to extract fields.  If you're trying to read generic CSV or TSV files, use the CSV
-      plugin instead as it handles escaping correctly."""
+    description = "Loads arbitrary data from line-delimited files"
+    additional = "Applies a regular expression to each line to extract fields.  If you're trying to read generic CSV or TSV files, use the CSV plugin instead as it handles escaping correctly."
     link = "https://countess-project.github.io/CountESS/plugins/#regex-reader"
     version = VERSION
 

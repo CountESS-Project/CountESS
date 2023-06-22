@@ -72,6 +72,7 @@ class BasePlugin:
 
     name: str = ""
     description: str = ""
+    additional: str = ""
     link: Optional[str] = None
 
     parameters: MutableMapping[str, BaseParam] = {}
@@ -134,7 +135,7 @@ class BasePlugin:
         for k in key.split("."):
             # XXX types are a mess here
             param = param[k]  # type: ignore
-        if isinstance(param, (FileParam, FileSaveParam)):
+        if isinstance(param, (FileParam, FileSaveParam)) and value is not None:
             assert isinstance(value, str)
             param.value = os.path.join(base_dir, value)
         else:
