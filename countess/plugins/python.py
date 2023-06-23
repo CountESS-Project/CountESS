@@ -20,7 +20,6 @@ class PythonPlugin(PandasTransformPlugin):
     description = "Apply python code to each row."
     additional = """
         Columns are mapped to local variables and back.
-        "__index" is set to the index value.
         If you assign to a variable called "__filter",
         only rows where that value is true will be kept.
     """
@@ -38,7 +37,8 @@ class PythonPlugin(PandasTransformPlugin):
             exec(code_object, {}, row_dict)  # pylint: disable=exec-used
             return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
 
-        dfo = df.assign(__index=df.index)
+        # XXX It'd be nice to do this without resetting the index
+        dfo = df.reset_index(drop=False)
         dfo = dfo.apply(_process, axis=1, result_type="expand")
 
         if "__filter" in dfo.columns:

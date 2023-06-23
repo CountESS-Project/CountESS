@@ -347,6 +347,12 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
     def is_none(self):
         return self.value == self.NONE_VALUE
 
+    def get_column(self, df):
+        if self.value == self.NONE_VALUE:
+            return None
+        else:
+            return super().get_column(df)
+
 
 class MultipleChoiceParam(ChoiceParam):
     pass
