@@ -321,7 +321,7 @@ class TabularDataFrame(tk.Frame):
         if r1 != r2:
             self.select_rows = (r1, r2)
             for cw in self.columns:
-                cw.tag_add("xsel", f"{r1}.0", f"{r2}.end")
+                cw.tag_add("xsel", f"{r1}.0", f"{r2+1}.0")
                 cw.tag_config("xsel", background="lightgrey")
         else:
             self.select_rows = None
@@ -335,7 +335,7 @@ class TabularDataFrame(tk.Frame):
         r1, r2 = self.select_rows
         df = self.dataframe.iloc[self.offset + r1 - 1 : self.offset + r2]
         buf = io.StringIO()
-        df.to_csv(buf, sep="\t", newline="\n")
+        df.to_csv(buf, sep="\t")
 
         # XXX very cheesy, but self.clipboard_append() etc didn't
         # seem to work, so this is a terrible workaround ... dump the
@@ -343,7 +343,7 @@ class TabularDataFrame(tk.Frame):
         # into the clipboard.
         top = tk.Toplevel()
         text = tk.Text(top)
-        text.insert(tk.END, buf)
+        text.insert(tk.END, buf.getvalue())
         text.tag_add("sel", "1.0", tk.END)
         text.event_generate("<<Copy>>")
         top.destroy()
