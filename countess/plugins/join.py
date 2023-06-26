@@ -1,5 +1,5 @@
 from collections.abc import Mapping, MutableMapping
-from typing import Optional
+from typing import Optional, Union
 
 import pandas as pd
 
@@ -80,7 +80,7 @@ class JoinPlugin(PandasBasePlugin):
         else:
             join_how = "outer"
 
-        join_params: MutableMapping[str, str | bool] = {
+        join_params: MutableMapping[str, Union[str, bool]] = {
             "how": join_how,
         }
 

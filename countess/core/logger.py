@@ -32,7 +32,9 @@ class Logger:
         self.log("error", message, detail)
 
     def exception(self, exception: Exception):
-        self.error(str(exception), detail="".join(traceback.format_exception(exception)))
+        # Slightly odd calling to maintain compatibility with 3.9 and 3.10
+        message = traceback.format_exception(None, value=exception, tb=None)
+        self.error(str(exception), detail="".join(message))
 
     def clear(self):
         """Clear logs (if possible)"""

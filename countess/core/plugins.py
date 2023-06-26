@@ -21,7 +21,7 @@ import logging
 import os.path
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -43,7 +43,14 @@ PRERUN_ROW_LIMIT = 100
 
 def get_plugin_classes():
     plugin_classes = set()
-    for ep in importlib.metadata.entry_points(group="countess_plugins"):
+    try:
+        # Python >= 3.10
+        entry_points = importlib.metadata.entry_points().select(group="countess_plugins")
+    except AttributeError:
+        # Python < 3.10
+        entry_points = importlib.metadata.entry_points()["countess_plugins"]
+
+    for ep in entry_points:
         try:
             plugin_class = ep.load()
         except (ModuleNotFoundError, ImportError, NotImplementedError) as exc:
@@ -130,7 +137,7 @@ class BasePlugin:
         self.parameters[name] = param.copy()
         return self.parameters[name]
 
-    def set_parameter(self, key: str, value: bool | int | float | str, base_dir: str = "."):
+    def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
         param = self.parameters
         for k in key.split("."):
             # XXX types are a mess here
@@ -234,7 +241,7 @@ class PandasTransformPlugin(PandasBasePlugin):
 
     def prepare(
         self,
-        data: pd.DataFrame | Mapping[str, pd.DataFrame],
+        data: Union[pd.DataFrame, Mapping[str, pd.DataFrame]],
         logger: Logger,
     ) -> bool:
         if isinstance(data, Mapping):
@@ -247,7 +254,7 @@ class PandasTransformPlugin(PandasBasePlugin):
 
     def run(
         self,
-        data: pd.DataFrame | Mapping[str, pd.DataFrame],
+        data: Union[pd.DataFrame, Mapping[str, pd.DataFrame]],
         logger: Logger,
         row_limit: Optional[int] = None,
     ) -> pd.DataFrame:

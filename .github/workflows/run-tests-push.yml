@@ -3,6 +3,20 @@ on:
   push:
 
 jobs:
+  run-tests-ubuntu-22_04-python-3_9:
+    runs-on: ubuntu-22.04
+    name: Ubuntu 22.04, Python 3.9
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - run: sudo apt install xvfb
+    - run: pip install --upgrade pip
+    - run: pip install .[dev]
+    - run: xvfb-run pytest tests/
+    - run: tests/cmd_tests.sh
+
   run-tests-ubuntu-22_04-python-3_10:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python 3.10
