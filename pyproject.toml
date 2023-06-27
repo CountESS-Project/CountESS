@@ -60,6 +60,7 @@ regex_reader = "countess.plugins.regex:RegexReaderPlugin"
 variants = "countess.plugins.variant:VariantPlugin"
 mutagenize = "countess.plugins.mutagenize:MutagenizePlugin"
 data_table = "countess.plugins.data_table:DataTablePlugin"
+correlation = "countess.plugins.correlation:CorrelationPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
