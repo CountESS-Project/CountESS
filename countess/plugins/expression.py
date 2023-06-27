@@ -46,9 +46,16 @@ class ExpressionPlugin(PandasTransformPlugin):
 
         df = process(df, codes, logger)
 
-        drop_columns = [
+        drop_names = [
             col for col, param in zip(self.input_columns, self.parameters["drop"]) if param.value
         ]
 
-        print(drop_columns)
-        return df.drop(columns=drop_columns)
+        drop_indexes = [ col for col in drop_names if col in df.index.names ]
+        if drop_indexes:
+            df = df.reset_index(drop_indexes, drop=True)
+
+        drop_columns = [ col for col in drop_names if col in df.columns ]
+        if drop_columns:
+            df = df.drop(columns=drop_columns)
+
+        return df
