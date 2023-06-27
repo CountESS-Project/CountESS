@@ -2,8 +2,9 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ChoiceParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, PerColumnArrayParam
+from countess.core.parameters import ChoiceParam, ColumnChoiceParam, ColumnOrNoneChoiceParam
 from countess.core.plugins import PandasTransformPlugin
+
 
 class CorrelationPlugin(PandasTransformPlugin):
     """Correlations"""
@@ -21,6 +22,7 @@ class CorrelationPlugin(PandasTransformPlugin):
     }
 
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        assert isinstance(self.parameters["group"], ColumnOrNoneChoiceParam)
 
         method = self.parameters["method"].value
         column1 = self.parameters["column1"].value
