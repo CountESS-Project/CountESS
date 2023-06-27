@@ -4,7 +4,7 @@ from typing import Any, Optional
 from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, get_plugin_classes
 
-PRERUN_ROW_LIMIT = 10000
+PRERUN_ROW_LIMIT = 100000
 
 
 @dataclass

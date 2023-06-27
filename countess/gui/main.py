@@ -206,8 +206,7 @@ class ConfiguratorWrapper:
         self.logger.clear()
         self.logger_subframe.grid(row=3, sticky=tk.NSEW)
         self.node.prerun(self.logger)
-        if self.node.result is not None:
-            self.show_preview_subframe()
+        self.show_preview_subframe()
         self.configurator.update()
         self.logger_subframe.after(5000, self.config_change_task_callback_2)
         self.change_callback(self.node)
