@@ -170,6 +170,8 @@ class SaveCsvPlugin(PandasBasePlugin):
             sep = " "
 
         options = {
+            "header": self.parameters["header"].value,
+            "index": data.index.name is not None or hasattr(data.index, "names"),
             "sep": sep,
             "quoting": csv.QUOTE_NONNUMERIC
             if self.parameters["quoting"].value
