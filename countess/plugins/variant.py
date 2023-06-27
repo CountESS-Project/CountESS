@@ -1,10 +1,14 @@
-from typing import Optional
-
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
+from countess.core.parameters import (
+    BooleanParam,
+    ColumnChoiceParam,
+    ColumnOrNoneChoiceParam,
+    IntegerParam,
+    StringParam,
+)
 from countess.core.plugins import PandasTransformPlugin
 from countess.utils.variant import find_variant_string
 
@@ -29,6 +33,7 @@ class VariantPlugin(PandasTransformPlugin):
 
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["column"], ColumnChoiceParam)
+        assert isinstance(self.parameters["reference"], ColumnChoiceParam)
         assert isinstance(self.parameters["sequence"], StringParam)
         assert isinstance(self.parameters["output"], StringParam)
         assert isinstance(self.parameters["max_mutations"], IntegerParam)
@@ -46,21 +51,27 @@ class VariantPlugin(PandasTransformPlugin):
         max_mutations = self.parameters["max_mutations"].value
 
         if reference is not None:
+
             def func(ref_var):
                 try:
                     return find_variant_string("g.", ref_var[0], ref_var[1], max_mutations)
                 except ValueError as exc:
                     logger.warning(str(exc))
                     return None
-            dfo[output] = pd.DataFrame([column, reference]).apply(func, raw=True, result_type='reduce')
+
+            dfo[output] = pd.DataFrame([column, reference]).apply(
+                func, raw=True, result_type="reduce"
+            )
         else:
             ref_str = self.parameters["sequence"].value
+
             def func(var_str):
                 try:
                     return find_variant_string("g.", ref_str, var_str, max_mutations)
                 except ValueError as exc:
                     logger.warning(str(exc))
                     return None
+
             dfo[output] = column.apply(func)
 
         if self.parameters["drop"].value:

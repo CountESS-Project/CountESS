@@ -50,11 +50,11 @@ class ExpressionPlugin(PandasTransformPlugin):
             col for col, param in zip(self.input_columns, self.parameters["drop"]) if param.value
         ]
 
-        drop_indexes = [ col for col in drop_names if col in df.index.names ]
+        drop_indexes = [col for col in drop_names if col in df.index.names]
         if drop_indexes:
             df = df.reset_index(drop_indexes, drop=True)
 
-        drop_columns = [ col for col in drop_names if col in df.columns ]
+        drop_columns = [col for col in drop_names if col in df.columns]
         if drop_columns:
             df = df.drop(columns=drop_columns)
 

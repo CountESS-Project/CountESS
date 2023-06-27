@@ -47,7 +47,11 @@ class LoadCsvPlugin(PandasInputPlugin):
     link = "https://countess-project.github.io/CountESS/plugins/#csv-reader"
     version = VERSION
 
-    file_types = [("CSV", "*.csv"), ("TSV", "*.tsv"), ("TXT", "*.txt")]
+    file_types = [
+        ("CSV", "*.csv *.csv.gz *.csv.bz2"),
+        ("TSV", "*.tsv *.tsv.gz *.tsv.bz2"),
+        ("TXT", "*.txt *.txt.gz *.txt.bz2"),
+    ]
 
     parameters = {
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
@@ -169,9 +173,13 @@ class SaveCsvPlugin(PandasBasePlugin):
         elif sep == "SPACE":
             sep = " "
 
+        has_named_index = (data.index.name is not None) or (
+            hasattr(data.index, "names") and data.index.names[0] is not None
+        )
+
         options = {
             "header": self.parameters["header"].value,
-            "index": data.index.name is not None or hasattr(data.index, "names"),
+            "index": has_named_index,
             "sep": sep,
             "quoting": csv.QUOTE_NONNUMERIC
             if self.parameters["quoting"].value
