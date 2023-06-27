@@ -68,8 +68,8 @@ class JoinPlugin(PandasBasePlugin):
         assert len(data) == 2
         assert all(isinstance(d, pd.DataFrame) for d in data.values())
 
-        ip1 = inputs_param[0]
-        ip2 = inputs_param[1]
+        ip1, ip2 = inputs_param
+        df1, df2 = data.values()
 
         if ip1.required.value and ip2.required.value:
             join_how = "inner"
@@ -84,16 +84,22 @@ class JoinPlugin(PandasBasePlugin):
             "how": join_how,
         }
 
-        dfs = list(data.values())
+        # "left_on" and "right_on" don't seem to mind if the column
+        # is an index, but don't seem to work correctly if the column
+        # is part of a multiindex: the other multiindex columns go missing.
 
-        if not ip1.join_on.value or ip1.join_on.value == INDEX:
-            join_params["left_index"] = True
-        else:
+        if ip1.join_on.value in df1.columns:
             join_params["left_on"] = ip1.join_on.value
-
-        if not ip2.join_on.value or ip2.join_on.value == INDEX:
-            join_params["right_index"] = True
         else:
-            join_params["right_on"] = ip2["join_on"].value
+            if ip1.join_on.value and ip1.join_on.value != INDEX:
+                df1 = df1.reset_index().set_index(ip1.join_on.value)
+            join_params["left_index"] = True
 
-        return dfs[0].merge(dfs[1], **join_params)
+        if ip2.join_on.value in df2.columns:
+            join_params["right_on"] = ip2.join_on.value
+        else:
+            if ip2.join_on.value and ip2.join_on.value != INDEX:
+                df2 = df2.reset_index().set_index(ip2.join_on.value)
+            join_params["right_index"] = True
+
+        return df1.merge(df2, **join_params)
