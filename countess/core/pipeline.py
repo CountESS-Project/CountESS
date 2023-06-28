@@ -182,6 +182,7 @@ class PipelineGraph:
 
         # XXX This is very arbitrary and not particularly efficient.
         # Some kind of FDP-like algorithm might be nice.
+        # Especially if it could include node/line collisions.
 
         nodes = list(self.traverse_nodes())
 
@@ -193,23 +194,23 @@ class PipelineGraph:
                 stratum[node] = 0
             else:
                 stratum[node] = max(stratum[n] for n in node.parent_nodes) + 1
-        for node in nodes[::-1]:
-            if node.child_nodes:
-                stratum[node] = min(stratum[n] for n in node.child_nodes) - 1
         max_stratum = max(stratum.values())
 
         position = {}
         for s in range(0, max_stratum + 1):
-            y = (s + 0.5) / (max_stratum + 1)
 
             # now sort all the nodes by the average position of their parents,
-            # to try and stop them forming a big tangle
+            # to try and stop them forming a big tangle.  The current position
+            # is included as a "tie breaker" and to keep some memory of the user's
+            # preference for position (eg: ordering of branches)
+
+            def avg_pos_parents(node):
+                return sum(position[p] for p in node.parent_nodes) / len(node.parent_nodes)
 
             snodes = [
                 (
-                    sum(position[p] for p in node.parent_nodes) / len(node.parent_nodes)
-                    if node.parent_nodes
-                    else 0.5,
+                    avg_pos_parents(node) if node.parent_nodes else 0.5,
+                    node.position[1],
                     n,
                 )
                 for n, node in enumerate(nodes)
@@ -217,9 +218,11 @@ class PipelineGraph:
             ]
             snodes.sort()
 
-            # Assign node positions
+            # Assign node positions with the stratums placed
+            # evenly and the nodes spaced evenly per stratum.
 
-            for p, (_, n) in enumerate(snodes):
+            y = (s + 0.5) / (max_stratum + 1)
+            for p, (_, _, n) in enumerate(snodes):
                 x = (p + 0.5) / len(snodes)
                 nodes[n].position = (y, x)
                 position[nodes[n]] = x

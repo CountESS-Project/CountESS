@@ -301,7 +301,7 @@ class GraphWrapper:
             label.place({"relx": node.position[1], "rely": node.position[0], "anchor": "c"})
 
         label.bind("<Button-1>", partial(self.on_mousedown, node), add=True)
-        label.bind("<Configure>", partial(self.on_configure, node), add=True)
+        label.bind("<Configure>", partial(self.on_configure, node, label), add=True)
         label.bind("<<GhostRelease>>", partial(self.on_ghost_release, node), add=True)
         label.bind("<Key-Delete>", partial(self.on_delete, node), add=True)
         label.bind("<Enter>", partial(self.on_enter, node), add=True)
@@ -334,14 +334,22 @@ class GraphWrapper:
         self.highlight_node(node)
         self.node_select_callback(node)
 
-    def on_configure(self, node, event):
+    def on_configure(self, node, label, event):
         """Stores the updated position of the label in node.position"""
-        node.position = self.new_node_position(event.x, event.y)
+        xx = label.place_info()['relx'] * self.canvas.winfo_width()
+        yy = label.place_info()['rely'] * self.canvas.winfo_height()
+        node.position = self.new_node_position(xx, yy)
 
         # Adapt label sizes to suit the window size, as best we can ...
+        # XXX very arbitrary and definitely open to tweaking
+        height = self.canvas.winfo_height()
         width = self.canvas.winfo_width()
-        label_max_width = max(width // 10, 25)
-        label_font_size = int(math.sqrt(width) / math.pi)
+        if height > width:
+            label_max_width = max(width // 9, 25)
+            label_font_size = int(math.sqrt(width) / 3)
+        else:
+            label_max_width = max(width // 20, 16)
+            label_font_size = int(math.sqrt(width) / 5)
         for label in self.labels.values():
             label["wraplength"] = label_max_width
             label["font"] = ("TkDefaultFont", label_font_size)
