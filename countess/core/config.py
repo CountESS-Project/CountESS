@@ -114,7 +114,10 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
             cp[node.name]["_notes"] = node.notes
         for n, parent in enumerate(node.parent_nodes):
             cp[node.name][f"_parent.{n}"] = parent.name
-        if node.plugin:
+        if node.config:
+            for k, v, _ in node.config:
+                cp[node.name][k] = repr(v)
+        elif node.plugin:
             for k, v in node.plugin.get_parameters(base_dir):
                 cp[node.name][k] = repr(v)
 
