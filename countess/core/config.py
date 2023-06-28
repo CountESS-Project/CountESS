@@ -87,7 +87,16 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     cp = ConfigParser()
     base_dir = os.path.dirname(filename)
 
+    node_names_seen = set()
     for node in pipeline_graph.traverse_nodes():
+        while node.name in node_names_seen:
+            num = 0
+            if match := re.match(r'(.*?)\s+(\d+)$', node.name):
+                node.name = match.group(1)
+                num = int(match.group(2))
+            node.name += f" {num + 1}"
+        node_names_seen.add(node.name)
+
         cp.add_section(node.name)
         if node.plugin:
             cp[node.name].update(

@@ -328,6 +328,11 @@ class MainWindow:
             return
         write_config(self.graph, filename)
         self.config_changed = False
+        # XXX there should be a self.graph_wrapper.refresh()
+        # Names may have changed on save
+        self.graph_wrapper.destroy()
+        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+
 
     def config_export(self, filename=None):
         if not filename:
