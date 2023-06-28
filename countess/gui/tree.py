@@ -336,8 +336,8 @@ class GraphWrapper:
 
     def on_configure(self, node, label, event):
         """Stores the updated position of the label in node.position"""
-        xx = label.place_info()['relx'] * self.canvas.winfo_width()
-        yy = label.place_info()['rely'] * self.canvas.winfo_height()
+        xx = float(label.place_info()['relx']) * self.canvas.winfo_width()
+        yy = float(label.place_info()['rely']) * self.canvas.winfo_height()
         node.position = self.new_node_position(xx, yy)
 
         # Adapt label sizes to suit the window size, as best we can ...
@@ -350,9 +350,8 @@ class GraphWrapper:
         else:
             label_max_width = max(width // 20, 16)
             label_font_size = int(math.sqrt(width) / 5)
-        for label in self.labels.values():
-            label["wraplength"] = label_max_width
-            label["font"] = ("TkDefaultFont", label_font_size)
+        label["wraplength"] = label_max_width
+        label["font"] = ("TkDefaultFont", label_font_size)
 
     def on_enter(self, node, event):
         """Mouse has entered a label"""

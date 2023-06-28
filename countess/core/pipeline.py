@@ -183,6 +183,7 @@ class PipelineGraph:
         # XXX This is very arbitrary and not particularly efficient.
         # Some kind of FDP-like algorithm might be nice.
         # Especially if it could include node/line collisions.
+        # See #24
 
         nodes = list(self.traverse_nodes())
 
@@ -194,6 +195,13 @@ class PipelineGraph:
                 stratum[node] = 0
             else:
                 stratum[node] = max(stratum[n] for n in node.parent_nodes) + 1
+
+        # shufffle nodes back down to avoid really long connections.
+
+        for node in nodes[::-1]:
+            if node.child_nodes and len(node.parent_nodes) < 2:
+                stratum[node] = min(stratum[n] for n in node.child_nodes) - 1
+
         max_stratum = max(stratum.values())
 
         position = {}
