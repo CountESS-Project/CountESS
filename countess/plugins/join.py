@@ -88,18 +88,21 @@ class JoinPlugin(PandasBasePlugin):
         # is an index, but don't seem to work correctly if the column
         # is part of a multiindex: the other multiindex columns go missing.
 
-        if ip1.join_on.value in df1.columns:
-            join_params["left_on"] = ip1.join_on.value
+        join1 = ip1.join_on.value
+        join2 = ip2.join_on.value
+
+        if join1 and join1 != INDEX:
+            if join1 not in df1.columns and df1.index.name != join1:
+                df1 = df1.reset_index()
+            join_params["left_on"] = join1
         else:
-            if ip1.join_on.value and ip1.join_on.value != INDEX:
-                df1 = df1.reset_index().set_index(ip1.join_on.value)
             join_params["left_index"] = True
 
-        if ip2.join_on.value in df2.columns:
-            join_params["right_on"] = ip2.join_on.value
+        if join2 and join2 != INDEX:
+            if join2 not in df2.columns and df2.index.name != join2:
+                df2 = df2.reset_index()
+            join_params["right_on"] = join2
         else:
-            if ip2.join_on.value and ip2.join_on.value != INDEX:
-                df2 = df2.reset_index().set_index(ip2.join_on.value)
             join_params["right_index"] = True
 
         return df1.merge(df2, **join_params)
