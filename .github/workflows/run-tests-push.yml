@@ -120,27 +120,27 @@ jobs:
     - run: xvfb-run python3.11 -mpytest tests/
     - run: tests/cmd_tests.sh
 
-  run-tests-ubuntu-22_10-python-3_11_from_apt:
-    runs-on: ubuntu-22.10
-    name: Ubuntu 22.10, Python from Apt
-    steps:
-    - uses: actions/checkout@v3
-    - run: sudo apt install python3.11-full python3-pip xvfb
-    - run: python3.11 -m pip install --upgrade pip
-    - run: python3.11 -m pip install -e .[dev]
-    - run: xvfb-run python3.11 -mpytest tests/
-    - run: tests/cmd_tests.sh
+      #  run-tests-ubuntu-22_10-python-3_11_from_apt:
+      #runs-on: ubuntu-22.10
+      #name: Ubuntu 22.10, Python from Apt
+      #steps:
+      #- uses: actions/checkout@v3
+      #- run: sudo apt install python3.11-full python3-pip xvfb
+      #- run: python3.11 -m pip install --upgrade pip
+      #- run: python3.11 -m pip install -e .[dev]
+      #- run: xvfb-run python3.11 -mpytest tests/
+      #- run: tests/cmd_tests.sh
 
-  run-tests-ubuntu-23_04-python-3_11_from_apt:
-    runs-on: ubuntu-23.04
-    name: Ubuntu 23.04, Python from Apt
-    steps:
-    - uses: actions/checkout@v3
-    - run: sudo apt install python3.11-full python3-pip xvfb
-    - run: python3.11 -m pip install --upgrade pip
-    - run: python3.11 -m pip install -e .[dev]
-    - run: xvfb-run python3.11 -mpytest tests/
-    - run: tests/cmd_tests.sh
+      #run-tests-ubuntu-23_04-python-3_11_from_apt:
+      #runs-on: ubuntu-23.04
+      #name: Ubuntu 23.04, Python from Apt
+      #steps:
+      #- uses: actions/checkout@v3
+      #- run: sudo apt install python3.11-full python3-pip xvfb
+      #- run: python3.11 -m pip install --upgrade pip
+      #- run: python3.11 -m pip install -e .[dev]
+      #- run: xvfb-run python3.11 -mpytest tests/
+      #- run: tests/cmd_tests.sh
 
 #  run-tests-ubuntu-22_04-pypy3:
 #    runs-on: ubuntu-22.04
