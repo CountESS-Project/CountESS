@@ -1,7 +1,7 @@
 import io
 import tkinter as tk
 from functools import partial
-from math import ceil, floor, isnan
+from math import ceil, floor, isnan, isinf
 from tkinter import ttk
 
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
@@ -18,11 +18,12 @@ def column_format_for(df_column):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
         column_min = df_column.min()
-        if type(column_min) is float and isnan(column_min):
-            column_min = 0
+        if isnan(column_min) or isinf(column_min):
+            column_min = -100
         column_max = df_column.max()
-        if type(column_max) is float and isnan(column_max):
-            column_max = 0
+        if isnan(column_max) or isinf(column_max):
+            column_max = 100
+        print(f"{type(column_max)} {repr(column_min)} {repr(column_max)}")
         width = max(len(str(floor(column_min))), len(str(ceil(column_max))))
         if is_integer_dtype(df_column.dtype):
             return f"%{width}d"
