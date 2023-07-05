@@ -336,8 +336,8 @@ class GraphWrapper:
 
     def on_configure(self, node, label, event):
         """Stores the updated position of the label in node.position"""
-        xx = float(label.place_info()['relx']) * self.canvas.winfo_width()
-        yy = float(label.place_info()['rely']) * self.canvas.winfo_height()
+        xx = float(label.place_info()["relx"]) * self.canvas.winfo_width()
+        yy = float(label.place_info()["rely"]) * self.canvas.winfo_height()
         node.position = self.new_node_position(xx, yy)
 
         # Adapt label sizes to suit the window size, as best we can ...

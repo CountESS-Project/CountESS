@@ -206,7 +206,6 @@ class PipelineGraph:
 
         position = {}
         for s in range(0, max_stratum + 1):
-
             # now sort all the nodes by the average position of their parents,
             # to try and stop them forming a big tangle.  The current position
             # is included as a "tie breaker" and to keep some memory of the user's

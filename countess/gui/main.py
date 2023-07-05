@@ -333,7 +333,6 @@ class MainWindow:
         self.graph_wrapper.destroy()
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
 
-
     def config_export(self, filename=None):
         if not filename:
             if self.config_filename:

@@ -91,7 +91,7 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
     for node in pipeline_graph.traverse_nodes():
         while node.name in node_names_seen:
             num = 0
-            if match := re.match(r'(.*?)\s+(\d+)$', node.name):
+            if match := re.match(r"(.*?)\s+(\d+)$", node.name):
                 node.name = match.group(1)
                 num = int(match.group(2))
             node.name += f" {num + 1}"

@@ -1,7 +1,7 @@
 import io
 import tkinter as tk
 from functools import partial
-from math import ceil, floor, isnan, isinf
+from math import ceil, floor, isinf, isnan
 from tkinter import ttk
 
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
