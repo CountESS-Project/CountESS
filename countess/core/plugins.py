@@ -21,7 +21,7 @@ import logging
 import os.path
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, Iterable, Iterator
 
 import numpy as np
 import pandas as pd
@@ -163,6 +163,13 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
+    def prepare_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger):
+        pass
+
+    def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger) -> Iterable[Any]:
+        raise NotImplementedError(f"{self.__class__}.process_inputs()")
+
+
 
 class FileInputMixin:
     """Mixin class to indicate that this plugin can read files from local
@@ -197,6 +204,11 @@ class FileInputMixin:
 
         return df
 
+    def prepare_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger):
+        if len(inputs) > 0:
+            logger.warning(f"{self.name} doesn't take inputs")
+
+
 
 def crop_dataframe(df: pd.DataFrame, row_limit: Optional[int]):
     if row_limit is None:
@@ -214,6 +226,26 @@ class PandasBasePlugin(BasePlugin):
         row_limit: Optional[int] = None,
     ):
         raise NotImplementedError(f"{self.__class__}.run()")
+
+    def process_inputs(self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger) -> Iterable[pd.DataFrame]:
+        iterators = set(iter(input) for input in inputs.values())
+        while iterators:
+            for it in list(iterators):
+                try:
+                    df_in = next(it)
+                    assert isinstance(df_in, pd.DataFrame)
+                    df_out = self.process_dataframe(df_in, logger)
+                    assert isinstance(df_out, pd.DataFrame)
+                    yield df_out
+                except StopIteration:
+                    iterators.remove(it)
+
+
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        raise NotImplementedError(f"{self.__class__}.process_dataframe()")
+
+
+
 
 
 class PandasTransformPlugin(PandasBasePlugin):
@@ -277,6 +309,28 @@ class PandasTransformPlugin(PandasBasePlugin):
             assert isinstance(df, pd.DataFrame)
             logger.progress("Finished", 100)
             return crop_dataframe(df, row_limit)
+
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        return dataframe.apply(self.process_row, expand=True)
+
+    def process_row(self, row: pd.Series, logger: Logger) -> pd.Series:
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.process_row()")
+
+
+class PandasSingleColumnTransformPlugin(PandasTransformPlugin):
+
+    def prepare(self, dataframe: pd.DataFrame, logger: Logger):
+        pass
+
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        input_column = self.parameters['input'].get_column()
+        output_column_name = self.parameters['output'].value
+
+        series = input_column.apply(self.process_value, logger=logger)
+        return dataframe.assign(**{output_column_name: series})
+
+    def process_value(self, value: Any, logger: Logger):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.process_value()")
 
 
 # XXX Potentially there's a PandasBasePlugin which can use a technique much

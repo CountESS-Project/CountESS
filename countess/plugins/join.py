@@ -106,3 +106,23 @@ class JoinPlugin(PandasBasePlugin):
             join_params["right_index"] = True
 
         return df1.merge(df2, **join_params)
+
+    source1 = None
+    source2 = None
+    memo1 = []
+    memo2 = []
+
+    def process_dataframe(self, dataframe, source: str, logger: Logger):
+        if source == self.source1:
+            for dataframe2 in self.memo2:
+                yield self.join_dataframes(dataframe, dataframe2)
+            self.memo1.append(
+        elif source == self.source2:
+
+        elif self.source1 is None:
+
+        elif self.source2 is None:
+
+        else:
+            raise NotImplementedError("Only two-way joins supported at this time")
+
