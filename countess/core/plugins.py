@@ -127,6 +127,9 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
+    def prepare(self):
+        pass
+
     def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger, row_limit: Optional[int]) -> Iterable[Any]:
         raise NotImplementedError(f"{self.__class__}.process_inputs()")
 
@@ -182,7 +185,8 @@ class PandasSimplePlugin(PandasBasePlugin):
                 except StopIteration:
                     iterators.remove(it)
 
-        for p in self.parameters:
+        print(f"process_inputs {self.parameters}")
+        for p in self.parameters.values():
             p.set_column_choices(self.input_columns.keys())
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
@@ -191,7 +195,9 @@ class PandasSimplePlugin(PandasBasePlugin):
 
 class PandasTransformPlugin(PandasSimplePlugin):
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        return dataframe.apply(self.process_row, expand=True)
+        df = dataframe.apply(self.process_row, result_type="expand", logger=logger)
+        print(f"process_dataframe {dataframe} {df}")
+        return df
 
     def process_row(self, row: pd.Series, logger: Logger) -> pd.Series:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.process_row()")

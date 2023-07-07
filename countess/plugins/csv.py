@@ -76,6 +76,8 @@ class LoadCsvPlugin(PandasInputPlugin):
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         filename = file_params["filename"].value
 
+        print(f"read_file_to_dataframe {filename}")
+
         options = {
             "header": 0 if self.parameters["header"].value else None,
         }
@@ -139,6 +141,7 @@ class LoadCsvPlugin(PandasInputPlugin):
         if index_col_numbers:
             df = df.set_index([df.columns[n] for n in index_col_numbers])
 
+        print(f"read_file_to_dataframe {df}")
         return df
 
 

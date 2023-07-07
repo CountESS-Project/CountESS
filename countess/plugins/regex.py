@@ -1,5 +1,7 @@
 import re
 
+from typing import Mapping, Iterable, Optional
+
 import pandas as pd
 
 from countess import VERSION
@@ -13,7 +15,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
-
+from countess.core.logger import Logger
 
 class RegexToolPlugin(PandasTransformPlugin):
     name = "Regex Tool"
@@ -42,6 +44,8 @@ class RegexToolPlugin(PandasTransformPlugin):
         "drop_column": BooleanParam("Drop Column", False),
         "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
     }
+
+    compiled_re = None
 
     def run_df(self, df, logger):
         compiled_re = re.compile(self.parameters["regex"].value)
@@ -98,6 +102,26 @@ class RegexToolPlugin(PandasTransformPlugin):
             df = df.set_index(index_names)
 
         return df
+
+    def process_inputs(
+        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
+    ) -> Iterable[pd.DataFrame]:
+
+        print(f"prepare! {self.parameters['regex'].value}")
+        self.compiled_re = re.compile(self.parameters["regex"].value)
+        while self.compiled_re.groups > len(self.parameters["output"].params):
+            self.parameters["output"].add_row()
+        
+        return super().process_inputs(inputs, logger, row_limit)
+
+    def process_row(self, row: pd.Series, logger: Logger) -> pd.Series:
+        print(f"process_row {row}")
+        value = row[self.parameters["column"].value]
+        print(f"process_row value {value}")
+        if match := self.compiled_re.match(value):
+            return [1,2,3]
+        else:
+            return [1,2,3]
 
 
 class RegexReaderPlugin(PandasInputPlugin):
