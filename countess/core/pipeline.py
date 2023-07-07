@@ -27,33 +27,23 @@ class PipelineNode:
         return id(self)
 
     def is_ancestor_of(self, node):
-        return (self in node.parent_nodes) or any(
-            (self.is_ancestor_of(n) for n in node.parent_nodes)
-        )
+        return (self in node.parent_nodes) or any((self.is_ancestor_of(n) for n in node.parent_nodes))
 
     def is_descendant_of(self, node):
-        return (self in node.child_nodes) or any(
-            (self.is_descendant_of(n) for n in node.child_nodes)
-        )
+        return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
-    def get_input_data(self):
-        if len(self.parent_nodes) == 0:
-            return None
-        elif len(self.parent_nodes) == 1:
-            return list(self.parent_nodes)[0].result
-        else:
-            return dict((n.name, n.result) for n in self.parent_nodes if n.result is not None)
-
-    def execute(self, logger: Logger, row_limit=None):
+    def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
-        input_data = self.get_input_data()
+        inputs = {p.name: p.result for p in self.parent_nodes}
+        self.result = []
         if self.plugin:
             try:
-                self.result = self.plugin.run(input_data, logger, row_limit)
-            except Exception as exc:  # pylint: disable=W0718
+                self.result = self.plugin.process_inputs(inputs, logger, row_limit)
+                if row_limit is not None or len(self.child_nodes) > 1:
+                    # XXX freeze to handle fan-out and reloading.
+                    self.result = list(self.result)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 logger.exception(exc)
-        else:
-            self.result = input_data
 
     def load_config(self, logger: Logger):
         assert isinstance(self.plugin, BasePlugin)
@@ -66,20 +56,6 @@ class PipelineNode:
                     print(exc)
             self.config = None
 
-    def prepare(self, logger: Logger):
-        assert isinstance(logger, Logger)
-
-        input_data = self.get_input_data()
-        if self.plugin:
-            try:
-                self.plugin.prepare(input_data, logger)
-                self.load_config(logger)
-            except Exception as exc:  # pylint: disable=W0718
-                logger.exception(exc)
-
-        else:
-            self.result = input_data
-
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
         assert isinstance(logger, Logger)
 
@@ -87,9 +63,7 @@ class PipelineNode:
             logger.info(f"Prerun {self.name} Start")
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
-            self.prepare(logger)
             self.load_config(logger)
-
             self.execute(logger, row_limit)
             self.is_dirty = False
             logger.info(f"Prerun {self.name} Done")
@@ -169,7 +143,6 @@ class PipelineGraph:
             # XXX TODO there's some opportunity for easy parallelization here,
             # by pushing each node into a pool as soon as its parents are
             # complete.
-            node.prepare(logger)
             node.execute(logger)
 
     def reset(self):

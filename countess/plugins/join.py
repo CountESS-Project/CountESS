@@ -1,7 +1,8 @@
 from collections.abc import Mapping, MutableMapping
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 
 import pandas as pd
+from moore_itertools import product
 
 from countess import VERSION
 from countess.core.logger import Logger
@@ -112,17 +113,18 @@ class JoinPlugin(PandasBasePlugin):
     memo1 = []
     memo2 = []
 
-    def process_dataframe(self, dataframe, source: str, logger: Logger):
-        if source == self.source1:
-            for dataframe2 in self.memo2:
-                yield self.join_dataframes(dataframe, dataframe2)
-            self.memo1.append(
-        elif source == self.source2:
+    def join_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame) -> pd.DataFrame:
+        return dataframe1.join(dataframe2)
 
-        elif self.source1 is None:
+    def process_inputs(
+        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
+    ) -> Iterable[pd.DataFrame]:
+        try:
+            input1, input2 = inputs.values()
+        except ValueError:
+            raise NotImplementedError("Only two-way joins implemented at this time")  # pylint: disable=raise-missing-from
 
-        elif self.source2 is None:
-
-        else:
-            raise NotImplementedError("Only two-way joins supported at this time")
-
+        for df_in1, df_in2 in product(input1, input2):
+            df_out = self.join_dataframes(df_in1, df_in2)
+            if len(df_out):
+                yield df_out

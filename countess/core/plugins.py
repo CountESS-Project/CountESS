@@ -21,24 +21,15 @@ import logging
 import os.path
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import Any, List, Optional, Union, Iterable, Iterator
+from typing import Any, Iterable, Optional, Union
 
-import numpy as np
 import pandas as pd
 
 from countess.core.logger import Logger
-from countess.core.parameters import (
-    ArrayParam,
-    BaseParam,
-    ChoiceParam,
-    FileArrayParam,
-    FileParam,
-    FileSaveParam,
-    MultiParam,
-    StringParam,
-)
+from countess.core.parameters import ArrayParam, BaseParam, FileArrayParam, FileParam, FileSaveParam, MultiParam
+from countess.utils.pandas import get_all_columns
 
-PRERUN_ROW_LIMIT = 100
+PRERUN_ROW_LIMIT = 100000
 
 
 def get_plugin_classes():
@@ -106,33 +97,6 @@ class BasePlugin:
                 self.parameters[key] = getattr(self, key).copy()
                 setattr(self, key, self.parameters[key])
 
-    def prepare(self, data: Any, logger: Logger):
-        """The plugin gets a preview version of its input data so it can
-        check types, column names, etc.  Should throw an exception if this
-        isn't a suitable data input."""
-        return True
-
-    def update(self):
-        """Notify the plugin that one or more of its parameters have been changed.
-        If this change affects other parameters, it can return True to indicate that
-        all parameters should be re-displayed"""
-        return False
-
-    def run(
-        self,
-        data: Any,
-        logger: Logger,
-        row_limit: Optional[int] = None,
-    ):
-        """Plugins which support progress monitoring should override this
-        method to call `callback` sporadically with two numbers estimating a
-        fraction of the work completed, and an optional string describing
-        what they're doing:
-            callback(42, 107, 'Thinking hard about stuff')
-        The user interface code will then display this to the user while the
-        pipeline is running."""
-        raise NotImplementedError(f"{self.__class__}.run()")
-
     def add_parameter(self, name: str, param: BaseParam):
         self.parameters[name] = param.copy()
         return self.parameters[name]
@@ -163,12 +127,8 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
-    def prepare_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger):
-        pass
-
-    def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger) -> Iterable[Any]:
+    def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger, row_limit: Optional[int]) -> Iterable[Any]:
         raise NotImplementedError(f"{self.__class__}.process_inputs()")
-
 
 
 class FileInputMixin:
@@ -181,135 +141,55 @@ class FileInputMixin:
     file_types = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
 
-    def prepare(self, obj: Any, logger: Logger) -> bool:
-        if obj is not None:
-            logger.error("FileInputMixin doesn't take inputs")
-            return False
-        return True
-
-    def load_files(
-        self,
-        logger: Logger,
-        row_limit: Optional[int] = None,
-    ):
+    def load_files(self, logger: Logger, row_limit: Optional[int] = None) -> Iterable[Any]:
         raise NotImplementedError("FileInputMixin.load_files")
 
-    def run(
-        self,
-        previous: Any,
-        logger: Logger,
-        row_limit: Optional[int] = None,
-    ):
-        df = self.load_files(logger, row_limit)
-
-        return df
-
-    def prepare_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger):
+    def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger, row_limit: Optional[int]) -> Iterable[Any]:
         if len(inputs) > 0:
             logger.warning(f"{self.name} doesn't take inputs")
+            raise ValueError(f"{self.name} doesn't take inputs")
 
-
-
-def crop_dataframe(df: pd.DataFrame, row_limit: Optional[int]):
-    if row_limit is None:
-        return df
-    return df[0:row_limit]
+        return self.load_files(logger, row_limit)
 
 
 class PandasBasePlugin(BasePlugin):
+    def process_inputs(
+        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
+    ) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError(f"{self.__class__}.process_inputs()")
+
+
+class PandasSimplePlugin(PandasBasePlugin):
     """Base class for plugins which accept and return pandas DataFrames"""
 
-    def run(
-        self,
-        data: Any,
-        logger: Logger,
-        row_limit: Optional[int] = None,
-    ):
-        raise NotImplementedError(f"{self.__class__}.run()")
+    input_columns = {}
 
-    def process_inputs(self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger) -> Iterable[pd.DataFrame]:
+    def process_inputs(
+        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
+    ) -> Iterable[pd.DataFrame]:
+        self.input_columns = {}
         iterators = set(iter(input) for input in inputs.values())
         while iterators:
             for it in list(iterators):
                 try:
                     df_in = next(it)
                     assert isinstance(df_in, pd.DataFrame)
+                    self.input_columns.update(get_all_columns(df_in))
+
                     df_out = self.process_dataframe(df_in, logger)
                     assert isinstance(df_out, pd.DataFrame)
                     yield df_out
                 except StopIteration:
                     iterators.remove(it)
 
+        for p in self.parameters:
+            p.set_column_choices(self.input_columns.keys())
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
 
-
-
-
-class PandasTransformPlugin(PandasBasePlugin):
-    input_columns: list[str] = []
-    input_dtypes: list[str] = []
-
-    def prepare_df(self, df: pd.DataFrame, logger: Logger):
-        assert isinstance(df, pd.DataFrame)
-        if hasattr(df.index, "dtypes"):
-            self.input_columns = [n for n in df.index.names if n] + list(df.columns)
-            self.input_dtypes = [d for d, n in zip(df.index.dtypes, df.index.names) if n] + list(
-                df.dtypes
-            )
-        elif df.index.name:
-            self.input_columns = [df.index.name] + list(df.columns)
-            self.input_dtypes = [df.index.dtype] + list(df.dtypes)
-        else:
-            self.input_columns = list(df.columns)
-            self.input_dtypes = list(df.dtypes)
-
-        for p in self.parameters.values():
-            p.set_column_choices(self.input_columns)
-
-    # XXX prepare and run handle multiple inputs differntly?
-
-    def prepare(
-        self,
-        data: Union[pd.DataFrame, Mapping[str, pd.DataFrame]],
-        logger: Logger,
-    ) -> bool:
-        if isinstance(data, Mapping):
-            data = pd.concat(data.values())
-
-        return self.prepare_df(data, logger)
-
-    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.run_df()")
-
-    def run(
-        self,
-        data: Union[pd.DataFrame, Mapping[str, pd.DataFrame]],
-        logger: Logger,
-        row_limit: Optional[int] = None,
-    ) -> pd.DataFrame:
-        assert isinstance(logger, Logger)
-        assert row_limit is None or isinstance(row_limit, int)
-
-        logger.progress("Starting", 0)
-        if isinstance(data, Mapping):
-            dfs = []
-            for obj in data.values():
-                assert isinstance(obj, pd.DataFrame)
-                df = self.run_df(obj, logger)
-                assert isinstance(df, pd.DataFrame)
-                dfs.append(crop_dataframe(df, row_limit))
-            logger.progress("Finished", 100)
-            return pd.concat(dfs)
-        else:
-            assert isinstance(data, pd.DataFrame)
-            df = self.run_df(data, logger)
-            assert isinstance(df, pd.DataFrame)
-            logger.progress("Finished", 100)
-            return crop_dataframe(df, row_limit)
-
+class PandasTransformPlugin(PandasSimplePlugin):
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         return dataframe.apply(self.process_row, expand=True)
 
@@ -318,24 +198,15 @@ class PandasTransformPlugin(PandasBasePlugin):
 
 
 class PandasSingleColumnTransformPlugin(PandasTransformPlugin):
-
-    def prepare(self, dataframe: pd.DataFrame, logger: Logger):
-        pass
-
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        input_column = self.parameters['input'].get_column()
-        output_column_name = self.parameters['output'].value
+        input_column = self.parameters["input"].get_column()
+        output_column_name = self.parameters["output"].value
 
         series = input_column.apply(self.process_value, logger=logger)
         return dataframe.assign(**{output_column_name: series})
 
     def process_value(self, value: Any, logger: Logger):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.process_value()")
-
-
-# XXX Potentially there's a PandasBasePlugin which can use a technique much
-# like tqdm does in tqdm/std.py to monkeypatch pandas.apply and friends and
-# provide progress feedback.
 
 
 class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
@@ -349,118 +220,21 @@ class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
         file_params.update(self.file_params)
 
         self.parameters = dict(
-            [("files", FileArrayParam("Files", MultiParam("File", file_params)))]
-            + list(self.parameters.items())
+            [("files", FileArrayParam("Files", MultiParam("File", file_params)))] + list(self.parameters.items())
         )
 
-    def combine_dfs(self, dfs: list[pd.DataFrame]) -> pd.DataFrame:
-        """First stage: collect all the files together in whatever
-        way is appropriate.  Override this to do it differently
-        or do more work on the dataframes (eg: counting, renaming, etc)"""
-        return pd.concat(dfs)
-
-    def load_files(
-        self,
-        logger: Logger,
-        row_limit: Optional[int] = None,
-    ) -> pd.DataFrame:
+    def load_files(self, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         assert isinstance(self.parameters["files"], ArrayParam)
         fps = self.parameters["files"].params
-        if not fps:
-            return pd.DataFrame()
 
-        if len(fps) == 1:
-            file_param = self.parameters["files"].params[0]
-            assert isinstance(file_param, MultiParam)
-            ddf = self.read_file_to_dataframe(file_param, logger, row_limit)
-            ddf = self.combine_dfs([ddf])
-        else:
-            num_files = len(fps)
-            # Input plugins are likely I/O bound so if there's more than one
-            # file, instead of using the Pandas progress callback mechanism
-            # this uses a simple count of files read."""
-            per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-            logger.progress("Loading", 0)
-            dfs = []
-            for num, fp in enumerate(fps):
-                assert isinstance(fp, MultiParam)
-                df = self.read_file_to_dataframe(fp, logger, per_file_row_limit)
-                dfs.append(df)
-                logger.progress("Loading", 100 * (num + 1) // (num_files + 1))
-            logger.progress("Combining", 100 * num_files // num_files + 1)
-            ddf = self.combine_dfs(dfs)
-            logger.progress("Done", 100)
+        num_files = len(fps)
+        per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
+        logger.progress("Loading", 0)
+        for num, fp in enumerate(fps):
+            assert isinstance(fp, MultiParam)
+            yield self.read_file_to_dataframe(fp, logger, per_file_row_limit)
+            logger.progress("Loading", 100 * (num + 1) // (num_files + 1))
+        logger.progress("Done", 100)
 
-        return ddf
-
-    def read_file_to_dataframe(
-        self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None
-    ) -> pd.DataFrame:
+    def read_file_to_dataframe(self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None) -> pd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.read_file_to_dataframe")
-
-
-class PandasScoringPlugin(PandasTransformPlugin):
-    """Specific kind of transform which turns counts into scores"""
-
-    # XXX not really useful?
-
-    max_counts = 5
-
-    parameters = {
-        "scores": ArrayParam(
-            "Scores",
-            MultiParam(
-                "Score",
-                {
-                    "score": StringParam("Score Column"),
-                    "counts": ArrayParam(
-                        "Counts", ChoiceParam("Column"), min_size=2, max_size=max_counts
-                    ),
-                },
-            ),
-            min_size=1,
-        )
-    }
-
-    def prepare_df(self, df, logger):
-        super().prepare_df(df, logger)
-        for pp in self.parameters["scores"]:
-            for ppp in pp.counts:
-                ppp.choices = self.input_columns
-
-    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        assert isinstance(self.parameters["scores"], ArrayParam)
-        score_cols = []
-        for pp in self.parameters["scores"]:
-            scol = pp.score.value
-            ccols = [ppp.value for ppp in pp.counts]
-
-            if scol and all(ccols):
-                df[scol] = self.score([df[col] for col in ccols])
-                score_cols.append(scol)
-
-        df = df.replace([np.inf, -np.inf], np.nan)
-        assert isinstance(df, pd.DataFrame)
-        df.dropna(how="all", subset=score_cols, inplace=True)
-        return df
-
-    def score(self, columns: List[pd.Series]) -> pd.Series:
-        raise NotImplementedError("Subclass PandasScoringPlugin and provide a score() method")
-
-
-class PandasReindexPlugin(PandasTransformPlugin):
-    # XXX not really useful?
-
-    translate_type = str
-
-    def translate(self, value):
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.translate")
-
-    def translate_row(self, row):
-        return self.translate(row.name)
-
-    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        df["__reindex"] = df.apply(
-            self.translate_row, axis=1, meta=pd.Series(self.translate_type())
-        )
-        return df.groupby("__reindex").sum()
