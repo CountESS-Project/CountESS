@@ -241,10 +241,7 @@ class ChoiceParam(BaseParam):
 
     @value.setter
     def value(self, value):
-        if value in self.choices:
-            self._value = value
-        else:
-            self._value = None
+        self._value = value
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
@@ -346,6 +343,24 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
             return None
         else:
             return super().get_column(df)
+
+
+class ColumnOrIndexChoiceParam(ColumnChoiceParam):
+    INDEX_VALUE = "— INDEX —"
+
+    def set_choices(self, choices: Iterable[str]):
+        super().set_choices([self.INDEX_VALUE] + list(choices))
+
+    def is_index(self):
+        return self.value == self.INDEX_VALUE
+
+    def get_column(self, df):
+        if self.value == self.INDEX_VALUE:
+            return df.index.to_series()
+        else:
+            return super().get_column(df)
+
+
 
 
 class MultipleChoiceParam(ChoiceParam):

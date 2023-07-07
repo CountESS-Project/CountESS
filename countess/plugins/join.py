@@ -6,10 +6,9 @@ from moore_itertools import product
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BooleanParam, ChoiceParam, MultiParam
+from countess.core.parameters import ArrayParam, BooleanParam, ColumnOrIndexChoiceParam, MultiParam
 from countess.core.plugins import PandasBasePlugin
-
-INDEX = "— INDEX —"
+from countess.utils.pandas import get_all_columns
 
 
 def _join_how(left_required: bool, right_required: bool) -> str:
@@ -31,7 +30,7 @@ class JoinPlugin(PandasBasePlugin):
             MultiParam(
                 "Input",
                 {
-                    "join_on": ChoiceParam("Join On", INDEX, choices=[INDEX]),
+                    "join_on": ColumnOrIndexChoiceParam("Join On"),
                     "required": BooleanParam("Required", True),
                 },
             ),
@@ -69,24 +68,22 @@ class JoinPlugin(PandasBasePlugin):
         ip1, ip2 = inputs_param
 
         join_params = {
-            "how": _join_how(ip1.required.value, ip2.required.value)
+            "how": _join_how(ip1.required.value, ip2.required.value),
+            "left_index": ip1.join_on.is_index(),
+            "right_index": ip2.join_on.is_index(),
+            "left_on": None if ip1.join_on.is_index() else ip1.join_on.value,
+            "right_on": None if ip2.join_on.is_index() else ip2.join_on.value,
         }
-        join1 = ip1.join_on.value
-        join2 = ip2.join_on.value
 
-        if join1 and join1 != INDEX:
-            join_params["left_on"] = join1
-        else:
-            join_params["left_index"] = True
-
-        if join2 and join2 != INDEX:
-            join_params["right_on"] = join2
-        else:
-            join_params["right_index"] = True
-
-        print(f"join_params {join_params}")
+        input_columns_1 = {}
+        input_columns_2 = {}
 
         for df_in1, df_in2 in product(input1, input2):
+            input_columns_1.update(get_all_columns(df_in1))
+            input_columns_2.update(get_all_columns(df_in2))
             df_out = self.join_dataframes(df_in1, df_in2, join_params)
             if len(df_out):
                 yield df_out
+
+        ip1.set_column_choices(input_columns_1.keys())
+        ip2.set_column_choices(input_columns_2.keys())
