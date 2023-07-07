@@ -69,10 +69,7 @@ class RegexToolPlugin(PandasTransformPlugin):
             def func(value):
                 if value is not None:
                     if match := compiled_re.match(value):
-                        return [
-                            op.datatype.cast_value(g)
-                            for op, g in zip(output_params, match.groups())
-                        ]
+                        return [op.datatype.cast_value(g) for op, g in zip(output_params, match.groups())]
                 logger.info("Didn't Match: " + repr(value))
                 return [None] * compiled_re.groups
 
@@ -143,11 +140,7 @@ class RegexReaderPlugin(PandasInputPlugin):
 
         output_parameters = list(self.parameters["output"])[: compiled_re.groups]
         columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
-        index_columns = [
-            p.name.value or f"column_{n+1}"
-            for n, p in enumerate(output_parameters)
-            if p.index.value
-        ] or None
+        index_columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) if p.index.value] or None
 
         records = []
         with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
@@ -156,21 +149,14 @@ class RegexReaderPlugin(PandasInputPlugin):
                     continue
                 match = compiled_re.match(line)
                 if match:
-                    records.append(
-                        (
-                            output_parameters[n].datatype.cast_value(g)
-                            for n, g in enumerate(match.groups())
-                        )
-                    )
+                    records.append((output_parameters[n].datatype.cast_value(g) for n, g in enumerate(match.groups())))
                 else:
                     logger.warning(f"Row {num+1} did not match", detail=line)
                 if row_limit is not None:
                     if len(records) >= row_limit or num > 100 * row_limit:
                         break
                 elif len(records) >= 100000:
-                    pdfs.append(
-                        pd.DataFrame.from_records(records, columns=columns, index=index_columns)
-                    )
+                    pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
                     records = []
 
         if len(records) > 0:

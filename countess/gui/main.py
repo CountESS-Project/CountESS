@@ -16,6 +16,7 @@ from countess.gui.config import PluginConfigurator
 from countess.gui.logger import LoggerFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
+from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
 # faulthandler.enable(all_threads=True)
@@ -85,22 +86,18 @@ class ConfiguratorWrapper:
         if self.config_canvas:
             self.config_canvas.destroy()
         self.config_canvas = tk.Canvas(self.frame)
-        self.config_scrollbar = tk.Scrollbar(
-            self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview
-        )
+        self.config_scrollbar = tk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview)
         self.config_canvas.configure(yscrollcommand=self.config_scrollbar.set, bd=0)
         self.config_canvas.grid(row=3, column=0, sticky=tk.NSEW)
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
-        self.node.prepare(self.logger)
+        #self.node.prepare(self.logger)
 
         if self.node.plugin:
             if self.node.notes:
                 self.show_notes_widget(self.node.notes)
             else:
-                self.notes_widget = tk.Button(
-                    self.frame, text="add notes", command=self.on_add_notes
-                )
+                self.notes_widget = tk.Button(self.frame, text="add notes", command=self.on_add_notes)
                 self.notes_widget.grid(row=2, columnspan=2, padx=10, pady=5)
 
             descr = re.sub(r"\s+", " ", self.node.plugin.description)
@@ -113,22 +110,16 @@ class ConfiguratorWrapper:
                 descr,
             )
             if self.node.plugin.link:
-                tk.Button(
-                    self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press
-                ).place(anchor=tk.NE, relx=1, y=50)
-            self.node.prepare(self.logger)
-            self.node.plugin.update()
-            self.configurator = PluginConfigurator(
-                self.config_canvas, self.node.plugin, self.config_change_callback
-            )
+                tk.Button(self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press).place(
+                    anchor=tk.NE, relx=1, y=50
+                )
+            #self.node.prepare(self.logger)
+            #self.node.plugin.update()
+            self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
         else:
-            self.config_subframe = PluginChooserFrame(
-                self.config_canvas, "Choose Plugin", self.choose_plugin
-            )
-        self.config_subframe_id = self.config_canvas.create_window(
-            (0, 0), window=self.config_subframe, anchor=tk.NW
-        )
+            self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
+        self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
         self.config_subframe.bind(
             "<Configure>",
             lambda e: self.config_canvas.configure(scrollregion=self.config_canvas.bbox("all")),
@@ -136,9 +127,7 @@ class ConfiguratorWrapper:
         self.config_canvas.bind("<Configure>", self.on_config_canvas_configure)
 
     def on_config_canvas_configure(self, *_):
-        self.config_canvas.itemconfigure(
-            self.config_subframe_id, width=self.config_canvas.winfo_width()
-        )
+        self.config_canvas.itemconfigure(self.config_subframe_id, width=self.config_canvas.winfo_width())
 
     def on_label_configure(self, *_):
         self.label["wraplength"] = self.label.winfo_width() - 20
@@ -159,24 +148,27 @@ class ConfiguratorWrapper:
     def show_preview_subframe(self):
         if self.preview_subframe:
             self.preview_subframe.destroy()
-        if isinstance(self.node.result, pd.DataFrame):
+        print(f"show_preview_subframe {self.node.result}")
+        try:
+            df = concat_dataframes(self.node.result)
             self.preview_subframe = TabularDataFrame(self.frame)
-            self.preview_subframe.set_dataframe(self.node.result)
-        elif isinstance(self.node.result, str):
-            self.preview_subframe = tk.Frame(self.frame)
-            self.preview_subframe.rowconfigure(1, weight=1)
-            n_lines = len(self.node.result.splitlines())
-            tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(
-                sticky=tk.NSEW
-            )
-            text = tk.Text(self.preview_subframe)
-            text.insert("1.0", self.node.result)
-            text["state"] = "disabled"
-            text.grid(sticky=tk.NSEW)
-        else:
+            self.preview_subframe.set_dataframe(df)
+        except (TypeError, ValueError):
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.columnconfigure(0, weight=1)
             tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
+
+        #if isinstance(self.node.result, pd.DataFrame):
+        #elif isinstance(self.node.result, str):
+        #    self.preview_subframe = tk.Frame(self.frame)
+        #    self.preview_subframe.rowconfigure(1, weight=1)
+        #    n_lines = len(self.node.result.splitlines())
+        #    tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(sticky=tk.NSEW)
+        #    text = tk.Text(self.preview_subframe)
+        #    text.insert("1.0", self.node.result)
+        #    text["state"] = "disabled"
+        #    text.grid(sticky=tk.NSEW)
+        #else:
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
@@ -241,9 +233,7 @@ class ButtonMenu:  # pylint: disable=R0903
     def __init__(self, tk_parent, buttons):
         self.frame = tk.Frame(tk_parent)
         for button_number, (button_label, button_command) in enumerate(buttons):
-            tk.Button(self.frame, text=button_label, command=button_command).grid(
-                row=0, column=button_number, sticky=tk.EW
-            )
+            tk.Button(self.frame, text=button_label, command=button_command).grid(row=0, column=button_number, sticky=tk.EW)
         self.frame.grid(sticky=tk.NSEW)
 
 
@@ -339,9 +329,7 @@ class MainWindow:
                 initialfile = self.config_filename.removesuffix(".ini") + ".dot"
             else:
                 initialfile = None
-            filename = filedialog.asksaveasfilename(
-                initialfile=initialfile, filetypes=[("Graphviz File", "*.dot")]
-            )
+            filename = filedialog.asksaveasfilename(initialfile=initialfile, filetypes=[("Graphviz File", "*.dot")])
         if not filename:
             return
         export_config_graphviz(self.graph, filename)
@@ -358,9 +346,7 @@ class MainWindow:
         self.graph.run(logger)
 
     def program_exit(self):
-        if not self.config_changed or messagebox.askokcancel(
-            "Exit", "Exit CountESS without saving config?"
-        ):
+        if not self.config_changed or messagebox.askokcancel("Exit", "Exit CountESS without saving config?"):
             self.tk_parent.quit()
 
     def node_select(self, node):

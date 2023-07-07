@@ -19,11 +19,7 @@ class PivotPlugin(PandasTransformPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/plugins/#pivot-tool"
 
-    parameters = {
-        "columns": PerColumnArrayParam(
-            "Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"])
-        )
-    }
+    parameters = {"columns": PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"]))}
 
     def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
@@ -48,8 +44,7 @@ class PivotPlugin(PandasTransformPlugin):
             if isinstance(df.columns, pd.MultiIndex):
                 # Clean up MultiIndex names ... XXX until such time as CountESS supports them
                 df.columns = [
-                    "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)])
-                    for cc in df.columns
+                    "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)]) for cc in df.columns
                 ]  # type: ignore
             return df
 
@@ -72,9 +67,7 @@ class PivotPlugin(PandasTransformPlugin):
 
         # `pivot_groups` then reattaches the labels to those values, eg:
         # [[('bin', 1), ('rep', 1)], [('bin', 1), ('rep', 2)] etc
-        pivot_groups = sorted(
-            [list(zip(pivot_cols, pivot_values)) for pivot_values in pivot_product]
-        )
+        pivot_groups = sorted([list(zip(pivot_cols, pivot_values)) for pivot_values in pivot_product])
 
         def _column_name(col, pg):
             return "`" + col + "".join([f"__{pc}_{pv}" for pc, pv in pg]) + "`"
@@ -89,11 +82,7 @@ class PivotPlugin(PandasTransformPlugin):
         # it'd be an easy patch to pandas, mind you.
 
         expr = "\n".join(
-            [
-                f"{_column_name(col, pg)} = `{col}` * ({_column_condition(col, pg)})"
-                for col in expand_cols
-                for pg in pivot_groups
-            ]
+            [f"{_column_name(col, pg)} = `{col}` * ({_column_condition(col, pg)})" for col in expand_cols for pg in pivot_groups]
         )
 
         df.eval(expr, inplace=True, engine="numexpr")

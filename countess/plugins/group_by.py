@@ -2,13 +2,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from countess import VERSION
-from countess.core.parameters import (
-    BaseParam,
-    BooleanParam,
-    PerColumnArrayParam,
-    TabularMultiParam,
-    TextParam,
-)
+from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam, TextParam
 from countess.core.plugins import PandasTransformPlugin
 
 
@@ -56,9 +50,7 @@ class GroupByPlugin(PandasTransformPlugin):
                     if k not in ("index", "count"):
                         pp.value = False
                 self.index_cols.add(p)
-            elif p in self.index_cols and any(
-                pp.value for k, pp in p.params.items() if k not in ("index", "count")
-            ):
+            elif p in self.index_cols and any(pp.value for k, pp in p.params.items() if k not in ("index", "count")):
                 p["index"].value = False
                 self.index_cols.discard(p)
         return True
@@ -125,9 +117,7 @@ class GroupByExprPlugin(PandasTransformPlugin):
 
     def run_df(self, df: pd.DataFrame, logger) -> pd.DataFrame:
         assert isinstance(self.parameters["groupby"], PerColumnArrayParam)
-        cols = [
-            col for col, param in zip(self.input_columns, self.parameters["groupby"]) if param.value
-        ]
+        cols = [col for col, param in zip(self.input_columns, self.parameters["groupby"]) if param.value]
         expr = self.parameters["expr"].value
 
         if not cols:

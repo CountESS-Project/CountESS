@@ -24,9 +24,7 @@ class LoadHdfPlugin(PandasInputPlugin):
 
     keys: list[str] = []
 
-    def read_file_to_dataframe(
-        self, file_params: MultiParam, logger, row_limit: Optional[int] = None
-    ) -> pd.DataFrame:
+    def read_file_to_dataframe(self, file_params: MultiParam, logger, row_limit: Optional[int] = None) -> pd.DataFrame:
         kp = file_params.key
         filename = file_params.filename.value
         with pd.HDFStore(filename) as hs:

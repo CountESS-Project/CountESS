@@ -128,9 +128,7 @@ class TreeviewLogger(Logger):
                     self.count += 1
                     datetime_now = datetime.datetime.now()
                     values = [self.name, message]
-                    iid = self.treeview.insert(
-                        "", "end", text=datetime_now.isoformat(), values=values
-                    )
+                    iid = self.treeview.insert("", "end", text=datetime_now.isoformat(), values=values)
                     if detail is not None:
                         self.detail[iid] = detail
                     self.treeview["height"] = min(self.count, 10)

@@ -95,9 +95,9 @@ class TabularDataFrame(tk.Frame):
             column_names = list(self.dataframe.index.names) + list(self.dataframe.columns)
             column_dtypes = list(self.dataframe.index.dtypes) + list(self.dataframe.dtypes)
             index_frame = self.dataframe.index.to_frame()
-            self.column_formats = [
-                column_format_for(index_frame[name]) for name in dataframe.index.names
-            ] + [column_format_for(dataframe[name]) for name in dataframe.columns]
+            self.column_formats = [column_format_for(index_frame[name]) for name in dataframe.index.names] + [
+                column_format_for(dataframe[name]) for name in dataframe.columns
+            ]
             self.index_cols = len(self.dataframe.index.names)
         elif self.dataframe.index.name:
             # a simple Index, with a name
@@ -173,9 +173,7 @@ class TabularDataFrame(tk.Frame):
 
         # get the new rows as an iterator
         if 1 <= offset_diff < self.height:
-            df = self.dataframe.iloc[
-                self.offset + self.height : self.offset + self.height + offset_diff
-            ]
+            df = self.dataframe.iloc[self.offset + self.height : self.offset + self.height + offset_diff]
             insert_at = tk.END
         elif 1 <= -offset_diff < self.height:
             # Get rows in reverse order so they can be inserted at the start

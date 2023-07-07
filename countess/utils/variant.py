@@ -23,9 +23,7 @@ def invert_dna_sequence(seq: str) -> str:
     return seq.translate(str.maketrans("ACGT", "TGCA"))[::-1]
 
 
-def search_for_sequence(
-    ref_seq: str, var_seq: str, min_search_length: int = MIN_SEARCH_LENGTH
-) -> str:
+def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN_SEARCH_LENGTH) -> str:
     """look for a copy of `var_seq` within `ref_seq` and if found return a reference
     in the form "offset1_offset2" otherwise return the `var_seq` itself.  Don't bother
     searching if the length of var_seq is less than MIN_SEARCH_LENGTH.
@@ -284,9 +282,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
                 # This is a duplication of one or more symbols immediately
                 # following this point.
                 src_offset = src_start
-                while (
-                    ref_seq[src_offset + len(dest_seq) : src_offset + len(dest_seq) * 2] == dest_seq
-                ):
+                while ref_seq[src_offset + len(dest_seq) : src_offset + len(dest_seq) * 2] == dest_seq:
                     src_offset += len(dest_seq)
 
                 if len(dest_seq) == 1:
@@ -321,9 +317,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
                 yield f"{src_start+1}_{src_end}delins{inserted_sequence}"
 
 
-def find_variant_string(
-    prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None
-) -> str:
+def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None) -> str:
     """As above, but returns a single string instead of a generator"""
 
     if not prefix.endswith("g.") and not prefix.endswith("n."):

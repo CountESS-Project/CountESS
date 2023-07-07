@@ -76,9 +76,7 @@ class ParameterWrapper:
             self.set_checkbox_value()
         elif isinstance(parameter, FileParam):
             self.entry = tk.Label(tk_parent, text=parameter.value)
-            self.button = tk.Button(
-                tk_parent, text="Select", width=3, command=self.change_file_callback
-            )
+            self.button = tk.Button(tk_parent, text="Select", width=3, command=self.change_file_callback)
         elif isinstance(parameter, TextParam):
             # tk.Text widget doesn't have a variable, for whatever reason,
             # so we use a different method!
@@ -95,11 +93,7 @@ class ParameterWrapper:
             if parameter.read_only:
                 self.entry["state"] = tk.DISABLED
 
-        elif (
-            isinstance(parameter, ArrayParam)
-            and self.level == 0
-            and not isinstance(parameter.param, TabularMultiParam)
-        ):
+        elif isinstance(parameter, ArrayParam) and self.level == 0 and not isinstance(parameter.param, TabularMultiParam):
             self.entry = tk.Frame(tk_parent)
             self.entry.columnconfigure(0, weight=1)
             drc = self.delete_row_callback if not parameter.read_only else None
@@ -112,9 +106,7 @@ class ParameterWrapper:
                 )
                 self.button.grid(row=len(parameter.params) + 1)
 
-        elif isinstance(parameter, ArrayParam) and (
-            self.level < 3 or isinstance(parameter.param, TabularMultiParam)
-        ):
+        elif isinstance(parameter, ArrayParam) and (self.level < 3 or isinstance(parameter.param, TabularMultiParam)):
             label_frame_label = tk.Frame(tk_parent)
             tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
             self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
@@ -149,9 +141,7 @@ class ParameterWrapper:
             if isinstance(parameter, ArrayParam):
                 drc = self.delete_row_callback if not parameter.read_only else None
                 self.update_subwrappers(parameter.params, drc)
-                self.button = tk.Button(
-                    tk_parent, text=UNICODE_PLUS, width=2, command=self.add_row_callback
-                )
+                self.button = tk.Button(tk_parent, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
             else:
                 self.update_subwrappers(parameter.params.values(), None)
         else:
@@ -178,19 +168,11 @@ class ParameterWrapper:
         else:
             self.entry["fg"] = None
 
-        if (
-            isinstance(self.parameter, ArrayParam)
-            and self.level == 0
-            and not isinstance(self.parameter.param, TabularMultiParam)
-        ):
+        if isinstance(self.parameter, ArrayParam) and self.level == 0 and not isinstance(self.parameter.param, TabularMultiParam):
             self.update_subwrappers_framed(self.parameter.params, self.delete_row_callback)
             if self.button:
                 self.button.grid(row=len(self.parameter.params) + 1, padx=10)
-        elif (
-            isinstance(self.parameter, ArrayParam)
-            and isinstance(self.parameter.param, MultiParam)
-            and self.level < 3
-        ):
+        elif isinstance(self.parameter, ArrayParam) and isinstance(self.parameter.param, MultiParam) and self.level < 3:
             self.update_subwrappers_tabular(
                 self.parameter.params,
                 self.delete_row_callback if not self.parameter.read_only else None,
@@ -203,8 +185,7 @@ class ParameterWrapper:
             if self.button:
                 self.button["state"] = (
                     tk.DISABLED
-                    if self.parameter.max_size is not None
-                    and len(self.subwrappers) >= self.parameter.max_size
+                    if self.parameter.max_size is not None and len(self.subwrappers) >= self.parameter.max_size
                     else tk.NORMAL
                 )
         elif isinstance(self.parameter, MultiParam):
@@ -462,8 +443,8 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
-        if self.plugin.update():
-            self.update()
+        #if self.plugin.update():
+        #    self.update()
         if self.change_callback:
             self.change_callback(self)
 
@@ -476,9 +457,7 @@ class PluginConfigurator:
             if key in self.wrapper_cache:
                 self.wrapper_cache[key].update()
             else:
-                self.wrapper_cache[key] = ParameterWrapper(
-                    self.subframe, parameter, self.change_parameter, level=top_level
-                )
+                self.wrapper_cache[key] = ParameterWrapper(self.subframe, parameter, self.change_parameter, level=top_level)
             self.wrapper_cache[key].set_row(n + 1)
 
         # Remove any parameter wrappers no longer needed

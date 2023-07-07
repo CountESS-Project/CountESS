@@ -63,9 +63,7 @@ class TkCursors(Enum):
 
 UNICODE_INFO = "\u2139"
 
-DraggableMixinState = Enum(
-    "DraggableMixinState", ["READY", "DRAG_WAIT", "LINK_WAIT", "DRAGGING", "LINKING"]
-)
+DraggableMixinState = Enum("DraggableMixinState", ["READY", "DRAG_WAIT", "LINK_WAIT", "DRAGGING", "LINKING"])
 
 
 class DraggableMixin:  # pylint: disable=R0903
@@ -289,9 +287,7 @@ class GraphWrapper:
         self.canvas.bind("<Key-Delete>", self.on_canvas_delete)
 
     def label_for_node(self, node):
-        label = DraggableLabel(
-            self.canvas, text=node.name, wraplength=125, cursor="hand1", takefocus=True
-        )
+        label = DraggableLabel(self.canvas, text=node.name, wraplength=125, cursor="hand1", takefocus=True)
         if not node.position:
             node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
         # XXX should be more elegant way of answering the question "are we flipped?"
@@ -364,9 +360,7 @@ class GraphWrapper:
         x, y, w, h = _geometry(self.labels[node])
         if self.highlight_rectangle:
             self.canvas.delete(self.highlight_rectangle)
-        self.highlight_rectangle = self.canvas.create_rectangle(
-            x - 3, y - 3, x + w + 3, y + h + 3, fill="red", width=0
-        )
+        self.highlight_rectangle = self.canvas.create_rectangle(x - 3, y - 3, x + w + 3, y + h + 3, fill="red", width=0)
 
     def on_leave(self, node, event):
         if self.highlight_rectangle is not None:
@@ -456,13 +450,7 @@ class GraphWrapper:
             self.add_new_node(select=True)
         elif node == self.selected_node:
             # arbitrarily pick another node to show
-            new_node = (
-                parent_nodes[0]
-                if parent_nodes
-                else child_nodes[0]
-                if child_nodes
-                else list(self.graph.nodes)[0]
-            )
+            new_node = parent_nodes[0] if parent_nodes else child_nodes[0] if child_nodes else list(self.graph.nodes)[0]
             self.highlight_node(new_node)
             self.node_select_callback(new_node)
 
@@ -515,9 +503,7 @@ class GraphWrapper:
     def add_parent(self, parent_node, child_node):
         if parent_node not in child_node.parent_nodes:
             child_node.add_parent(parent_node)
-            connecting_line = ConnectingLine(
-                self.canvas, self.labels[parent_node], self.labels[child_node]
-            )
+            connecting_line = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
             self.lines[child_node][parent_node] = connecting_line
             self.lines_lookup[connecting_line.line] = (
                 connecting_line,

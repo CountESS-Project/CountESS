@@ -150,9 +150,7 @@ class StringCharacterSetParam(StringParam):
         return x
 
     def copy(self):
-        return self.__class__(
-            self.label, self.value, self.read_only, character_set=self.character_set
-        )
+        return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
 
 
 class FileParam(StringParam):
@@ -267,9 +265,7 @@ class DataTypeChoiceParam(ChoiceParam):
         "boolean": (bool, False, BooleanParam),
     }
 
-    def __init__(
-        self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
-    ):
+    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
         if not choices:
             choices = list(self.DATA_TYPES.keys())
         super().__init__(label, value, choices)
@@ -295,9 +291,7 @@ class DataTypeChoiceParam(ChoiceParam):
 class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
     NONE_VALUE = "— NONE —"
 
-    def __init__(
-        self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None
-    ):
+    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
         if not choices:
             choices = list(self.DATA_TYPES.keys()) + [self.NONE_VALUE]
         if value is None:

@@ -20,6 +20,7 @@ from countess.core.plugins import PandasBasePlugin, PandasInputPlugin
 # data types to each column
 
 
+
 def maybe_number(x):
     """CSV is never clear on if something is actually a number so ... try it I guess ..."""
     try:
@@ -55,9 +56,7 @@ class LoadCsvPlugin(PandasInputPlugin):
 
     parameters = {
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
-        "quoting": ChoiceParam(
-            "Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]
-        ),
+        "quoting": ChoiceParam("Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]),
         "comment": ChoiceParam("Comment", "None", choices=["None", "#", ";"]),
         "header": BooleanParam("CSV file has header row?", True),
         "filename_column": StringParam("Filename Column", ""),
@@ -173,17 +172,13 @@ class SaveCsvPlugin(PandasBasePlugin):
         elif sep == "SPACE":
             sep = " "
 
-        has_named_index = (data.index.name is not None) or (
-            hasattr(data.index, "names") and data.index.names[0] is not None
-        )
+        has_named_index = (data.index.name is not None) or (hasattr(data.index, "names") and data.index.names[0] is not None)
 
         options = {
             "header": self.parameters["header"].value,
             "index": has_named_index,
             "sep": sep,
-            "quoting": csv.QUOTE_NONNUMERIC
-            if self.parameters["quoting"].value
-            else csv.QUOTE_MINIMAL,
+            "quoting": csv.QUOTE_NONNUMERIC if self.parameters["quoting"].value else csv.QUOTE_MINIMAL,
         }
 
         if row_limit is None:

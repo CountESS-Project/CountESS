@@ -2,13 +2,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import (
-    BooleanParam,
-    ColumnChoiceParam,
-    ColumnOrNoneChoiceParam,
-    IntegerParam,
-    StringParam,
-)
+from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformPlugin
 from countess.utils.variant import find_variant_string
 
@@ -59,9 +53,7 @@ class VariantPlugin(PandasTransformPlugin):
                     logger.warning(str(exc))
                     return None
 
-            dfo[output] = pd.DataFrame([column, reference]).apply(
-                func, raw=True, result_type="reduce"
-            )
+            dfo[output] = pd.DataFrame([column, reference]).apply(func, raw=True, result_type="reduce")
         else:
             ref_str = self.parameters["sequence"].value
 
