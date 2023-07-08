@@ -361,8 +361,6 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
             return super().get_column(df)
 
 
-
-
 class MultipleChoiceParam(ChoiceParam):
     pass
 

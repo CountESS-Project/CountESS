@@ -1,10 +1,10 @@
 import re
-
-from typing import Mapping, Iterable, Optional
+from typing import Iterable, Mapping, Optional, Tuple
 
 import pandas as pd
 
 from countess import VERSION
+from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -14,10 +14,10 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasInputPlugin, PandasTransformPlugin
-from countess.core.logger import Logger
+from countess.core.plugins import PandasInputPlugin, PandasTransformSingleToTuplePlugin
 
-class RegexToolPlugin(PandasTransformPlugin):
+
+class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     name = "Regex Tool"
     description = "Apply regular expressions to a column to make new column(s)"
     link = "https://countess-project.github.io/CountESS/plugins/#regex-tool"
@@ -47,57 +47,20 @@ class RegexToolPlugin(PandasTransformPlugin):
 
     compiled_re = None
 
-    def run_df(self, df, logger):
-        compiled_re = re.compile(self.parameters["regex"].value)
-
-        while compiled_re.groups > len(self.parameters["output"].params):
-            self.parameters["output"].add_row()
-
-        output_params = self.parameters["output"].params
-        output_names = [pp["name"].value for pp in output_params]
-        index_names = [pp["name"].value for pp in output_params if pp["index"].value]
-
-        column = self.parameters["column"].get_column(df)
-
-        if self.parameters["multi"].value:
-
-            def func(value):
-                matches = compiled_re.findall(str(value))
-                if matches:
-                    return [[m[n] for m in matches] for n in range(0, compiled_re.groups)]
-                else:
-                    return [[None]] * compiled_re.groups
-
-        else:
-
-            def func(value):
-                if value is not None:
-                    if match := compiled_re.match(value):
-                        return [op.datatype.cast_value(g) for op, g in zip(output_params, match.groups())]
-                logger.info("Didn't Match: " + repr(value))
-                return [None] * compiled_re.groups
-
-        # make a series of tuples, then turn those back into a dataframe,
-        # then copy those new columns over.
-        # XXX this isn't particularly elegant but it does seem to be fairly quick
-        # XXX should be a special case for a single output column
-
-        series = column.apply(func)
-        output_df = pd.DataFrame(series.tolist(), columns=output_names, index=series.index)
-        df = df.assign(**{column_name: output_df[column_name] for column_name in output_names})
-
-        if self.parameters["multi"].value:
-            df = df.explode(output_names)
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        df = super().process_dataframe(dataframe, logger)
 
         if self.parameters["drop_unmatch"].value:
             df = df.dropna(subset=output_names, how="all")
 
         if self.parameters["drop_column"].value:
             column_name = self.parameters["column"].value
-            if column_name not in df.columns:
-                df = df.reset_index()
-            df = df.drop(columns=column_name)
+            if column_name in df.columns:
+                df = df.drop(columns=column_name)
+            else:
+                df = df.reset_index(column_name, drop=True)
 
+        index_names = [pp["name"].value for pp in output_params if pp["index"].value]
         if index_names:
             df = df.set_index(index_names)
 
@@ -106,22 +69,24 @@ class RegexToolPlugin(PandasTransformPlugin):
     def process_inputs(
         self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
     ) -> Iterable[pd.DataFrame]:
-
         print(f"prepare! {self.parameters['regex'].value}")
         self.compiled_re = re.compile(self.parameters["regex"].value)
         while self.compiled_re.groups > len(self.parameters["output"].params):
             self.parameters["output"].add_row()
-        
+
         return super().process_inputs(inputs, logger, row_limit)
 
-    def process_row(self, row: pd.Series, logger: Logger) -> pd.Series:
-        print(f"process_row {row}")
-        value = row[self.parameters["column"].value]
-        print(f"process_row value {value}")
-        if match := self.compiled_re.match(value):
-            return [1,2,3]
-        else:
-            return [1,2,3]
+    def process_value(self, value: str, logger: Logger) -> Tuple[str]:
+        print(f"RegexToolPlugin.process_value {value}")
+        try:
+            if match := self.compiled_re.match(value):
+                return match.groups()
+            else:
+                logger.info(f"{repr(value)} didn't match")
+        except (TypeError, ValueError) as exc:
+            logger.exception(exc)
+
+        return [None] * self.compiled_re.groups
 
 
 class RegexReaderPlugin(PandasInputPlugin):
