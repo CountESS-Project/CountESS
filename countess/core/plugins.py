@@ -193,26 +193,107 @@ class PandasSimplePlugin(PandasBasePlugin):
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
 
-class PandasTransformPlugin(PandasSimplePlugin):
+# XXX this might be excessively DRY but we'll see.
+
+class PandasTransformBasePlugin:
+    """Base classes for the six (!) PandasTransformXToXPlugin superclasses."""
+    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        return NotImplementedError(f"{self.__class__}.series_to_dataframe()")
+
+    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+        return NotImplementedError(f"{self.__class__}.dataframe_to_series()")
+
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        df = dataframe.apply(self.process_row, result_type="expand", logger=logger)
-        print(f"process_dataframe {dataframe} {df}")
-        return df
+        return dataframe.merge(
+            self.series_to_dataframe(
+                self.dataframe_to_series(dataframe, logger)
+            ),
+            left_index=True,
+            right_index=True,
+        )
 
-    def process_row(self, row: pd.Series, logger: Logger) -> pd.Series:
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.process_row()")
+# XXX instead of just asserting the existence of the parameters should we 
+# actually create them in these mixins?
 
+class PandasTransformSingleToXMixin:
+    """Transformer which takes a single column, the name of which is specified
+    in a ColumnChoiceParam called "column" """
+    def __init__(self, *a, **k):
+        super.__init__(*a, **k)
+        assert issubclass(self.parameters["column"], ColumnChoiceParam)
 
-class PandasSingleColumnTransformPlugin(PandasTransformPlugin):
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        input_column = self.parameters["input"].get_column()
-        output_column_name = self.parameters["output"].value
+    def process_value(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_value()")
 
-        series = input_column.apply(self.process_value, logger=logger)
-        return dataframe.assign(**{output_column_name: series})
+    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+        column_name = self.parameters["column"].value
+        return dataframe[column_name].apply(self.process_value, logger=logger)
 
-    def process_value(self, value: Any, logger: Logger):
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.process_value()")
+class PandasTransformRowToXMixin:
+    """Transformer which takes an entire row. Less efficient than processing
+    just a single value, but a bit more flexible."""
+
+    def process_row(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_row()")
+
+    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+        return dataframe.apply(self.process_row, axis=1, logger=logger)
+
+class PandasTransformXToSingleMixin:
+    """Transformer which returns a single value, putting into the column specified
+    by the StringParam called "output" """
+
+    def __init__(self, *a, **k):
+        super.__init__(*a, **k)
+        assert issubclass(self.parameters["output"], StringParam)
+
+    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        return series.to_frame(name=self.parameters["output"].value)
+
+class PandasTransformXToTupleMixin:
+    """Transformer which returns a tuple of values, putting them into columns
+    specifed by the StringParams "name" in the ArrayParam "output" """
+    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        column_names = [ pp.name.value for pp in self.parameters["output"] ]
+        return pd.DataFrame(series.tolist(), columns=column_names, index=series.index)
+
+class PandasTransformXToDictMixin:
+    """Transformer which returns a dictionary of values, putting them into
+    columns named after the dictionary keys."""
+
+    def __init__(self, *a, **k):
+        super.__init__(*a, **k)
+        assert issubclass(self.parameters["output"], ArrayParam)
+        assert all(issubclass(pp["name"], StringParam) for pp in self.parameters["output"])
+
+    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        return pd.DataFrame(series.tolist(), index=series.index)
+
+# Six combinations of the five mixins!
+
+class PandasTransformSingleToSinglePlugin(PandasTransformXToSingleMixin, PandasTransformSingleToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a single column and returns a single value"""
+    pass
+
+class PandasTransformSingleToTuplePlugin(PandasTransformXToTupleMixin, PandasTransformSingleToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a single column and returns a tuple of values"""
+    pass
+
+class PandasTransformSingleToDictPlugin(PandasTransformXToDictMixin, PandasTransformSingleToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a single column and returns a dictionary of values"""
+    pass
+
+class PandasTransformRowToSinglePlugin(PandasTransformXToSingleMixin, PandasTransformRowToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a whole row and returns a single value"""
+    pass
+
+class PandasTransformRowToTuplePlugin(PandasTransformXToTupleMixin, PandasTransformRowToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a whole row and returns a tuple of values"""
+    pass
+
+class PandasTransformRowToDictPlugin(PandasTransformXToDictMixin, PandasTransformRowToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a whole row and returns a dictionary of values"""
+    pass
 
 
 class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
