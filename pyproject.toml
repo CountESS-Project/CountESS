@@ -98,6 +98,7 @@ disable = [
     "too-many-instance-attributes",
     "too-many-locals",
     "too-many-statements",
+    "too-few-public-methods",
     "too-many-public-methods",
     "unidiomatic-typecheck",
 ]
