@@ -3,7 +3,7 @@ import pandas as pd
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import TextParam
-from countess.core.plugins import PandasTransformPlugin
+from countess.core.plugins import PandasTransformRowToDictPlugin
 
 # XXX pretty sure this is a job for ast.parse rather than just
 # running compile() and exec() but that can wait.
@@ -15,7 +15,7 @@ from countess.core.plugins import PandasTransformPlugin
 SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 
 
-class PythonPlugin(PandasTransformPlugin):
+class PythonPlugin(PandasTransformRowToDictPlugin):
     name = "Python Code"
     description = "Apply python code to each row."
     additional = """
@@ -28,20 +28,22 @@ class PythonPlugin(PandasTransformPlugin):
 
     parameters = {"code": TextParam("Python Code")}
 
-    def run_df(self, df, logger: Logger) -> pd.DataFrame:
+    def process_row(self, row: pd.Series, logger: Logger):
+
         assert isinstance(self.parameters["code"], TextParam)
         code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
 
-        def _process(row):
-            row_dict = dict(row)
-            exec(code_object, {}, row_dict)  # pylint: disable=exec-used
-            return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
+        row_dict = dict(row)
+        exec(code_object, {}, row_dict)  # pylint: disable=exec-used
+        return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
 
-        # XXX It'd be nice to do this without resetting the index
-        dfo = df.reset_index(drop=False)
-        dfo = dfo.apply(_process, axis=1, result_type="expand")
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
 
-        if "__filter" in dfo.columns:
-            dfo = dfo.query("__filter").drop(columns="__filter")
+        dataframe = dataframe.reset_index(drop=False)
+        series = self.dataframe_to_series(dataframe, logger)
+        dataframe = self.series_to_dataframe(series)
 
-        return dfo
+        if "__filter" in dataframe.columns:
+            dataframe = dataframe.query("__filter").drop(columns="__filter")
+
+        return dataframe

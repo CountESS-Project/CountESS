@@ -271,6 +271,11 @@ class PandasTransformXToTupleMixin:
     """Transformer which returns a tuple of values, putting them into columns
     specifed by the StringParams "name" in the ArrayParam "output" """
 
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        assert isinstance(self.parameters["output"], ArrayParam)
+        assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
+
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
         column_names = [pp.name.value for pp in self.parameters["output"]]
         df = pd.DataFrame(series.tolist(), columns=column_names, index=series.index)
@@ -281,10 +286,6 @@ class PandasTransformXToDictMixin:
     """Transformer which returns a dictionary of values, putting them into
     columns named after the dictionary keys."""
 
-    def __init__(self, *a, **k):
-        super().__init__(*a, **k)
-        assert isinstance(self.parameters["output"], ArrayParam)
-        assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
         return pd.DataFrame(series.tolist(), index=series.index)
