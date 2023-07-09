@@ -2,8 +2,8 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BooleanParam, PerColumnArrayParam, TextParam
-from countess.core.plugins import PandasTransformPlugin
+from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
+from countess.core.plugins import PandasSimplePlugin
 
 
 def process(df: pd.DataFrame, codes, logger: Logger):
@@ -28,7 +28,7 @@ def process(df: pd.DataFrame, codes, logger: Logger):
     return df
 
 
-class ExpressionPlugin(PandasTransformPlugin):
+class ExpressionPlugin(PandasSimplePlugin):
     name = "Expression"
     description = "Apply simple expressions"
     version = VERSION
@@ -38,13 +38,9 @@ class ExpressionPlugin(PandasTransformPlugin):
         "drop": PerColumnArrayParam("Drop Columns", BooleanParam("Drop")),
     }
 
-    def run_df(self, df, logger: Logger) -> pd.DataFrame:
-        assert isinstance(self.parameters["code"], TextParam)
-        assert isinstance(self.parameters["drop"], ArrayParam)
-
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         codes = [c.replace("\n", " ").strip() for c in self.parameters["code"].value.split("\n\n")]
-
-        df = process(df, codes, logger)
+        df = process(dataframe, codes, logger)
 
         drop_names = [col for col, param in zip(self.input_columns, self.parameters["drop"]) if param.value]
 
