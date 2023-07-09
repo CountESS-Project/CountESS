@@ -77,13 +77,14 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         return super().process_inputs(inputs, logger, row_limit)
 
     def process_value(self, value: str, logger: Logger) -> Tuple[str]:
-        try:
-            if match := self.compiled_re.match(str(value)):
-                return match.groups()
-            else:
-                logger.info(f"{repr(value)} didn't match")
-        except (TypeError, ValueError) as exc:
-            logger.exception(exc)
+        if value is not None:
+            try:
+                if match := self.compiled_re.match(str(value)):
+                    return match.groups()
+                else:
+                    logger.info(f"{repr(value)} didn't match")
+            except (TypeError, ValueError) as exc:
+                logger.exception(exc)
 
         return [None] * self.compiled_re.groups
 

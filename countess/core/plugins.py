@@ -21,12 +21,13 @@ import logging
 import os.path
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, Optional, Union, Dict
 
 import pandas as pd
+import numpy as np
 
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BaseParam, ColumnChoiceParam, FileArrayParam, FileParam, FileSaveParam, MultiParam
+from countess.core.parameters import ArrayParam, BaseParam, ColumnChoiceParam, FileArrayParam, FileParam, FileSaveParam, MultiParam, StringParam
 from countess.utils.pandas import get_all_columns
 
 PRERUN_ROW_LIMIT = 100000
@@ -139,6 +140,7 @@ class FileInputMixin:
     storage."""
 
     file_number = 0
+    name = ""
 
     # used by the GUI file dialog
     file_types = [("Any", "*")]
@@ -165,7 +167,7 @@ class PandasBasePlugin(BasePlugin):
 class PandasSimplePlugin(PandasBasePlugin):
     """Base class for plugins which accept and return pandas DataFrames"""
 
-    input_columns = {}
+    input_columns : Dict[str, np.dtype] = {}
 
     def process_inputs(
         self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
@@ -185,7 +187,6 @@ class PandasSimplePlugin(PandasBasePlugin):
                 except StopIteration:
                     iterators.remove(it)
 
-        print(f"process_inputs {self.parameters}")
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns.keys())
 
@@ -206,11 +207,14 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
         return NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        return dataframe.merge(
-            self.series_to_dataframe(self.dataframe_to_series(dataframe, logger)),
-            left_index=True,
-            right_index=True,
-        )
+
+        series = self.dataframe_to_series(dataframe, logger)
+        df2 = self.series_to_dataframe(series)
+        df3 = dataframe.merge(df2, left_index=True, right_index=True)
+        return df3
+
+    def process_value(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
 # XXX instead of just asserting the existence of the parameters should we
@@ -225,23 +229,19 @@ class PandasTransformSingleToXMixin:
         super().__init__(*a, **k)
         assert isinstance(self.parameters["column"], ColumnChoiceParam)
 
-    def process_value(self, value, logger: Logger):
-        raise NotImplementedError(f"{self.__class__}.process_value()")
-
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
         column_name = self.parameters["column"].value
         if column_name in dataframe:
             return dataframe[column_name].apply(self.process_value, logger=logger)
         else:
-            return pd.Series()
+            null_values = [ self.process_value(None, logger) ] * len(dataframe)
+            s = pd.Series(null_values, index=dataframe.index)
+            return s
 
 
 class PandasTransformRowToXMixin:
     """Transformer which takes an entire row. Less efficient than processing
     just a single value, but a bit more flexible."""
-
-    def process_row(self, value, logger: Logger):
-        raise NotImplementedError(f"{self.__class__}.process_row()")
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
         return dataframe.apply(self.process_row, axis=1, logger=logger)
@@ -265,7 +265,8 @@ class PandasTransformXToTupleMixin:
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
         column_names = [pp.name.value for pp in self.parameters["output"]]
-        return pd.DataFrame(series.tolist(), columns=column_names, index=series.index)
+        df = pd.DataFrame(series.tolist(), columns=column_names, index=series.index)
+        return df
 
 
 class PandasTransformXToDictMixin:
@@ -287,37 +288,43 @@ class PandasTransformXToDictMixin:
 class PandasTransformSingleToSinglePlugin(PandasTransformXToSingleMixin, PandasTransformSingleToXMixin, PandasTransformBasePlugin):
     """Transformer which takes a single column and returns a single value"""
 
-    pass
+    def process_value(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
 class PandasTransformSingleToTuplePlugin(PandasTransformXToTupleMixin, PandasTransformSingleToXMixin, PandasTransformBasePlugin):
     """Transformer which takes a single column and returns a tuple of values"""
 
-    pass
+    def process_value(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
 class PandasTransformSingleToDictPlugin(PandasTransformXToDictMixin, PandasTransformSingleToXMixin, PandasTransformBasePlugin):
     """Transformer which takes a single column and returns a dictionary of values"""
 
-    pass
+    def process_value(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
 class PandasTransformRowToSinglePlugin(PandasTransformXToSingleMixin, PandasTransformRowToXMixin, PandasTransformBasePlugin):
     """Transformer which takes a whole row and returns a single value"""
 
-    pass
+    def process_row(self, row: pd.Series, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_row()")
 
 
 class PandasTransformRowToTuplePlugin(PandasTransformXToTupleMixin, PandasTransformRowToXMixin, PandasTransformBasePlugin):
     """Transformer which takes a whole row and returns a tuple of values"""
 
-    pass
+    def process_row(self, row: pd.Series, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_row()")
 
 
 class PandasTransformRowToDictPlugin(PandasTransformXToDictMixin, PandasTransformRowToXMixin, PandasTransformBasePlugin):
     """Transformer which takes a whole row and returns a dictionary of values"""
 
-    pass
+    def process_row(self, row: pd.Series, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_row()")
 
 
 class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
