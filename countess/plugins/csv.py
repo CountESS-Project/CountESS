@@ -20,7 +20,6 @@ from countess.core.plugins import PandasBasePlugin, PandasInputPlugin
 # data types to each column
 
 
-
 def maybe_number(x):
     """CSV is never clear on if something is actually a number so ... try it I guess ..."""
     try:
@@ -133,6 +132,7 @@ class LoadCsvPlugin(PandasInputPlugin):
             for n, col in enumerate(df.columns):
                 if not self.parameters["columns"][n]["name"].value:
                     self.parameters["columns"][n]["name"].value = str(col)
+                    self.parameters["columns"][n]["type"].value = "string"
 
         filename_column = self.parameters["filename_column"].value
         if filename_column:

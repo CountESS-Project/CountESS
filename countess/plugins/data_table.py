@@ -1,4 +1,4 @@
-from typing import Any, Optional, Mapping, Iterable
+from typing import Any, Iterable, Mapping, Optional
 
 import pandas as pd
 

@@ -21,13 +21,22 @@ import logging
 import os.path
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import Any, Iterable, Optional, Union, Dict
+from typing import Any, Dict, Iterable, Optional, Union
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BaseParam, ColumnChoiceParam, FileArrayParam, FileParam, FileSaveParam, MultiParam, StringParam
+from countess.core.parameters import (
+    ArrayParam,
+    BaseParam,
+    ColumnChoiceParam,
+    FileArrayParam,
+    FileParam,
+    FileSaveParam,
+    MultiParam,
+    StringParam,
+)
 from countess.utils.pandas import get_all_columns
 
 PRERUN_ROW_LIMIT = 100000
@@ -167,7 +176,7 @@ class PandasBasePlugin(BasePlugin):
 class PandasSimplePlugin(PandasBasePlugin):
     """Base class for plugins which accept and return pandas DataFrames"""
 
-    input_columns : Dict[str, np.dtype] = {}
+    input_columns: Dict[str, np.dtype] = {}
 
     def process_inputs(
         self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
@@ -207,7 +216,6 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
         return NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-
         series = self.dataframe_to_series(dataframe, logger)
         df2 = self.series_to_dataframe(series)
         df3 = dataframe.merge(df2, left_index=True, right_index=True)
@@ -234,7 +242,7 @@ class PandasTransformSingleToXMixin:
         if column_name in dataframe:
             return dataframe[column_name].apply(self.process_value, logger=logger)
         else:
-            null_values = [ self.process_value(None, logger) ] * len(dataframe)
+            null_values = [self.process_value(None, logger)] * len(dataframe)
             s = pd.Series(null_values, index=dataframe.index)
             return s
 

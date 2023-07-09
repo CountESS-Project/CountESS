@@ -51,7 +51,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         df = super().process_dataframe(dataframe, logger)
 
         if self.parameters["drop_unmatch"].value:
-            output_names = [ pp.name.value for pp in self.parameters["output"] ]
+            output_names = [pp.name.value for pp in self.parameters["output"]]
             df = df.dropna(subset=output_names, how="all")
 
         if self.parameters["drop_column"].value:
