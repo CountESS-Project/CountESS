@@ -17,6 +17,7 @@ def _join_how(left_required: bool, right_required: bool) -> str:
     else:
         return "right" if right_required else "outer"
 
+
 class JoinPlugin(PandasBasePlugin):
     """Joins Pandas Dataframes"""
 
@@ -51,7 +52,7 @@ class JoinPlugin(PandasBasePlugin):
         join2 = join_params.get("right_on")
         if join2 and join2 not in dataframe2.columns and dataframe2.index.name != join2:
             dataframe2 = dataframe2.reset_index()
-        
+
         return dataframe1.merge(dataframe2, **join_params)
 
     def process_inputs(

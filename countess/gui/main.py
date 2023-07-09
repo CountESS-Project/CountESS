@@ -91,7 +91,7 @@ class ConfiguratorWrapper:
         self.config_canvas.grid(row=3, column=0, sticky=tk.NSEW)
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
-        #self.node.prepare(self.logger)
+        # self.node.prepare(self.logger)
 
         if self.node.plugin:
             if self.node.notes:
@@ -113,8 +113,8 @@ class ConfiguratorWrapper:
                 tk.Button(self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press).place(
                     anchor=tk.NE, relx=1, y=50
                 )
-            #self.node.prepare(self.logger)
-            #self.node.plugin.update()
+            # self.node.prepare(self.logger)
+            # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
         else:
@@ -148,7 +148,6 @@ class ConfiguratorWrapper:
     def show_preview_subframe(self):
         if self.preview_subframe:
             self.preview_subframe.destroy()
-        print(f"show_preview_subframe {self.node.result}")
         try:
             df = concat_dataframes(self.node.result)
             self.preview_subframe = TabularDataFrame(self.frame)
@@ -158,8 +157,8 @@ class ConfiguratorWrapper:
             self.preview_subframe.columnconfigure(0, weight=1)
             tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
-        #if isinstance(self.node.result, pd.DataFrame):
-        #elif isinstance(self.node.result, str):
+        # if isinstance(self.node.result, pd.DataFrame):
+        # elif isinstance(self.node.result, str):
         #    self.preview_subframe = tk.Frame(self.frame)
         #    self.preview_subframe.rowconfigure(1, weight=1)
         #    n_lines = len(self.node.result.splitlines())
@@ -168,7 +167,7 @@ class ConfiguratorWrapper:
         #    text.insert("1.0", self.node.result)
         #    text["state"] = "disabled"
         #    text.grid(sticky=tk.NSEW)
-        #else:
+        # else:
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 

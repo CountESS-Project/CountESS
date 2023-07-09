@@ -23,7 +23,6 @@ def column_format_for(df_column):
         column_max = df_column.max()
         if isnan(column_max) or isinf(column_max):
             column_max = 100
-        print(f"{type(column_max)} {repr(column_min)} {repr(column_max)}")
         width = max(len(str(floor(column_min))), len(str(ceil(column_max))))
         if is_integer_dtype(df_column.dtype):
             return f"%{width}d"

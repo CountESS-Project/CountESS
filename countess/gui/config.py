@@ -443,7 +443,7 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
-        #if self.plugin.update():
+        # if self.plugin.update():
         #    self.update()
         if self.change_callback:
             self.change_callback(self)
