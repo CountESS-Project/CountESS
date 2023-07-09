@@ -223,6 +223,8 @@ class ChoiceParam(BaseParam):
     """A drop-down menu parameter choosing between options.
     Defaults to 'None'"""
 
+    DEFAULT_VALUE = ""
+
     _value: Optional[str] = None
 
     def __init__(
@@ -232,7 +234,10 @@ class ChoiceParam(BaseParam):
         choices: Optional[Iterable[str]] = None,
     ):
         self.label = label
-        self._value = value
+        if value is None:
+            self._value = self.DEFAULT_VALUE
+        else:
+            self._value = value
         self.choices = list(choices or [])
 
     @property
@@ -249,7 +254,7 @@ class ChoiceParam(BaseParam):
             if self._value not in self.choices:
                 self._value = self.choices[0]
         else:
-            self._value = ""
+            self._value = self.DEFAULT_VALUE
 
     def copy(self):
         return self.__class__(self.label, self.value, self.choices)
@@ -287,29 +292,27 @@ class DataTypeChoiceParam(ChoiceParam):
 
 
 class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
-    NONE_VALUE = "— NONE —"
+    DEFAULT_VALUE = "— NONE —"
 
     def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):
         if not choices:
-            choices = list(self.DATA_TYPES.keys()) + [self.NONE_VALUE]
-        if value is None:
-            value = self.NONE_VALUE
+            choices = list(self.DATA_TYPES.keys()) + [self.DEFAULT_VALUE]
         super().__init__(label, value, choices)
 
     def get_selected_type(self):
-        if self.value == self.NONE_VALUE:
+        if self.value == self.DEFAULT_VALUE:
             return None
         else:
             return super().get_selected_type()
 
     def cast_value(self, value):
-        if self.value == self.NONE_VALUE:
+        if self.value == self.DEFAULT_VALUE:
             return None
         else:
             return super().cast_value(value)
 
     def is_none(self):
-        return self.value == self.NONE_VALUE
+        return self.value == self.DEFAULT_VALUE
 
 
 class ColumnChoiceParam(ChoiceParam):
@@ -331,32 +334,32 @@ class ColumnChoiceParam(ChoiceParam):
 
 
 class ColumnOrNoneChoiceParam(ColumnChoiceParam):
-    NONE_VALUE = "— NONE —"
+    DEFAULT_VALUE = "— NONE —"
 
     def set_choices(self, choices: Iterable[str]):
-        super().set_choices([self.NONE_VALUE] + list(choices))
+        super().set_choices([self.DEFAULT_VALUE] + list(choices))
 
     def is_none(self):
-        return self.value == self.NONE_VALUE
+        return self.value == self.DEFAULT_VALUE
 
     def get_column(self, df):
-        if self.value == self.NONE_VALUE:
+        if self.value == self.DEFAULT_VALUE:
             return None
         else:
             return super().get_column(df)
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
-    INDEX_VALUE = "— INDEX —"
+    DEFAULT_VALUE = "— INDEX —"
 
     def set_choices(self, choices: Iterable[str]):
-        super().set_choices([self.INDEX_VALUE] + list(choices))
+        super().set_choices([self.DEFAULT_VALUE] + list(choices))
 
     def is_index(self):
-        return self.value == self.INDEX_VALUE
+        return self.value == self.DEFAULT_VALUE
 
     def get_column(self, df):
-        if self.value == self.INDEX_VALUE:
+        if self.value == self.DEFAULT_VALUE:
             return df.index.to_series()
         else:
             return super().get_column(df)
