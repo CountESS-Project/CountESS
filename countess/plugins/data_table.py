@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Mapping, Iterable
 
 import pandas as pd
 
@@ -73,20 +73,14 @@ class DataTablePlugin(PandasBasePlugin):
             self.fix_columns()
         super().set_parameter(key, *a, **k)
 
-    def prepare(self, data: Any, logger: Logger) -> bool:
-        self.fix_columns()
-        if data is not None:
-            logger.error("DataTable doesn't take inputs")
-            return False
-        return True
+    def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger, row_limit: Optional[int]) -> Iterable[Any]:
+        if len(inputs) > 0:
+            logger.warning(f"{self.name} doesn't take inputs")
+            raise ValueError(f"{self.name} doesn't take inputs")
 
-    def run(self, data: Any, logger: Logger, row_limit: Optional[int] = None):
         self.fix_columns()
         values = []
-        assert isinstance(self.parameters["rows"], ArrayParam)
-        assert isinstance(self.parameters["columns"], ArrayParam)
-
         for row in self.parameters["rows"]:
             values.append(dict((col["name"].value, row[str(num)].value) for num, col in enumerate(self.parameters["columns"])))
 
-        return pd.DataFrame(values)
+        yield pd.DataFrame(values)
