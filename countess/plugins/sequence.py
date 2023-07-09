@@ -1,19 +1,17 @@
-import pandas as pd
-
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, IntegerParam, StringParam
-from countess.core.plugins import PandasTransformPlugin
+from countess.core.plugins import PandasTransformSingleToSinglePlugin
 from countess.utils.variant import invert_dna_sequence
 
 
-class SequencePlugin(PandasTransformPlugin):
-    """Manipulate DNA sequences"""
+class SequencePlugin(PandasTransformSingleToSinglePlugin):
+    """Manipulate DNA valueuences"""
 
     name = "Sequence Tool"
     description = "Manipulate DNA Sequences"
     version = VERSION
-    link = "https://countess-project.github.io/CountESS/plugins/#sequence"
+    link = "https://countess-project.github.io/CountESS/plugins/#valueuence"
 
     parameters = {
         "column": ColumnChoiceParam("Input Column"),
@@ -25,33 +23,25 @@ class SequencePlugin(PandasTransformPlugin):
         "output": StringParam("Output Column", "sequence"),
     }
 
-    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        def _process(seq):
-            if self.parameters["invert"].value:
-                seq = invert_dna_sequence(seq)
-            if self.parameters["offset"].value:
-                offset = self.parameters["offset"].value
-                seq = seq[offset:]
-            if self.parameters["start"].value:
-                offset = seq.find(self.parameters["start"].value)
-                if offset >= 0:
-                    seq = seq[offset:]
-                else:
-                    return None
-            if self.parameters["stop"].value:
-                offset = seq.find(self.parameters["stop"].value)
-                if offset >= 0:
-                    seq = seq[0 : offset + len(self.parameters["stop"].value)]
-            if self.parameters["length"].value:
-                seq = seq[0 : self.parameters["length"].value]
-            return seq
+    def process_value(self, value: str, logger: Logger) -> str:
+        if value is None:
+            return None
 
-        column_name = self.parameters["column"].value
-        output_column_name = self.parameters["output"].value
-
-        if column_name in df.columns:
-            column = df[column_name]
-        else:
-            column = df.index.to_frame()[column_name]
-
-        return df.assign(**{output_column_name: column.apply(_process)})
+        if self.parameters["invert"].value:
+            value = invert_dna_sequence(value)
+        if self.parameters["offset"].value:
+            offset = self.parameters["offset"].value
+            value = value[offset:]
+        if self.parameters["start"].value:
+            offset = value.find(self.parameters["start"].value)
+            if offset >= 0:
+                value = value[offset:]
+            else:
+                return None
+        if self.parameters["stop"].value:
+            offset = value.find(self.parameters["stop"].value)
+            if offset >= 0:
+                value = value[0 : offset + len(self.parameters["stop"].value)]
+        if self.parameters["length"].value:
+            value = value[0 : self.parameters["length"].value]
+        return value
