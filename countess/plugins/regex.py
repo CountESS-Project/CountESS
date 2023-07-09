@@ -51,6 +51,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         df = super().process_dataframe(dataframe, logger)
 
         if self.parameters["drop_unmatch"].value:
+            output_names = [ pp.name.value for pp in self.parameters["output"] ]
             df = df.dropna(subset=output_names, how="all")
 
         if self.parameters["drop_column"].value:
@@ -60,7 +61,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
             else:
                 df = df.reset_index(column_name, drop=True)
 
-        index_names = [pp["name"].value for pp in output_params if pp["index"].value]
+        index_names = [pp.name.value for pp in self.parameters["output"] if pp.index.value]
         if index_names:
             df = df.set_index(index_names)
 
@@ -69,7 +70,6 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     def process_inputs(
         self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
     ) -> Iterable[pd.DataFrame]:
-        print(f"prepare! {self.parameters['regex'].value}")
         self.compiled_re = re.compile(self.parameters["regex"].value)
         while self.compiled_re.groups > len(self.parameters["output"].params):
             self.parameters["output"].add_row()
@@ -77,9 +77,8 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         return super().process_inputs(inputs, logger, row_limit)
 
     def process_value(self, value: str, logger: Logger) -> Tuple[str]:
-        print(f"RegexToolPlugin.process_value {value}")
         try:
-            if match := self.compiled_re.match(value):
+            if match := self.compiled_re.match(str(value)):
                 return match.groups()
             else:
                 logger.info(f"{repr(value)} didn't match")

@@ -245,10 +245,11 @@ class ChoiceParam(BaseParam):
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if len(self.choices) == 1:
-            self._value = list(choices)[0]
-        elif self.value not in self.choices:
-            self._value = None
+        if self.choices:
+            if self._value not in self.choices:
+                self._value = self.choices[0]
+        else:
+            self._value = ""
 
     def copy(self):
         return self.__class__(self.label, self.value, self.choices)

@@ -230,7 +230,10 @@ class PandasTransformSingleToXMixin:
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
         column_name = self.parameters["column"].value
-        return dataframe[column_name].apply(self.process_value, logger=logger)
+        if column_name in dataframe:
+            return dataframe[column_name].apply(self.process_value, logger=logger)
+        else:
+            return pd.Series()
 
 
 class PandasTransformRowToXMixin:
