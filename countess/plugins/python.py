@@ -29,7 +29,6 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
     parameters = {"code": TextParam("Python Code")}
 
     def process_row(self, row: pd.Series, logger: Logger):
-
         assert isinstance(self.parameters["code"], TextParam)
         code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
 
@@ -38,7 +37,6 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
         return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-
         dataframe = dataframe.reset_index(drop=False)
         series = self.dataframe_to_series(dataframe, logger)
         dataframe = self.series_to_dataframe(series)

@@ -41,13 +41,3 @@ class LoadFastqPlugin(PandasInputPlugin):
         else:
             with open(filename, "r", encoding="utf-8") as fh:
                 return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
-
-    def combine_dfs(self, dfs):
-        """first concatenate the count dataframes, then (optionally) group them by sequence"""
-
-        combined_df = pd.concat(dfs)
-
-        if len(combined_df) and self.parameters["group"].value:
-            combined_df = combined_df.groupby(by=["sequence"]).agg("count").rename({"header": "count"}, axis=1)
-
-        return combined_df

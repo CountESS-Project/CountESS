@@ -37,6 +37,7 @@ class PipelineNode:
         inputs = {p.name: p.result for p in self.parent_nodes}
         self.result = []
         if self.plugin:
+            print(f"EXECUTE {self.name} {self.plugin} {inputs}")
             try:
                 self.result = self.plugin.process_inputs(inputs, logger, row_limit)
                 if not isinstance(self.result, (bytes, str)) and (row_limit is not None or len(self.child_nodes) > 1):
@@ -143,6 +144,7 @@ class PipelineGraph:
             # XXX TODO there's some opportunity for easy parallelization here,
             # by pushing each node into a pool as soon as its parents are
             # complete.
+            node.load_config(logger)
             node.execute(logger)
 
     def reset(self):

@@ -208,7 +208,9 @@ class SaveCsvPlugin(PandasOutputPlugin):
         assert isinstance(self.parameters["filename"], StringParam)
 
         if row_limit is None:
-            self.filehandle = open(self.parameters["filename"].value, "wb")
+            filename = self.parameters["filename"].value
+            print(f"OPEN {filename}")
+            self.filehandle = open(filename, "wb")
             super().process_inputs(inputs, logger, row_limit)
             return None
         else:
