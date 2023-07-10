@@ -50,6 +50,6 @@ class ExpressionPlugin(PandasSimplePlugin):
 
         drop_columns = [col for col in drop_names if col in df.columns]
         if drop_columns:
-            df = df.drop(columns=drop_columns)
+            df.drop(columns=drop_columns, inplace=True)
 
         return df

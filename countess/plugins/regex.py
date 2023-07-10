@@ -40,7 +40,6 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
                 },
             ),
         ),
-        "multi": BooleanParam("Multi Match", False),
         "drop_column": BooleanParam("Drop Column", False),
         "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
     }
@@ -80,7 +79,10 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         if value is not None:
             try:
                 if match := self.compiled_re.match(str(value)):
-                    return match.groups()
+                    return [
+                        op.datatype.cast_value(val)
+                        for op, val in zip(self.parameters["output"], match.groups())
+                    ]
                 else:
                     logger.info(f"{repr(value)} didn't match")
             except (TypeError, ValueError) as exc:

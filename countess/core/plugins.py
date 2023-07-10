@@ -241,6 +241,10 @@ class PandasTransformSingleToXMixin:
         column_name = self.parameters["column"].value
         if column_name in dataframe:
             return dataframe[column_name].apply(self.process_value, logger=logger)
+        elif column_name == dataframe.index.name:
+            return dataframe.index.apply(self.process_value, logger=logger)
+        elif column_name in dataframe.index.names:
+            return dataframe.index.to_frame()[column_name].apply(self.process_value, logger=logger)
         else:
             null_values = [self.process_value(None, logger)] * len(dataframe)
             s = pd.Series(null_values, index=dataframe.index)
@@ -253,6 +257,16 @@ class PandasTransformRowToXMixin:
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
         return dataframe.apply(self.process_row, axis=1, logger=logger)
+
+
+class PandasTransformDictToXMixin:
+    """Transformer which takes a row as a dictionary"""
+
+    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+        return dataframe.apply(self.process_raw, axis=1, raw=True, logger=logger, columns=list(dataframe.columns))
+
+    def process_raw(self, data, columns, logger: Logger) -> pd.Series:
+        return self.process_dict(dict(zip(columns, data)), logger)
 
 
 class PandasTransformXToSingleMixin:
@@ -333,6 +347,27 @@ class PandasTransformRowToDictPlugin(PandasTransformXToDictMixin, PandasTransfor
 
     def process_row(self, row: pd.Series, logger: Logger):
         raise NotImplementedError(f"{self.__class__}.process_row()")
+
+
+class PandasTransformDictToSinglePlugin(PandasTransformXToSingleMixin, PandasTransformDictToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a whole row and returns a single value"""
+
+    def process_dict(self, data, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_dict()")
+
+
+class PandasTransformDictToTuplePlugin(PandasTransformXToTupleMixin, PandasTransformDictToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a whole row and returns a tuple of values"""
+
+    def process_dict(self, data, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_dict()")
+
+
+class PandasTransformDictToDictPlugin(PandasTransformXToDictMixin, PandasTransformDictToXMixin, PandasTransformBasePlugin):
+    """Transformer which takes a whole row and returns a dictionary of values"""
+
+    def process_dict(self, data, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
 class PandasInputPlugin(FileInputMixin, PandasBasePlugin):

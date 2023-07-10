@@ -33,12 +33,13 @@ class JoinPlugin(PandasBasePlugin):
                 {
                     "join_on": ColumnOrIndexChoiceParam("Join On"),
                     "required": BooleanParam("Required", True),
+                    "drop": BooleanParam("Drop Column", False),
                 },
             ),
             read_only=True,
             min_size=2,
             max_size=2,
-        )
+        ),
     }
 
     def join_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, join_params) -> pd.DataFrame:
@@ -46,14 +47,23 @@ class JoinPlugin(PandasBasePlugin):
         # is an index, but don't seem to work correctly if the column
         # is part of a multiindex: the other multiindex columns go missing.
         join1 = join_params.get("left_on")
-        if join1 and join1 not in dataframe1.columns and dataframe1.index.name != join1:
-            dataframe1 = dataframe1.reset_index()
+        if join1 and dataframe1.index.name != join1:
+            drop_index = dataframe1.index.name is None and dataframe1.index.names[0] is None
+            dataframe1 = dataframe1.reset_index(drop=drop_index)
 
         join2 = join_params.get("right_on")
-        if join2 and join2 not in dataframe2.columns and dataframe2.index.name != join2:
-            dataframe2 = dataframe2.reset_index()
+        if join2 and dataframe2.index.name != join2:
+            drop_index = dataframe2.index.name is None and dataframe2.index.names[0] is None
+            dataframe2 = dataframe2.reset_index(drop=drop_index)
 
-        return dataframe1.merge(dataframe2, **join_params)
+        dataframe = dataframe1.merge(dataframe2, **join_params)
+
+        if self.parameters["inputs"][0]["drop"].value and join1 in dataframe.columns:
+            dataframe.drop(columns=join1, inplace=True)
+        if self.parameters["inputs"][1]["drop"].value and join2 in dataframe.columns:
+            dataframe.drop(columns=join2, inplace=True)
+
+        return dataframe
 
     def process_inputs(
         self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]

@@ -37,7 +37,20 @@ class LoadFastqPlugin(PandasInputPlugin):
 
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
-                return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
         else:
             with open(filename, "r", encoding="utf-8") as fh:
-                return pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+
+        if self.parameters["group"].value:
+            for comm_len in range(0, dataframe['header'].str.len().min()-1):
+                if dataframe['header'].str.slice(0, comm_len+1).nunique() > 1:
+                    break
+
+            if comm_len > 0:
+                dataframe['header'] = dataframe['header'].str.slice(0, comm_len)
+                dataframe = dataframe.assign(count=1).groupby(['sequence', 'header']).count()
+            else:
+                dataframe = dataframe.groupby("sequence").count()
+
+        return dataframe

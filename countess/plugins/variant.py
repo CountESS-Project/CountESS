@@ -1,13 +1,14 @@
-import pandas as pd
+from typing import Optional
 
+import pandas as pd
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
-from countess.core.plugins import PandasTransformPlugin
+from countess.core.plugins import PandasTransformDictToSinglePlugin
 from countess.utils.variant import find_variant_string
 
 
-class VariantPlugin(PandasTransformPlugin):
+class VariantPlugin(PandasTransformDictToSinglePlugin):
     """Turns a DNA sequence into a HGVS variant code"""
 
     name = "Variant Translator"
@@ -23,50 +24,36 @@ class VariantPlugin(PandasTransformPlugin):
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
         "drop": BooleanParam("Drop unidentified variants", False),
+        "drop_columns": BooleanParam("Drop Input Column(s)", False),
     }
 
-    def run_df(self, df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        assert isinstance(self.parameters["column"], ColumnChoiceParam)
-        assert isinstance(self.parameters["reference"], ColumnChoiceParam)
-        assert isinstance(self.parameters["sequence"], StringParam)
-        assert isinstance(self.parameters["output"], StringParam)
-        assert isinstance(self.parameters["max_mutations"], IntegerParam)
+    def process_dict(self, data, logger: Logger) -> Optional[str]:
+        if not self.parameters["column"].value:
+            return None
+        try:
+            sequence = data[self.parameters["column"].value]
+            max_mutations = self.parameters["max_mutations"].value
+            if self.parameters["reference"].is_none():
+                reference = self.parameters["sequence"].value
+            else:
+                reference = data[self.parameters["reference"].value]
+            return find_variant_string("g.", reference, sequence, max_mutations)
+        except ValueError:
+            return None
+        except (TypeError, KeyError) as exc:
+            logger.exception(exc)
+            return None
 
-        dfo = df.copy()
-
-        column = self.parameters["column"].get_column(df)
-        reference = self.parameters["reference"].get_column(df)
-        output = self.parameters["output"].value
-
-        if self.parameters["auto"].value:
-            value = pd.Series.mode(column)[0]
-            self.parameters["sequence"].value = value
-
-        max_mutations = self.parameters["max_mutations"].value
-
-        if reference is not None:
-
-            def func(ref_var):
-                try:
-                    return find_variant_string("g.", ref_var[0], ref_var[1], max_mutations)
-                except ValueError as exc:
-                    logger.warning(str(exc))
-                    return None
-
-            dfo[output] = pd.DataFrame([column, reference]).apply(func, raw=True, result_type="reduce")
-        else:
-            ref_str = self.parameters["sequence"].value
-
-            def func(var_str):
-                try:
-                    return find_variant_string("g.", ref_str, var_str, max_mutations)
-                except ValueError as exc:
-                    logger.warning(str(exc))
-                    return None
-
-            dfo[output] = column.apply(func)
-
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        dataframe = super().process_dataframe(dataframe, logger)
         if self.parameters["drop"].value:
-            dfo = dfo.query("variant.notnull()")
+            dataframe.dropna(subset=self.parameters["output"].value, inplace=True)
+        if self.parameters["drop_columns"].value:
+            try:
+                dataframe.drop(columns=self.parameters["column"].value, inplace=True)
+                if not self.parameters["reference"].is_none():
+                    dataframe.drop(columns=self.parameters["reference"].value, inplace=True)
+            except KeyError:
+                pass
 
-        return dfo
+        return dataframe

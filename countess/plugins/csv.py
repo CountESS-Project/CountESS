@@ -1,6 +1,7 @@
 import csv
 from io import BufferedWriter, BytesIO
 from typing import Iterable, Mapping, Optional, Union
+import gzip
 
 import pandas as pd
 
@@ -210,7 +211,10 @@ class SaveCsvPlugin(PandasOutputPlugin):
         if row_limit is None:
             filename = self.parameters["filename"].value
             print(f"OPEN {filename}")
-            self.filehandle = open(filename, "wb")
+            if filename.endswith(".gz"):
+                self.filehandle = gzip.open(filename, "wb")
+            else:
+                self.filehandle = open(filename, "wb")
             super().process_inputs(inputs, logger, row_limit)
             return None
         else:
