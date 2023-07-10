@@ -286,7 +286,6 @@ class PandasTransformXToDictMixin:
     """Transformer which returns a dictionary of values, putting them into
     columns named after the dictionary keys."""
 
-
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
         return pd.DataFrame(series.tolist(), index=series.index)
 
@@ -365,3 +364,20 @@ class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
 
     def read_file_to_dataframe(self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None) -> pd.DataFrame:
         raise NotImplementedError(f"Implement {self.__class__.__name__}.read_file_to_dataframe")
+
+
+class PandasOutputPlugin(PandasBasePlugin):
+    def process_inputs(self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]):
+        iterators = set(iter(input) for input in inputs.values())
+
+        while iterators:
+            for it in list(iterators):
+                try:
+                    df_in = next(it)
+                    assert isinstance(df_in, pd.DataFrame)
+                    self.output_dataframe(df_in, logger)
+                except StopIteration:
+                    iterators.remove(it)
+
+    def output_dataframe(self, dataframe: pd.DataFrame, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.output_dataframe")

@@ -1,10 +1,11 @@
 import csv
-from io import StringIO
-from typing import Any, Optional
+from io import BufferedWriter, BytesIO
+from typing import Iterable, Mapping, Optional, Union
 
 import pandas as pd
 
 from countess import VERSION
+from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -14,7 +15,7 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasBasePlugin, PandasInputPlugin
+from countess.core.plugins import PandasInputPlugin, PandasOutputPlugin
 
 # XXX it would be better to do the same this Regex Tool does and get the user to assign
 # data types to each column
@@ -145,7 +146,7 @@ class LoadCsvPlugin(PandasInputPlugin):
         return df
 
 
-class SaveCsvPlugin(PandasBasePlugin):
+class SaveCsvPlugin(PandasOutputPlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
@@ -160,34 +161,57 @@ class SaveCsvPlugin(PandasBasePlugin):
         "quoting": BooleanParam("Quote all Strings", False),
     }
 
-    def run(
+    filehandle: Optional[Union[BufferedWriter | BytesIO]] = None
+    csv_columns = []
+
+    SEPARATORS = {",": ",", ";": ";", "SPACE": " ", "TAB": "\t"}
+    QUOTING = {False: csv.QUOTE_MINIMAL, True: csv.QUOTE_NONNUMERIC}
+
+    def output_dataframe(self, dataframe: pd.DataFrame, logger: Logger):
+        # reset indexes so we can treat all columns equally.
+        # if there's just a nameless index then we don't care about it, drop it.
+
+        drop_index = dataframe.index.name is None and dataframe.index.names[0] is None
+        dataframe = dataframe.reset_index(drop=drop_index)
+
+        # if this is our first dataframe to write then decide whether to
+        # include the header or not.
+        if self.filehandle.tell() == 0:
+            self.csv_columns = list(dataframe.columns)
+            emit_header = self.parameters["header"].value
+        else:
+            # add in any columns we haven't seen yet in previous dataframes.
+            for c in dataframe.columns:
+                if c not in self.csv_columns:
+                    self.csv_columns.append(c)
+                    logger.warning(f"Added CSV Column {repr(c)} with no header")
+            # fill in blanks for any columns which are in previous dataframes but not
+            # in this one.
+            dataframe = dataframe.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
+            emit_header = False
+
+        dataframe.to_csv(
+            self.filehandle,
+            header=emit_header,
+            columns=self.csv_columns,
+            index=False,
+            sep=self.SEPARATORS[self.parameters["delimiter"].value],
+            quoting=self.QUOTING[self.parameters["quoting"].value],
+        )
+
+    def process_inputs(
         self,
-        data: Any,
+        inputs: Mapping[str, Iterable[pd.DataFrame]],
         logger,
         row_limit: Optional[int] = None,
-    ):
+    ) -> Optional[str]:
         assert isinstance(self.parameters["filename"], StringParam)
 
-        filename = self.parameters["filename"].value
-        sep = self.parameters["delimiter"].value
-        if sep == "TAB":
-            sep = "\t"
-        elif sep == "SPACE":
-            sep = " "
-
-        has_named_index = (data.index.name is not None) or (hasattr(data.index, "names") and data.index.names[0] is not None)
-
-        options = {
-            "header": self.parameters["header"].value,
-            "index": has_named_index,
-            "sep": sep,
-            "quoting": csv.QUOTE_NONNUMERIC if self.parameters["quoting"].value else csv.QUOTE_MINIMAL,
-        }
-
         if row_limit is None:
-            data.to_csv(filename, **options)
+            self.filehandle = open(self.parameters["filename"].value, "wb")
+            super().process_inputs(inputs, logger, row_limit)
             return None
         else:
-            buf = StringIO()
-            data.to_csv(buf, **options)
-            return buf.getvalue()
+            self.filehandle = BytesIO()
+            super().process_inputs(inputs, logger, row_limit)
+            return self.filehandle.getvalue().decode("utf-8")

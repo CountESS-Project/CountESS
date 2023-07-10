@@ -39,7 +39,7 @@ class PipelineNode:
         if self.plugin:
             try:
                 self.result = self.plugin.process_inputs(inputs, logger, row_limit)
-                if row_limit is not None or len(self.child_nodes) > 1:
+                if not isinstance(self.result, (bytes, str)) and (row_limit is not None or len(self.child_nodes) > 1):
                     # XXX freeze to handle fan-out and reloading.
                     self.result = list(self.result)
             except Exception as exc:  # pylint: disable=broad-exception-caught

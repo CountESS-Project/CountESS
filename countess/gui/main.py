@@ -5,8 +5,6 @@ import webbrowser
 from tkinter import filedialog, messagebox
 from typing import Optional
 
-import pandas as pd
-
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
 from countess.core.logger import ConsoleLogger
@@ -148,26 +146,24 @@ class ConfiguratorWrapper:
     def show_preview_subframe(self):
         if self.preview_subframe:
             self.preview_subframe.destroy()
-        try:
-            df = concat_dataframes(self.node.result)
-            self.preview_subframe = TabularDataFrame(self.frame)
-            self.preview_subframe.set_dataframe(df)
-        except (TypeError, ValueError):
+        if isinstance(self.node.result, str):
             self.preview_subframe = tk.Frame(self.frame)
-            self.preview_subframe.columnconfigure(0, weight=1)
-            tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
-
-        # if isinstance(self.node.result, pd.DataFrame):
-        # elif isinstance(self.node.result, str):
-        #    self.preview_subframe = tk.Frame(self.frame)
-        #    self.preview_subframe.rowconfigure(1, weight=1)
-        #    n_lines = len(self.node.result.splitlines())
-        #    tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(sticky=tk.NSEW)
-        #    text = tk.Text(self.preview_subframe)
-        #    text.insert("1.0", self.node.result)
-        #    text["state"] = "disabled"
-        #    text.grid(sticky=tk.NSEW)
-        # else:
+            self.preview_subframe.rowconfigure(1, weight=1)
+            n_lines = len(self.node.result.splitlines())
+            tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(sticky=tk.NSEW)
+            text = tk.Text(self.preview_subframe)
+            text.insert("1.0", self.node.result)
+            text["state"] = "disabled"
+            text.grid(sticky=tk.NSEW)
+        else:
+            try:
+                df = concat_dataframes(self.node.result)
+                self.preview_subframe = TabularDataFrame(self.frame)
+                self.preview_subframe.set_dataframe(df)
+            except (TypeError, ValueError):
+                self.preview_subframe = tk.Frame(self.frame)
+                self.preview_subframe.columnconfigure(0, weight=1)
+                tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
