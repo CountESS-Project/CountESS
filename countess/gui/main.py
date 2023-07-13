@@ -146,7 +146,8 @@ class ConfiguratorWrapper:
     def show_preview_subframe(self):
         if self.preview_subframe:
             self.preview_subframe.destroy()
-        if isinstance(self.node.result, str):
+
+        if isinstance(self.node.result, (str, bytes)):
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.rowconfigure(1, weight=1)
             n_lines = len(self.node.result.splitlines())
