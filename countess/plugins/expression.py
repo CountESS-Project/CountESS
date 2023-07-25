@@ -10,6 +10,7 @@ def process(df: pd.DataFrame, codes, logger: Logger):
     for code in codes:
         if not code:
             continue
+
         try:
             result = df.eval(code)
         except Exception as exc:  # pylint: disable=W0718

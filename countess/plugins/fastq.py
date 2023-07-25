@@ -1,5 +1,6 @@
 import gzip
 from itertools import islice
+from typing import Optional, Iterable
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -7,7 +8,7 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from countess import VERSION
 from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputPlugin
-
+from countess.core.logger import Logger
 
 def _file_reader(file_handle, min_avg_quality, row_limit=None):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
@@ -54,3 +55,11 @@ class LoadFastqPlugin(PandasInputPlugin):
                 dataframe = dataframe.groupby("sequence").count()
 
         return dataframe
+
+    def num_files(self):
+        return len(self.parameters["files"])
+
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        file_params = self.parameters["files"][file_number]
+        yield self.read_file_to_dataframe(file_params, logger, row_limit)
+

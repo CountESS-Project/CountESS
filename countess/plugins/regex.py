@@ -46,6 +46,10 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
 
     compiled_re = None
 
+    def prepare(self, sources: list[str]):
+
+        self.compiled_re = re.compile(self.parameters["regex"].value)
+
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         df = super().process_dataframe(dataframe, logger)
 
@@ -65,15 +69,6 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
             df = df.set_index(index_names)
 
         return df
-
-    def process_inputs(
-        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
-    ) -> Iterable[pd.DataFrame]:
-        self.compiled_re = re.compile(self.parameters["regex"].value)
-        while self.compiled_re.groups > len(self.parameters["output"].params):
-            self.parameters["output"].add_row()
-
-        return super().process_inputs(inputs, logger, row_limit)
 
     def process_value(self, value: str, logger: Logger) -> Tuple[str]:
         if value is not None:

@@ -1,13 +1,15 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from more_itertools import interleave_longest
+
 from queue import Empty
 import multiprocessing
 import time
 import psutil
 
 from countess.core.logger import Logger
-from countess.core.plugins import BasePlugin, get_plugin_classes
+from countess.core.plugins import BasePlugin, get_plugin_classes, FileInputMixin
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -57,7 +59,6 @@ class MultiprocessingProxyIterator:
         raise StopIteration
 
 
-
 @dataclass
 class PipelineNode:
     name: str
@@ -85,22 +86,38 @@ class PipelineNode:
 
     def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
-        inputs = {p.name: p.result for p in self.parent_nodes}
-        self.result = []
-        if self.plugin:
-            try:
-                self.result = self.plugin.process_inputs(inputs, logger, row_limit)
-                if isinstance(self.result, (bytes, str)):
-                    pass
-                elif row_limit is not None:
-                    self.result = list(self.result)
-                #if not isinstance(self.result, (bytes, str)) and (row_limit is not None or len(self.child_nodes) > 1):
-                    # XXX freeze to handle fan-out and reloading.
-                #    self.result = list(self.result)
-                elif hasattr(self.result, '__iter__'):
-                    self.result = MultiprocessingProxy(self.result, self.name)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
-                logger.exception(exc)
+
+        if self.plugin is None:
+            self.result = []
+        elif self.result and not self.is_dirty:
+            return
+        elif isinstance(self.plugin, FileInputMixin):
+            num_files = self.plugin.num_files()
+            gg = [
+                    self.plugin.load_file(n, logger, row_limit // num_files)
+                    for n in range(0, num_files)
+            ]
+            self.result = list(interleave_longest(*gg))
+        else:
+            self.plugin.prepare([p.name for p in self.parent_nodes])
+            input_source_data = interleave_longest(*(
+                [ (p.name, r) for r in p.result ]
+                for p in self.parent_nodes
+            ))
+            self.result = list(self.plugin.collect(
+                d
+                for source, data in input_source_data
+                for d in self.plugin.process(data, source, logger)
+            ))
+        for p in self.parent_nodes:
+            r = self.plugin.finished(p.name, logger)
+            if r:
+                self.result += list(r)
+        r = self.plugin.finalize(logger)
+        if r:
+            self.result += list(r)
+
+        self.is_dirty = False
 
     def load_config(self, logger: Logger):
         assert isinstance(self.plugin, BasePlugin)

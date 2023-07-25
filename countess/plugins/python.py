@@ -14,6 +14,9 @@ from countess.core.plugins import PandasTransformRowToDictPlugin
 
 SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 
+# XXX should probably actually be based on
+# PandasTransformDictToDictPlugin
+# which is a bit more efficient.
 
 class PythonPlugin(PandasTransformRowToDictPlugin):
     name = "Python Code"
@@ -37,6 +40,10 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
         return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        """Override parent class because we a) want to reset
+        the indexes so we can use their values easily and 
+        b) we don't need to merge afterwards"""
+
         dataframe = dataframe.reset_index(drop=False)
         series = self.dataframe_to_series(dataframe, logger)
         dataframe = self.series_to_dataframe(series)

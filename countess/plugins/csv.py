@@ -143,6 +143,13 @@ class LoadCsvPlugin(PandasInputPlugin):
 
         return df
 
+    def num_files(self):
+        return len(self.parameters["files"])
+
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        file_params = self.parameters["files"][file_number]
+        yield self.read_file_to_dataframe(file_params, logger, row_limit)
+
 
 class SaveCsvPlugin(PandasOutputPlugin):
     name = "CSV Save"

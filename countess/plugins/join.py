@@ -2,12 +2,11 @@ from collections.abc import Mapping, MutableMapping
 from typing import Iterable, Optional, Union
 
 import pandas as pd
-from moore_itertools import product
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, BooleanParam, ColumnOrIndexChoiceParam, MultiParam
-from countess.core.plugins import PandasBasePlugin
+from countess.core.plugins import PandasBasePlugin, PandasProductPlugin
 from countess.utils.pandas import get_all_columns
 
 
@@ -18,7 +17,7 @@ def _join_how(left_required: bool, right_required: bool) -> str:
         return "right" if right_required else "outer"
 
 
-class JoinPlugin(PandasBasePlugin):
+class JoinPlugin(PandasProductPlugin):
     """Joins Pandas Dataframes"""
 
     name = "Join"
@@ -41,22 +40,51 @@ class JoinPlugin(PandasBasePlugin):
             max_size=2,
         ),
     }
+    join_params = None
+    input_columns_1 = None
+    input_columns_2 = None
 
-    def join_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, join_params) -> pd.DataFrame:
+    def prepare(self, sources: list[str]):
+        super().prepare(sources)
+
+        assert isinstance(self.parameters["inputs"], ArrayParam)
+        assert len(self.parameters["inputs"]) == 2
+        ip1, ip2 = self.parameters["inputs"]
+        ip1.label = f"Input 1: {sources[0]}"
+        ip2.label = f"Input 2: {sources[1]}"
+
+        self.join_params = {
+            "how": _join_how(ip1.required.value, ip2.required.value),
+            "left_index": ip1.join_on.is_index(),
+            "right_index": ip2.join_on.is_index(),
+            "left_on": None if ip1.join_on.is_index() else ip1.join_on.value,
+            "right_on": None if ip2.join_on.is_index() else ip2.join_on.value,
+        }
+        self.input_columns_1 = {}
+        self.input_columns_2 = {}
+
+    def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+
+        # update columns on inputs, these won't propagate back in the case of multiprocess runs but
+        # they will work in preview mode where we only run this in a single thread.
+
+        self.input_columns_1.update(get_all_columns(dataframe1))
+        self.input_columns_2.update(get_all_columns(dataframe2))
+
         # "left_on" and "right_on" don't seem to mind if the column
         # is an index, but don't seem to work correctly if the column
         # is part of a multiindex: the other multiindex columns go missing.
-        join1 = join_params.get("left_on")
+        join1 = self.join_params.get("left_on")
         if join1 and dataframe1.index.name != join1:
             drop_index = dataframe1.index.name is None and dataframe1.index.names[0] is None
             dataframe1 = dataframe1.reset_index(drop=drop_index)
 
-        join2 = join_params.get("right_on")
+        join2 = self.join_params.get("right_on")
         if join2 and dataframe2.index.name != join2:
             drop_index = dataframe2.index.name is None and dataframe2.index.names[0] is None
             dataframe2 = dataframe2.reset_index(drop=drop_index)
 
-        dataframe = dataframe1.merge(dataframe2, **join_params)
+        dataframe = dataframe1.merge(dataframe2, **self.join_params)
 
         if self.parameters["inputs"][0]["drop"].value and join1 in dataframe.columns:
             dataframe.drop(columns=join1, inplace=True)
@@ -65,36 +93,9 @@ class JoinPlugin(PandasBasePlugin):
 
         return dataframe
 
-    def process_inputs(
-        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
-    ) -> Iterable[pd.DataFrame]:
-        try:
-            input1, input2 = inputs.values()
-        except ValueError:
-            raise NotImplementedError("Only two-way joins implemented at this time")  # pylint: disable=raise-missing-from
-
-        inputs_param = self.parameters["inputs"]
-        assert isinstance(inputs_param, ArrayParam)
-        assert len(inputs_param) == 2
-        ip1, ip2 = inputs_param
-
-        join_params = {
-            "how": _join_how(ip1.required.value, ip2.required.value),
-            "left_index": ip1.join_on.is_index(),
-            "right_index": ip2.join_on.is_index(),
-            "left_on": None if ip1.join_on.is_index() else ip1.join_on.value,
-            "right_on": None if ip2.join_on.is_index() else ip2.join_on.value,
-        }
-
-        input_columns_1 = {}
-        input_columns_2 = {}
-
-        for df_in1, df_in2 in product(input1, input2):
-            input_columns_1.update(get_all_columns(df_in1))
-            input_columns_2.update(get_all_columns(df_in2))
-            df_out = self.join_dataframes(df_in1, df_in2, join_params)
-            if len(df_out):
-                yield df_out
-
-        ip1.set_column_choices(input_columns_1.keys())
-        ip2.set_column_choices(input_columns_2.keys())
+    def finalize(self, logger: Logger) -> None:
+        assert isinstance(self.parameters["inputs"], ArrayParam)
+        assert len(self.parameters["inputs"]) == 2
+        ip1, ip2 = self.parameters["inputs"]
+        ip1.set_column_choices(self.input_columns_1.keys())
+        ip2.set_column_choices(self.input_columns_2.keys())
