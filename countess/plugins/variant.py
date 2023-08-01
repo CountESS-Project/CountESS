@@ -1,6 +1,7 @@
 from typing import Optional
 
 import pandas as pd
+
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
@@ -28,6 +29,7 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
     }
 
     def process_dict(self, data, logger: Logger) -> Optional[str]:
+        assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
         if not self.parameters["column"].value:
             return None
         try:
@@ -45,6 +47,7 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
             return None
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
         dataframe = super().process_dataframe(dataframe, logger)
         if self.parameters["drop"].value:
             dataframe.dropna(subset=self.parameters["output"].value, inplace=True)

@@ -1,73 +1,25 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, Iterable
+from multiprocessing import Process, Queue
 from os import cpu_count
 from queue import Empty
-import multiprocessing
-import time
-
-import psutil
+from typing import Any, Iterable, Optional
 
 from countess.core.logger import Logger
-from countess.core.plugins import BasePlugin, get_plugin_classes, FileInputMixin
+from countess.core.plugins import BasePlugin, FileInputMixin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
-
-
-class MultiprocessingProxy:
-
-    def __init__(self, iterator, name):
-        self.iterator = iterator
-        self.process = None
-        self.queue = multiprocessing.Queue(maxsize=3)
-        self.name = name
-
-    def target(self):
-        for x in self.iterator:
-            self.queue.put(x)
-
-            # Throttle back if system memory is running
-            # low.
-            # XXX risk of deadlocks, of course.
-            while psutil.virtual_memory().percent > 75:
-                time.sleep(1)
-
-        self.queue.close()
-
-    def __iter__(self):
-        self.process = multiprocessing.Process(target=self.target)
-        self.process.start()
-        return MultiprocessingProxyIterator(self.process, self.queue, self.name)
-
-class MultiprocessingProxyIterator:
-
-    def __init__(self, process, queue, name):
-        self.process = process
-        self.queue = queue
-        self.name = name
-        self.count = 0
-
-    def __next__(self):
-        while True:
-            try:
-                msg = self.queue.get(timeout=2)
-                self.count += 1
-                return msg
-            except Empty:
-                if not self.process.is_alive():
-                    break
-        raise StopIteration
 
 
 def multi_iterator_map(function, values, args) -> Iterable:
     """Pretty much equivalent to:
         interleave_longest(function(v, *args) for v in values)
-    but runs in multiple processes using a queue 
+    but runs in multiple processes using a queue
     to organize `values` and another queue to organize the
     returned values."""
 
-    nproc = min((cpu_count(), len(values)))
-    queue1 = multiprocessing.Queue()
-    queue2 = multiprocessing.Queue(maxsize=nproc)
+    nproc = min(((cpu_count() or 1) + 1, len(values)))
+    queue1: Queue = Queue()
+    queue2: Queue = Queue(maxsize=nproc)
 
     for v in values:
         queue1.put(v)
@@ -81,10 +33,7 @@ def multi_iterator_map(function, values, args) -> Iterable:
         except Empty:
             pass
 
-    processes = [
-        multiprocessing.Process(target = __target)
-        for _ in range(0, nproc)
-    ]
+    processes = [Process(target=__target) for _ in range(0, nproc)]
     for p in processes:
         p.start()
 
@@ -93,6 +42,7 @@ def multi_iterator_map(function, values, args) -> Iterable:
             yield queue2.get(timeout=1)
         except Empty:
             pass
+
 
 @dataclass
 class PipelineNode:
@@ -120,11 +70,11 @@ class PipelineNode:
         return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
     def process_parent_iterables(self, logger):
-        """Combines the values from all the input interables and processes 
+        """Combines the values from all the input interables and processes
         them"""
         # XXX this really should be multiprocess and asynchronous.
 
-        iters_dict = { p.name: iter(p.result) for p in self.parent_nodes }
+        iters_dict = {p.name: iter(p.result) for p in self.parent_nodes}
         while iters_dict:
             for name, it in list(iters_dict.items()):
                 try:
@@ -139,16 +89,13 @@ class PipelineNode:
 
         if self.plugin is None:
             self.result = []
+            return
         elif self.result and not self.is_dirty:
             return
         elif isinstance(self.plugin, FileInputMixin):
             num_files = self.plugin.num_files()
             row_limit_each_file = row_limit // num_files if row_limit is not None else None
-            self.result = multi_iterator_map(
-                self.plugin.load_file,
-                range(0, num_files),
-                args=(logger, row_limit_each_file)
-            )
+            self.result = multi_iterator_map(self.plugin.load_file, range(0, num_files), args=(logger, row_limit_each_file))
         else:
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
             self.result = self.process_parent_iterables(logger)

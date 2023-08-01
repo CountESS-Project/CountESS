@@ -1,21 +1,20 @@
 """ pandas utility functions """
 
-from typing import Iterable, Mapping, Optional
+from typing import Any, Dict, Iterable, Optional
 
-import numpy as np
 import pandas as pd
 
 
-def get_all_indexes(dataframe: pd.DataFrame) -> Mapping[str, np.dtype]:
+def get_all_indexes(dataframe: pd.DataFrame) -> Dict[str, Any]:
     if dataframe.index.name:
-        return {dataframe.index.name: dataframe.index.dtype}
-    elif hasattr(dataframe.index, "names") and dataframe.index.names[0] is not None:
+        return {str(dataframe.index.name): dataframe.index.dtype}
+    elif hasattr(dataframe.index, "names") and hasattr(dataframe.index, "dtypes") and dataframe.index.names[0] is not None:
         return dict(zip(dataframe.index.names, dataframe.index.dtypes))
     else:
         return {}
 
 
-def get_all_columns(dataframe: pd.DataFrame) -> Mapping[str, np.dtype]:
+def get_all_columns(dataframe: pd.DataFrame) -> Dict[str, Any]:
     r = get_all_indexes(dataframe)
     r.update(dict(zip(dataframe.columns, dataframe.dtypes)))
     return r

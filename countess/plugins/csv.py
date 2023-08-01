@@ -1,7 +1,7 @@
 import csv
-from io import BufferedWriter, BytesIO
-from typing import Iterable, Mapping, Optional, Union
 import gzip
+from io import BufferedWriter, BytesIO
+from typing import Iterable, Optional, Union
 
 import pandas as pd
 
@@ -147,6 +147,7 @@ class LoadCsvPlugin(PandasInputPlugin):
         return len(self.parameters["files"])
 
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        assert isinstance(self.parameters["files"], ArrayParam)
         file_params = self.parameters["files"][file_number]
         yield self.read_file_to_dataframe(file_params, logger, row_limit)
 
@@ -195,7 +196,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
         # include the header or not.
         if self.csv_columns is None:
             self.csv_columns = list(dataframe.columns)
-            emit_header = self.parameters["header"].value
+            emit_header = bool(self.parameters["header"].value)
         else:
             # add in any columns we haven't seen yet in previous dataframes.
             for c in dataframe.columns:
@@ -213,8 +214,8 @@ class SaveCsvPlugin(PandasOutputPlugin):
             columns=self.csv_columns,
             index=False,
             sep=self.SEPARATORS[self.parameters["delimiter"].value],
-            quoting=self.QUOTING[self.parameters["quoting"].value],
-        )
+            quoting=bool(self.QUOTING[self.parameters["quoting"].value]),
+        )  # type: ignore [call-overload]
         return []
 
     def finalize(self, logger: Logger):

@@ -18,6 +18,7 @@ SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 # PandasTransformDictToDictPlugin
 # which is a bit more efficient.
 
+
 class PythonPlugin(PandasTransformRowToDictPlugin):
     name = "Python Code"
     description = "Apply python code to each row."
@@ -41,7 +42,7 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         """Override parent class because we a) want to reset
-        the indexes so we can use their values easily and 
+        the indexes so we can use their values easily and
         b) we don't need to merge afterwards"""
 
         dataframe = dataframe.reset_index(drop=False)

@@ -40,6 +40,8 @@ class ExpressionPlugin(PandasSimplePlugin):
     }
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        assert isinstance(self.parameters["drop"], PerColumnArrayParam)
+
         codes = [c.replace("\n", " ").strip() for c in self.parameters["code"].value.split("\n\n")]
         df = process(dataframe, codes, logger)
 

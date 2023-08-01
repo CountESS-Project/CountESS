@@ -1,5 +1,5 @@
 import re
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 import pandas as pd
 
@@ -47,10 +47,10 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     compiled_re = None
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
-
         self.compiled_re = re.compile(self.parameters["regex"].value)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+        assert isinstance(self.parameters["output"], ArrayParam)
         df = super().process_dataframe(dataframe, logger)
 
         if self.parameters["drop_unmatch"].value:
@@ -70,14 +70,13 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
 
         return df
 
-    def process_value(self, value: str, logger: Logger) -> Tuple[str]:
+    def process_value(self, value: str, logger: Logger) -> Iterable:
+        assert self.compiled_re is not None
+        assert isinstance(self.parameters["output"], ArrayParam)
         if value is not None:
             try:
                 if match := self.compiled_re.match(str(value)):
-                    return [
-                        op.datatype.cast_value(val)
-                        for op, val in zip(self.parameters["output"], match.groups())
-                    ]
+                    return [op.datatype.cast_value(val) for op, val in zip(self.parameters["output"], match.groups())]
                 else:
                     logger.info(f"{repr(value)} didn't match")
             except (TypeError, ValueError) as exc:
@@ -153,3 +152,8 @@ class RegexReaderPlugin(PandasInputPlugin):
 
         df = pd.concat(pdfs)
         return df
+
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        assert isinstance(self.parameters["files"], ArrayParam)
+        file_params = self.parameters["files"][file_number]
+        yield self.read_file_to_dataframe(file_params, logger, row_limit)

@@ -21,7 +21,7 @@ import logging
 import os.path
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import Dict, Iterable, Optional, Union, List
+from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -38,7 +38,6 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.utils.pandas import get_all_columns
-
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -141,8 +140,8 @@ class BasePlugin:
     def prepare(self, sources: List[str], row_limit: Optional[int]):
         pass
 
-    def process(self, data, source: str, logger: Logger) -> Optional[Iterable[pd.DataFrame]]:
-        """Called with each `data` input from `source`, calls 
+    def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+        """Called with each `data` input from `source`, calls
         `callback` to send messages to the next plugin"""
         raise NotImplementedError(f"{self.__class__}.process")
 
@@ -153,8 +152,8 @@ class BasePlugin:
         return []
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
-        """Called when all sources are finished.  Can be 
-        ignored by most things.  This should reset the 
+        """Called when all sources are finished.  Can be
+        ignored by most things.  This should reset the
         plugin to be ready for another use."""
         # override this if you need to do anything
         return []
@@ -188,15 +187,9 @@ class FileInputMixin:
 
 
 class PandasBasePlugin(BasePlugin):
-
     DATAFRAME_BUFFER_SIZE = 1000000
 
-    def process_inputs(
-        self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]
-    ) -> Iterable[pd.DataFrame]:
-        raise NotImplementedError(f"{self.__class__}.process_inputs()")
-
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> pd.DataFrame:
+    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")
 
     def collect(self, data: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
@@ -252,11 +245,10 @@ class PandasProductPlugin(PandasBasePlugin):
 
     source1 = None
     source2 = None
-    mem1 = None
-    mem2 = None
+    mem1: Optional[List] = None
+    mem2: Optional[List] = None
 
     def prepare(self, sources: list[str], row_limit: Optional[int]):
-
         if len(sources) != 2:
             raise ValueError(f"{self.__class__} required exactly two inputs")
         self.source1, self.source2 = sources
@@ -270,6 +262,7 @@ class PandasProductPlugin(PandasBasePlugin):
         if source == self.source1:
             if self.mem1 is not None:
                 self.mem1.append(data)
+            assert self.mem2 is not None
             for val2 in self.mem2:
                 df = self.process_dataframes(data, val2, logger)
                 if len(df):
@@ -278,6 +271,7 @@ class PandasProductPlugin(PandasBasePlugin):
         elif source == self.source2:
             if self.mem2 is not None:
                 self.mem2.append(data)
+            assert self.mem1 is not None
             for val1 in self.mem1:
                 df = self.process_dataframes(val1, data, logger)
                 if len(df):
@@ -332,14 +326,15 @@ class PandasProductPlugin(PandasBasePlugin):
 # Most plugins just need to pick a PandasTransform class and run with it.  A lot of the time it's
 # going to be PandasTransformSingleToSinglePlugin.
 
+
 class PandasTransformBasePlugin(PandasSimplePlugin):
     """Base classes for the nine (!!) PandasTransformXToXPlugin superclasses."""
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        return NotImplementedError(f"{self.__class__}.series_to_dataframe()")
+        raise NotImplementedError(f"{self.__class__}.series_to_dataframe()")
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        return NotImplementedError(f"{self.__class__}.dataframe_to_series()")
+        raise NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         series = self.dataframe_to_series(dataframe, logger)
@@ -347,15 +342,12 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
         df3 = dataframe.merge(df2, left_index=True, right_index=True)
         return df3
 
-    def process_value(self, value, logger: Logger):
-        raise NotImplementedError(f"{self.__class__}.process_value()")
-
 
 # XXX instead of just asserting the existence of the parameters should we
 # actually create them in these mixins?
 
 
-class PandasTransformSingleToXMixin:
+class PandasTransformSingleToXMixin:  # type: ignore [attr-defined]
     """Transformer which takes a single column, the name of which is specified
     in a ColumnChoiceParam called "column" """
 
@@ -363,12 +355,15 @@ class PandasTransformSingleToXMixin:
         super().__init__(*a, **k)
         assert isinstance(self.parameters["column"], ColumnChoiceParam)
 
+    def process_value(self, value, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_value()")
+
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        column_name = self.parameters["column"].value
+        column_name = self.parameters["column"].value  # type: ignore [attr-defined]
         if column_name in dataframe:
             return dataframe[column_name].apply(self.process_value, logger=logger)
         elif column_name == dataframe.index.name:
-            return dataframe.index.apply(self.process_value, logger=logger)
+            return dataframe.index.to_series().apply(self.process_value, logger=logger)
         elif column_name in dataframe.index.names:
             return dataframe.index.to_frame()[column_name].apply(self.process_value, logger=logger)
         else:
@@ -381,18 +376,32 @@ class PandasTransformRowToXMixin:
     """Transformer which takes an entire row. Less efficient than processing
     just a single value, but a bit more flexible."""
 
+    def process_row(self, row: pd.Series, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_row()")
+
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        return dataframe.apply(self.process_row, axis=1, logger=logger)
+        return dataframe.apply(self.process_row, axis=1, args=(logger,))
 
 
 class PandasTransformDictToXMixin:
     """Transformer which takes a row as a dictionary"""
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        return dataframe.apply(self.process_raw, axis=1, raw=True, logger=logger, columns=list(dataframe.columns))
+        return dataframe.apply(
+            self.process_raw,
+            axis=1,
+            raw=True,
+            kwargs={
+                "columns": list(dataframe.columns),
+                "logger": logger,
+            },
+        )
+
+    def process_dict(self, data, logger: Logger):
+        raise NotImplementedError(f"{self.__class__}.process_dict()")
 
     def process_raw(self, data, columns, logger: Logger) -> pd.Series:
-        return self.process_dict(dict(zip(columns, data)), logger)
+        return self.process_dict(dict(zip(columns, data)), logger=logger)
 
 
 class PandasTransformXToSingleMixin:
@@ -404,7 +413,7 @@ class PandasTransformXToSingleMixin:
         assert isinstance(self.parameters["output"], StringParam)
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        return series.to_frame(name=self.parameters["output"].value)
+        return series.to_frame(name=self.parameters["output"].value)  # type: ignore [attr-defined]
 
 
 class PandasTransformXToTupleMixin:
@@ -417,7 +426,7 @@ class PandasTransformXToTupleMixin:
         assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        column_names = [pp.name.value for pp in self.parameters["output"]]
+        column_names = [pp.name.value for pp in self.parameters["output"]]  # type: ignore [attr-defined]
         df = pd.DataFrame(series.tolist(), columns=column_names, index=series.index)
         return df
 
@@ -496,9 +505,9 @@ class PandasTransformDictToDictPlugin(PandasTransformXToDictMixin, PandasTransfo
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
-class PandasInputPlugin(FileInputMixin, PandasBasePlugin):
+class PandasInputPlugin(FileInputMixin,BasePlugin):
     """A specialization of the PandasBasePlugin to allow it to follow nothing,
-    eg: come first. """
+    eg: come first."""
 
     def __init__(self, *a, **k):
         # Add in filenames

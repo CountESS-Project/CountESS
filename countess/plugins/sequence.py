@@ -1,3 +1,5 @@
+from typing import Optional
+
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, IntegerParam, StringParam
@@ -23,7 +25,7 @@ class SequencePlugin(PandasTransformSingleToSinglePlugin):
         "output": StringParam("Output Column", "sequence"),
     }
 
-    def process_value(self, value: str, logger: Logger) -> str:
+    def process_value(self, value: str, logger: Logger) -> Optional[str]:
         if value is None:
             return None
 

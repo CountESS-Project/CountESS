@@ -1,14 +1,15 @@
 import gzip
 from itertools import islice
-from typing import Optional, Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import BooleanParam, FloatParam
-from countess.core.plugins import PandasInputPlugin
 from countess.core.logger import Logger
+from countess.core.parameters import ArrayParam, BooleanParam, FloatParam
+from countess.core.plugins import PandasInputPlugin
+
 
 def _file_reader(file_handle, min_avg_quality, row_limit=None):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
@@ -44,13 +45,13 @@ class LoadFastqPlugin(PandasInputPlugin):
                 dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
 
         if self.parameters["group"].value:
-            for comm_len in range(0, dataframe['header'].str.len().min()-1):
-                if dataframe['header'].str.slice(0, comm_len+1).nunique() > 1:
+            for comm_len in range(0, dataframe["header"].str.len().min() - 1):
+                if dataframe["header"].str.slice(0, comm_len + 1).nunique() > 1:
                     break
 
             if comm_len > 0:
-                dataframe['header'] = dataframe['header'].str.slice(0, comm_len)
-                dataframe = dataframe.assign(count=1).groupby(['sequence', 'header']).count()
+                dataframe["header"] = dataframe["header"].str.slice(0, comm_len)
+                dataframe = dataframe.assign(count=1).groupby(["sequence", "header"]).count()
             else:
                 dataframe = dataframe.groupby("sequence").count()
 
@@ -60,6 +61,6 @@ class LoadFastqPlugin(PandasInputPlugin):
         return len(self.parameters["files"])
 
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        assert isinstance(self.parameters["files"], ArrayParam)
         file_params = self.parameters["files"][file_number]
         yield self.read_file_to_dataframe(file_params, logger, row_limit)
-

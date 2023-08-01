@@ -1,12 +1,11 @@
-from collections.abc import Mapping, MutableMapping
-from typing import Iterable, Optional, Union
+from typing import Dict, Iterable, Optional
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, BooleanParam, ColumnOrIndexChoiceParam, MultiParam
-from countess.core.plugins import PandasBasePlugin, PandasProductPlugin
+from countess.core.plugins import PandasProductPlugin
 from countess.utils.pandas import get_all_columns
 
 
@@ -41,8 +40,8 @@ class JoinPlugin(PandasProductPlugin):
         ),
     }
     join_params = None
-    input_columns_1 = None
-    input_columns_2 = None
+    input_columns_1: Optional[Dict] = None
+    input_columns_2: Optional[Dict] = None
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         super().prepare(sources, row_limit)
@@ -64,9 +63,13 @@ class JoinPlugin(PandasProductPlugin):
         self.input_columns_2 = {}
 
     def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-
         # update columns on inputs, these won't propagate back in the case of multiprocess runs but
         # they will work in preview mode where we only run this in a single thread.
+
+        assert self.input_columns_1 is not None
+        assert self.input_columns_2 is not None
+        assert self.join_params is not None
+        assert isinstance(self.parameters["inputs"], ArrayParam)
 
         self.input_columns_1.update(get_all_columns(dataframe1))
         self.input_columns_2.update(get_all_columns(dataframe2))
@@ -96,6 +99,8 @@ class JoinPlugin(PandasProductPlugin):
     def finalize(self, logger: Logger) -> Iterable:
         assert isinstance(self.parameters["inputs"], ArrayParam)
         assert len(self.parameters["inputs"]) == 2
+        assert self.input_columns_1 is not None
+        assert self.input_columns_2 is not None
         ip1, ip2 = self.parameters["inputs"]
         ip1.set_column_choices(self.input_columns_1.keys())
         ip2.set_column_choices(self.input_columns_2.keys())
