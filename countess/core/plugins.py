@@ -146,17 +146,21 @@ class BasePlugin:
         `callback` to send messages to the next plugin"""
         raise NotImplementedError(f"{self.__class__}.process")
 
-    def finished(self, source: str, logger: Logger) -> Optional[Iterable[pd.DataFrame]]:
+    def finished(self, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         """Called when a `source` is finished and not able to
         send any more messages.  Can be ignored by most things."""
         # override this if you need to do anything
+        return []
 
-    def finalize(self, logger: Logger) -> Optional[Iterable[pd.DataFrame]]:
+    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
         """Called when all sources are finished.  Can be 
         ignored by most things.  This should reset the 
         plugin to be ready for another use."""
         # override this if you need to do anything
-        return None
+        return []
+
+    def collect(self, data: Iterable) -> Iterable:
+        return data
 
 
 class FileInputMixin:
@@ -195,9 +199,9 @@ class PandasBasePlugin(BasePlugin):
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> pd.DataFrame:
         raise NotImplementedError(f"{self.__class__}.process")
 
-    def collect(self, dataframes: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
+    def collect(self, data: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
         buffer = None
-        for dataframe in dataframes:
+        for dataframe in data:
             if dataframe is None or len(dataframe) == 0:
                 continue
             if len(dataframe) > self.DATAFRAME_BUFFER_SIZE:
@@ -268,7 +272,7 @@ class PandasProductPlugin(PandasBasePlugin):
                 self.mem1.append(data)
             for val2 in self.mem2:
                 df = self.process_dataframes(data, val2, logger)
-                if len(df): 
+                if len(df):
                     yield df
 
         elif source == self.source2:
@@ -282,20 +286,24 @@ class PandasProductPlugin(PandasBasePlugin):
         else:
             raise ValueError(f"Unknown source {source}")
 
-    def finished(self, source: str, logger: Logger) -> None:
+    def finished(self, source: str, logger: Logger) -> Iterable:
         if source == self.source1:
-            # source1 is finished, mem1 is no longer needed
-            self.mem1 = None
-        elif source == self.source2:
-            # source2 is finished, mem2 is no longer needed
+            # source1 is finished, mem2 is no longer needed
+            self.source1 = None
             self.mem2 = None
+        elif source == self.source2:
+            # source2 is finished, mem1 is no longer needed
+            self.source2 = None
+            self.mem1 = None
         else:
             raise ValueError(f"Unknown source {source}")
+        return []
 
-    def finalize(self, logger: Logger) -> None:
+    def finalize(self, logger: Logger) -> Iterable:
         # free up any memory taken up by memoization
         self.mem1 = None
         self.mem2 = None
+        return []
 
     def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         raise NotImplementedError(f"{self.__class__}.process_dataframes")

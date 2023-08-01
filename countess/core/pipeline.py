@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional
-
-from more_itertools import interleave_longest
-
+from typing import Any, Optional, Iterable
+from os import cpu_count
 from queue import Empty
 import multiprocessing
 import time
+
 import psutil
 
 from countess.core.logger import Logger
@@ -59,6 +58,42 @@ class MultiprocessingProxyIterator:
         raise StopIteration
 
 
+def multi_iterator_map(function, values, args) -> Iterable:
+    """Pretty much equivalent to:
+        interleave_longest(function(v, *args) for v in values)
+    but runs in multiple processes using a queue 
+    to organize `values` and another queue to organize the
+    returned values."""
+
+    nproc = min((cpu_count()//2, len(values)))
+    queue1 = multiprocessing.Queue()
+    queue2 = multiprocessing.Queue(maxsize=nproc)
+
+    for v in values:
+        queue1.put(v)
+
+    def __target():
+        try:
+            while True:
+                v = queue1.get(timeout=1)
+                for x in function(v, *args):
+                    queue2.put(x)
+        except Empty:
+            pass
+
+    processes = [
+        multiprocessing.Process(target = __target)
+        for _ in range(0, nproc)
+    ]
+    for p in processes:
+        p.start()
+
+    while any(p.is_alive() for p in processes):
+        try:
+            yield queue2.get(timeout=1)
+        except Empty:
+            pass
+
 @dataclass
 class PipelineNode:
     name: str
@@ -84,6 +119,21 @@ class PipelineNode:
     def is_descendant_of(self, node):
         return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
+    def process_parent_iterables(self, logger):
+        """Combines the values from all the input interables and processes 
+        them"""
+        # XXX this really should be multiprocess and asynchronous.
+
+        iters_dict = { p.name: iter(p.result) for p in self.parent_nodes }
+        while iters_dict:
+            for name, it in list(iters_dict.items()):
+                try:
+                    yield from self.plugin.process(next(it), name, logger)
+                except StopIteration:
+                    del iters_dict[name]
+                    yield from self.plugin.finished(name, logger)
+        yield from self.plugin.finalize(logger)
+
     def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
 
@@ -93,29 +143,19 @@ class PipelineNode:
             return
         elif isinstance(self.plugin, FileInputMixin):
             num_files = self.plugin.num_files()
-            gg = [
-                    self.plugin.load_file(n, logger, row_limit // num_files)
-                    for n in range(0, num_files)
-            ]
-            self.result = list(interleave_longest(*gg))
+            row_limit_each_file = row_limit // num_files if row_limit is not None else None
+            self.result = multi_iterator_map(
+                self.plugin.load_file,
+                range(0, num_files),
+                args=(logger, row_limit_each_file)
+            )
         else:
             self.plugin.prepare([p.name for p in self.parent_nodes])
-            input_source_data = interleave_longest(*(
-                [ (p.name, r) for r in p.result ]
-                for p in self.parent_nodes
-            ))
-            self.result = list(self.plugin.collect(
-                d
-                for source, data in input_source_data
-                for d in self.plugin.process(data, source, logger)
-            ))
-        for p in self.parent_nodes:
-            r = self.plugin.finished(p.name, logger)
-            if r:
-                self.result += list(r)
-        r = self.plugin.finalize(logger)
-        if r:
-            self.result += list(r)
+            self.result = self.process_parent_iterables(logger)
+
+        self.result = self.plugin.collect(self.result)
+        if len(self.child_nodes) != 1:
+            self.result = list(self.result)
 
         self.is_dirty = False
 
