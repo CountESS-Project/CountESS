@@ -65,7 +65,7 @@ def multi_iterator_map(function, values, args) -> Iterable:
     to organize `values` and another queue to organize the
     returned values."""
 
-    nproc = min((cpu_count()//2, len(values)))
+    nproc = min((cpu_count(), len(values)))
     queue1 = multiprocessing.Queue()
     queue2 = multiprocessing.Queue(maxsize=nproc)
 
@@ -150,7 +150,7 @@ class PipelineNode:
                 args=(logger, row_limit_each_file)
             )
         else:
-            self.plugin.prepare([p.name for p in self.parent_nodes])
+            self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
             self.result = self.process_parent_iterables(logger)
 
         self.result = self.plugin.collect(self.result)

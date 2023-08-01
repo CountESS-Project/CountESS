@@ -138,7 +138,7 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
-    def prepare(self, sources: List[str]):
+    def prepare(self, sources: List[str], row_limit: Optional[int]):
         pass
 
     def process(self, data, source: str, logger: Logger) -> Optional[Iterable[pd.DataFrame]]:
@@ -225,7 +225,7 @@ class PandasSimplePlugin(PandasBasePlugin):
 
     input_columns: Dict[str, np.dtype] = {}
 
-    def prepare(self, sources: list[str]):
+    def prepare(self, sources: list[str], row_limit: Optional[int]):
         self.input_columns = {}
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
@@ -255,13 +255,13 @@ class PandasProductPlugin(PandasBasePlugin):
     mem1 = None
     mem2 = None
 
-    def prepare(self, sources: list[str]):
+    def prepare(self, sources: list[str], row_limit: Optional[int]):
 
         if len(sources) != 2:
             raise ValueError(f"{self.__class__} required exactly two inputs")
         self.source1, self.source2 = sources
 
-        super().prepare(sources)
+        super().prepare(sources, row_limit)
 
         self.mem1 = []
         self.mem2 = []

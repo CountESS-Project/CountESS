@@ -46,7 +46,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
 
     compiled_re = None
 
-    def prepare(self, sources: list[str]):
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
 
         self.compiled_re = re.compile(self.parameters["regex"].value)
 

@@ -44,8 +44,8 @@ class JoinPlugin(PandasProductPlugin):
     input_columns_1 = None
     input_columns_2 = None
 
-    def prepare(self, sources: list[str]):
-        super().prepare(sources)
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
+        super().prepare(sources, row_limit)
 
         assert isinstance(self.parameters["inputs"], ArrayParam)
         assert len(self.parameters["inputs"]) == 2
@@ -93,9 +93,10 @@ class JoinPlugin(PandasProductPlugin):
 
         return dataframe
 
-    def finalize(self, logger: Logger) -> None:
+    def finalize(self, logger: Logger) -> Iterable:
         assert isinstance(self.parameters["inputs"], ArrayParam)
         assert len(self.parameters["inputs"]) == 2
         ip1, ip2 = self.parameters["inputs"]
         ip1.set_column_choices(self.input_columns_1.keys())
         ip2.set_column_choices(self.input_columns_2.keys())
+        return []

@@ -167,12 +167,24 @@ class SaveCsvPlugin(PandasOutputPlugin):
     }
 
     filehandle: Optional[Union[BufferedWriter | BytesIO]] = None
-    csv_columns = []
+    csv_columns = None
 
     SEPARATORS = {",": ",", ";": ";", "SPACE": " ", "TAB": "\t"}
     QUOTING = {False: csv.QUOTE_MINIMAL, True: csv.QUOTE_NONNUMERIC}
 
-    def output_dataframe(self, dataframe: pd.DataFrame, logger: Logger):
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
+        if row_limit is None:
+            filename = self.parameters["filename"].value
+            if filename.endswith(".gz"):
+                self.filehandle = gzip.open(filename, "wb")
+            else:
+                self.filehandle = open(filename, "wb")
+        else:
+            self.filehandle = BytesIO()
+
+        self.csv_columns = None
+
+    def process(self, dataframe: pd.DataFrame, source: str, logger: Logger):
         # reset indexes so we can treat all columns equally.
         # if there's just a nameless index then we don't care about it, drop it.
 
@@ -181,7 +193,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
 
         # if this is our first dataframe to write then decide whether to
         # include the header or not.
-        if self.filehandle.tell() == 0:
+        if self.csv_columns is None:
             self.csv_columns = list(dataframe.columns)
             emit_header = self.parameters["header"].value
         else:
@@ -203,25 +215,8 @@ class SaveCsvPlugin(PandasOutputPlugin):
             sep=self.SEPARATORS[self.parameters["delimiter"].value],
             quoting=self.QUOTING[self.parameters["quoting"].value],
         )
+        return []
 
-    def process_inputs(
-        self,
-        inputs: Mapping[str, Iterable[pd.DataFrame]],
-        logger,
-        row_limit: Optional[int] = None,
-    ) -> Optional[str]:
-        assert isinstance(self.parameters["filename"], StringParam)
-
-        if row_limit is None:
-            filename = self.parameters["filename"].value
-            print(f"OPEN {filename}")
-            if filename.endswith(".gz"):
-                self.filehandle = gzip.open(filename, "wb")
-            else:
-                self.filehandle = open(filename, "wb")
-            super().process_inputs(inputs, logger, row_limit)
-            return None
-        else:
-            self.filehandle = BytesIO()
-            super().process_inputs(inputs, logger, row_limit)
-            return self.filehandle.getvalue().decode("utf-8")
+    def finalize(self, logger: Logger):
+        if isinstance(self.filehandle, BytesIO):
+            yield self.filehandle.getvalue().decode("utf-8")
