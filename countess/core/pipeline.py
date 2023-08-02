@@ -234,8 +234,11 @@ class PipelineGraph:
         # shufffle nodes back down to avoid really long connections.
 
         for node in nodes[::-1]:
-            if node.child_nodes and len(node.parent_nodes) < 2:
-                stratum[node] = min(stratum[n] for n in node.child_nodes) - 1
+            if node.child_nodes:
+                if len(node.parent_nodes) == 0:
+                    stratum[node] = min(stratum[n] for n in node.child_nodes) - 1
+                else:
+                    stratum[node] = (min(stratum[n] for n in node.child_nodes) + max(stratum[n] for n in node.parent_nodes)) // 2
 
         max_stratum = max(stratum.values())
 
