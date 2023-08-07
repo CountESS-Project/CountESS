@@ -159,7 +159,7 @@ class SaveCsvPlugin(PandasProcessPlugin):
         "quoting": BooleanParam("Quote all Strings", False),
     }
 
-    filehandle: Optional[Union[BufferedWriter | BytesIO]] = None
+    filehandle: Optional[Union[BufferedWriter, BytesIO]] = None
     csv_columns = None
 
     SEPARATORS = {",": ",", ";": ";", "SPACE": " ", "TAB": "\t"}
