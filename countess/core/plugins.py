@@ -137,6 +137,10 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
+
+class ProcessPlugin(BasePlugin):
+    """A plugin which accepts data from one or more sources"""
+
     def prepare(self, sources: List[str], row_limit: Optional[int]):
         pass
 
@@ -162,7 +166,7 @@ class BasePlugin:
         return data
 
 
-class FileInputMixin:
+class FileInputPlugin(BasePlugin):
     """Mixin class to indicate that this plugin can read files from local
     storage."""
 
@@ -186,8 +190,8 @@ class FileInputMixin:
         raise NotImplementedError("FileInputMixin.load_file")
 
 
-class PandasBasePlugin(BasePlugin):
-    DATAFRAME_BUFFER_SIZE = 1000000
+class PandasProcessPlugin(ProcessPlugin):
+    DATAFRAME_BUFFER_SIZE = 100000
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")
@@ -211,7 +215,7 @@ class PandasBasePlugin(BasePlugin):
             yield buffer
 
 
-class PandasSimplePlugin(PandasBasePlugin):
+class PandasSimplePlugin(PandasProcessPlugin):
     """Base class for plugins which accept and return pandas DataFrames.
     Subclassing this hides all the distracting aspects of the pipeline
     from the plugin implementor, who only needs to override process_dataframe"""
@@ -232,12 +236,12 @@ class PandasSimplePlugin(PandasBasePlugin):
             assert isinstance(result, pd.DataFrame)
             yield result
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
 
-class PandasProductPlugin(PandasBasePlugin):
+class PandasProductPlugin(PandasProcessPlugin):
     """Some plugins need to have all the data from two sources presented to them,
     which is tricky in a pipelined environment.  This superclass handles the two
     input sources and calls .process_dataframes with pairs of dataframes.
@@ -391,10 +395,8 @@ class PandasTransformDictToXMixin:
             self.process_raw,
             axis=1,
             raw=True,
-            kwargs={
-                "columns": list(dataframe.columns),
-                "logger": logger,
-            },
+            columns=list(dataframe.columns),
+            logger=logger,
         )
 
     def process_dict(self, data, logger: Logger):
@@ -505,7 +507,7 @@ class PandasTransformDictToDictPlugin(PandasTransformXToDictMixin, PandasTransfo
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
-class PandasInputPlugin(FileInputMixin,BasePlugin):
+class PandasInputPlugin(FileInputPlugin):
     """A specialization of the PandasBasePlugin to allow it to follow nothing,
     eg: come first."""
 
@@ -522,23 +524,25 @@ class PandasInputPlugin(FileInputMixin,BasePlugin):
     def num_files(self):
         return len(self.parameters["files"].params)
 
-    def load_files(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError(f"{self.__class__}.load_file()")
+
+class PandasInputFilesPlugin(PandasInputPlugin):
+
+    def num_files(self):
+        return len(self.parameters["files"])
+
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         assert isinstance(self.parameters["files"], ArrayParam)
-        fps = self.parameters["files"].params
-        num_files = len(fps)
-        per_file_row_limit = int(row_limit / len(fps) + 1) if row_limit else None
-        logger.progress("Loading", 0)
-        for num, fp in enumerate(fps):
-            assert isinstance(fp, MultiParam)
-            yield self.read_file_to_dataframe(fp, logger, per_file_row_limit)
-            logger.progress("Loading", 100 * (num + 1) // (num_files + 1))
-        logger.progress("Done", 100)
+        file_params = self.parameters["files"][file_number]
+        yield self.read_file_to_dataframe(file_params, logger, row_limit)
 
-    def read_file_to_dataframe(self, file_params: MultiParam, logger: Logger, row_limit: Optional[int] = None) -> pd.DataFrame:
-        raise NotImplementedError(f"Implement {self.__class__.__name__}.read_file_to_dataframe")
+    def read_file_to_dataframe(self, file_params, logger, row_limit=None) -> pd.DataFrame:
+        raise NotImplementedError(f"{self.__class__}.read_file_to_dataframe")
 
 
-class PandasOutputPlugin(PandasBasePlugin):
+
+class PandasOutputPlugin(PandasProcessPlugin):
     def process_inputs(self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]):
         iterators = set(iter(input) for input in inputs.values())
 

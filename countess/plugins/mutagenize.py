@@ -1,12 +1,12 @@
 from itertools import islice
-from typing import Any, Iterable, Optional
+from typing import Iterable, Optional
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, StringCharacterSetParam
-from countess.core.plugins import PandasBasePlugin
+from countess.core.plugins import PandasInputPlugin
 
 
 def mutagenize(sequence: str, mutate: bool, delete: bool, insert: bool) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
@@ -27,7 +27,7 @@ def mutagenize(sequence: str, mutate: bool, delete: bool, insert: bool) -> Itera
             yield sequence + b2, ll, None, b2
 
 
-class MutagenizePlugin(PandasBasePlugin):
+class MutagenizePlugin(PandasInputPlugin):
     """Mutagenize"""
 
     name = "Mutagenize"
@@ -45,13 +45,12 @@ class MutagenizePlugin(PandasBasePlugin):
         "remove": BooleanParam("Remove Duplicates?", False),
     }
 
-    def prepare(self, data: Any, logger: Logger) -> bool:
-        if data is not None:
-            logger.error("Mutagenize doesn't take inputs")
-            return False
-        return True
+    def num_files(self):
+        return 1
 
-    def run(self, data: Any, logger: Logger, row_limit: Optional[int] = None):
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+        assert file_number == 0
+
         df = pd.DataFrame(
             islice(
                 mutagenize(
@@ -67,4 +66,4 @@ class MutagenizePlugin(PandasBasePlugin):
         )
         if self.parameters["remove"].value:
             df = df.groupby("sequence").agg("first")
-        return df
+        yield df

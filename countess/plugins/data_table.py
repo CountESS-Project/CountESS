@@ -1,14 +1,14 @@
-from typing import Any, Iterable, Mapping, Optional
+from typing import Iterable, Optional
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, DataTypeChoiceParam, MultiParam, StringParam, TabularMultiParam
-from countess.core.plugins import PandasBasePlugin
+from countess.core.plugins import PandasInputPlugin
 
 
-class DataTablePlugin(PandasBasePlugin):
+class DataTablePlugin(PandasInputPlugin):
     """DataTable"""
 
     name = "DataTable"
@@ -73,11 +73,13 @@ class DataTablePlugin(PandasBasePlugin):
             self.fix_columns()
         super().set_parameter(key, *a, **k)
 
-    def process_inputs(self, inputs: Mapping[str, Iterable[Any]], logger: Logger, row_limit: Optional[int]) -> Iterable[Any]:
-        if len(inputs) > 0:
-            logger.warning(f"{self.name} doesn't take inputs")
-            raise ValueError(f"{self.name} doesn't take inputs")
+    def num_files(self):
+        return 1
 
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+        assert file_number == 0
+        assert isinstance(self.parameters["rows"], ArrayParam)
+        assert isinstance(self.parameters["columns"], ArrayParam)
         self.fix_columns()
         values = []
         for row in self.parameters["rows"]:

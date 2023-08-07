@@ -5,7 +5,7 @@ from queue import Empty
 from typing import Any, Iterable, Optional
 
 from countess.core.logger import Logger
-from countess.core.plugins import BasePlugin, FileInputMixin, get_plugin_classes
+from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -92,16 +92,15 @@ class PipelineNode:
             return
         elif self.result and not self.is_dirty:
             return
-        elif isinstance(self.plugin, FileInputMixin):
+        elif isinstance(self.plugin, FileInputPlugin):
             num_files = self.plugin.num_files()
             row_limit_each_file = row_limit // num_files if row_limit is not None else None
             self.result = multi_iterator_map(self.plugin.load_file, range(0, num_files), args=(logger, row_limit_each_file))
-        else:
+        elif isinstance(self.plugin, ProcessPlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
-            self.result = self.process_parent_iterables(logger)
+            self.result = self.plugin.collect(self.process_parent_iterables(logger))
 
-        self.result = self.plugin.collect(self.result)
-        if len(self.child_nodes) != 1:
+        if row_limit is not None or len(self.child_nodes) != 1:
             self.result = list(self.result)
 
         self.is_dirty = False

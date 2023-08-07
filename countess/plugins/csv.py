@@ -1,7 +1,7 @@
 import csv
 import gzip
 from io import BufferedWriter, BytesIO
-from typing import Iterable, Optional, Union
+from typing import Optional, Union
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasInputPlugin, PandasOutputPlugin
+from countess.core.plugins import PandasInputFilesPlugin, PandasProcessPlugin
 
 # XXX it would be better to do the same this Regex Tool does and get the user to assign
 # data types to each column
@@ -41,7 +41,7 @@ def clean_row(row):
     return [maybe_number(x) for x in row]
 
 
-class LoadCsvPlugin(PandasInputPlugin):
+class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
 
     name = "CSV Load"
@@ -143,16 +143,8 @@ class LoadCsvPlugin(PandasInputPlugin):
 
         return df
 
-    def num_files(self):
-        return len(self.parameters["files"])
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
-        assert isinstance(self.parameters["files"], ArrayParam)
-        file_params = self.parameters["files"][file_number]
-        yield self.read_file_to_dataframe(file_params, logger, row_limit)
-
-
-class SaveCsvPlugin(PandasOutputPlugin):
+class SaveCsvPlugin(PandasProcessPlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
@@ -185,30 +177,30 @@ class SaveCsvPlugin(PandasOutputPlugin):
 
         self.csv_columns = None
 
-    def process(self, dataframe: pd.DataFrame, source: str, logger: Logger):
+    def process(self, data: pd.DataFrame, source: str, logger: Logger):
         # reset indexes so we can treat all columns equally.
         # if there's just a nameless index then we don't care about it, drop it.
 
-        drop_index = dataframe.index.name is None and dataframe.index.names[0] is None
-        dataframe = dataframe.reset_index(drop=drop_index)
+        drop_index = data.index.name is None and data.index.names[0] is None
+        dataframe = data.reset_index(drop=drop_index)
 
         # if this is our first dataframe to write then decide whether to
         # include the header or not.
         if self.csv_columns is None:
-            self.csv_columns = list(dataframe.columns)
+            self.csv_columns = list(data.columns)
             emit_header = bool(self.parameters["header"].value)
         else:
             # add in any columns we haven't seen yet in previous dataframes.
-            for c in dataframe.columns:
+            for c in data.columns:
                 if c not in self.csv_columns:
                     self.csv_columns.append(c)
                     logger.warning(f"Added CSV Column {repr(c)} with no header")
             # fill in blanks for any columns which are in previous dataframes but not
             # in this one.
-            dataframe = dataframe.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
+            dataframe = data.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
             emit_header = False
 
-        dataframe.to_csv(
+        data.to_csv(
             self.filehandle,
             header=emit_header,
             columns=self.csv_columns,

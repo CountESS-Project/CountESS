@@ -9,10 +9,10 @@ except ImportError as exc:
 
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, MultiParam
-from countess.core.plugins import PandasInputPlugin
+from countess.core.plugins import PandasInputFilesPlugin
 
 
-class LoadHdfPlugin(PandasInputPlugin):
+class LoadHdfPlugin(PandasInputFilesPlugin):
     name = "HDF5 Load"
     description = "Loads counts from HDF5 files"
     version = VERSION
