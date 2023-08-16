@@ -65,5 +65,5 @@ class MutagenizePlugin(PandasInputPlugin):
             columns=["sequence", "position", "reference", "variation"],
         )
         if self.parameters["remove"].value:
-            df = df.groupby("sequence").agg("first")
+            df = df.groupby(["sequence"]).agg({"sequence": "count"}).rename(columns={"sequence": "count"})
         yield df
