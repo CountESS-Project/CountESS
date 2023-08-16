@@ -147,13 +147,14 @@ class ConfiguratorWrapper:
         if self.preview_subframe:
             self.preview_subframe.destroy()
 
-        if isinstance(self.node.result, (str, bytes)):
+        if all(isinstance(r, (str, bytes)) for r in self.node.result):
+            text_result = ''.join(self.node.result)
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.rowconfigure(1, weight=1)
-            n_lines = len(self.node.result.splitlines())
+            n_lines = len(text_result.splitlines())
             tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(sticky=tk.NSEW)
             text = tk.Text(self.preview_subframe)
-            text.insert("1.0", self.node.result)
+            text.insert("1.0", text_result)
             text["state"] = "disabled"
             text.grid(sticky=tk.NSEW)
         else:
