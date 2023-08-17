@@ -87,7 +87,11 @@ class JoinPlugin(PandasProductPlugin):
             drop_index = dataframe2.index.name is None and dataframe2.index.names[0] is None
             dataframe2 = dataframe2.reset_index(drop=drop_index)
 
-        dataframe = dataframe1.merge(dataframe2, **self.join_params)
+        try:
+            dataframe = dataframe1.merge(dataframe2, **self.join_params)
+        except ValueError as exc:
+            logger.exception(exc)
+            return pd.DataFrame()
 
         if self.parameters["inputs"][0]["drop"].value and join1 in dataframe.columns:
             dataframe.drop(columns=join1, inplace=True)
@@ -102,6 +106,7 @@ class JoinPlugin(PandasProductPlugin):
         assert self.input_columns_1 is not None
         assert self.input_columns_2 is not None
         ip1, ip2 = self.parameters["inputs"]
+
         ip1.set_column_choices(self.input_columns_1.keys())
         ip2.set_column_choices(self.input_columns_2.keys())
-        return []
+        yield from super().finalize(logger)
