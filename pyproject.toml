@@ -100,7 +100,7 @@ disable = [
     "too-many-public-methods",
     "unidiomatic-typecheck",
 ]
-max-line-length = 132
+max-line-length = 120
 
 [tool.black]
-line-length = 132
+line-length = 120

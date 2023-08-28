@@ -1,4 +1,4 @@
-from typing import Iterable, Optional, List
+from typing import Iterable, List, Optional
 
 import pandas as pd
 
@@ -44,7 +44,7 @@ class GroupByPlugin(PandasSimplePlugin):
         "join": BooleanParam("Join Back?"),
     }
 
-    dataframes : Optional[List[pd.DataFrame]] = None
+    dataframes: Optional[List[pd.DataFrame]] = None
 
     def prepare(self, *_):
         self.dataframes = []

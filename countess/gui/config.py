@@ -93,7 +93,9 @@ class ParameterWrapper:
             if parameter.read_only:
                 self.entry["state"] = tk.DISABLED
 
-        elif isinstance(parameter, ArrayParam) and self.level == 0 and not isinstance(parameter.param, TabularMultiParam):
+        elif (
+            isinstance(parameter, ArrayParam) and self.level == 0 and not isinstance(parameter.param, TabularMultiParam)
+        ):
             self.entry = tk.Frame(tk_parent)
             self.entry.columnconfigure(0, weight=1)
             drc = self.delete_row_callback if not parameter.read_only else None
@@ -168,7 +170,11 @@ class ParameterWrapper:
         else:
             self.entry["fg"] = None
 
-        if isinstance(self.parameter, ArrayParam) and self.level == 0 and not isinstance(self.parameter.param, TabularMultiParam):
+        if (
+            isinstance(self.parameter, ArrayParam)
+            and self.level == 0
+            and not isinstance(self.parameter.param, TabularMultiParam)
+        ):
             self.update_subwrappers_framed(self.parameter.params, self.delete_row_callback)
             if self.button:
                 self.button.grid(row=len(self.parameter.params) + 1, padx=10)
@@ -457,7 +463,9 @@ class PluginConfigurator:
             if key in self.wrapper_cache:
                 self.wrapper_cache[key].update()
             else:
-                self.wrapper_cache[key] = ParameterWrapper(self.subframe, parameter, self.change_parameter, level=top_level)
+                self.wrapper_cache[key] = ParameterWrapper(
+                    self.subframe, parameter, self.change_parameter, level=top_level
+                )
             self.wrapper_cache[key].set_row(n + 1)
 
         # Remove any parameter wrappers no longer needed

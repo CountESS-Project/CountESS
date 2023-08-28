@@ -70,7 +70,9 @@ def read_config(
             if key.startswith("_parent."):
                 node.add_parent(nodes_by_name[val])
 
-        node.config = [(key, ast.literal_eval(val), base_dir) for key, val in config_dict.items() if not key.startswith("_")]
+        node.config = [
+            (key, ast.literal_eval(val), base_dir) for key, val in config_dict.items() if not key.startswith("_")
+        ]
 
         nodes_by_name[section_name] = node
 

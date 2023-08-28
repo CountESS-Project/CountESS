@@ -9,7 +9,9 @@ from countess.core.parameters import BooleanParam, StringCharacterSetParam
 from countess.core.plugins import PandasInputPlugin
 
 
-def mutagenize(sequence: str, mutate: bool, delete: bool, insert: bool) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
+def mutagenize(
+    sequence: str, mutate: bool, delete: bool, insert: bool
+) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
     # XXX it'd be faster, but less neat, to include logic for duplicate
     # removal here instead of producing duplicates and then removing them
     # later.

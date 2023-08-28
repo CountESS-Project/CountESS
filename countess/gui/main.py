@@ -148,7 +148,7 @@ class ConfiguratorWrapper:
             self.preview_subframe.destroy()
 
         if all(isinstance(r, (str, bytes)) for r in self.node.result):
-            text_result = ''.join(self.node.result)
+            text_result = "".join(self.node.result)
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.rowconfigure(1, weight=1)
             n_lines = len(text_result.splitlines())
@@ -230,7 +230,9 @@ class ButtonMenu:  # pylint: disable=R0903
     def __init__(self, tk_parent, buttons):
         self.frame = tk.Frame(tk_parent)
         for button_number, (button_label, button_command) in enumerate(buttons):
-            tk.Button(self.frame, text=button_label, command=button_command).grid(row=0, column=button_number, sticky=tk.EW)
+            tk.Button(self.frame, text=button_label, command=button_command).grid(
+                row=0, column=button_number, sticky=tk.EW
+            )
         self.frame.grid(sticky=tk.NSEW)
 
 

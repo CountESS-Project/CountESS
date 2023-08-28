@@ -17,7 +17,9 @@ class PivotPlugin(PandasSimplePlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/plugins/#pivot-tool"
 
-    parameters = {"columns": PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"]))}
+    parameters = {
+        "columns": PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"]))
+    }
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)

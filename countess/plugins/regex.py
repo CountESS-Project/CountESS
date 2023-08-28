@@ -125,7 +125,9 @@ class RegexReaderPlugin(PandasInputPlugin):
 
         output_parameters = list(self.parameters["output"])[: compiled_re.groups]
         columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
-        index_columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) if p.index.value] or None
+        index_columns = [
+            p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) if p.index.value
+        ] or None
 
         records = []
         with open(file_params["filename"].value, "r", encoding="utf-8") as fh:

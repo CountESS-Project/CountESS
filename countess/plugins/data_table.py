@@ -83,6 +83,8 @@ class DataTablePlugin(PandasInputPlugin):
         self.fix_columns()
         values = []
         for row in self.parameters["rows"]:
-            values.append(dict((col["name"].value, row[str(num)].value) for num, col in enumerate(self.parameters["columns"])))
+            values.append(
+                dict((col["name"].value, row[str(num)].value) for num, col in enumerate(self.parameters["columns"]))
+            )
 
         yield pd.DataFrame(values)

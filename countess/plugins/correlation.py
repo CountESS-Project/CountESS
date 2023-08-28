@@ -1,4 +1,4 @@
-from typing import Optional, Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
 
@@ -22,14 +22,14 @@ class CorrelationPlugin(PandasSimplePlugin):
         "column1": ColumnChoiceParam("Column 1"),
         "column2": ColumnChoiceParam("Column 2"),
     }
-    columns : list[str] = []
-    dataframes : list[pd.DataFrame] = []
+    columns: list[str] = []
+    dataframes: list[pd.DataFrame] = []
 
     def prepare(self, sources: list[str], row_limit: Optional[int]):
         assert isinstance(self.parameters["group"], ColumnOrNoneChoiceParam)
         column1 = self.parameters["column1"].value
         column2 = self.parameters["column2"].value
-        self.columns = [ column1, column2 ]
+        self.columns = [column1, column2]
         if not self.parameters["group"].is_none():
             self.columns.append(self.parameters["group"].value)
         self.dataframes = []
