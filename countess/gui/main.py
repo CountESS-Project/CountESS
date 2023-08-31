@@ -126,7 +126,6 @@ class ConfiguratorWrapper:
         self.config_canvas.bind("<Configure>", self.on_config_canvas_configure)
 
     def on_config_canvas_configure(self, *_):
-
         self.config_canvas.itemconfigure(self.config_subframe_id, width=self.config_canvas.winfo_width())
 
     def on_label_configure(self, *_):

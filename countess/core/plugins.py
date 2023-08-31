@@ -430,17 +430,20 @@ class PandasTransformXToTupleMixin:
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
+        assert hasattr(self, "parameters")
         assert isinstance(self.parameters["output"], ArrayParam)
         assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        assert hasattr(self, "parameters")
+        assert isinstance(self.parameters["output"], ArrayParam)
+        assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
         column_names = [
-            pp.name.value or "Column %d" % n
-            for n, pp in enumerate(self.parameters["output"], 1)
+            pp.name.value or "Column %d" % n for n, pp in enumerate(self.parameters["output"], 1)
         ]  # type: ignore [attr-defined]
 
         data = series.tolist()
-        column_names = column_names[:len(data[0])]
+        column_names = column_names[: len(data[0])]
         df = pd.DataFrame(data, columns=column_names, index=series.index)
         return df
 
