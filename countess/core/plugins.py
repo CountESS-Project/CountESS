@@ -240,6 +240,12 @@ class PandasSimplePlugin(PandasProcessPlugin):
         """Override this to process a single dataframe"""
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
+    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+        for p in self.parameters.values():
+            p.set_column_choices(self.input_columns.keys())
+
+        return super().finalize(logger)
+
 
 class PandasProductPlugin(PandasProcessPlugin):
     """Some plugins need to have all the data from two sources presented to them,
@@ -428,8 +434,14 @@ class PandasTransformXToTupleMixin:
         assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        column_names = [pp.name.value for pp in self.parameters["output"]]  # type: ignore [attr-defined]
-        df = pd.DataFrame(series.tolist(), columns=column_names, index=series.index)
+        column_names = [
+            pp.name.value or "Column %d" % n
+            for n, pp in enumerate(self.parameters["output"], 1)
+        ]  # type: ignore [attr-defined]
+
+        data = series.tolist()
+        column_names = column_names[:len(data[0])]
+        df = pd.DataFrame(data, columns=column_names, index=series.index)
         return df
 
 

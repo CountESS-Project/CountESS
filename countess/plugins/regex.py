@@ -47,6 +47,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     compiled_re = None
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
+        super().prepare(sources, row_limit)
         self.compiled_re = re.compile(self.parameters["regex"].value)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
@@ -62,7 +63,11 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
             if column_name in df.columns:
                 df = df.drop(columns=column_name)
             else:
-                df = df.reset_index(column_name, drop=True)
+                # XXX maybe set up a helper function for this
+                try:
+                    df = df.reset_index(column_name, drop=True)
+                except KeyError:
+                    pass
 
         index_names = [pp.name.value for pp in self.parameters["output"] if pp.index.value]
         if index_names:

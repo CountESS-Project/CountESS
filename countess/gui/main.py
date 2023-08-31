@@ -115,6 +115,7 @@ class ConfiguratorWrapper:
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
+
         else:
             self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
         self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
@@ -125,6 +126,7 @@ class ConfiguratorWrapper:
         self.config_canvas.bind("<Configure>", self.on_config_canvas_configure)
 
     def on_config_canvas_configure(self, *_):
+
         self.config_canvas.itemconfigure(self.config_subframe_id, width=self.config_canvas.winfo_width())
 
     def on_label_configure(self, *_):
@@ -160,7 +162,7 @@ class ConfiguratorWrapper:
         else:
             try:
                 df = concat_dataframes(self.node.result)
-                self.preview_subframe = TabularDataFrame(self.frame)
+                self.preview_subframe = TabularDataFrame(self.frame, highlightbackground="black", highlightthickness=3)
                 self.preview_subframe.set_dataframe(df)
             except (TypeError, ValueError):
                 self.preview_subframe = tk.Frame(self.frame)
@@ -208,6 +210,7 @@ class ConfiguratorWrapper:
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
+        self.node.prerun(self.logger)
         self.node.is_dirty = True
         self.show_config_subframe()
         if self.node.name.startswith("NEW "):
@@ -272,8 +275,8 @@ class MainWindow:
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
         self.subframe.rowconfigure(2, weight=0)
-        self.subframe.rowconfigure(3, weight=1)
-        self.subframe.rowconfigure(4, weight=2)
+        self.subframe.rowconfigure(3, weight=2)
+        self.subframe.rowconfigure(4, weight=1)
         self.subframe.rowconfigure(5, weight=0)
 
         self.frame.bind("<Configure>", self.on_frame_configure, add=True)
