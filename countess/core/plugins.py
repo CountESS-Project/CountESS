@@ -162,9 +162,6 @@ class ProcessPlugin(BasePlugin):
         # override this if you need to do anything
         return []
 
-    def collect(self, data: Iterable) -> Iterable:
-        return data
-
 
 class FileInputPlugin(BasePlugin):
     """Mixin class to indicate that this plugin can read files from local
@@ -196,24 +193,6 @@ class PandasProcessPlugin(ProcessPlugin):
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")
 
-    def collect(self, data: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
-        buffer = None
-        for dataframe in data:
-            if dataframe is None or len(dataframe) == 0:
-                continue
-            if len(dataframe) > self.DATAFRAME_BUFFER_SIZE:
-                yield dataframe
-            elif buffer is None:
-                buffer = dataframe
-            elif len(buffer) + len(dataframe) > self.DATAFRAME_BUFFER_SIZE:
-                yield buffer
-                buffer = dataframe
-            else:
-                # XXX catch errors?
-                buffer = pd.concat([buffer, dataframe])
-        if buffer is not None and len(buffer) > 0:
-            yield buffer
-
 
 class PandasSimplePlugin(PandasProcessPlugin):
     """Base class for plugins which accept and return pandas DataFrames.
@@ -234,7 +213,8 @@ class PandasSimplePlugin(PandasProcessPlugin):
         result = self.process_dataframe(data, logger)
         if result is not None:
             assert isinstance(result, pd.DataFrame)
-            yield result
+            if len(result) > 0:
+                yield result
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""

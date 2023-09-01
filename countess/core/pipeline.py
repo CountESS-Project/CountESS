@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from itertools import chain
 from multiprocessing import Process, Queue
 from os import cpu_count
 from queue import Empty
@@ -101,9 +100,7 @@ class PipelineNode:
             )
         elif isinstance(self.plugin, ProcessPlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
-            self.result = chain(
-                self.plugin.collect(self.process_parent_iterables(logger)), self.plugin.finalize(logger)
-            )
+            self.result = self.process_parent_iterables(logger)
 
         if row_limit is not None or len(self.child_nodes) != 1:
             self.result = list(self.result)

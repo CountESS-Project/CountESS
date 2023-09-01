@@ -5,6 +5,25 @@ from typing import Any, Dict, Iterable, Optional
 import pandas as pd
 
 
+def collect_dataframes(data: Iterable[pd.DataFrame], preferred_size: int=100000) -> Iterable[pd.DataFrame]:
+    buffer = None
+    for dataframe in data:
+        if dataframe is None or len(dataframe) == 0:
+            continue
+        if len(dataframe) > preferred_size:
+            yield dataframe
+        elif buffer is None:
+            buffer = dataframe
+        elif len(buffer) + len(dataframe) > preferred_size:
+            yield buffer
+            buffer = dataframe
+        else:
+            # XXX catch errors?
+            buffer = pd.concat([buffer, dataframe])
+    if buffer is not None and len(buffer) > 0:
+        yield buffer
+
+
 def get_all_indexes(dataframe: pd.DataFrame) -> Dict[str, Any]:
     if dataframe.index.name:
         return {str(dataframe.index.name): dataframe.index.dtype}
