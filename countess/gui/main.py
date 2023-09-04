@@ -1,6 +1,7 @@
 import re
 import sys
 import tkinter as tk
+from tkinter import ttk
 import webbrowser
 from tkinter import filedialog, messagebox
 from typing import Optional
@@ -84,7 +85,7 @@ class ConfiguratorWrapper:
         if self.config_canvas:
             self.config_canvas.destroy()
         self.config_canvas = tk.Canvas(self.frame)
-        self.config_scrollbar = tk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview)
+        self.config_scrollbar = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview)
         self.config_canvas.configure(yscrollcommand=self.config_scrollbar.set, bd=0)
         self.config_canvas.grid(row=3, column=0, sticky=tk.NSEW)
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
@@ -118,6 +119,7 @@ class ConfiguratorWrapper:
 
         else:
             self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
+
         self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
         self.config_subframe.bind(
             "<Configure>",
@@ -150,7 +152,8 @@ class ConfiguratorWrapper:
 
         if all(isinstance(r, (str, bytes)) for r in self.node.result):
             text_result = "".join(self.node.result)
-            self.preview_subframe = tk.Frame(self.frame)
+            self.preview_subframe = tk.Frame(self.frame, highlightbackground="black", highlightthickness=3)
+            self.preview_subframe.columnconfigure(0, weight=1)
             self.preview_subframe.rowconfigure(1, weight=1)
             n_lines = len(text_result.splitlines())
             tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(sticky=tk.NSEW)
@@ -197,7 +200,15 @@ class ConfiguratorWrapper:
         self.logger_subframe.grid(row=3, sticky=tk.NSEW)
         self.node.prerun(self.logger)
         self.show_preview_subframe()
+
+        # XXX stop the form scrolling away when it is refreshed, by putting
+        # it back where it belongs.
+        pos1, pos2 = self.config_scrollbar.get()
         self.configurator.update()
+        self.frame.update()
+        self.config_canvas.yview_moveto(pos1)
+        self.config_scrollbar.set(pos1, pos2)
+
         self.logger_subframe.after(5000, self.config_change_task_callback_2)
         self.change_callback(self.node)
 
