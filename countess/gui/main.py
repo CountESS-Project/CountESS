@@ -1,10 +1,10 @@
 import re
 import sys
 import tkinter as tk
-from tkinter import ttk
 import webbrowser
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from typing import Optional
+import threading
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
@@ -71,10 +71,8 @@ class ConfiguratorWrapper:
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
 
-        self.logger_subframe = LoggerFrame(self.frame)
-        self.logger = self.logger_subframe.get_logger(node.name)
-
         self.show_config_subframe()
+
         if self.node.plugin:
             if self.node.is_dirty:
                 self.config_change_callback()
@@ -90,7 +88,9 @@ class ConfiguratorWrapper:
         self.config_canvas.grid(row=3, column=0, sticky=tk.NSEW)
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
-        # self.node.prepare(self.logger)
+        self.logger_subframe = LoggerFrame(self.frame)
+        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
+        self.logger = self.logger_subframe.get_logger(self.node.name)
 
         if self.node.plugin:
             if self.node.notes:
@@ -173,12 +173,6 @@ class ConfiguratorWrapper:
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
 
-        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
-        if self.logger.count > 0:
-            self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
-        else:
-            self.logger_subframe.grid_forget()
-
     def name_changed_callback(self, *_):
         name = self.name_var.get()
         self.node.name = name
@@ -196,23 +190,33 @@ class ConfiguratorWrapper:
 
     def config_change_task_callback(self):
         self.config_change_task = None
-        self.logger.clear()
-        self.logger_subframe.grid(row=3, sticky=tk.NSEW)
-        self.node.prerun(self.logger)
-        self.show_preview_subframe()
+
+        self.node_update_thread = threading.Thread(
+                target = self.node.prerun,
+                args=(self.logger,)
+        )
+        self.node_update_thread.start()
+
+        self.logger_subframe.after(100, self.config_change_task_callback_2)
+        self.change_callback(self.node)
+
+    def config_change_task_callback_2(self):
+        self.logger.poll()
+
+        if self.node_update_thread.is_alive():
+            self.logger_subframe.after(100, self.config_change_task_callback_2)
+            return
+
 
         # XXX stop the form scrolling away when it is refreshed, by putting
         # it back where it belongs.
         pos1, pos2 = self.config_scrollbar.get()
+        self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
         self.config_canvas.yview_moveto(pos1)
         self.config_scrollbar.set(pos1, pos2)
 
-        self.logger_subframe.after(5000, self.config_change_task_callback_2)
-        self.change_callback(self.node)
-
-    def config_change_task_callback_2(self):
         if self.logger.count == 0:
             self.logger_subframe.grid_forget()
         else:
@@ -278,18 +282,31 @@ class MainWindow:
         self.frame = tk.Frame(tk_parent)
         self.frame.grid(sticky=tk.NSEW)
 
+        # The left (or top) pane, which contains the pipeline graph
         self.canvas = FlippyCanvas(self.frame, bg="skyblue")
+
+        # The right (or bottom) pane, which contains everything else.
+        # 0: The node label
+        # 1: The plugin description
+        # 2: Node nodes / add notes button
+        # 3: Configuration
+        # 4: Preview pane
+        # 5: Log output
+
         self.subframe = tk.Frame(self.frame)
         self.subframe.columnconfigure(0, weight=1)
         self.subframe.columnconfigure(1, weight=0)
         self.subframe.rowconfigure(0, weight=0)
         self.subframe.rowconfigure(1, weight=0)
         self.subframe.rowconfigure(2, weight=0)
-        self.subframe.rowconfigure(3, weight=2)
+        self.subframe.rowconfigure(3, weight=1)
         self.subframe.rowconfigure(4, weight=1)
         self.subframe.rowconfigure(5, weight=0)
 
         self.frame.bind("<Configure>", self.on_frame_configure, add=True)
+
+        self.logger_subframe = LoggerFrame(self.subframe)
+        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
 
         if config_filename:
             self.config_load(config_filename)
@@ -397,12 +414,6 @@ def make_root():
     except ImportError:
         root = tk.Tk()
         # XXX some kind of ttk style setup goes here as a fallback
-
-    # Set up treeview font and row heights.
-    linespace = font.Font(None, 10).metrics()["linespace"]
-    style = ttk.Style()
-    style.configure("Treeview", font=(None, 10), rowheight=linespace)
-    style.configure("Treeview.Heading", font=(None, 10, "bold"), rowheight=linespace)
 
     root.title(f"CountESS {VERSION}")
     root.rowconfigure(0, weight=0)

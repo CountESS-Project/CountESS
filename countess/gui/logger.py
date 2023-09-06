@@ -103,13 +103,12 @@ class TreeviewLogger(Logger):
         self.treeview.bind("<<TreeviewSelect>>", self.on_click)
 
         self.queue: queue.Queue = queue.Queue()
-        self.on_poll()
 
     def on_click(self, event):
         # XXX display detail more nicely
         TreeviewDetailWindow(self.detail[self.treeview.focus()])
 
-    def on_poll(self):
+    def poll(self):
         # XXX dask apply etc don't seem to be thread safe when updating Tk, so
         # this adds in a queue to separate the two.
         try:
@@ -135,8 +134,6 @@ class TreeviewLogger(Logger):
 
         except queue.Empty:
             pass
-
-        self.treeview.after(1000, self.on_poll)
 
     def log(self, level: str, message: str, detail: Optional[str] = None):
         print(level, message, detail)

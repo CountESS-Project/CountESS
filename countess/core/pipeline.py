@@ -122,13 +122,13 @@ class PipelineNode:
         assert isinstance(logger, Logger)
 
         if self.is_dirty and self.plugin:
-            logger.info(f"Prerun {self.name} Start")
+            logger.progress("Start")
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
             self.load_config(logger)
             self.execute(logger, row_limit)
             self.is_dirty = False
-            logger.info(f"Prerun {self.name} Done")
+            logger.progress("Done")
 
     def mark_dirty(self):
         self.is_dirty = True
