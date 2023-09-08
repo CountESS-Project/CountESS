@@ -1,10 +1,10 @@
 import re
 import sys
+import threading
 import tkinter as tk
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
-import threading
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
@@ -55,6 +55,7 @@ class ConfiguratorWrapper:
     preview_subframe = None
     config_change_task = None
     notes_widget = None
+    node_update_thread = None
 
     def __init__(self, frame, node, change_callback):
         self.frame = frame
@@ -191,10 +192,7 @@ class ConfiguratorWrapper:
     def config_change_task_callback(self):
         self.config_change_task = None
 
-        self.node_update_thread = threading.Thread(
-                target = self.node.prerun,
-                args=(self.logger,)
-        )
+        self.node_update_thread = threading.Thread(target=self.node.prerun, args=(self.logger,))
         self.node_update_thread.start()
 
         self.logger_subframe.after(100, self.config_change_task_callback_2)
@@ -207,6 +205,7 @@ class ConfiguratorWrapper:
             self.logger_subframe.after(100, self.config_change_task_callback_2)
             return
 
+        self.node_update_thread.join()
 
         # XXX stop the form scrolling away when it is refreshed, by putting
         # it back where it belongs.
