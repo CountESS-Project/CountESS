@@ -54,9 +54,9 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         assert isinstance(self.parameters["output"], ArrayParam)
         df = super().process_dataframe(dataframe, logger)
 
-        if self.parameters["drop_unmatch"].value:
-            output_names = [pp.name.value for pp in self.parameters["output"]]
-            df = df.dropna(subset=output_names, how="all")
+        #if self.parameters["drop_unmatch"].value:
+        #    output_names = [pp.name.value for pp in self.parameters["output"]]
+        #    df = df.dropna(subset=output_names, how="all")
 
         if self.parameters["drop_column"].value:
             column_name = self.parameters["column"].value
@@ -87,8 +87,21 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
             except (TypeError, ValueError) as exc:
                 logger.exception(exc)
 
-        return [None] * self.compiled_re.groups
+        # If dropping unmatched values, return a simple None which will
+        # be filtered out in series_to_dataframe below, otherwise return
+        # a tuple of Nones which will fill in the unmatched row.
+        
+        if self.parameters["drop_unmatch"].value:
+            return None
+        else:
+            return [None] * self.compiled_re.groups
 
+    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        # Unmatched rows return a single None, so we can easily drop
+        # them out before doing further processing
+        if self.parameters["drop_unmatch"].value:
+            series.dropna(inplace=True)
+        return super().series_to_dataframe(series)
 
 class RegexReaderPlugin(PandasInputPlugin):
     name = "Regex Reader"
