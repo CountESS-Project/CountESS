@@ -453,7 +453,7 @@ class PandasTransformSingleToTuplePlugin(
 ):
     """Transformer which takes a single column and returns a tuple of values"""
 
-    def process_value(self, value, logger: Logger):
+    def process_value(self, value, logger: Logger) -> Optional[Iterable]:
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
@@ -462,7 +462,7 @@ class PandasTransformSingleToDictPlugin(
 ):
     """Transformer which takes a single column and returns a dictionary of values"""
 
-    def process_value(self, value, logger: Logger):
+    def process_value(self, value, logger: Logger) -> Optional[Dict]:
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
