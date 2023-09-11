@@ -2,8 +2,9 @@
 
 import sys
 import traceback
-from typing import Optional
-
+from typing import Optional, Iterable, Tuple
+import multiprocessing
+import queue
 
 class Logger:
     """Logger Base Class"""
@@ -11,13 +12,13 @@ class Logger:
     def __init__(self):
         pass
 
-    def progress(self, message: str = "Running", percentage: Optional[int] = None):
-        """Record progress"""
-        return None
-
     def log(self, level: str, message: str, detail: Optional[str] = None):
         """Log a message"""
         return None
+
+    def progress(self, message: str = "Running", percentage: Optional[int] = None):
+        """Record progress"""
+        self.log("progress", message, str(percentage) if percentage else None)
 
     def info(self, message: str, detail: Optional[str] = None):
         """Log a message at level info"""
@@ -49,13 +50,6 @@ class ConsoleLogger(Logger):
         self.stderr = stderr
         self.prefix = prefix
 
-    def progress(self, message: str = "Running", percentage: Optional[int] = None):
-        if self.prefix:
-            message = self.prefix + ": " + message
-        if percentage:
-            message += f" [{int(percentage):2d}%]"
-        self.stdout.write(f"{message}\n")
-
     def log(self, level: str, message: str, detail: Optional[str] = None):
         if self.prefix:
             message = self.prefix + ": " + message
@@ -63,3 +57,19 @@ class ConsoleLogger(Logger):
             message += " " + repr(detail)
 
         self.stderr.write(message + "\n")
+
+
+class MultiprocessLogger(Logger):
+
+    def __init__(self):
+        self.queue = multiprocessing.Queue()
+
+    def log(self, level: str, message: str, detail: Optional[str] = None):
+        self.queue.put((level, message, detail))
+
+    def poll(self) -> Iterable[Tuple[str, str, str]]:
+        try:
+            while True:
+                yield self.queue.get_nowait()
+        except queue.Empty:
+            pass
