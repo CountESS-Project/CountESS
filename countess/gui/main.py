@@ -5,6 +5,8 @@ import tkinter as tk
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
+import multiprocessing
+import psutil
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
@@ -252,6 +254,43 @@ class ButtonMenu:  # pylint: disable=R0903
         self.frame.grid(sticky=tk.NSEW)
 
 
+class RunWindow:
+    """Opens a separate window to run the pipeline in.  The actual pipeline is then run
+    in a separate process as well, so that it can be stopped."""
+
+    def __init__(self, graph):
+        self.graph = graph
+
+        self.toplevel = tk.Toplevel()
+        self.toplevel.columnconfigure(0, weight=1)
+        self.toplevel.rowconfigure(1, weight=1)
+
+        tk.Label(self.toplevel, text="Run").grid(row=0, column=0, stick=tk.EW)
+
+        self.logger_frame = LoggerFrame(self.toplevel)
+        self.logger_frame.grid(row=1, column=0, stick=tk.NSEW)
+        self.logger = self.logger_frame.get_logger('')
+
+        tk.Button(self.toplevel, text="Stop", command=self.stop).grid(row=2, column=0, sticky=tk.EW)
+
+        self.process = multiprocessing.Process(target=self.subproc)
+        self.process.start()
+        self.poll()
+
+    def subproc(self):
+        self.graph.run(self.logger)
+
+    def poll(self):
+        if self.process.is_alive():
+            self.logger.poll()
+            self.logger_frame.after(1000, self.poll)
+
+    def stop(self):
+        for p in psutil.Process(self.process.pid).children(recursive=True):
+            p.terminate()
+        self.process.terminate()
+
+
 class MainWindow:
     """Arrange the parts of the main window, with the FrameWrapper on the top
     left and the ConfiguratorWrapper either beside it or under it depending on
@@ -369,9 +408,7 @@ class MainWindow:
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
 
     def program_run(self):
-        # XXX should be handled in a different thread
-        logger = ConsoleLogger()
-        self.graph.run(logger)
+        RunWindow(self.graph)
 
     def program_exit(self):
         if not self.config_changed or messagebox.askokcancel("Exit", "Exit CountESS without saving config?"):
