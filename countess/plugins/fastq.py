@@ -8,7 +8,7 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, BooleanParam, FloatParam
-from countess.core.plugins import PandasInputPlugin
+from countess.core.plugins import PandasInputFilesPlugin
 
 
 def _file_reader(file_handle, min_avg_quality, row_limit=None):
@@ -17,7 +17,7 @@ def _file_reader(file_handle, min_avg_quality, row_limit=None):
             yield {"sequence": fastq_read.sequence, "header": fastq_read.header}
 
 
-class LoadFastqPlugin(PandasInputPlugin):
+class LoadFastqPlugin(PandasInputFilesPlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
     with count=1 and then grouping by sequence and summing counts.  It supports counting
     in multiple columns."""
@@ -56,11 +56,3 @@ class LoadFastqPlugin(PandasInputPlugin):
                 dataframe = dataframe.groupby("sequence").count()
 
         return dataframe
-
-    def num_files(self):
-        return len(self.parameters["files"])
-
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
-        assert isinstance(self.parameters["files"], ArrayParam)
-        file_params = self.parameters["files"][file_number]
-        yield self.read_file_to_dataframe(file_params, logger, row_limit)
