@@ -1,3 +1,4 @@
+import multiprocessing
 import re
 import sys
 import threading
@@ -5,12 +6,11 @@ import tkinter as tk
 import webbrowser
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
-import multiprocessing
+
 import psutil
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
-from countess.core.logger import ConsoleLogger
 from countess.core.pipeline import PipelineGraph
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
@@ -218,10 +218,11 @@ class ConfiguratorWrapper:
         self.config_canvas.yview_moveto(pos1)
         self.config_scrollbar.set(pos1, pos2)
 
-        if self.logger.count == 0:
+        if self.logger_subframe.count == 0:
             self.logger_subframe.grid_forget()
-        else:
-            self.logger.progress_hide()
+
+    #        else:
+    #            self.logger_subframe.progress_hide()
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
@@ -269,26 +270,43 @@ class RunWindow:
 
         self.logger_frame = LoggerFrame(self.toplevel)
         self.logger_frame.grid(row=1, column=0, stick=tk.NSEW)
-        self.logger = self.logger_frame.get_logger('')
+        self.logger = self.logger_frame.get_logger("")
+        self.logger.info("Started")
 
-        tk.Button(self.toplevel, text="Stop", command=self.stop).grid(row=2, column=0, sticky=tk.EW)
+        self.button = tk.Button(self.toplevel, text="Stop", command=self.on_button)
+        self.button.grid(row=2, column=0, sticky=tk.EW)
 
         self.process = multiprocessing.Process(target=self.subproc)
         self.process.start()
+
         self.poll()
 
     def subproc(self):
         self.graph.run(self.logger)
 
     def poll(self):
-        if self.process.is_alive():
-            self.logger.poll()
-            self.logger_frame.after(1000, self.poll)
+        if self.process:
+            if self.process.is_alive():
+                self.logger_frame.after(1000, self.poll)
+            else:
+                self.logger.info("Finished")
+                self.process = None
+                self.button["text"] = "Close"
+            self.logger_frame.poll()
 
-    def stop(self):
-        for p in psutil.Process(self.process.pid).children(recursive=True):
-            p.terminate()
-        self.process.terminate()
+    def on_button(self):
+        if self.process:
+            for p in psutil.Process(self.process.pid).children(recursive=True):
+                p.terminate()
+            self.process.terminate()
+            self.button["text"] = "Close"
+            self.process = None
+
+            self.logger.info("Stopped")
+            self.logger_frame.poll()
+
+        else:
+            self.toplevel.destroy()
 
 
 class MainWindow:

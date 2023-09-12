@@ -10,19 +10,22 @@ from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, ge
 PRERUN_ROW_LIMIT = 100000
 
 
-def multi_iterator_map(function, values, args) -> Iterable:
+def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
     """Pretty much equivalent to:
         interleave_longest(function(v, *args) for v in values)
     but runs in multiple processes using a queue
     to organize `values` and another queue to organize the
     returned values."""
 
-    nproc = min(((cpu_count() or 1) + 1, len(values)))
+    nproc = min(((cpu_count() or 1), len(values)))
     queue1: Queue = Queue()
     queue2: Queue = Queue(maxsize=nproc)
 
     for v in values:
         queue1.put(v)
+
+    if progress_cb:
+        progress_cb(0)
 
     def __target():
         try:
@@ -37,11 +40,15 @@ def multi_iterator_map(function, values, args) -> Iterable:
     for p in processes:
         p.start()
 
-    while any(p.is_alive() for p in processes):
+    while alive_count := sum(1 if p.is_alive() else 0 for p in processes):
         try:
             yield queue2.get(timeout=1)
         except Empty:
-            pass
+            if progress_cb:
+                progress_cb((100 * (len(values) - queue1.qsize() - alive_count)) // len(values))
+
+    if progress_cb:
+        progress_cb(100)
 
 
 @dataclass
@@ -76,6 +83,8 @@ class PipelineNode:
 
         iters_dict = {p.name: iter(p.result) for p in self.parent_nodes}
         while iters_dict:
+            logger.progress(self.name, None)
+
             for name, it in list(iters_dict.items()):
                 try:
                     yield from self.plugin.process(next(it), name, logger)
@@ -84,13 +93,15 @@ class PipelineNode:
                     yield from self.plugin.finished(name, logger)
         yield from self.plugin.finalize(logger)
 
+        logger.progress(self.name, 100)
+
     def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
 
         if self.plugin is None:
             self.result = []
             return
-        elif self.result and not self.is_dirty:
+        elif row_limit is not None and self.result and not self.is_dirty:
             return
         elif isinstance(self.plugin, FileInputPlugin):
             num_files = self.plugin.num_files()
@@ -100,7 +111,10 @@ class PipelineNode:
 
             row_limit_each_file = row_limit // num_files if row_limit is not None else None
             self.result = multi_iterator_map(
-                self.plugin.load_file, range(0, num_files), args=(logger, row_limit_each_file)
+                self.plugin.load_file,
+                range(0, num_files),
+                args=(logger, row_limit_each_file),
+                progress_cb=lambda p: logger.progress(self.name, p),
             )
         elif isinstance(self.plugin, ProcessPlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
@@ -126,13 +140,11 @@ class PipelineNode:
         assert isinstance(logger, Logger)
 
         if self.is_dirty and self.plugin:
-            logger.progress("Start")
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
             self.load_config(logger)
             self.execute(logger, row_limit)
             self.is_dirty = False
-            logger.progress("Done")
 
     def mark_dirty(self):
         self.is_dirty = True
