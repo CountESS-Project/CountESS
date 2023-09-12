@@ -2,7 +2,10 @@ from dataclasses import dataclass, field
 from multiprocessing import Process, Queue
 from os import cpu_count
 from queue import Empty
+import time
 from typing import Any, Iterable, Optional
+
+import psutil
 
 from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
@@ -30,6 +33,13 @@ def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
     def __target():
         try:
             while True:
+
+                # Prevent processes from using up all
+                # available memory while waiting
+                while psutil.virtual_memory().percent > 75:
+                    print(f"MEMORY {psutil.virtual_memory().percent}")
+                    time.sleep(1)
+
                 v = queue1.get(timeout=1)
                 for x in function(v, *args):
                     queue2.put(x)
@@ -44,8 +54,9 @@ def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
         try:
             yield queue2.get(timeout=1)
         except Empty:
-            if progress_cb:
-                progress_cb((100 * (len(values) - queue1.qsize() - alive_count)) // len(values))
+            pass
+        if progress_cb:
+            progress_cb((100 * (len(values) - queue1.qsize() - alive_count)) // len(values))
 
     if progress_cb:
         progress_cb(100)
