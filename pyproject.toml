@@ -20,7 +20,7 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Bio-Informatics',
 ]
 dependencies = [
-    'fqfa~=1.2.3',
+    'fqfa~=1.3.0',
     'more_itertools~=9.1.0',
     'numpy~=1.24.2',
     'pandas~=2.0.0',
