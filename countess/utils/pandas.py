@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterable, Optional
 import pandas as pd
 
 
-def collect_dataframes(data: Iterable[pd.DataFrame], preferred_size: int=100000) -> Iterable[pd.DataFrame]:
+def collect_dataframes(data: Iterable[pd.DataFrame], preferred_size: int = 100000) -> Iterable[pd.DataFrame]:
     buffer = None
     for dataframe in data:
         if dataframe is None or len(dataframe) == 0:

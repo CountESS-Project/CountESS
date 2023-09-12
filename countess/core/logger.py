@@ -1,10 +1,11 @@
 """Logger base classes"""
 
-import sys
-import traceback
-from typing import Optional, Iterable, Tuple
 import multiprocessing
 import queue
+import sys
+import traceback
+from typing import Iterable, Optional, Tuple
+
 
 class Logger:
     """Logger Base Class"""
@@ -60,7 +61,6 @@ class ConsoleLogger(Logger):
 
 
 class MultiprocessLogger(Logger):
-
     def __init__(self):
         self.queue = multiprocessing.Queue()
 

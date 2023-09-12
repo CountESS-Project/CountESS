@@ -1,10 +1,8 @@
 import datetime
-import queue
 import tkinter as tk
 from tkinter import ttk
-from typing import MutableMapping, Optional
 
-from countess.core.logger import MultiprocessLogger, Logger
+from countess.core.logger import MultiprocessLogger
 
 
 class LoggerTreeview(ttk.Treeview):
@@ -81,16 +79,17 @@ class LoggerFrame(ttk.Frame):
     def poll(self):
         datetime_now = datetime.datetime.now()
         for level, message, detail in self.logger.poll():
-            if level == 'progress':
+            if level == "progress":
                 try:
                     pbar = self.progress_bars[message]
                 except KeyError:
-                    pbar = self.progress_bars[message] = LabeledProgressbar(self.progress_frame, mode="determinate", value=0)
+                    pbar = LabeledProgressbar(self.progress_frame, mode="determinate", value=0)
+                    self.progress_bars[message] = pbar
                     pbar.update_label(message)
                     pbar.grid(sticky=tk.EW)
 
                 if detail is not None:
-                    pbar.config(mode="determinate", value=int(detail))
+                    pbar.config(mode="determinate", value=int(float(detail)))
                     pbar.update_label(f"{message} {detail}%")
                 else:
                     pbar.config(mode="indeterminate")
@@ -109,7 +108,6 @@ class LoggerFrame(ttk.Frame):
     def on_click(self, _):
         # XXX display detail more nicely
         TreeviewDetailWindow(self.details[self.treeview.focus()])
-
 
 
 class TreeviewDetailWindow(tk.Toplevel):

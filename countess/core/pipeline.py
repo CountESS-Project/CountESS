@@ -120,6 +120,11 @@ class PipelineNode:
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
             self.result = self.process_parent_iterables(logger)
 
+        # XXX at the moment, we freeze the results into an array
+        # if we have multiple children, as *both children* will be
+        # drawing items from the array.  This isn't the most efficient
+        # strategy.
+
         if row_limit is not None or len(self.child_nodes) != 1:
             self.result = list(self.result)
 

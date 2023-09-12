@@ -1,13 +1,11 @@
 import gzip
 from itertools import islice
-from typing import Iterable, Optional
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 
 from countess import VERSION
-from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BooleanParam, FloatParam
+from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputFilesPlugin
 
 
