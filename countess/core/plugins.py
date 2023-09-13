@@ -422,6 +422,7 @@ class PandasTransformXToTupleMixin:
             pp.name.value or "Column %d" % n for n, pp in enumerate(self.parameters["output"], 1)
         ]  # type: ignore [attr-defined]
 
+        series.dropna(inplace=True)
         data = series.tolist()
         column_names = column_names[: len(data[0])]
         df = pd.DataFrame(data, columns=column_names, index=series.index)
@@ -433,6 +434,7 @@ class PandasTransformXToDictMixin:
     columns named after the dictionary keys."""
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+        series.dropna(inplace=True)
         return pd.DataFrame(series.tolist(), index=series.index)
 
 
