@@ -1,8 +1,8 @@
+import time
 from dataclasses import dataclass, field
 from multiprocessing import Process, Queue
-from os import cpu_count
+from os import cpu_count, getpid
 from queue import Empty
-import time
 from typing import Any, Iterable, Optional
 
 import psutil
@@ -22,7 +22,7 @@ def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
 
     nproc = min(((cpu_count() or 1), len(values)))
     queue1: Queue = Queue()
-    queue2: Queue = Queue(maxsize=nproc)
+    queue2: Queue = Queue(maxsize=3)
 
     for v in values:
         queue1.put(v)
@@ -33,16 +33,22 @@ def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
     def __target():
         try:
             while True:
-
                 # Prevent processes from using up all
                 # available memory while waiting
+                # XXX this is probably a bad idea
                 while psutil.virtual_memory().percent > 75:
-                    print(f"MEMORY {psutil.virtual_memory().percent}")
+                    print(f"{getpid()} LOW MEMORY {psutil.virtual_memory().percent}")
                     time.sleep(1)
 
-                v = queue1.get(timeout=1)
-                for x in function(v, *args):
-                    queue2.put(x)
+                data_in = queue1.get(timeout=1)
+                for data_out in function(data_in, *args):
+                    queue2.put(data_out)
+
+                    # Make sure large data is disposed of before we
+                    # go around for the next loop
+                    del data_out
+                del data_in
+
         except Empty:
             pass
 
