@@ -424,9 +424,13 @@ class PandasTransformXToTupleMixin:
 
         series.dropna(inplace=True)
         data = series.tolist()
-        column_names = column_names[: len(data[0])]
-        df = pd.DataFrame(data, columns=column_names, index=series.index)
-        return df
+        if len(data):
+            max_cols = max(len(d) for d in data)
+            column_names = column_names[:max_cols]
+            df = pd.DataFrame(data, columns=column_names, index=series.index)
+            return df
+        else:
+            return pd.DataFrame()
 
 
 class PandasTransformXToDictMixin:
