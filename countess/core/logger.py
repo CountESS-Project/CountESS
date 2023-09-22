@@ -59,6 +59,12 @@ class ConsoleLogger(Logger):
 
         self.stderr.write(message + "\n")
 
+    def progress(self, message: str = "Running", percentage: Optional[int] = None):
+        if percentage is not None:
+            self.log("progress", "%-20s [%-10s] %d%%" % (message, "*" * (percentage // 10), percentage))
+        else:
+            self.log("progress", "%-20s [ Running! ]" % message)
+
 
 class MultiprocessLogger(Logger):
     def __init__(self):
