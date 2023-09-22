@@ -181,6 +181,9 @@ class SaveCsvPlugin(PandasProcessPlugin):
         # reset indexes so we can treat all columns equally.
         # if there's just a nameless index then we don't care about it, drop it.
 
+        # XXX sometimes this doesn't seem to work?
+        # I've set "index=True" below to emit the indexes
+
         drop_index = data.index.name is None and data.index.names[0] is None
         dataframe = data.reset_index(drop=drop_index)
 
@@ -204,7 +207,7 @@ class SaveCsvPlugin(PandasProcessPlugin):
             self.filehandle,
             header=emit_header,
             columns=self.csv_columns,
-            index=False,
+            index=drop_index,
             sep=self.SEPARATORS[self.parameters["delimiter"].value],
             quoting=bool(self.QUOTING[self.parameters["quoting"].value]),
         )  # type: ignore [call-overload]

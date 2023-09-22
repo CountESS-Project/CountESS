@@ -1,7 +1,7 @@
 import hashlib
 import os.path
 import re
-from typing import Any, Iterable, Mapping, Optional, Type, Union
+from typing import Any, Iterable, Mapping, MutableMapping, Optional, Type, Union
 
 PARAM_DIGEST_HASH = "sha256"
 
@@ -474,7 +474,6 @@ class ArrayParam(BaseParam):
 
 
 class PerColumnArrayParam(ArrayParam):
-
     # XXX deprecated in favour of PerColumnMultiParam
 
     def __init__(self, *a, **k) -> None:
@@ -592,7 +591,7 @@ class TabularMultiParam(MultiParam):
 
 def escape_column_name(k):
     # XXX do something to protect '.' and '=' and also whitespace.
-    # XXX actually this should probably be *all* key names since 
+    # XXX actually this should probably be *all* key names since
     # that way a parameter name isn't limited either.
     return k
 
@@ -603,8 +602,9 @@ def unescape_column_name(k):
 
 
 class PerColumnMultiParam(MultiParam):
+    params: MutableMapping[str, BaseParam]
+
     def __init__(self, label: str, param: BaseParam):
-        print(f"$$$$$ {label} {param}")
         super().__init__(label, {})
         self.param = param
 
@@ -619,7 +619,6 @@ class PerColumnMultiParam(MultiParam):
             yield from p.get_parameters(f"{key}.{escape_column_name(k)}", base_dir)
 
     def __getitem__(self, key):
-        print(f"PCMP GI {key}")
         return self.params.setdefault(unescape_column_name(key), self.param.copy())
 
     @property
@@ -628,15 +627,11 @@ class PerColumnMultiParam(MultiParam):
 
     @value.setter
     def value(self, value):
-        print(f"PCMP SV {self} {value}")
         for k, v in value.items():
-            print(f"PCMP SV {k} {v}")
             kk = unescape_column_name(k)
             self.params.setdefault(kk, self.param.copy()).value = v
-            print(f"PCMP SV {list(self.get_parameters('x'))}")
 
     def set_column_choices(self, choices):
-        print(f"PCMP SCC {choices}")
         for choice in choices:
             if choice not in self.params:
                 self.params[choice] = self.param.copy()
@@ -644,5 +639,3 @@ class PerColumnMultiParam(MultiParam):
         for name in list(self.params.keys()):
             if name not in choices:
                 del self.params[name]
-        print(f"PCMP SCC {self.params}")
-        print(f"PCMP SCC {list(self.get_parameters('x'))}")

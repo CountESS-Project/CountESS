@@ -26,7 +26,7 @@ class PivotPlugin(PandasProcessPlugin):
 
     input_columns: Dict[str, np.dtype] = {}
 
-    dataframes = []
+    dataframes: List[pd.DataFrame] = []
 
     def prepare(self, sources: List[str], row_limit: Optional[int]):
         assert isinstance(self.parameters["columns"], PerColumnMultiParam)
@@ -35,16 +35,14 @@ class PivotPlugin(PandasProcessPlugin):
         self.dataframes = []
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger):
+        assert isinstance(self.parameters["columns"], PerColumnMultiParam)
         self.input_columns.update(get_all_columns(data))
-
-        print(f"PTP {data}")
 
         params_by_column_name = self.parameters["columns"].params.items()
 
         index_cols = [col for col, param in params_by_column_name if param.value == "Index"]
         pivot_cols = [col for col, param in params_by_column_name if param.value == "Pivot"]
         expand_cols = [col for col, param in params_by_column_name if param.value == "Expand"]
-        print(f"XXX {params_by_column_name} {index_cols} {pivot_cols} {expand_cols}")
 
         if not pivot_cols:
             return []
@@ -68,9 +66,9 @@ class PivotPlugin(PandasProcessPlugin):
         return []
 
     def finalize(self, logger: Logger):
+        assert isinstance(self.parameters["columns"], PerColumnMultiParam)
         params_by_column_name = self.parameters["columns"].params.items()
         index_cols = [col for col, param in params_by_column_name if param.value == "Index"]
-        print(f"FINALIZE {self.dataframes} {index_cols}")
         if self.dataframes:
             df = pd.concat(self.dataframes).groupby(by=index_cols, group_keys=True).sum()
             self.dataframes = []

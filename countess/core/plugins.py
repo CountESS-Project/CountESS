@@ -163,6 +163,13 @@ class ProcessPlugin(BasePlugin):
         return []
 
 
+class SimplePlugin(ProcessPlugin):
+    def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+        """Called with each `data` input from `source`, calls
+        `callback` to send messages to the next plugin"""
+        raise NotImplementedError(f"{self.__class__}.process")
+
+
 class FileInputPlugin(BasePlugin):
     """Mixin class to indicate that this plugin can read files from local
     storage."""
@@ -194,7 +201,7 @@ class PandasProcessPlugin(ProcessPlugin):
         raise NotImplementedError(f"{self.__class__}.process")
 
 
-class PandasSimplePlugin(PandasProcessPlugin):
+class PandasSimplePlugin(SimplePlugin):
     """Base class for plugins which accept and return pandas DataFrames.
     Subclassing this hides all the distracting aspects of the pipeline
     from the plugin implementor, who only needs to override process_dataframe"""
@@ -225,6 +232,28 @@ class PandasSimplePlugin(PandasProcessPlugin):
             p.set_column_choices(self.input_columns.keys())
 
         return super().finalize(logger)
+
+
+# class MapReduceFinalizePlugin(BasePlugin):
+#    def map(self, data, logger: Logger) -> Iterable:
+#        return []
+#
+#    def reduce(self, data: Iterable):
+#        pass
+#
+#    def finalize(self, data: Iterable):
+#        pass
+#
+#
+# class PandasMapReduceFinalizePlugin(MapReduceFinalizePlugin):
+#    def map(self, data, logger: Logger) -> Iterable[pd.DataFrame]:
+#        return []
+#
+#    def reduce(self, data: Iterable[pd.DataFrame]) -> pd.DataFrame:
+#        return pd.DataFrame()
+#
+#    def finalize(self, data: pd.DataFrame):
+#        pass
 
 
 class PandasProductPlugin(PandasProcessPlugin):
@@ -442,7 +471,7 @@ class PandasTransformXToDictMixin:
         return pd.DataFrame(series.tolist(), index=series.index)
 
 
-# Six combinations of the five mixins!
+# Nine combinations of the six mixins!
 
 
 class PandasTransformSingleToSinglePlugin(

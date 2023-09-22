@@ -22,7 +22,7 @@ def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
     to organize `values` and another queue to organize the
     returned values."""
 
-    nproc = (cpu_count() // 2) or 1
+    nproc = ((cpu_count() or 1) + 1) // 2
     queue1: Queue = Queue()
     queue2: Queue = Queue(maxsize=3)
 
@@ -185,7 +185,7 @@ class PipelineNode:
             for key, val, base_dir in self.config:
                 try:
                     self.plugin.set_parameter(key, val, base_dir)
-                except (KeyError, ValueError) as exc:
+                except (KeyError, ValueError):
                     logger.warning(f"Parameter {key}={val} Not Found")
             self.config = None
 
