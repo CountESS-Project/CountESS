@@ -474,6 +474,9 @@ class ArrayParam(BaseParam):
 
 
 class PerColumnArrayParam(ArrayParam):
+
+    # XXX deprecated in favour of PerColumnMultiParam
+
     def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
         self.params_by_column_name: Mapping[str, BaseParam] = {}
@@ -585,3 +588,61 @@ class MultiParam(BaseParam):
 
 class TabularMultiParam(MultiParam):
     pass
+
+
+def escape_column_name(k):
+    # XXX do something to protect '.' and '=' and also whitespace.
+    # XXX actually this should probably be *all* key names since 
+    # that way a parameter name isn't limited either.
+    return k
+
+
+def unescape_column_name(k):
+    # XXX do the opposite of escape_column_name
+    return k
+
+
+class PerColumnMultiParam(MultiParam):
+    def __init__(self, label: str, param: BaseParam):
+        print(f"$$$$$ {label} {param}")
+        super().__init__(label, {})
+        self.param = param
+
+    def copy(self) -> "PerColumnMultiParam":
+        new = self.__class__(self.label, self.param)
+        for k, p in self.params.items():
+            new.params[k] = p.copy()
+        return new
+
+    def get_parameters(self, key, base_dir="."):
+        for k, p in self.params.items():
+            yield from p.get_parameters(f"{key}.{escape_column_name(k)}", base_dir)
+
+    def __getitem__(self, key):
+        print(f"PCMP GI {key}")
+        return self.params.setdefault(unescape_column_name(key), self.param.copy())
+
+    @property
+    def value(self):
+        return dict((k, p.value) for k, p in self.params.items())
+
+    @value.setter
+    def value(self, value):
+        print(f"PCMP SV {self} {value}")
+        for k, v in value.items():
+            print(f"PCMP SV {k} {v}")
+            kk = unescape_column_name(k)
+            self.params.setdefault(kk, self.param.copy()).value = v
+            print(f"PCMP SV {list(self.get_parameters('x'))}")
+
+    def set_column_choices(self, choices):
+        print(f"PCMP SCC {choices}")
+        for choice in choices:
+            if choice not in self.params:
+                self.params[choice] = self.param.copy()
+                self.params[choice].label = f'"{choice}"'
+        for name in list(self.params.keys()):
+            if name not in choices:
+                del self.params[name]
+        print(f"PCMP SCC {self.params}")
+        print(f"PCMP SCC {list(self.get_parameters('x'))}")
