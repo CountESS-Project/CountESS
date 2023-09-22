@@ -1,14 +1,16 @@
+import threading
 import time
 from dataclasses import dataclass, field
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
 from typing import Any, Iterable, Optional
 
 import psutil
+from more_itertools import interleave_longest
 
 from countess.core.logger import Logger
-from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
+from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, SimplePlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -20,49 +22,65 @@ def multi_iterator_map(function, values, args, progress_cb=None) -> Iterable:
     to organize `values` and another queue to organize the
     returned values."""
 
-    nproc = min(((cpu_count() or 1), len(values)))
+    nproc = (cpu_count() // 2) or 1
     queue1: Queue = Queue()
     queue2: Queue = Queue(maxsize=3)
 
-    for v in values:
-        queue1.put(v)
+    # XXX do this a better way
+    len_values = [0]
+    yield_count = 0
 
     if progress_cb:
         progress_cb(0)
 
-    def __target():
-        try:
-            while True:
-                # Prevent processes from using up all
-                # available memory while waiting
-                # XXX this is probably a bad idea
-                while psutil.virtual_memory().percent > 75:
-                    print(f"{getpid()} LOW MEMORY {psutil.virtual_memory().percent}")
-                    time.sleep(1)
+    enqueue_running = Value("b", True)
 
-                data_in = queue1.get(timeout=1)
-                for data_out in function(data_in, *args):
-                    queue2.put(data_out)
+    def __enqueue():
+        for v in values:
+            len_values[0] += 1
+            queue1.put(v)
+        enqueue_running.value = False
 
-                    # Make sure large data is disposed of before we
-                    # go around for the next loop
-                    del data_out
-                del data_in
+    thread = threading.Thread(target=__enqueue)
+    thread.start()
+    time.sleep(1)
 
-        except Empty:
-            pass
+    def __process():
+        while True:
+            try:
+                while True:
+                    # Prevent processes from using up all
+                    # available memory while waiting
+                    # XXX this is probably a bad idea
+                    while psutil.virtual_memory().percent > 75:
+                        print(f"{getpid()} LOW MEMORY {psutil.virtual_memory().percent}")
+                        time.sleep(1)
 
-    processes = [Process(target=__target) for _ in range(0, nproc)]
+                    data_in = queue1.get(timeout=1)
+                    for data_out in function(data_in, *args):
+                        queue2.put(data_out)
+
+                        # Make sure large data is disposed of before we
+                        # go around for the next loop
+                        del data_out
+                    del data_in
+
+            except Empty:
+                if not enqueue_running.value:
+                    break
+
+    processes = [Process(target=__process, name=f"worker {n}") for n in range(0, nproc)]
     for p in processes:
         p.start()
 
-    while alive_count := sum(1 if p.is_alive() else 0 for p in processes):
+    while thread.is_alive() or any(p.is_alive() for p in processes):
         try:
             yield queue2.get(timeout=1)
+            yield_count += 1
         except Empty:
             pass
-        if progress_cb:
-            progress_cb((100 * (len(values) - queue1.qsize() - alive_count)) // len(values))
+        if progress_cb and len_values[0]:
+            progress_cb((100 * yield_count) // len_values[0])
 
     if progress_cb:
         progress_cb(100)
@@ -112,6 +130,9 @@ class PipelineNode:
 
         logger.progress(self.name, 100)
 
+    def plugin_process(self, x):
+        self.plugin.process(*x)
+
     def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
 
@@ -131,6 +152,17 @@ class PipelineNode:
                 self.plugin.load_file,
                 range(0, num_files),
                 args=(logger, row_limit_each_file),
+                progress_cb=lambda p: logger.progress(self.name, p),
+            )
+        elif isinstance(self.plugin, SimplePlugin):
+            self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
+
+            input_data = interleave_longest(*[parent_node.result for parent_node in self.parent_nodes])
+
+            self.result = multi_iterator_map(
+                self.plugin.process,
+                input_data,
+                args=("", logger),
                 progress_cb=lambda p: logger.progress(self.name, p),
             )
         elif isinstance(self.plugin, ProcessPlugin):
@@ -155,7 +187,6 @@ class PipelineNode:
                     self.plugin.set_parameter(key, val, base_dir)
                 except (KeyError, ValueError) as exc:
                     logger.warning(f"Parameter {key}={val} Not Found")
-                    print(exc)
             self.config = None
 
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
