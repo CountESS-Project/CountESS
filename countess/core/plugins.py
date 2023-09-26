@@ -228,10 +228,10 @@ class PandasSimplePlugin(SimplePlugin):
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+        yield from super().finalize(logger)
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns.keys())
 
-        return super().finalize(logger)
 
 
 # class MapReduceFinalizePlugin(BasePlugin):

@@ -1,6 +1,7 @@
 import threading
 import time
 from dataclasses import dataclass, field
+from itertools import chain
 from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
@@ -146,24 +147,48 @@ class PipelineNode:
             if not num_files:
                 self.result = []
                 return
-
-            row_limit_each_file = row_limit // num_files if row_limit is not None else None
-            self.result = multi_iterator_map(
-                self.plugin.load_file,
-                range(0, num_files),
-                args=(logger, row_limit_each_file),
-                progress_cb=lambda p: logger.progress(self.name, p),
-            )
+            if row_limit is not None:
+                # for preview mode, just do everything in the one process.
+                # XXX consider threads for this though
+                row_limit_each_file = row_limit // num_files
+                self.result = []
+                for file_number in range(0, num_files):
+                    logger.progreess(self.name, file_number * 100 // num_files)
+                    self.result += list(
+                        self.plugin.load_file(file_number, logger, row_limit_each_file)
+                    )
+                    logger.progress(self.name, 100)
+            else:
+                self.result = multi_iterator_map(
+                    self.plugin.load_file,
+                    range(0, num_files),
+                    args=(logger, None),
+                    progress_cb=lambda p: logger.progress(self.name, p),
+                )
+        elif row_limit is not None:
+            # for preview mode, just do everything in the one process.
+            self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
+            self.result = []
+            for pn in self.parent_nodes:
+                for data_in in pn.result:
+                    logger.progress(self.name, None)
+                    self.result += list(
+                        self.plugin.process(data_in, pn.name, logger)
+                    )
+            logger.progress(self.name, 100)
         elif isinstance(self.plugin, SimplePlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
 
             input_data = interleave_longest(*[parent_node.result for parent_node in self.parent_nodes])
 
-            self.result = multi_iterator_map(
-                self.plugin.process,
-                input_data,
-                args=("", logger),
-                progress_cb=lambda p: logger.progress(self.name, p),
+            self.result = chain(
+                multi_iterator_map(
+                    self.plugin.process,
+                    input_data,
+                    args=("", logger),
+                    progress_cb=lambda p: logger.progress(self.name, p),
+                ),
+                self.plugin.finalize(logger)
             )
         elif isinstance(self.plugin, ProcessPlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
@@ -174,7 +199,7 @@ class PipelineNode:
         # drawing items from the array.  This isn't the most efficient
         # strategy.
 
-        if row_limit is not None or len(self.child_nodes) != 1:
+        if len(self.child_nodes) != 1:
             self.result = list(self.result)
 
         self.is_dirty = False
