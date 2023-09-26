@@ -226,6 +226,7 @@ class ChoiceParam(BaseParam):
     DEFAULT_VALUE = ""
 
     _value: Optional[str] = None
+    _choice: Optional[int] = None
 
     def __init__(
         self,
@@ -247,6 +248,20 @@ class ChoiceParam(BaseParam):
     @value.setter
     def value(self, value):
         self._value = value
+        self._choice = None
+
+    @property
+    def choice(self):
+        return self._choice
+
+    @choice.setter
+    def choice(self, choice):
+        if choice is not None and 0 <= choice < len(self.choices):
+            self._choice = choice
+            self._value = self.choices[choice]
+        else:
+            self._choice = None
+            self._value = None
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
@@ -362,6 +377,17 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
         if self.value == self.DEFAULT_VALUE:
             return df.index.to_series()
         else:
+            return super().get_column(df)
+
+
+class ColumnOrStringParam(ColumnChoiceParam):
+    DEFAULT_VALUE = ""
+
+    def get_column(self, df):
+        if self.choice is None:
+            return [ self.value ]
+        else:
+            # column selection
             return super().get_column(df)
 
 

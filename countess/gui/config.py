@@ -1,8 +1,8 @@
 # TK based GUI for CountESS
 import math
 import tkinter as tk
+from tkinter import filedialog, ttk
 from functools import partial
-from tkinter import filedialog
 from typing import Mapping, MutableMapping, Optional
 
 import numpy as np
@@ -12,6 +12,7 @@ from ..core.parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
+    ColumnOrStringParam,
     FileArrayParam,
     FileParam,
     FileSaveParam,
@@ -69,8 +70,13 @@ class ParameterWrapper:
 
         if isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
-            choices = parameter.choices or [""]
-            self.entry = tk.OptionMenu(tk_parent, self.var, *choices)
+            self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
+            self.entry['values'] = parameter.choices or [""]
+            if isinstance(parameter, ColumnOrStringParam):
+                self.entry.bind('<Key>', lambda event: self.entry.set(event.char))
+                self.entry['state'] = 'normal'
+            else:
+                self.entry['state'] = 'readonly'
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
@@ -197,11 +203,8 @@ class ParameterWrapper:
         elif isinstance(self.parameter, MultiParam):
             self.update_subwrappers(self.parameter.params.values(), None)
         elif isinstance(self.parameter, ChoiceParam):
-            self.entry.destroy()
             choices = self.parameter.choices or [""]
-            self.var.set(self.parameter.value)
-            self.entry = tk.OptionMenu(self.tk_parent, self.var, *choices)
-            self.entry.grid(sticky=tk.EW, padx=10, pady=5)
+            self.entry['values'] = choices
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
         elif isinstance(self.parameter, TextParam):
@@ -378,8 +381,16 @@ class ParameterWrapper:
             self.callback(self.parameter)
         return self.parameter.value
 
+    def set_choice(self, choice):
+        self.entry.current(choice)
+        self.parameter.set_choice(choice)
+
     def value_changed_callback(self, *_):
-        self.var.set(self.set_value(self.var.get()))
+        if isinstance(self.parameter, ChoiceParam) and self.entry.current() != -1:
+            print(f">>>>> {self.entry.current()}")
+            self.set_choice(self.entry.current())
+        else: 
+            self.var.set(self.set_value(self.var.get()))
 
     def widget_modified_callback(self, *_):
         # only gets called the *first* time a modification happens, unless
