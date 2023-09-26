@@ -140,8 +140,10 @@ class PipelineNode:
         if self.plugin is None:
             self.result = []
             return
+
         elif row_limit is not None and self.result and not self.is_dirty:
             return
+
         elif isinstance(self.plugin, FileInputPlugin):
             num_files = self.plugin.num_files()
             if not num_files:
@@ -153,7 +155,7 @@ class PipelineNode:
                 row_limit_each_file = row_limit // num_files
                 self.result = []
                 for file_number in range(0, num_files):
-                    logger.progreess(self.name, file_number * 100 // num_files)
+                    logger.progress(self.name, file_number * 100 // num_files)
                     self.result += list(
                         self.plugin.load_file(file_number, logger, row_limit_each_file)
                     )
@@ -165,6 +167,7 @@ class PipelineNode:
                     args=(logger, None),
                     progress_cb=lambda p: logger.progress(self.name, p),
                 )
+
         elif row_limit is not None:
             # for preview mode, just do everything in the one process.
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
@@ -176,6 +179,8 @@ class PipelineNode:
                         self.plugin.process(data_in, pn.name, logger)
                     )
             logger.progress(self.name, 100)
+            self.result += list(self.plugin.finalize(logger))
+
         elif isinstance(self.plugin, SimplePlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
 
@@ -190,6 +195,7 @@ class PipelineNode:
                 ),
                 self.plugin.finalize(logger)
             )
+
         elif isinstance(self.plugin, ProcessPlugin):
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
             self.result = self.process_parent_iterables(logger)
