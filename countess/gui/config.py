@@ -1,8 +1,8 @@
 # TK based GUI for CountESS
 import math
 import tkinter as tk
-from tkinter import filedialog, ttk
 from functools import partial
+from tkinter import filedialog, ttk
 from typing import Mapping, MutableMapping, Optional
 
 import numpy as np
@@ -71,12 +71,13 @@ class ParameterWrapper:
         if isinstance(parameter, ChoiceParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
-            self.entry['values'] = parameter.choices or [""]
+            self.entry["values"] = parameter.choices or [""]
             if isinstance(parameter, ColumnOrStringParam):
-                self.entry.bind('<Key>', lambda event: self.entry.set(event.char))
-                self.entry['state'] = 'normal'
+                assert isinstance(self.entry, ttk.Combobox)
+                self.entry.bind("<Key>", self.combobox_set)
+                self.entry["state"] = "normal"
             else:
-                self.entry['state'] = 'readonly'
+                self.entry["state"] = "readonly"
         elif isinstance(parameter, BooleanParam):
             self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
@@ -204,7 +205,7 @@ class ParameterWrapper:
             self.update_subwrappers(self.parameter.params.values(), None)
         elif isinstance(self.parameter, ChoiceParam):
             choices = self.parameter.choices or [""]
-            self.entry['values'] = choices
+            self.entry["values"] = choices
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
         elif isinstance(self.parameter, TextParam):
@@ -322,6 +323,10 @@ class ParameterWrapper:
 
         self.cull_subwrappers(params)
 
+    def combobox_set(self, event):
+        assert isinstance(self.entry, ttk.Combobox)
+        self.entry.set(event.char)
+
     def set_row(self, row):
         if not self.label:
             self.entry.grid(row=row, column=0, columnspan=3)
@@ -389,7 +394,7 @@ class ParameterWrapper:
         if isinstance(self.parameter, ChoiceParam) and self.entry.current() != -1:
             print(f">>>>> {self.entry.current()}")
             self.set_choice(self.entry.current())
-        else: 
+        else:
             self.var.set(self.set_value(self.var.get()))
 
     def widget_modified_callback(self, *_):

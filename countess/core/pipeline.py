@@ -156,9 +156,7 @@ class PipelineNode:
                 self.result = []
                 for file_number in range(0, num_files):
                     logger.progress(self.name, file_number * 100 // num_files)
-                    self.result += list(
-                        self.plugin.load_file(file_number, logger, row_limit_each_file)
-                    )
+                    self.result += list(self.plugin.load_file(file_number, logger, row_limit_each_file))
                     logger.progress(self.name, 100)
             else:
                 self.result = multi_iterator_map(
@@ -168,16 +166,14 @@ class PipelineNode:
                     progress_cb=lambda p: logger.progress(self.name, p),
                 )
 
-        elif row_limit is not None:
+        elif isinstance(self.plugin, ProcessPlugin) and row_limit is not None:
             # for preview mode, just do everything in the one process.
             self.plugin.prepare([p.name for p in self.parent_nodes], row_limit)
             self.result = []
             for pn in self.parent_nodes:
                 for data_in in pn.result:
                     logger.progress(self.name, None)
-                    self.result += list(
-                        self.plugin.process(data_in, pn.name, logger)
-                    )
+                    self.result += list(self.plugin.process(data_in, pn.name, logger))
             logger.progress(self.name, 100)
             self.result += list(self.plugin.finalize(logger))
 
@@ -193,7 +189,7 @@ class PipelineNode:
                     args=("", logger),
                     progress_cb=lambda p: logger.progress(self.name, p),
                 ),
-                self.plugin.finalize(logger)
+                self.plugin.finalize(logger),
             )
 
         elif isinstance(self.plugin, ProcessPlugin):

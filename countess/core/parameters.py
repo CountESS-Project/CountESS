@@ -385,7 +385,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
 
     def get_column(self, df):
         if self.choice is None:
-            return [ self.value ]
+            return [self.value]
         else:
             # column selection
             return super().get_column(df)

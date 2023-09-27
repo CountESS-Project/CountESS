@@ -233,7 +233,6 @@ class PandasSimplePlugin(SimplePlugin):
             p.set_column_choices(self.input_columns.keys())
 
 
-
 # class MapReduceFinalizePlugin(BasePlugin):
 #    def map(self, data, logger: Logger) -> Iterable:
 #        return []
