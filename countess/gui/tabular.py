@@ -242,19 +242,13 @@ class TabularDataFrame(tk.Frame):
 
     def __label_b1_motion(self, num, event):
         # Detect label drags left and right.
-        # XXX not quite right yet
+        # XXX still not quite right
         label = self.labels[num]
         label_width = label.winfo_width()
 
-        if num < len(self.labels) - 1 and event.x > label_width:
-            next_label = self.labels[num + 1]
-            next_label_width = next_label.winfo_width()
+        if event.x > label_width:
             self.subframe.columnconfigure(num, minsize=event.x)
-            self.subframe.columnconfigure(num + 1, minsize=next_label_width + label_width - event.x)
-        elif num != 0 and event.x < 0:
-            prev_label = self.labels[num - 1]
-            prev_label_width = prev_label.winfo_width()
-            self.subframe.columnconfigure(num - 1, minsize=prev_label_width + event.x)
+        elif event.x < 0:
             self.subframe.columnconfigure(num, minsize=label_width + event.x)
 
     def __scrollbar_command(self, command, *parameters):

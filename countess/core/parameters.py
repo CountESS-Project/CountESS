@@ -3,6 +3,8 @@ import os.path
 import re
 from typing import Any, Iterable, Mapping, MutableMapping, Optional, Type, Union
 
+import pandas as pd
+
 PARAM_DIGEST_HASH = "sha256"
 
 
@@ -49,7 +51,10 @@ class SimpleParam(BaseParam):
             self.read_only = True
 
     def clean_value(self, value):
-        return self.var_type(value)
+        try:
+            return self.var_type(value)
+        except ValueError:
+            return None
 
     @property
     def value(self):
@@ -227,6 +232,7 @@ class ChoiceParam(BaseParam):
 
     _value: Optional[str] = None
     _choice: Optional[int] = None
+    choices: list[str] = []
 
     def __init__(
         self,
@@ -235,10 +241,7 @@ class ChoiceParam(BaseParam):
         choices: Optional[Iterable[str]] = None,
     ):
         self.label = label
-        if value is None:
-            self._value = self.DEFAULT_VALUE
-        else:
-            self._value = value
+        self.value = value
         self.choices = list(choices or [])
 
     @property
@@ -247,8 +250,14 @@ class ChoiceParam(BaseParam):
 
     @value.setter
     def value(self, value):
-        self._value = value
-        self._choice = None
+        if value is None:
+            self._value = self.DEFAULT_VALUE
+        else:
+            self._value = value
+        try:
+            self._choice = self.choices.index(value)
+        except ValueError:
+            self._choice = None
 
     @property
     def choice(self):
@@ -330,6 +339,17 @@ class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
         return self.value == self.DEFAULT_VALUE
 
 
+def _dataframe_get_column(df: pd.DataFrame, col: str):
+    if col in df.columns:
+        return df[col]
+    elif col == df.index.name:
+        return df.index.to_series()
+    elif hasattr(df.index, "names") and col in df.index.names:
+        return df.index.to_frame()[col]
+    else:
+        raise ValueError(f"Column {col} not found")
+
+
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
@@ -338,14 +358,7 @@ class ColumnChoiceParam(ChoiceParam):
         self.set_choices(list(choices))
 
     def get_column(self, df):
-        if self.value in df.columns:
-            return df[self.value]
-        elif self.value == df.index.name:
-            return df.index.to_series()
-        elif hasattr(df.index, "names") and self.value in df.index.names:
-            return df.index.to_frame()[self.value]
-        else:
-            raise ValueError(f"Column {self.value} not found")
+        return _dataframe_get_column(df, self.value)
 
 
 class ColumnOrNoneChoiceParam(ColumnChoiceParam):
@@ -361,7 +374,7 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
         if self.value == self.DEFAULT_VALUE:
             return None
         else:
-            return super().get_column(df)
+            return _dataframe_get_column(df, self.value)
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
@@ -377,18 +390,35 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
         if self.value == self.DEFAULT_VALUE:
             return df.index.to_series()
         else:
-            return super().get_column(df)
+            return _dataframe_get_column(df, self.value)
 
 
 class ColumnOrStringParam(ColumnChoiceParam):
     DEFAULT_VALUE = ""
+    PREFIX = "— "
+
+    def set_column_choices(self, choices):
+        self.set_choices([self.PREFIX + c for c in choices])
+
+    def get_column_name(self):
+        if self.value.startswith(self.PREFIX):
+            return self.value[len(self.PREFIX) :]
+        return None
 
     def get_column(self, df):
-        if self.choice is None:
-            return [self.value]
+        if self.value.startswith(self.PREFIX):
+            col = self.value[len(self.PREFIX) :]
+            return _dataframe_get_column(df, col)
         else:
-            # column selection
-            return super().get_column(df)
+            return None
+
+
+class ColumnOrIntegerParam(ColumnOrStringParam):
+    def clean_value(self, value):
+        if isinstance(value, str):
+            return int("".join(re.split(r"\D+", value)))
+        else:
+            return int(value)
 
 
 class MultipleChoiceParam(ChoiceParam):

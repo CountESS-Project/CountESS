@@ -73,7 +73,6 @@ class ParameterWrapper:
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
             self.entry["values"] = parameter.choices or [""]
             if isinstance(parameter, ColumnOrStringParam):
-                assert isinstance(self.entry, ttk.Combobox)
                 self.entry.bind("<Key>", self.combobox_set)
                 self.entry["state"] = "normal"
             else:
@@ -325,7 +324,8 @@ class ParameterWrapper:
 
     def combobox_set(self, event):
         assert isinstance(self.entry, ttk.Combobox)
-        self.entry.set(event.char)
+        if self.entry.current() != -1:
+            self.entry.set(event.char)
 
     def set_row(self, row):
         if not self.label:
@@ -388,11 +388,10 @@ class ParameterWrapper:
 
     def set_choice(self, choice):
         self.entry.current(choice)
-        self.parameter.set_choice(choice)
+        self.parameter.choice = choice
 
     def value_changed_callback(self, *_):
         if isinstance(self.parameter, ChoiceParam) and self.entry.current() != -1:
-            print(f">>>>> {self.entry.current()}")
             self.set_choice(self.entry.current())
         else:
             self.var.set(self.set_value(self.var.get()))

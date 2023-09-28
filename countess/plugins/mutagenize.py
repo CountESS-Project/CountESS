@@ -10,7 +10,7 @@ from countess.core.plugins import PandasInputPlugin
 
 
 def mutagenize(
-    sequence: str, mutate: bool, delete: bool, insert: bool
+    sequence: str, mutate: bool, delete: bool, del3: bool, insert: bool
 ) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
     # XXX it'd be faster, but less neat, to include logic for duplicate
     # removal here instead of producing duplicates and then removing them
@@ -23,6 +23,8 @@ def mutagenize(
                 yield sequence[0:n] + b2 + sequence[n:], n + 1, None, b2
         if delete:
             yield sequence[0:n] + sequence[n + 1 :], n + 1, b1, None
+        if del3:
+            yield sequence[0:n] + sequence[n + 3 :], n + 1, sequence[n : n + 3], None
     if insert:
         ll = len(sequence)
         for b2 in "ACGT":
@@ -43,6 +45,7 @@ class MutagenizePlugin(PandasInputPlugin):
         "sequence": StringCharacterSetParam("Sequence", "", character_set=character_set),
         "mutate": BooleanParam("All Single Mutations?", True),
         "delete": BooleanParam("All Single Deletes?", False),
+        "del3": BooleanParam("All Triple Deletes?", False),
         "insert": BooleanParam("All Single Inserts?", False),
         "remove": BooleanParam("Remove Duplicates?", False),
     }
@@ -59,6 +62,7 @@ class MutagenizePlugin(PandasInputPlugin):
                     self.parameters["sequence"].value,
                     self.parameters["mutate"].value,
                     self.parameters["delete"].value,
+                    self.parameters["del3"].value,
                     self.parameters["insert"].value,
                 ),
                 0,
