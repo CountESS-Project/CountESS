@@ -1,3 +1,3 @@
 """CountESS Project"""
 
-VERSION = "0.0.35"
+VERSION = "0.0.36"
