@@ -42,6 +42,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         ),
         "drop_column": BooleanParam("Drop Column", False),
         "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
+        "multi": BooleanParam("Multi Match", False),
     }
 
     compiled_re = None
@@ -76,11 +77,15 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         assert isinstance(self.parameters["output"], ArrayParam)
         if value is not None:
             try:
-                if match := self.compiled_re.match(str(value)):
-                    return [op.datatype.cast_value(val) for op, val in zip(self.parameters["output"], match.groups())]
+                if self.parameters["multi"].value:
+                    
+                    return self.compiled_re.findall(str(value))
                 else:
-                    pass
-                    # logger.info(f"{repr(value)} didn't match")
+                    if match := self.compiled_re.match(str(value)):
+                        return [op.datatype.cast_value(val) for op, val in zip(self.parameters["output"], match.groups())]
+                    else:
+                        pass
+                        # logger.info(f"{repr(value)} didn't match")
             except (TypeError, ValueError) as exc:
                 logger.exception(exc)
 
@@ -98,8 +103,11 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         # them out before doing further processing
         if self.parameters["drop_unmatch"].value:
             series.dropna(inplace=True)
-        return super().series_to_dataframe(series)
 
+        if self.parameters["multi"].value:
+            series = series.explode()
+
+        return super().series_to_dataframe(series)
 
 class RegexReaderPlugin(PandasInputPlugin):
     name = "Regex Reader"
