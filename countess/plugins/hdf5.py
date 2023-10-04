@@ -17,7 +17,7 @@ class LoadHdfPlugin(PandasInputFilesPlugin):
     description = "Loads counts from HDF5 files"
     version = VERSION
 
-    file_types = [("HDF5 File", "*.hdf5")]
+    file_types = [("HDF5 File", ".hdf5")]
     file_params = {
         "key": ChoiceParam("HDF Key"),
     }

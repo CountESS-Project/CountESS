@@ -50,9 +50,9 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     version = VERSION
 
     file_types = [
-        ("CSV", "*.csv *.csv.gz *.csv.bz2"),
-        ("TSV", "*.tsv *.tsv.gz *.tsv.bz2"),
-        ("TXT", "*.txt *.txt.gz *.txt.bz2"),
+        ("CSV", [".csv", ".gz"]),
+        ("TSV", [".tsv", ".gz"]),
+        ("TXT", ".txt")
     ]
 
     parameters = {
@@ -150,7 +150,11 @@ class SaveCsvPlugin(PandasProcessPlugin):
     link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
     version = VERSION
 
-    file_types = [("CSV", "*.csv"), ("TSV", "*.tsv"), ("TXT", "*.txt")]
+    file_types = [
+        ("CSV", ".csv"),
+        ("TSV", ".tsv"),
+        ("TXT", ".txt")
+    ]
 
     parameters = {
         "header": BooleanParam("CSV header row?", True),
