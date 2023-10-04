@@ -24,7 +24,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
     description = "Loads counts from FASTQ files containing either variant or barcodes"
     version = VERSION
 
-    file_types = [("FASTQ", "*.fastq"), ("FASTQ (gzipped)", "*.fastq.gz")]
+    file_types = [("FASTQ", ".fastq"), ("FASTQ (gzipped)", ".gz")]
 
     parameters = {
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
