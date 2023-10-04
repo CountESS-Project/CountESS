@@ -158,6 +158,29 @@ class StringCharacterSetParam(StringParam):
         return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
 
 
+def clean_file_types(file_types):
+    # MacOS in particular is crashy if file_types is not to it's liking.
+    # This leads to very confusing errors.  Better to throw an assertion
+    # error here than bomb out later.  See #27.
+
+    # XXX MacOS also doesn't seem to handle multiple file
+    # extensions, eg: .csv.gz, whereas Linux can.
+    # So maybe this function could accept those and censor
+    # them if running MacOS.
+
+    assert type(file_types) is list
+    for ft in file_types:
+        assert type(ft) in (tuple, list)
+        assert type(ft[0]) is str
+        assert type(ft[1]) in (tuple, list, str)
+        if type(ft[1]) in (tuple, list):
+            for ext in ft[1]:
+                assert type(ext) is str
+                assert ext == '*' or re.match(r'\.\w+$', ext), f"Invalid FileType Extension {ext}"
+
+    return file_types
+
+
 class FileParam(StringParam):
     """A StringParam for holding a filename.  Defaults to `read_only` because
     it really should be populated from a file dialog or simiar."""
@@ -169,7 +192,7 @@ class FileParam(StringParam):
     def __init__(self, label: str, value=None, read_only: bool = True, file_types=None):
         super().__init__(label, value, read_only)
         if file_types is not None:
-            self.file_types = file_types
+            self.file_types = clean_file_types(file_types)
 
     def get_file_hash(self):
         if not self.value:
