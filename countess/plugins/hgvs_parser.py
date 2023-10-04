@@ -2,13 +2,7 @@ import re
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import (
-    BooleanParam,
-    ColumnChoiceParam,
-    ColumnOrNoneChoiceParam,
-    IntegerParam,
-    StringParam,
-)
+from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 
 

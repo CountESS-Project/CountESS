@@ -78,11 +78,12 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         if value is not None:
             try:
                 if self.parameters["multi"].value:
-                    
                     return self.compiled_re.findall(str(value))
                 else:
                     if match := self.compiled_re.match(str(value)):
-                        return [op.datatype.cast_value(val) for op, val in zip(self.parameters["output"], match.groups())]
+                        return [
+                            op.datatype.cast_value(val) for op, val in zip(self.parameters["output"], match.groups())
+                        ]
                     else:
                         pass
                         # logger.info(f"{repr(value)} didn't match")
@@ -108,6 +109,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
             series = series.explode()
 
         return super().series_to_dataframe(series)
+
 
 class RegexReaderPlugin(PandasInputPlugin):
     name = "Regex Reader"
