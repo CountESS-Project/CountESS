@@ -36,9 +36,9 @@ class PivotPlugin(PandasProcessPlugin):
         self.input_columns.update(get_all_columns(data))
 
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
-        index_cols = [col for col, param in column_parameters if param.value == 'Index']
-        pivot_cols = [col for col, param in column_parameters if param.value == 'Pivot']
-        expand_cols = [col for col, param in column_parameters if param.value == 'Expand']
+        index_cols = [col for col, param in column_parameters if param.value == "Index"]
+        pivot_cols = [col for col, param in column_parameters if param.value == "Pivot"]
+        expand_cols = [col for col, param in column_parameters if param.value == "Expand"]
 
         if not pivot_cols:
             return []

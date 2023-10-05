@@ -1,13 +1,14 @@
 from typing import Iterable, List, Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam
 from countess.core.plugins import PandasProcessPlugin
 from countess.utils.pandas import get_all_columns
+
 
 def _column_renamer(col):
     if isinstance(col, tuple):
@@ -51,7 +52,7 @@ class GroupByPlugin(PandasProcessPlugin):
     def prepare(self, *_):
         self.dataframes = []
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
+    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
         # XXX can do this in two stages
         assert self.dataframes is not None
         self.dataframes.append(data)

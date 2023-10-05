@@ -114,7 +114,7 @@ class BasePlugin:
     def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
         param = self.parameters
         for k in key.split("."):
-            if k == '_label':
+            if k == "_label" and hasattr(param, "label"):
                 param.label = value
                 return
 
@@ -182,7 +182,7 @@ class FileInputPlugin(BasePlugin):
     name = ""
 
     # used by the GUI file dialog
-    file_types : List[tuple[str,str|list[str]]] = [("Any", "*")]
+    file_types: List[tuple[str, str | list[str]]] = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
 
     def num_files(self) -> int:

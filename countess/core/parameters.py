@@ -1,7 +1,7 @@
 import hashlib
 import os.path
 import re
-from typing import Any, Iterable, Mapping, MutableMapping, Optional, Type, Union
+from typing import Any, Iterable, Mapping, Optional, Type, Union
 
 import pandas as pd
 
@@ -176,7 +176,7 @@ def clean_file_types(file_types):
         if type(ft[1]) in (tuple, list):
             for ext in ft[1]:
                 assert type(ext) is str
-                assert ext == '*' or re.match(r'\.\w+$', ext), f"Invalid FileType Extension {ext}"
+                assert ext == "*" or ext == "" or re.match(r"\.\w+$", ext), f"Invalid FileType Extension {ext}"
 
     return file_types
 
@@ -554,7 +554,6 @@ class ArrayParam(BaseParam):
 
 
 class PerColumnArrayParam(ArrayParam):
-
     def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
         self.params_by_column_name: Mapping[str, BaseParam] = {}
@@ -566,7 +565,7 @@ class PerColumnArrayParam(ArrayParam):
             yield from p.get_parameters(f"{key}.{n}", base_dir)
 
     def set_column_choices(self, choices):
-        params_by_label = { p.label: p for p in self.params }
+        params_by_label = {p.label: p for p in self.params}
         self.params = [None] * len(choices)
         for num, name in enumerate(choices):
             label = f'"{name}"'
