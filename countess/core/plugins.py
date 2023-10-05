@@ -114,6 +114,10 @@ class BasePlugin:
     def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
         param = self.parameters
         for k in key.split("."):
+            if k == '_label':
+                param.label = value
+                return
+
             # XXX types are a mess here
             param = param[k]  # type: ignore
         if isinstance(param, (FileParam, FileSaveParam)) and value is not None:

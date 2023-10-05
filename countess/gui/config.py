@@ -388,12 +388,16 @@ class ParameterWrapper:
 
     def set_choice(self, choice):
         self.entry.current(choice)
-        self.parameter.choice = choice
+        if self.parameter.choice != choice:
+            self.parameter.choice = choice
+            self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
         if isinstance(self.parameter, ChoiceParam) and self.entry.current() != -1:
+            print(f"VCC SC {self.entry.current()}")
             self.set_choice(self.entry.current())
         else:
+            print(f"VCC SV {self.var.get()}")
             self.var.set(self.set_value(self.var.get()))
 
     def widget_modified_callback(self, *_):

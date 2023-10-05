@@ -146,7 +146,11 @@ class SaveCsvPlugin(PandasProcessPlugin):
     link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
     version = VERSION
 
-    file_types = [("CSV", ".csv"), ("TSV", ".tsv"), ("TXT", ".txt")]
+    file_types = [
+        ("CSV", [".csv", ".gz"]),
+        ("TSV", [".tsv", ".gz"]),
+        ("TXT", ".txt")
+    ]
 
     parameters = {
         "header": BooleanParam("CSV header row?", True),

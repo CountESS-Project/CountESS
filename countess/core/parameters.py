@@ -14,6 +14,7 @@ class BaseParam:
     label: str = ""
     value: Any = None
     hide: bool = False
+    read_only: bool = False
 
     def copy(self):
         """Plugins declare their parameters with instances of BaseParam, these
@@ -41,7 +42,6 @@ class SimpleParam(BaseParam):
     """A SimpleParam has a single value"""
 
     var_type: type = type(None)
-    read_only: bool = False
 
     def __init__(self, label: str, value=None, read_only: bool = False):
         self.label = label
@@ -498,7 +498,8 @@ class ArrayParam(BaseParam):
 
     def relabel(self):
         for n, param in enumerate(self.params):
-            param.label = self.param.label + f" {n+1}"
+            if param.label.startswith(self.param.label + " "):
+                param.label = self.param.label + f" {n+1}"
 
     def copy(self) -> "ArrayParam":
         return self.__class__(self.label, self.param, self.read_only, self.min_size, self.max_size)
@@ -554,23 +555,33 @@ class ArrayParam(BaseParam):
 
 class PerColumnArrayParam(ArrayParam):
     # XXX deprecated in favour of PerColumnMultiParam
+    # or maybe not
 
     def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
         self.params_by_column_name: Mapping[str, BaseParam] = {}
         self.read_only = True
 
+    def get_parameters(self, key, base_dir="."):
+        for n, p in enumerate(self.params):
+            yield f"{key}.{n}._label", p.label
+            yield from p.get_parameters(f"{key}.{n}", base_dir)
+
     def set_column_choices(self, choices):
+        params_by_label = { p.label: p for p in self.params }
         self.params = [None] * len(choices)
         for num, name in enumerate(choices):
-            if name not in self.params_by_column_name:
-                self.params_by_column_name[name] = self.param.copy()
-            self.params[num] = self.params_by_column_name[name]
-            self.params[num].label = f'Column {num+1}: "{name}"'
+            label = f'"{name}"'
+            if label in params_by_label:
+                self.params[num] = params_by_label[label]
+            else:
+                self.params[num] = self.param.copy()
+                self.params[num].label = label
             self.params[num].set_column_choices(choices)
-        for name in list(self.params_by_column_name.keys()):
-            if name not in choices:
-                del self.params_by_column_name[name]
+
+    def get_column_params(self):
+        for p in self.params:
+            yield p.label, p
 
 
 class FileArrayParam(ArrayParam):
