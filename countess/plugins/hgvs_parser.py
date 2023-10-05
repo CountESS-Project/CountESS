@@ -13,7 +13,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
     version = VERSION
 
     parameters = {
-        "column": ColumnChoiceParam("Input Column", "hgvs"),
+        "column": ColumnChoiceParam("Input Column"),
         "guides_col": ColumnOrNoneChoiceParam("Guide(s) Column"),
         "guides_str": StringParam("Guide(s)"),
         "max_var": IntegerParam("Maximum Variations", 1),
@@ -22,7 +22,14 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
 
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["guides_col"], ColumnOrNoneChoiceParam)
-        value = data[self.parameters["column"].value]
+        try:
+            value = data[self.parameters["column"].value]
+        except KeyError:
+            return None
+
+        if value is None:
+            return None
+
         output = {}
 
         guides = []
