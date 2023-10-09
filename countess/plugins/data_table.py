@@ -32,6 +32,8 @@ class DataTablePlugin(PandasInputPlugin):
 
     col_rows: list[MultiParam] = []
 
+    show_preview = False
+
     def fix_columns(self):
         for num, col_row in enumerate(self.col_rows):
             if col_row not in self.parameters["columns"].params:

@@ -153,7 +153,10 @@ class ConfiguratorWrapper:
         if self.preview_subframe:
             self.preview_subframe.destroy()
 
-        if self.node.result is None:
+        if not self.node.plugin.show_preview:
+            self.frame.rowconfigure(4, weight=0)
+            return
+        elif self.node.result is None:
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.columnconfigure(0, weight=1)
             tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)

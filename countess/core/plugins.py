@@ -84,6 +84,7 @@ class BasePlugin:
     link: Optional[str] = None
 
     parameters: MutableMapping[str, BaseParam] = {}
+    show_preview: bool = True
 
     @property
     def version(self) -> str:
@@ -572,6 +573,15 @@ class PandasInputPlugin(FileInputPlugin):
     """A specialization of the PandasBasePlugin to allow it to follow nothing,
     eg: come first."""
 
+    def num_files(self):
+        raise NotImplementedError(f"{self.__class__}.num_files()")
+
+    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError(f"{self.__class__}.load_file()")
+
+
+class PandasInputFilesPlugin(PandasInputPlugin):
+
     def __init__(self, *a, **k):
         # Add in filenames
         super().__init__(*a, **k)
@@ -584,14 +594,6 @@ class PandasInputPlugin(FileInputPlugin):
 
     def num_files(self):
         return len(self.parameters["files"].params)
-
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
-        raise NotImplementedError(f"{self.__class__}.load_file()")
-
-
-class PandasInputFilesPlugin(PandasInputPlugin):
-    def num_files(self):
-        return len(self.parameters["files"])
 
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         assert isinstance(self.parameters["files"], ArrayParam)

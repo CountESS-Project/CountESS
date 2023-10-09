@@ -90,7 +90,6 @@ class LoggerFrame(ttk.Frame):
 
                 if detail is not None:
                     progress = int(float(detail))
-                    print(f"PROGRESS {message} {progress} {detail}")
                     pbar.config(mode="determinate", value=progress)
                     pbar.update_label(f"{message} {detail}%")
                     if progress == 100:

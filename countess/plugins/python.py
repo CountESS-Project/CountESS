@@ -2,7 +2,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import TextParam
+from countess.core.parameters import TextParam, PerColumnArrayParam, BooleanParam
 from countess.core.plugins import PandasTransformRowToDictPlugin
 
 # XXX pretty sure this is a job for ast.parse rather than just
@@ -30,7 +30,9 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
 
     version = VERSION
 
-    parameters = {"code": TextParam("Python Code")}
+    parameters = {
+            "columns": PerColumnArrayParam("columns", BooleanParam("keep", True)),
+            "code": TextParam("Python Code")}
 
     def process_row(self, row: pd.Series, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
@@ -38,7 +40,11 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
 
         row_dict = dict(row)
         exec(code_object, {}, row_dict)  # pylint: disable=exec-used
-        return dict((k, v) for k, v in row_dict.items() if type(v) in SIMPLE_TYPES)
+
+        column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
+        columns_to_remove = set( col for col, param in column_parameters if not param.value )
+
+        return dict((k, v) for k, v in row_dict.items() if k not in columns_to_remove and type(v) in SIMPLE_TYPES)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         """Override parent class because we a) want to reset

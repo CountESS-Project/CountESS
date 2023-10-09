@@ -14,7 +14,7 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasInputPlugin, PandasTransformSingleToTuplePlugin
+from countess.core.plugins import PandasInputFilesPlugin, PandasTransformSingleToTuplePlugin
 
 
 class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
@@ -111,7 +111,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         return super().series_to_dataframe(series)
 
 
-class RegexReaderPlugin(PandasInputPlugin):
+class RegexReaderPlugin(PandasInputFilesPlugin):
     name = "Regex Reader"
     description = "Loads arbitrary data from line-delimited files"
     additional = """Applies a regular expression to each line to extract fields.
