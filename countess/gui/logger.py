@@ -89,12 +89,17 @@ class LoggerFrame(ttk.Frame):
                     pbar.grid(sticky=tk.EW)
 
                 if detail is not None:
-                    pbar.config(mode="determinate", value=int(float(detail)))
+                    progress = int(float(detail))
+                    print(f"PROGRESS {message} {progress} {detail}")
+                    pbar.config(mode="determinate", value=progress)
                     pbar.update_label(f"{message} {detail}%")
+                    if progress == 100:
+                        self.after(2000, self.remove_pbar, message)
                 else:
                     pbar.config(mode="indeterminate")
                     pbar.step(5)
                     pbar.update_label(f"{message}")
+
             else:
                 self.count += 1
                 iid = self.treeview.insert("", "end", text=datetime_now.isoformat(), values=(level, message))
@@ -108,6 +113,11 @@ class LoggerFrame(ttk.Frame):
     def on_click(self, _):
         # XXX display detail more nicely
         TreeviewDetailWindow(self.details[self.treeview.focus()])
+
+    def remove_pbar(self, message):
+        if message in self.progress_bars:
+            self.progress_bars[message].destroy()
+            del self.progress_bars[message]
 
 
 class TreeviewDetailWindow(tk.Toplevel):

@@ -157,7 +157,7 @@ class PipelineNode:
                 for file_number in range(0, num_files):
                     logger.progress(self.name, file_number * 100 // num_files)
                     self.result += list(self.plugin.load_file(file_number, logger, row_limit_each_file))
-                    logger.progress(self.name, 100)
+                logger.progress(self.name, 100)
             else:
                 self.result = multi_iterator_map(
                     self.plugin.load_file,
