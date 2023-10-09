@@ -1,4 +1,4 @@
-from itertools import islice
+from itertools import islice, product
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -10,7 +10,7 @@ from countess.core.plugins import PandasInputPlugin
 
 
 def mutagenize(
-    sequence: str, mutate: bool, delete: bool, del3: bool, insert: bool
+        sequence: str, mutate: bool, delete: bool, del3: bool, insert: bool, ins3: bool
 ) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
     # XXX it'd be faster, but less neat, to include logic for duplicate
     # removal here instead of producing duplicates and then removing them
@@ -25,10 +25,20 @@ def mutagenize(
             yield sequence[0:n] + sequence[n + 1 :], n + 1, b1, None
         if del3:
             yield sequence[0:n] + sequence[n + 3 :], n + 1, sequence[n : n + 3], None
+        if ins3:
+            for ins in product("ACGT", "ACGT", "ACGT"):
+                ins_str = ''.join(ins)
+                yield sequence[0:n] + ins_str + sequence[n:], n+1, None, ins_str
+
+    ll = len(sequence) + 1
     if insert:
-        ll = len(sequence)
         for b2 in "ACGT":
             yield sequence + b2, ll, None, b2
+    if ins3:
+        for ins in product("ACGT", "ACGT", "ACGT"):
+            ins_str = ''.join(ins)
+            yield sequence + ins_str, ll, None, ins_str
+
 
 
 class MutagenizePlugin(PandasInputPlugin):
@@ -47,6 +57,7 @@ class MutagenizePlugin(PandasInputPlugin):
         "delete": BooleanParam("All Single Deletes?", False),
         "del3": BooleanParam("All Triple Deletes?", False),
         "insert": BooleanParam("All Single Inserts?", False),
+        "ins3": BooleanParam("All Triple Inserts?", False),
         "remove": BooleanParam("Remove Duplicates?", False),
     }
 
@@ -64,6 +75,7 @@ class MutagenizePlugin(PandasInputPlugin):
                     self.parameters["delete"].value,
                     self.parameters["del3"].value,
                     self.parameters["insert"].value,
+                    self.parameters["ins3"].value,
                 ),
                 0,
                 row_limit,
