@@ -153,7 +153,11 @@ class ConfiguratorWrapper:
         if self.preview_subframe:
             self.preview_subframe.destroy()
 
-        if all(isinstance(r, (str, bytes)) for r in self.node.result):
+        if self.node.result is None:
+            self.preview_subframe = tk.Frame(self.frame)
+            self.preview_subframe.columnconfigure(0, weight=1)
+            tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
+        elif all(isinstance(r, (str, bytes)) for r in self.node.result):
             text_result = "".join(self.node.result)
             self.preview_subframe = tk.Frame(self.frame, highlightbackground="black", highlightthickness=3)
             self.preview_subframe.columnconfigure(0, weight=1)

@@ -221,11 +221,16 @@ class PandasSimplePlugin(SimplePlugin):
 
         self.input_columns.update(get_all_columns(data))
 
-        result = self.process_dataframe(data, logger)
-        if result is not None:
-            assert isinstance(result, pd.DataFrame)
-            if len(result) > 0:
-                yield result
+        try:
+            result = self.process_dataframe(data, logger)
+            if result is not None:
+                assert isinstance(result, pd.DataFrame)
+                if len(result) > 0:
+                    yield result
+
+        except Exception as exc:
+            logger.exception(exc)
+
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
@@ -359,8 +364,13 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
         raise NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-        series = self.dataframe_to_series(dataframe, logger)
-        df2 = self.series_to_dataframe(series)
+        try:
+            series = self.dataframe_to_series(dataframe, logger)
+            df2 = self.series_to_dataframe(series)
+        except Exception as exc:
+            print(f"EXCEPTION! {exc}")
+            logger.exception(exc)
+            return None
         df3 = dataframe.merge(df2, left_index=True, right_index=True)
         return df3
 
