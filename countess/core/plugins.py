@@ -182,7 +182,7 @@ class FileInputPlugin(BasePlugin):
     name = ""
 
     # used by the GUI file dialog
-    file_types: List[tuple[str, str | list[str]]] = [("Any", "*")]
+    file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
 
     def num_files(self) -> int:
