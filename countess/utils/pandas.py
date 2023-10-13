@@ -6,6 +6,9 @@ import pandas as pd
 
 
 def collect_dataframes(data: Iterable[pd.DataFrame], preferred_size: int = 100000) -> Iterable[pd.DataFrame]:
+    """Takes an iterable of dataframes, ignores any empty ones and tries to pack smaller ones
+    together up to `preferred_size`."""
+    # XXX Data doesn't necessarily come out in the same order it went in.
     buffer = None
     for dataframe in data:
         if dataframe is None or len(dataframe) == 0:
@@ -25,7 +28,11 @@ def collect_dataframes(data: Iterable[pd.DataFrame], preferred_size: int = 10000
 
 
 def get_all_indexes(dataframe: pd.DataFrame) -> Dict[str, Any]:
-    if dataframe.index.name:
+    """Indexes work a couple of different ways, so this massages them into a consistent
+    dictionary of name => dtype.  A single RangeIndex or a nameless index isn't counted."""
+    if isinstance(dataframe.index, pd.RangeIndex):
+        return {}
+    elif dataframe.index.name:
         return {str(dataframe.index.name): dataframe.index.dtype}
     elif (
         hasattr(dataframe.index, "names")
@@ -43,14 +50,22 @@ def get_all_columns(dataframe: pd.DataFrame) -> Dict[str, Any]:
     return r
 
 
-def crop_dataframe(dataframe: pd.DataFrame, row_limit: Optional[int]) -> pd.DataFrame:
-    if row_limit is None:
-        return dataframe
-    return dataframe[0:row_limit]
+def concat_dataframes(dataframes: list[pd.DataFrame]) -> pd.DataFrame:
+    """handles the special case where there's an empty list"""
+    # XXX dask also had a special case for a single input dataframe I think?
+    if len(dataframes) == 0:
+        return pd.DataFrame()
+    return pd.concat(dataframes)
 
 
-def concat_dataframes(dataframes: Iterable[pd.DataFrame]) -> pd.DataFrame:
-    df_out = pd.DataFrame()
-    for df_in in dataframes:
-        df_out = pd.concat([df_out, df_in])
-    return df_out
+def flatten_columns(dataframe: pd.DataFrame, inplace: bool = False) -> Optional[pd.DataFrame]:
+    """used to rename columns with tuple names like `('things', 'count')` to easier-to-refer-to-
+    in-python names like `'things__count'`."""
+    # XXX arguably this would be better done at python plugin and/or export time but for now
+    # we flatten columns where possible.
+    return dataframe.rename(
+        columns={
+            name: "__".join(x for x in name if name) if type(name) is tuple else name for name in dataframe.columns
+        },
+        inplace=inplace,
+    )

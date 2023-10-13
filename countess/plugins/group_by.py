@@ -1,22 +1,13 @@
-from typing import Iterable, List, Optional
+from typing import Iterable, List
 
 import numpy as np
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BaseParam, BooleanParam, PerColumnArrayParam, TabularMultiParam
+from countess.core.parameters import BooleanParam, PerColumnArrayParam, TabularMultiParam
 from countess.core.plugins import PandasProcessPlugin
-from countess.utils.pandas import get_all_columns
-
-
-def _column_renamer(col):
-    if isinstance(col, tuple):
-        if col[-1] == "first":
-            return "__".join(col[:-1])
-        else:
-            return "__".join(col)
-    return col
+from countess.utils.pandas import flatten_columns, get_all_columns
 
 
 class GroupByPlugin(PandasProcessPlugin):
@@ -26,8 +17,7 @@ class GroupByPlugin(PandasProcessPlugin):
     description = "Group records by column(s) and calculate aggregates"
     version = VERSION
 
-    index_cols: set[BaseParam] = set()
-    input_columns: dict[str, np.dtype] = {}
+    input_columns: dict[str, np.dtype]
 
     parameters = {
         "columns": PerColumnArrayParam(
@@ -47,14 +37,21 @@ class GroupByPlugin(PandasProcessPlugin):
         "join": BooleanParam("Join Back?"),
     }
 
-    dataframes: Optional[List[pd.DataFrame]] = None
+    dataframes: List[pd.DataFrame]
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.prepare()
 
     def prepare(self, *_):
         self.dataframes = []
+        self.input_columns = {}
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
-        # XXX can do this in two stages
+        # XXX should do this in two stages: group each dataframe and then combine.
+        # that can wait for a more general MapReduceFinalizePlugin class though.
         assert self.dataframes is not None
+
         self.dataframes.append(data)
         self.input_columns.update(get_all_columns(data))
         return []
@@ -62,7 +59,12 @@ class GroupByPlugin(PandasProcessPlugin):
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         assert self.dataframes
+
+        for p in self.parameters.values():
+            p.set_column_choices(self.input_columns.keys())
+
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
+
         index_cols = [col for col, col_param in column_parameters if col_param["index"].value]
         agg_ops = dict(
             (
@@ -73,16 +75,20 @@ class GroupByPlugin(PandasProcessPlugin):
             if any(pp.value for k, pp in col_param.params.items() if k != "index")
         )
 
+        if not index_cols or not agg_ops:
+            return
+
         data_in = pd.concat(self.dataframes)
 
         try:
-            data_out = data_in.groupby(index_cols or data_in.index).agg(agg_ops)
+            x = data_in.groupby(index_cols or data_in.index)
+
+            data_out = x.agg(agg_ops)
+            flatten_columns(data_out, inplace=True)
+
             if self.parameters["join"].value:
                 yield data_in.merge(data_out, how="left", left_on=index_cols, right_on=index_cols)
             else:
                 yield data_out
         except ValueError:
             pass
-
-        for p in self.parameters.values():
-            p.set_column_choices(self.input_columns.keys())
