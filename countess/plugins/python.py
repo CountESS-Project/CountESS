@@ -2,7 +2,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import TextParam, PerColumnArrayParam, BooleanParam
+from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
 from countess.core.plugins import PandasTransformRowToDictPlugin
 
 # XXX pretty sure this is a job for ast.parse rather than just
@@ -31,18 +31,20 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
     version = VERSION
 
     parameters = {
-            "columns": PerColumnArrayParam("columns", BooleanParam("keep", True)),
-            "code": TextParam("Python Code")}
+        "columns": PerColumnArrayParam("columns", BooleanParam("keep", True)),
+        "code": TextParam("Python Code"),
+    }
 
     def process_row(self, row: pd.Series, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
+        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
 
         row_dict = dict(row)
         exec(code_object, {}, row_dict)  # pylint: disable=exec-used
 
-        column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
-        columns_to_remove = set( col for col, param in column_parameters if not param.value )
+        column_parameters = list(zip(self.input_columns, self.parameters["columns"].params))
+        columns_to_remove = set(col for col, param in column_parameters if not param.value)
 
         return dict((k, v) for k, v in row_dict.items() if k not in columns_to_remove and type(v) in SIMPLE_TYPES)
 

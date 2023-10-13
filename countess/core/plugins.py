@@ -30,7 +30,6 @@ from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BaseParam,
-    ColumnChoiceParam,
     FileArrayParam,
     FileParam,
     FileSaveParam,
@@ -229,9 +228,8 @@ class PandasSimplePlugin(SimplePlugin):
                 if len(result) > 0:
                     yield result
 
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
-
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
@@ -364,12 +362,11 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
         raise NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         try:
             series = self.dataframe_to_series(dataframe, logger)
             df2 = self.series_to_dataframe(series)
-        except Exception as exc:
-            print(f"EXCEPTION! {exc}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
             return None
         df3 = dataframe.merge(df2, left_index=True, right_index=True)
@@ -383,10 +380,6 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
 class PandasTransformSingleToXMixin:  # type: ignore [attr-defined]
     """Transformer which takes a single column, the name of which is specified
     in a ColumnChoiceParam called "column" """
-
-    def __init__(self, *a, **k):
-        super().__init__(*a, **k)
-        assert isinstance(self.parameters["column"], ColumnChoiceParam)
 
     def process_value(self, value, logger: Logger):
         raise NotImplementedError(f"{self.__class__}.process_value()")
@@ -581,7 +574,6 @@ class PandasInputPlugin(FileInputPlugin):
 
 
 class PandasInputFilesPlugin(PandasInputPlugin):
-
     def __init__(self, *a, **k):
         # Add in filenames
         super().__init__(*a, **k)

@@ -51,9 +51,11 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         super().prepare(sources, row_limit)
         self.compiled_re = re.compile(self.parameters["regex"].value)
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["output"], ArrayParam)
         df = super().process_dataframe(dataframe, logger)
+        if df is None:
+            return None
 
         if self.parameters["drop_column"].value:
             column_name = self.parameters["column"].value

@@ -46,17 +46,19 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
             logger.exception(exc)
             return None
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
-        dataframe = super().process_dataframe(dataframe, logger)
-        if self.parameters["drop"].value:
-            dataframe.dropna(subset=self.parameters["output"].value, inplace=True)
-        if self.parameters["drop_columns"].value:
-            try:
-                dataframe.drop(columns=self.parameters["column"].value, inplace=True)
-                if not self.parameters["reference"].is_none():
-                    dataframe.drop(columns=self.parameters["reference"].value, inplace=True)
-            except KeyError:
-                pass
+        df_out = super().process_dataframe(dataframe, logger)
 
-        return dataframe
+        if df_out is not None:
+            if self.parameters["drop"].value:
+                df_out.dropna(subset=self.parameters["output"].value, inplace=True)
+            if self.parameters["drop_columns"].value:
+                try:
+                    df_out.drop(columns=self.parameters["column"].value, inplace=True)
+                    if not self.parameters["reference"].is_none():
+                        df_out.drop(columns=self.parameters["reference"].value, inplace=True)
+                except KeyError:
+                    pass
+
+        return df_out

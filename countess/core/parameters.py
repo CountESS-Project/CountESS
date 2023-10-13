@@ -68,7 +68,7 @@ class SimpleParam(BaseParam):
     def value(self):
         self._value = None
 
-    def copy(self):
+    def copy(self) -> "SimpleParam":
         return self.__class__(self.label, self.value, self.read_only)
 
 
@@ -154,7 +154,7 @@ class StringCharacterSetParam(StringParam):
         x = "".join([self.clean_character(c) for c in value_str])
         return x
 
-    def copy(self):
+    def copy(self) -> "StringCharacterSetParam":
         return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
 
 
@@ -221,7 +221,7 @@ class FileParam(StringParam):
 
         return [(key, relpath)]
 
-    def copy(self):
+    def copy(self) -> "FileParam":
         return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
 
     def get_hash_value(self) -> str:
@@ -303,7 +303,7 @@ class ChoiceParam(BaseParam):
         else:
             self._value = self.DEFAULT_VALUE
 
-    def copy(self):
+    def copy(self) -> "ChoiceParam":
         return self.__class__(self.label, self.value, self.choices)
 
 
@@ -456,7 +456,7 @@ class ArrayParam(BaseParam):
     # maybe we should have a TabularParam which combines ArrayParam and
     # MultiParam more directly."""
 
-    params: list[BaseParam] = []
+    params: list[BaseParam]
 
     def __init__(
         self,
@@ -556,7 +556,6 @@ class ArrayParam(BaseParam):
 class PerColumnArrayParam(ArrayParam):
     def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
-        self.params_by_column_name: Mapping[str, BaseParam] = {}
         self.read_only = True
 
     def get_parameters(self, key, base_dir="."):

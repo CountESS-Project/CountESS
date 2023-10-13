@@ -10,8 +10,9 @@ from countess.core.plugins import PandasInputPlugin
 
 
 def mutagenize(
-        sequence: str, mutate: bool, delete: bool, del3: bool, insert: bool, ins3: bool
+    sequence: str, mutate: bool, delete: bool, del3: bool, insert: bool, ins3: bool
 ) -> Iterable[tuple[str, int, Optional[str], Optional[str]]]:
+    # XXX not really happy with how the args are multiplying here!
     # XXX it'd be faster, but less neat, to include logic for duplicate
     # removal here instead of producing duplicates and then removing them
     # later.
@@ -27,8 +28,8 @@ def mutagenize(
             yield sequence[0:n] + sequence[n + 3 :], n + 1, sequence[n : n + 3], None
         if ins3:
             for ins in product("ACGT", "ACGT", "ACGT"):
-                ins_str = ''.join(ins)
-                yield sequence[0:n] + ins_str + sequence[n:], n+1, None, ins_str
+                ins_str = "".join(ins)
+                yield sequence[0:n] + ins_str + sequence[n:], n + 1, None, ins_str
 
     ll = len(sequence) + 1
     if insert:
@@ -36,9 +37,8 @@ def mutagenize(
             yield sequence + b2, ll, None, b2
     if ins3:
         for ins in product("ACGT", "ACGT", "ACGT"):
-            ins_str = ''.join(ins)
+            ins_str = "".join(ins)
             yield sequence + ins_str, ll, None, ins_str
-
 
 
 class MutagenizePlugin(PandasInputPlugin):
