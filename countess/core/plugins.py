@@ -413,12 +413,15 @@ class PandasTransformDictToXMixin:
     """Transformer which takes a row as a dictionary"""
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+        # XXX there is a bug in Pandas 2.1.x which prevents
+        # args and kwargs getting passed through when raw=True
+        # this seems to be fixed in Pandas 2.2.0.dev so
+        # hopefully this lambda can be removed some day.
+        # https://github.com/pandas-dev/pandas/issues/55009
         return dataframe.apply(
-            self.process_raw,
+            lambda x: self.process_raw(x, list(dataframe.columns), logger),
             axis=1,
             raw=True,
-            columns=list(dataframe.columns),
-            logger=logger,
         )
 
     def process_dict(self, data, logger: Logger):

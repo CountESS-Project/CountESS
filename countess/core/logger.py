@@ -35,7 +35,9 @@ class Logger:
 
     def exception(self, exception: Exception):
         # Slightly odd calling to maintain compatibility with 3.9 and 3.10
+        # XXX format more nicely
         message = traceback.format_exception(None, value=exception, tb=None)
+        message += "\n\n" + "".join(traceback.format_tb(exception.__traceback__))
         self.error(str(exception), detail="".join(message))
 
     def clear(self):

@@ -1,3 +1,5 @@
+from types import CodeType
+
 import pandas as pd
 
 from countess import VERSION
@@ -18,7 +20,6 @@ SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 # PandasTransformDictToDictPlugin
 # which is a bit more efficient.
 
-
 class PythonPlugin(PandasTransformRowToDictPlugin):
     name = "Python Code"
     description = "Apply python code to each row."
@@ -35,13 +36,18 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
         "code": TextParam("Python Code"),
     }
 
+    code_object = None
+
     def process_row(self, row: pd.Series, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
-        code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
+        assert isinstance(self.code_object, CodeType)
 
         row_dict = dict(row)
-        exec(code_object, {}, row_dict)  # pylint: disable=exec-used
+        try:
+            exec(self.code_object, {}, row_dict)  # pylint: disable=exec-used
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(exc)
 
         column_parameters = list(zip(self.input_columns, self.parameters["columns"].params))
         columns_to_remove = set(col for col, param in column_parameters if not param.value)
@@ -52,6 +58,9 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
         """Override parent class because we a) want to reset
         the indexes so we can use their values easily and
         b) we don't need to merge afterwards"""
+
+        # XXX cache this?
+        self.code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
 
         dataframe = dataframe.reset_index(drop=False)
         series = self.dataframe_to_series(dataframe, logger)
