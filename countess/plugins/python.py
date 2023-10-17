@@ -1,26 +1,32 @@
 from types import CodeType
+import builtins
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
-from countess.core.plugins import PandasTransformRowToDictPlugin
+from countess.core.plugins import PandasTransformDictToDictPlugin
 
 # XXX pretty sure this is a job for ast.parse rather than just
 # running compile() and exec() but that can wait.
-
+# Builtins are restricted but there's still plenty of things which
+# could go wrong here.
 
 # These types will get copied to columns, anything else
 # (eg: classes, methods, functions) won't.
 
 SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 
-# XXX should probably actually be based on
-# PandasTransformDictToDictPlugin
-# which is a bit more efficient.
+SAFE_BUILTINS = {
+    x: builtins.__dict__[x]
+    for x in
+        "abs all any ascii bin bool bytearray bytes chr complex dict divmod enumerate "
+        "filter float format frozenset hash hex id int len list map max min oct "
+        "ord pow range reversed round set slice sorted str sum tuple type zip".split()
+}
 
-class PythonPlugin(PandasTransformRowToDictPlugin):
+class PythonPlugin(PandasTransformDictToDictPlugin):
     name = "Python Code"
     description = "Apply python code to each row."
     additional = """
@@ -38,21 +44,21 @@ class PythonPlugin(PandasTransformRowToDictPlugin):
 
     code_object = None
 
-    def process_row(self, row: pd.Series, logger: Logger):
+
+    def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         assert isinstance(self.code_object, CodeType)
 
-        row_dict = dict(row)
         try:
-            exec(self.code_object, {}, row_dict)  # pylint: disable=exec-used
+            exec(self.code_object, {"__builtins__": SAFE_BUILTINS}, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
 
         column_parameters = list(zip(self.input_columns, self.parameters["columns"].params))
         columns_to_remove = set(col for col, param in column_parameters if not param.value)
 
-        return dict((k, v) for k, v in row_dict.items() if k not in columns_to_remove and type(v) in SIMPLE_TYPES)
+        return dict((k, v) for k, v in data.items() if k not in columns_to_remove and type(v) in SIMPLE_TYPES)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         """Override parent class because we a) want to reset
