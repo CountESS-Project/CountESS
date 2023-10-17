@@ -1,5 +1,5 @@
-from types import CodeType
 import builtins
+from types import CodeType
 
 import pandas as pd
 
@@ -20,11 +20,11 @@ SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
 
 SAFE_BUILTINS = {
     x: builtins.__dict__[x]
-    for x in
-        "abs all any ascii bin bool bytearray bytes chr complex dict divmod enumerate "
-        "filter float format frozenset hash hex id int len list map max min oct "
-        "ord pow range reversed round set slice sorted str sum tuple type zip".split()
+    for x in "abs all any ascii bin bool bytearray bytes chr complex dict divmod "
+    "enumerate filter float format frozenset hash hex id int len list map max min "
+    "oct ord pow range reversed round set slice sorted str sum tuple type zip".split()
 }
+
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
     name = "Python Code"
@@ -43,7 +43,6 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     }
 
     code_object = None
-
 
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
