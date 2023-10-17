@@ -1,5 +1,7 @@
 import re
 
+import pandas as pd
+
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
@@ -18,6 +20,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         "guides_str": StringParam("Guide(s)"),
         "max_var": IntegerParam("Maximum Variations", 1),
         "split": BooleanParam("Split Output", False),
+        "multi": BooleanParam("Multiple rows", False),
     }
 
     def process_dict(self, data: dict, logger: Logger):
@@ -58,12 +61,36 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         if len(variations) > max_variations:
             return None
 
-        for n, v in enumerate(variations, 1):
+        if self.parameters["multi"].value:
+            output["var"] = []
             if self.parameters["split"].value:
-                if m := re.match(r"([\d_]+)(.*)", v):
-                    output[f"loc_{n}"] = m.group(1)
-                    output[f"var_{n}"] = m.group(2)
-                    continue
-            output[f"var_{n}"] = v
+                output["loc"] = []
+            for v in variations:
+                if self.parameters["split"].value:
+                    if m := re.match(r"([\d_]+)(.*)", v):
+                        output["loc"].append(m.group(1))
+                        output["var"].append(m.group(2))
+                        continue
+                output["var"].append(v)
+        else:
+            for n, v in enumerate(variations, 1):
+                if self.parameters["split"].value:
+                    if m := re.match(r"([\d_]+)(.*)", v):
+                        output[f"loc_{n}"] = m.group(1)
+                        output[f"var_{n}"] = m.group(2)
+                        continue
+                output[f"var_{n}"] = v
 
         return output
+
+    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
+
+        dataframe = super().series_to_dataframe(series)
+
+        if self.parameters["multi"].value:
+            if self.parameters["split"].value:
+                dataframe = dataframe.explode(['var', 'loc'])
+            else:
+                dataframe = dataframe.explode(['var'])
+
+        return dataframe
