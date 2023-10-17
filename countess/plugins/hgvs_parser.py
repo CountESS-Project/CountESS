@@ -61,36 +61,36 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         if len(variations) > max_variations:
             return None
 
-        if self.parameters["multi"].value:
-            output["var"] = []
+        output_vars = []
+        output_locs = []
+        for v in variations:
             if self.parameters["split"].value:
-                output["loc"] = []
-            for v in variations:
-                if self.parameters["split"].value:
-                    if m := re.match(r"([\d_]+)(.*)", v):
-                        output["loc"].append(m.group(1))
-                        output["var"].append(m.group(2))
-                        continue
-                output["var"].append(v)
+                if m := re.match(r"([\d_]+)(.*)", v):
+                    output_locs.append(m.group(1))
+                    output_vars.append(m.group(2))
+                    continue
+            output_locs.append(None)
+            output_vars.append(v)
+
+        if self.parameters["multi"].value:
+            output["var"] = output_vars
+            if self.parameters["split"].value:
+                output["loc"] = output_locs
         else:
-            for n, v in enumerate(variations, 1):
+            for n, (var, loc) in enumerate(zip(output_vars, output_locs), 1):
+                output[f"var_{n}"] = var
                 if self.parameters["split"].value:
-                    if m := re.match(r"([\d_]+)(.*)", v):
-                        output[f"loc_{n}"] = m.group(1)
-                        output[f"var_{n}"] = m.group(2)
-                        continue
-                output[f"var_{n}"] = v
+                    output[f"loc_{n}"] = loc
 
         return output
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-
         dataframe = super().series_to_dataframe(series)
 
         if self.parameters["multi"].value:
             if self.parameters["split"].value:
-                dataframe = dataframe.explode(['var', 'loc'])
+                dataframe = dataframe.explode(["var", "loc"])
             else:
-                dataframe = dataframe.explode(['var'])
+                dataframe = dataframe.explode(["var"])
 
         return dataframe
