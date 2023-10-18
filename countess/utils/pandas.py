@@ -1,6 +1,6 @@
 """ pandas utility functions """
 
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable
 
 import pandas as pd
 
@@ -58,14 +58,18 @@ def concat_dataframes(dataframes: list[pd.DataFrame]) -> pd.DataFrame:
     return pd.concat(dataframes)
 
 
-def flatten_columns(dataframe: pd.DataFrame, inplace: bool = False) -> Optional[pd.DataFrame]:
+def flatten_columns(dataframe: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
     """used to rename columns with tuple names like `('things', 'count')` to easier-to-refer-to-
     in-python names like `'things__count'`."""
     # XXX arguably this would be better done at python plugin and/or export time but for now
     # we flatten columns where possible.
-    return dataframe.rename(
-        columns={
-            name: "__".join(x for x in name if name) if type(name) is tuple else name for name in dataframe.columns
-        },
-        inplace=inplace,
-    )
+
+    if not inplace:
+        dataframe = dataframe.copy()
+
+    dataframe.columns = [
+        "__".join(a) if type(a) is tuple else a
+        for a in dataframe.columns.to_flat_index()
+    ] # type: ignore [assignment]
+
+    return dataframe

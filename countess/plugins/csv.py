@@ -17,6 +17,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import PandasInputFilesPlugin, PandasProcessPlugin
+from countess.utils.pandas import flatten_columns
 
 # XXX it would be better to do the same this Regex Tool does and get the user to assign
 # data types to each column
@@ -181,25 +182,27 @@ class SaveCsvPlugin(PandasProcessPlugin):
         # I've set "index=True" below to emit the indexes
 
         drop_index = data.index.name is None and data.index.names[0] is None
-        dataframe = data.reset_index(drop=drop_index)
+        dataframe = flatten_columns(
+            data.reset_index(drop=drop_index)
+        )
 
         # if this is our first dataframe to write then decide whether to
         # include the header or not.
         if self.csv_columns is None:
-            self.csv_columns = list(data.columns)
+            self.csv_columns = list(dataframe.columns)
             emit_header = bool(self.parameters["header"].value)
         else:
             # add in any columns we haven't seen yet in previous dataframes.
-            for c in data.columns:
+            for c in dataframe.columns:
                 if c not in self.csv_columns:
                     self.csv_columns.append(c)
                     logger.warning(f"Added CSV Column {repr(c)} with no header")
             # fill in blanks for any columns which are in previous dataframes but not
             # in this one.
-            dataframe = data.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
+            dataframe = dataframe.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
             emit_header = False
 
-        data.to_csv(
+        dataframe.to_csv(
             self.filehandle,
             header=emit_header,
             columns=self.csv_columns,
