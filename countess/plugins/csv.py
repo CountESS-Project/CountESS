@@ -182,9 +182,7 @@ class SaveCsvPlugin(PandasProcessPlugin):
         # I've set "index=True" below to emit the indexes
 
         drop_index = data.index.name is None and data.index.names[0] is None
-        dataframe = flatten_columns(
-            data.reset_index(drop=drop_index)
-        )
+        dataframe = flatten_columns(data.reset_index(drop=drop_index))
 
         # if this is our first dataframe to write then decide whether to
         # include the header or not.

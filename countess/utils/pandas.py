@@ -68,8 +68,7 @@ def flatten_columns(dataframe: pd.DataFrame, inplace: bool = False) -> pd.DataFr
         dataframe = dataframe.copy()
 
     dataframe.columns = [
-        "__".join(a) if type(a) is tuple else a
-        for a in dataframe.columns.to_flat_index()
-    ] # type: ignore [assignment]
+        "__".join(a) if type(a) is tuple else a for a in dataframe.columns.to_flat_index()
+    ]  # type: ignore [assignment]
 
     return dataframe
