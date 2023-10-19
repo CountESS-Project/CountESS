@@ -60,8 +60,7 @@ class GroupByPlugin(PandasProcessPlugin):
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         assert self.dataframes
 
-        for p in self.parameters.values():
-            p.set_column_choices(self.input_columns.keys())
+        self.parameters["columns"].set_column_choices(self.input_columns.keys())
 
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
 
@@ -81,9 +80,7 @@ class GroupByPlugin(PandasProcessPlugin):
         data_in = pd.concat(self.dataframes)
 
         try:
-            x = data_in.groupby(index_cols or data_in.index)
-
-            data_out = x.agg(agg_ops)
+            data_out = data_in.groupby(index_cols or data_in.index).agg(agg_ops)
             flatten_columns(data_out, inplace=True)
 
             if self.parameters["join"].value:
