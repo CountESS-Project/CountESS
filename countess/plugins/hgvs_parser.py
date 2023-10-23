@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 import pandas as pd
 
@@ -61,16 +62,15 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         if len(variations) > max_variations:
             return None
 
-        output_vars = []
-        output_locs = []
-        for v in variations:
+        output_vars : list[Optional[str]] = [None] * max_variations
+        output_locs : list[Optional[str]] = [None] * max_variations
+        for n, v in enumerate(variations):
             if self.parameters["split"].value:
                 if m := re.match(r"([\d_]+)(.*)", v):
-                    output_locs.append(m.group(1))
-                    output_vars.append(m.group(2))
+                    output_locs[n] = m.group(1)
+                    output_vars[n] = m.group(2)
                     continue
-            output_locs.append(None)
-            output_vars.append(v)
+            output_vars[n] = v
 
         if self.parameters["multi"].value:
             output["var"] = output_vars

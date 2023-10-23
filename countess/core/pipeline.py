@@ -173,7 +173,10 @@ class PipelineNode:
             for pn in self.parent_nodes:
                 for data_in in pn.result:
                     logger.progress(self.name, None)
-                    self.result += list(self.plugin.process(data_in, pn.name, logger))
+                    try:
+                        self.result += list(self.plugin.process(data_in, pn.name, logger))
+                    except Exception as exc:  # pylint: disable=broad-exception-caught
+                        logger.exception(exc)
             logger.progress(self.name, 100)
             self.result += list(self.plugin.finalize(logger))
 
