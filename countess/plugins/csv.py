@@ -202,7 +202,7 @@ class SaveCsvPlugin(PandasProcessPlugin):
             columns=self.csv_columns,
             index=False,
             sep=self.SEPARATORS[self.parameters["delimiter"].value],
-            quoting=bool(self.QUOTING[self.parameters["quoting"].value]),
+            quoting=self.QUOTING[self.parameters["quoting"].value],
         )  # type: ignore [call-overload]
         return []
 
