@@ -33,18 +33,18 @@ we use [homebrew](https://brew.sh/) to install a recent version.
    These instructions are for installing on a Mac without needing Administrator access.
    If you already have homebrew installed you can skip this step:
 
-    mkdir bin homebrew
-    curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
-    echo 'export PATH=$HOME/bin:$HOME/homebrew/bin:$PATH' >> .bash_profile
-    source .bash_profile
+        mkdir bin homebrew
+        curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
+        echo 'export PATH=$HOME/bin:$HOME/homebrew/bin:$PATH' >> .bash_profile
+        source .bash_profile
 
 2. Use homebrew to install a recent Tk and Python 3.10 into your `$HOME/homebrew/bin`
    directory.  This step is pretty slow as it has to compile stuff:
 
-    brew install tcl-tk python@3.10 python-tk@3.10
-    ln -s $HOME/homebrew/bin/python3.10 bin/python
-    ln -s $HOME/homebrew/bin/pip3.10 bin/pip
+        brew install tcl-tk python@3.10 python-tk@3.10
+        ln -s $HOME/homebrew/bin/python3.10 bin/python
+        ln -s $HOME/homebrew/bin/pip3.10 bin/pip
 
 3. Install countess using pip:
 
-    pip install countess
+        pip install countess
