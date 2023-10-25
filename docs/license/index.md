@@ -1,3 +1,10 @@
+# Licensing
+
+CountESS, including this documentation, is licensed under the
+BSD 3-clause license.
+
+## License Text
+
 Copyright (C) 2022- CountESS Developers.
 
 Redistribution and use in source and binary forms, with or without
