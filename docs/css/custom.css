@@ -1,0 +1,5 @@
+div.navbar {
+    display: block;
+    border-bottom: 2px solid var(--tertiary-color);
+}
+
