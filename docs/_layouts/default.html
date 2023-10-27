@@ -1,12 +1,12 @@
 <html>
   <head>
      <title>{{ page.title }}</title>
-     <link rel="stylesheet" href="{{ baseurl }}/css/vanilla.css">
-     <link rel="stylesheet" href="{{ baseurl }}/css/custom.css">
+     <link rel="stylesheet" href="{{ site.baseurl }}/css/vanilla.css">
+     <link rel="stylesheet" href="{{ site.baseurl }}/css/custom.css">
   </head>
   <body>
     {% if page.url != "/" %}
-      <div class="navbar"><a href="{{ baseurl }}/">CountESS Documentation</a></div>
+      <div class="navbar"><a href="{{ site.baseurl }}/">CountESS Documentation</a></div>
     {% endif %}
     {{ content }}
   </body>
