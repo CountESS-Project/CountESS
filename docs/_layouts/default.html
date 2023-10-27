@@ -5,6 +5,9 @@
      <link rel="stylesheet" href="/CountESS/css/custom.css">
   <head>
   <body>
+    {% if page.url != "/CountESS/" %}
+      <div class="navbar"><a href="/CountESS/">CountESS Documentation</a></div>
+    {% endif %}
     {{ content }}
   </body>
 </html>
