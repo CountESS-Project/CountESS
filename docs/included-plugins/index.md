@@ -1,7 +1,4 @@
-# CountESS Documentation: Plugins
-
-CountESS pipelines are constructed from plugins.
-There are several built-in plugins and 
+# Included Plugins
 
 ## Built-in Plugins: File Formats
 
@@ -34,3 +31,6 @@ Anyone can write and publish CountESS plugins.
 
 * [Pebbles](https://github.com/genomematt/pebbles/) for reading SAM and BAM files
 
+## Writing your own Plugins
+
+See [Writing CountESS Plugins](../writing-plugins/)

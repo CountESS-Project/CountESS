@@ -62,8 +62,8 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         if len(variations) > max_variations:
             return None
 
-        output_vars : list[Optional[str]] = [None] * max_variations
-        output_locs : list[Optional[str]] = [None] * max_variations
+        output_vars: list[Optional[str]] = [None] * max_variations
+        output_locs: list[Optional[str]] = [None] * max_variations
         for n, v in enumerate(variations):
             if self.parameters["split"].value:
                 if m := re.match(r"([\d_]+)(.*)", v):

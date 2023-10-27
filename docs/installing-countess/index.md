@@ -10,11 +10,13 @@ CountESS can be installed from [pypi](https://pypi.org/):
 
     pip install git+https://github.com/CountESS-Project/CountESS.git
 
-... or download the source and [install for development](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e):
+## ... using git, for development
+
+Clone the repository and [install for development](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e):
 
     git clone https://github.com/CountESS-Project/CountESS.git
     cd CountESS
-    pip install -e .
+    pip install -e .[dev]
 
 ## ... using nix
 
@@ -24,9 +26,8 @@ CountESS can be installed and run with nix:
 
 ## ... under homebrew
 
-
-Even recent Mac installs use a very old version of Python and Tk so
-we use [homebrew](https://brew.sh/) to install a recent version.
+Even recent MacOS installs use a very old version of Python and Tk, so
+we use [homebrew](https://brew.sh/) to install more recent versions.
 
 1. download the homebrew tarball & make its binaries available from your shell.
 
@@ -39,7 +40,7 @@ we use [homebrew](https://brew.sh/) to install a recent version.
         source .bash_profile
 
 2. Use homebrew to install a recent Tk and Python 3.10 into your `$HOME/homebrew/bin`
-   directory.  This step is pretty slow as it has to compile stuff:
+   directory.  This step is pretty slow as it has to compile Tk and Python.
 
         brew install tcl-tk python@3.10 python-tk@3.10
         ln -s $HOME/homebrew/bin/python3.10 bin/python
@@ -48,3 +49,7 @@ we use [homebrew](https://brew.sh/) to install a recent version.
 3. Install countess using pip:
 
         pip install countess
+
+# NEXT
+
+Now CountESS is installed, see [Running CountESS](../running-countess/)

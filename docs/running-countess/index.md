@@ -20,7 +20,7 @@ To link nodes, right-click and drag a new link between them.  Nodes cannot be
 linked to themselves, or in cycles.  To remove a link between nodes, right-click
 the link.
 
-Only the first few hundred rows of input files are read at configuration time.
+Only the first few thousand rows of input files are read at configuration time.
 To perform a complete run using the entire input file, click 'Run'.
 
 Plugin configurations can be saved and loaded in .INI file format.
