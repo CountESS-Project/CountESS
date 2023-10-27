@@ -1,5 +1,7 @@
 # Running CountESS
 
+## GUI
+
 To run the CountESS GUI, use `countess_gui`.
 
 A CountESS pipeline consists of a bunch of components called 'nodes',
@@ -22,6 +24,8 @@ the link.
 
 Only the first few thousand rows of input files are read at configuration time.
 To perform a complete run using the entire input file, click 'Run'.
+
+## CLI
 
 Plugin configurations can be saved and loaded in .INI file format.
 CountESS can also be run in headless mode with `countess_cmd your_config.ini`.

@@ -56,7 +56,7 @@ be distributed over many CPUs.
 
 Some plugins may operate on a single input value, others on an entire row.
 Some plugins may generate a single output value, others several.
-For convenient, several subclasses are provided:
+For convenience, several subclasses are provided:
 
 * PandasTransformSingleToSinglePlugin
 
@@ -124,25 +124,6 @@ class declaration using subclasses of `countess.core.parameters.BaseParameter`.
 
 Configuration values are provided by a [single configuration file](../config-file-format/)
 which is read and written by the CountESS GUI and read by the CountESS CLI.
-
-## Subclassing `BasePlugin`
-
-To make life easier, there are several subclasses of `BasePlugin`
-under `countess.core.plugins` ... each of these provides common 
-features used in different types of plugins.
-
-### PandasSimplePlugin
-
-### PandasTransform**X**To**Y**Plugin
-
-There are several classes of the form `PandasTransform`**X**`To`**Y**`Plugin`.
-
-The most obviously useful ones are `PandasTransformSingleToSinglePlugin`, 
-which translates a single value into another single value, and 
-`PandasTransformDictToDictPlugin`, which translates an entire table row.
-
-To use these classes, subclass the appropriate one for your plugin and 
-override `process_value`, `process_row` or `process_dict` as appropriate.
 
 ## Example Plugins
 
