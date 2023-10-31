@@ -13,8 +13,9 @@ under a [BSD 3-clause license](license/).
 
 * [Installing CountESS](installing-countess/)
 * [Running CountESS](running-countess/)
-* [Writing Plugins](writing-plugins/)
 * [Configuration File Format](config-file-format/)
+* [Writing Plugins](writing-plugins/)
+* [Contributing to CountESS](contributing/)
 
 ## Presentations
 
