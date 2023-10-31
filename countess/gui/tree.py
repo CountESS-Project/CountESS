@@ -289,6 +289,7 @@ class GraphWrapper:
         self.canvas.bind("<Motion>", self.on_canvas_motion)
         self.canvas.bind("<Leave>", self.on_canvas_leave)
         self.canvas.bind("<Key-Delete>", self.on_canvas_delete)
+        self.canvas.bind("<Key-BackSpace>", self.on_canvas_delete)
 
     def label_for_node(self, node):
         label = DraggableLabel(self.canvas, text=node.name, wraplength=125, cursor="hand1", takefocus=True)
@@ -304,6 +305,7 @@ class GraphWrapper:
         label.bind("<Configure>", partial(self.on_configure, node, label), add=True)
         label.bind("<<GhostRelease>>", partial(self.on_ghost_release, node), add=True)
         label.bind("<Key-Delete>", partial(self.on_delete, node), add=True)
+        label.bind("<Key-BackSpace>", partial(self.on_delete, node), add=True)
         label.bind("<Enter>", partial(self.on_enter, node), add=True)
         label.bind("<Leave>", partial(self.on_leave, node), add=True)
 
