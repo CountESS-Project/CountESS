@@ -72,15 +72,18 @@ class DraggableMixin:  # pylint: disable=R0903
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.bind("<Button-1>", self.__on_button, add=True)
+        self.bind("<Button-2>", self.__on_button, add=True)
         self.bind("<Button-3>", self.__on_button, add=True)
         self.bind("<B1-Motion>", self.__on_motion, add=True)
+        self.bind("<B2-Motion>", self.__on_motion, add=True)
         self.bind("<B3-Motion>", self.__on_motion, add=True)
         self.bind("<ButtonRelease-1>", self.__on_release, add=True)
+        self.bind("<ButtonRelease-2>", self.__on_release, add=True)
         self.bind("<ButtonRelease-3>", self.__on_release, add=True)
         self["cursor"] = TkCursors.HAND.value
 
     def __on_button(self, event):
-        if event.state & TkEventState.CONTROL or event.num == 3:
+        if event.state & TkEventState.CONTROL or event.num > 1:
             self.__state = self.__state.LINK_WAIT
         else:
             self.__state = self.__state.DRAG_WAIT
@@ -280,8 +283,9 @@ class GraphWrapper:
             for parent_node, connecting_line in lines_for_child.items()
         )
 
-        self.canvas.bind("<Button-1>", self.on_canvas_button1)
-        self.canvas.bind("<Button-3>", self.on_canvas_button3)
+        self.canvas.bind("<Button-1>", self.on_canvas_button)
+        self.canvas.bind("<Button-2>", self.on_canvas_button)
+        self.canvas.bind("<Button-3>", self.on_canvas_button)
         self.canvas.bind("<Motion>", self.on_canvas_motion)
         self.canvas.bind("<Leave>", self.on_canvas_leave)
         self.canvas.bind("<Key-Delete>", self.on_canvas_delete)
@@ -387,12 +391,12 @@ class GraphWrapper:
         yp = _limit(y / self.canvas.winfo_height(), 0.05, 0.95)
         return (yp, xp) if flipped else (xp, yp)
 
-    def on_canvas_button1(self, event):
-        pass
-
-    def on_canvas_button3(self, event):
-        """Click to create a new node, if it is created on top of a line
+    def on_canvas_button(self, event):
+        """Control-Click or Secondary Click to create a new node, if it is created on top of a line
         that line is broken and the node is included."""
+
+        if event.num == 1 and not event.state & TkEventState.CONTROL:
+            return
 
         items = self.canvas.find_overlapping(event.x - 10, event.y - 10, event.x + 10, event.y + 10)
 
@@ -414,7 +418,7 @@ class GraphWrapper:
             self.add_parent(parent_node, new_node)
 
     def on_canvas_delete(self, event):
-        """Button3 on canvas: delete line(s)."""
+        """Delete key on canvas: delete line(s)."""
         items = self.canvas.find_overlapping(event.x - 10, event.y - 10, event.x + 10, event.y + 10)
         for item in items:
             _, child_node, parent_node = self.lines_lookup[item]
