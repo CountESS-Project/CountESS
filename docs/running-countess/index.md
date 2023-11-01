@@ -9,17 +9,14 @@ your application launcher.
 
 CountESS runs on multiple platforms, which have slightly different 
 names for keys and mouse buttons. To avoid confusion, CountESS
-accepts multiple ways of using the UI.
-
-CountESS
-
-In this document, we're using the following terms:
+accepts multiple ways of using the UI.  In this document, we're using
+the following terms in the hopes of avoiding confusion:
 
 Primary Mouse Button 
-: The first (most frequently used) button
+: The first (most frequently used, or only) mouse button
 
 Secondary Mouse Button
-: Any other button, **OR** the first button while holding "Control"
+: Any other mouse button, **OR** the first mouse button while holding the "Control" key.
 
 Delete Key
 : Either "Backspace" or "Delete" or similar key.
@@ -42,8 +39,7 @@ Save Config
 A CountESS pipeline consists of multiple components called 'nodes',
 connected in an acyclic graph.
 
-The graph is displayed on the left of the window (or at the top of the window,
-on portrait monitors/windows).
+The graph is displayed on the left of the window (or at the top of the window, on portrait monitors/windows).
 
 ### Highlighting nodes & connections
 
@@ -75,7 +71,6 @@ To delete a node, highlight it and press the Delete Key.
 Connections will be retained between the parents and children of the
 deleted node.  To prevent this, hold Shift and press the Delete Key.
 
-
 To select a node for configuration, primary click it.  You can also move it
 around on the scren with primary click and drag.  To remove a node, select it
 and then press the Delete key.
@@ -87,8 +82,24 @@ the link and press the Delete key.
 Only the first few thousand rows of input files are read at configuration time.
 To perform a complete run using the entire input file, click 'Run'.
 
+### Tidying the Graph
+
+Rearranging nodes by hand can be tedious, so there's a "Tidy Graph" button at the top of the screen which realigns nodes in a tidy way.
+Node positions are stored in the configuration file in a way which is independent of the display dimensions and orientation.
+
+## Configuring Nodes
+
+At the top of the configuration pane is a field for the node "name", which is displayed on the graph and in diagnostic messages. Nodes must have distinct names and CountESS will add numbers to the end of the name to distinguish them.
+
+Under the node name is a brief description of the purpose of the plugin, which may also include an **ℹ** button which links to a description of the plugin on this site.
+
+Under that is an optional notes section to outline to purpose of this node.
+This text isn't used by CountESS but is saved in the configuration file and exported.
+
+Beneath that are all the configuration options allowed by this plugin, and a preview pane showing the output of the plugin run on a limited number of rows.
+
 ## CLI
 
 Plugin configurations can be saved and loaded in .INI file format.
 CountESS can also be run in headless mode with `countess_cmd your_config.ini`.
-
+In headless mode, all output is to the console.

@@ -3,3 +3,6 @@ div.navbar {
     border-bottom: 2px solid var(--tertiary-color);
 }
 
+dt {
+    font-weight: bold;
+}
