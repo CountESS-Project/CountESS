@@ -40,23 +40,36 @@ Several abstract subclassess are provided in `countess.core.plugins`,
 which do most of the complex work of implementing different types of
 plugin, leaving your plugin class to fill in the final details.
 
+### PandasBasePlugin
+
+Plugins which subclass PandasBasePlugin pass iterables of Pandas dataframes.
+This lets CountESS process data sets larger than RAM.  Where possible each
+dataframe is processed separately.  Where this isn't possible, a map/reduce/finalize
+strategy can be used.
+
 ### PandasInputFilesPlugin
 
 Many plugins exist to read specific file formats, both generic formats like CSV and
 bioinformatics specific formats like FASTQ.  To implement a reader for a new file format,
 subclass PandasInputFilesPlugin and override the function `read_file_to_dataframe`.
 
+Where multiple files are selected, several processes can be run in parallel.
+
 *Examples: countess.core.plugins.csv.LoadCsvPlugin, countess.core.plugins.fastq.LoadFastqPlugin*
 
 ### PandasTransform**...**Plugin
 
-Many plugins just take tabular data and transform each row by adding,
-altering or deleting columns.  As processing is entirely local, it can
-be distributed over many CPUs.
+Many plugins just take tabular data and transform each row by
+altering or deleting columns, or adding columns based on the existing ones.
+As processing is entirely row-local, it can be distributed over many CPUs
+and caching can be performed to increase efficiency.
 
 Some plugins may operate on a single input value, others on an entire row.
 Some plugins may generate a single output value, others several.
-For convenience, several subclasses are provided:
+For convenience, several subclasses are provided to transform either a 
+single value or a whole row into one or several new columns.
+
+These include:
 
 * PandasTransformSingleToSinglePlugin
 
@@ -66,11 +79,13 @@ For convenience, several subclasses are provided:
 
   *Example: countess.core.plugins.sequence.SequencePlugin*
 
+<!--
 * PandasTransformSingleToTuplePlugin
 
   Subclasses provide a function `process_value` which takes a single value and returns a tuple of values.
   Input value is extracted from a column whose name is provided in a parameter 'column'.
   Output values are written to columns whose names are provided in subparameter 'name' of an array parameter 'output'.
+-->
   
 * PandasTransformSingleToDictPlugin
 
@@ -86,6 +101,7 @@ For convenience, several subclasses are provided:
   Marshalling rows into pd.Series incurs significant overhead, so you might be better off using PandasTransformDictToSinglePlugin.
   Output value is written to a column whose name is provided in a parameter 'output'.
 
+<!--
 * PandasTransformRowToTuplePlugin
 
   Subclasses provide a function `process_row` which takes a row (pd.Series) and returns a tuple of values.
@@ -97,6 +113,7 @@ For convenience, several subclasses are provided:
   Subclasses provide a function `process_row` which takes a row (pd.Series) and returns a dictionary.
   Marshalling rows into pd.Series incurs significant overhead, so you might be better off using PandasTransformDictToDictPlugin.
   Output values are written to columns whose names are provided by the dictionary keys.
+-->
 
 * PandasTransformDictToSinglePlugin
 
@@ -105,10 +122,12 @@ For convenience, several subclasses are provided:
 
   *Example: countess.core.plugins.variant.VariantPlugin*
 
+<!--
 * PandasTransformDictToTuplePlugin
 
   Subclasses provide a function `process_dict` which takes a dictionary and returns a tuple of values.
   Output values are written to columns whose names are provided in subparameter 'name' of an array parameter 'output'.
+-->
 
 * PandasTransformDictToDictPlugin
 
