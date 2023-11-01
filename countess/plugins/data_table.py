@@ -13,7 +13,7 @@ class DataTablePlugin(PandasInputPlugin):
 
     name = "DataTable"
     description = "enter small amounts of data directly"
-    link = "https://countess-project.github.io/CountESS/plugins/#data-table"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#data-table"
     version = VERSION
 
     parameters = {

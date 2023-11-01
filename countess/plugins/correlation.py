@@ -14,7 +14,7 @@ class CorrelationPlugin(PandasSimplePlugin):
     name = "Correlation Tool"
     description = "Measures Pearsons / Kendall / Spearman correlation of columns"
     version = VERSION
-    link = "https://countess-project.github.io/CountESS/plugins/#correlation-tool"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#correlation-tool"
 
     parameters = {
         "method": ChoiceParam("Method", choices=["pearson", "kendall", "spearman"]),

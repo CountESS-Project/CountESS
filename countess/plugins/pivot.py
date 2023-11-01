@@ -18,7 +18,7 @@ class PivotPlugin(PandasProcessPlugin):
     name = "Pivot Tool"
     description = "Groups a dataframe and pivots column values into columns"
     version = VERSION
-    link = "https://countess-project.github.io/CountESS/plugins/#pivot-tool"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
     parameters = {
         "columns": PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"]))

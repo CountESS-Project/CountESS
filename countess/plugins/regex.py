@@ -20,7 +20,7 @@ from countess.core.plugins import PandasInputFilesPlugin, PandasTransformSingleT
 class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     name = "Regex Tool"
     description = "Apply regular expressions to a column to make new column(s)"
-    link = "https://countess-project.github.io/CountESS/plugins/#regex-tool"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#regex-tool"
     version = VERSION
 
     parameters = {
@@ -119,7 +119,7 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
     additional = """Applies a regular expression to each line to extract fields.
         If you're trying to read generic CSV or TSV files, use the CSV plugin
         instead as it handles escaping correctly."""
-    link = "https://countess-project.github.io/CountESS/plugins/#regex-reader"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#regex-reader"
     version = VERSION
 
     file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]

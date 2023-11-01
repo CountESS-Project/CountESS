@@ -13,7 +13,7 @@ class SequencePlugin(PandasTransformSingleToSinglePlugin):
     name = "Sequence Tool"
     description = "Manipulate DNA Sequences"
     version = VERSION
-    link = "https://countess-project.github.io/CountESS/plugins/#valueuence"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#valueuence"
 
     parameters = {
         "column": ColumnChoiceParam("Input Column"),

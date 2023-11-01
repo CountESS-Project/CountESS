@@ -47,7 +47,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
 
     name = "CSV Load"
     description = "Loads data from CSV or similar delimited text files and assigns types to columns"
-    link = "https://countess-project.github.io/CountESS/plugins/#csv-reader"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#csv-reader"
     version = VERSION
 
     file_types = [("CSV", [".csv", ".gz"]), ("TSV", [".tsv", ".gz"]), ("TXT", ".txt")]
@@ -144,7 +144,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
 class SaveCsvPlugin(PandasProcessPlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
-    link = "https://countess-project.github.io/CountESS/plugins/#csv-writer"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#csv-writer"
     version = VERSION
 
     file_types = [("CSV", [".csv", ".gz"]), ("TSV", [".tsv", ".gz"]), ("TXT", ".txt")]
