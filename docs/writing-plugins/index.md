@@ -69,7 +69,7 @@ Some plugins may generate a single output value, others several.
 For convenience, several subclasses are provided to transform either a 
 single value or a whole row into one or several new columns.
 
-These include:
+These include (not all combintions are listed here):
 
 * PandasTransformSingleToSinglePlugin
 

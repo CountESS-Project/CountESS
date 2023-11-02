@@ -7,6 +7,7 @@
   <body>
     {% if page.url != "/" %}
       <div class="navbar"><a href="{{ site.baseurl }}/">CountESS Documentation</a></div>
+      {% if page.parent %}/ <a href="../">{{ page.parent }}</a>{% endif %}
     {% endif %}
     {{ content }}
   </body>

@@ -79,8 +79,6 @@ To link nodes, secondary click and drag a new link between them.  Nodes cannot b
 linked to themselves, or in cycles.  To remove a link between nodes, hover over 
 the link and press the Delete key.
 
-Only the first few thousand rows of input files are read at configuration time.
-To perform a complete run using the entire input file, click 'Run'.
 
 ### Tidying the Graph
 
@@ -91,12 +89,20 @@ Node positions are stored in the configuration file in a way which is independen
 
 At the top of the configuration pane is a field for the node "name", which is displayed on the graph and in diagnostic messages. Nodes must have distinct names and CountESS will add numbers to the end of the name to distinguish them.
 
-Under the node name is a brief description of the purpose of the plugin, which may also include an **ℹ** button which links to a description of the plugin on this site.
+Under the node name is the version number and a brief description of the purpose of the plugin, which may also include an **ℹ** button which links to a description of the plugin on the web.
 
 Under that is an optional notes section to outline to purpose of this node.
 This text isn't used by CountESS but is saved in the configuration file and exported.
 
-Beneath that are all the configuration options allowed by this plugin, and a preview pane showing the output of the plugin run on a limited number of rows.
+Beneath that are all the configuration options allowed by this plugin.
+
+## Previewing Results
+
+Beneath the configuration pane is the results pane, which shows a preview of the output from the node.
+
+Only the first few thousand rows of input files are read at preview time, which may lead to misleading preview results.
+
+To perform a complete run using the entire input file, click 'Run'.
 
 ## CLI
 
