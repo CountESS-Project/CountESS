@@ -15,7 +15,7 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
     name = "Variant Translator"
     description = "Turns a DNA sequence into a HGVS variant code"
     version = VERSION
-    link = "https://countess-project.github.io/CountESS/included-plugins/#variant"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#variant-caller"
 
     parameters = {
         "column": ColumnChoiceParam("Input Column", "sequence"),

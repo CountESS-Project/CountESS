@@ -5,6 +5,8 @@ CountESS is designed to be easy to write plugins for, but plugins are included f
 Source code for the included plugins can be found in the repository at
 [countess/plugins](https://github.com/CountESS-Project/CountESS/tree/main/countess/plugins)
 
+CountESS is not limited to these included plugins: anyone can write and publish CountESS plugins. See [Other Plugins](../other-plugins/) for some examples or  [Writing CountESS Plugins](../writing-plugins/) to write your own.
+
 ## Built-in Plugins: File Formats
 
 ### CSV Reader
@@ -89,7 +91,7 @@ The result will have one row per Index value, with each of the "Expand" columns 
 
 For example this data set:
 
-| `x` | `y` | `z` |
+| `variant` | `replicate` | `count` |
 |---|---|---|
 | `1` | `2` | `3` |
 | `1` | `4` | `5` |
@@ -98,9 +100,9 @@ For example this data set:
 | `3` | `7` | `9` |
 | `3` | `7` | `10` |
 
-when pivoted with Index X, Pivot Y, Expand Z becomes:
+when pivoted with index on Variant, pivot on Replicate and expanding Count becomes:
 
-| `x` | `z__y_2` | `z__y_4` | `z__y_7` |
+| `variant` | `count__replicate_2` | `count__replicate_4` | `count__replicate_7` |
 |---|---|---|---|
 | `1` | `3` | `5` | `0` |
 | `2` | `6` | `0` | `8` |
@@ -108,13 +110,8 @@ when pivoted with Index X, Pivot Y, Expand Z becomes:
 
 ### Variant Caller
 
+Turns a DNA sequence into an HGVS variant code by comparing it to a reference sequence.
+The reference sequence can either be provided directly as a configuration parameter or in a selected column.
 
-## Other Plugins
+*See also: [countess-minimap2 plugin](https://github.com/CountESS-Project/countess-minimap2), a variant caller which uses 'minimap2' to find sequences within a genome.*
 
-Anyone can write and publish CountESS plugins.
-
-* [Pebbles](https://github.com/genomematt/pebbles/) for reading SAM and BAM files
-
-## Writing your own Plugins
-
-See [Writing CountESS Plugins](../writing-plugins/)
