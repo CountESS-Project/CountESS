@@ -7,7 +7,7 @@ Source code for the included plugins can be found in the repository at
 
 CountESS is not limited to these included plugins: anyone can write and publish CountESS plugins. See [Other Plugins](../other-plugins/) for some examples or  [Writing CountESS Plugins](../writing-plugins/) to write your own.
 
-## Built-in Plugins: File Formats
+## File Formats
 
 ### CSV Reader
 
@@ -71,7 +71,7 @@ skip
 output
 : for each regex group, what colum name and data type should it be stored as.
 
-## Built-in Plugins: Data Manipulation
+## Data Manipulation
 
 ### Regex Tool
 
@@ -107,6 +107,47 @@ when pivoted with index on Variant, pivot on Replicate and expanding Count becom
 | `1` | `3` | `5` | `0` |
 | `2` | `6` | `0` | `8` |
 | `3` | `0` | `0` | `19` | 
+
+## Bioinformatics
+
+### FASTQ Load
+
+Read one (or more) [FASTQ](https://maq.sourceforge.net/fastq.shtml) files, optionally gzipped.
+Returns a datatable with columns:
+
+sequence
+: the sequence, as a DNA or RNA string of A, C, G, T.
+
+header
+: the header string from the FASTQ read (the line starting with `@`)
+
+A minimum average quality filter can be applied.
+
+If "Group by sequence?" is selected, an additional column "count" is added and the sequences are grouped.  The header is reduced to the common prefix of all headers in the FASTQ file.
+
+### Mutagenize
+
+Takes a sequence in configuration and returns all possible mutations of that sequence of various types.  Only one kind is applied at a time.
+
+#### Parameters
+
+All Single Mutations?
+: Include all SNVs of the sequence
+
+All Single Deletes?
+: Include all single base deletions of the sequence
+
+All Triple Deletes?
+: Include all triple base deletions, eg: aligned deletions, of the sequence
+
+All Single Inserts?
+: Include all single base insertions of the sequence
+
+All Triple Inserts?
+: Include all triple base insertions, eg: aligned insertions, of the sequence
+
+Remove Duplicates?
+: Deletions and Insertions into the sequence can end up with the same sequence from multiple operations, for example inserting `A` into `CAAT` can produce `CAAAT` in three different ways, and single deletions can produce `CAT` in two different ways.  If "Remove Dupliates" is selected, duplicates are removed but an additional column "count" is added to indicate how many ways this sequence can have been produced.
 
 ### Variant Caller
 

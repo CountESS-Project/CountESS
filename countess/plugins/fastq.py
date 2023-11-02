@@ -22,6 +22,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
     name = "FASTQ Load"
     description = "Loads counts from FASTQ files containing either variant or barcodes"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#fastq-load"
     version = VERSION
 
     file_types = [("FASTQ", ".fastq"), ("FASTQ (gzipped)", ".gz")]
