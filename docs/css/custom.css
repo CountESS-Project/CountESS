@@ -1,8 +1,19 @@
+/* little overrides to vanilla.css */
+
 div.navbar {
     display: block;
     border-bottom: 2px solid var(--tertiary-color);
 }
 
 dt {
+    font-weight: bold;
+}
+
+table code {
+    border: none;
+    background: none;
+}
+
+table th code {
     font-weight: bold;
 }
