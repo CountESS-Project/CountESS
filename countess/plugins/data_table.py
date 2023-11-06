@@ -4,7 +4,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, DataTypeChoiceParam, MultiParam, StringParam, TabularMultiParam
+from countess.core.parameters import ArrayParam, BooleanParam, DataTypeChoiceParam, MultiParam, StringParam, TabularMultiParam
 from countess.core.plugins import PandasInputPlugin
 
 
@@ -24,6 +24,7 @@ class DataTablePlugin(PandasInputPlugin):
                 {
                     "name": StringParam("Name"),
                     "type": DataTypeChoiceParam("Type", "string"),
+                    "index": BooleanParam("Index?"),
                 },
             ),
         ),
@@ -89,4 +90,10 @@ class DataTablePlugin(PandasInputPlugin):
                 dict((col["name"].value, row[str(num)].value) for num, col in enumerate(self.parameters["columns"]))
             )
 
-        yield pd.DataFrame(values)
+        df = pd.DataFrame(values)
+
+        index_cols = [ col["name"].value for col in self.parameters["columns"] if col["index"].value ]
+        if index_cols:
+            df = df.set_index(index_cols)
+
+        yield df

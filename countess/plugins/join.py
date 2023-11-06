@@ -22,6 +22,7 @@ class JoinPlugin(PandasProductPlugin):
     name = "Join"
     description = "Joins two Pandas Dataframes by indexes or columns"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#join"
 
     parameters = {
         "inputs": ArrayParam(

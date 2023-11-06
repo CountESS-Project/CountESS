@@ -12,7 +12,7 @@ from countess.core.plugins import PandasInputFilesPlugin
 def _file_reader(file_handle, min_avg_quality, row_limit=None):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
-            yield {"sequence": fastq_read.sequence, "header": fastq_read.header}
+            yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:]}
 
 
 class LoadFastqPlugin(PandasInputFilesPlugin):

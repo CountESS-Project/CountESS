@@ -16,6 +16,7 @@ class GroupByPlugin(PandasProcessPlugin):
     name = "Group By"
     description = "Group records by column(s) and calculate aggregates"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#group-by"
 
     input_columns: dict[str, np.dtype]
 

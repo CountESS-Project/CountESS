@@ -15,6 +15,7 @@ class CollatePlugin(PandasProcessPlugin):
     name = "Collate"
     description = "Collate and sort records by column(s), taking the first N"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-p  lugins/#collate"
 
     parameters = {
         "columns": PerColumnArrayParam(
