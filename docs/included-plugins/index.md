@@ -96,7 +96,7 @@ Groups data by one or more columns, and aggregates the rest of the columns.
 For each column of the input, select either "Index" or zero or more aggregation functions.
 
 | `name` | `score` |
-|---|---|
+|:---:|:---:|
 | `A` | `7` |
 | `A` | `8` |
 | `B` | `9` |
@@ -104,7 +104,7 @@ For each column of the input, select either "Index" or zero or more aggregation 
 For example the above can be indexed by `name` and both count and mean evaluated for `score`, resulting in:
 
 | `name` | `score__count` | `score__mean` |
-|---|---|---|
+|:---:|:---:|:---:|
 | `A` | `2` | `7.5` |
 | `B` | `1` | `9` |
 
@@ -128,7 +128,7 @@ Drop Column
 The "required" flag on the input datatables lets you select the type of join:
 
 | Input 1 Required | Input 2 Required | Type of Join |
-|---|---|---|
+|:---:|:---:|:---:|
 | ✓ | ✓ | Inner |
 | ✓ | ✗ | Left |
 | ✗ | ✓ | Right | 
@@ -153,7 +153,7 @@ The result will have one row per Index value, with each of the "Expand" columns 
 For example this data set:
 
 | `variant` | `replicate` | `count` |
-|---|---|---|
+|:---:|:---:|:---:|
 | `1` | `2` | `3` |
 | `1` | `4` | `5` |
 | `2` | `2` | `6` |
@@ -164,7 +164,7 @@ For example this data set:
 when pivoted with index on Variant, pivot on Replicate and expanding Count becomes:
 
 | `variant` | `count__replicate_2` | `count__replicate_4` | `count__replicate_7` |
-|---|---|---|---|
+|:---:|:---:|:---:|:---:|
 | `1` | `3` | `5` | `0` |
 | `2` | `6` | `0` | `8` |
 | `3` | `0` | `0` | `19` | 
