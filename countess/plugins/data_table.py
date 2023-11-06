@@ -4,7 +4,14 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BooleanParam, DataTypeChoiceParam, MultiParam, StringParam, TabularMultiParam
+from countess.core.parameters import (
+    ArrayParam,
+    BooleanParam,
+    DataTypeChoiceParam,
+    MultiParam,
+    StringParam,
+    TabularMultiParam,
+)
 from countess.core.plugins import PandasInputPlugin
 
 
@@ -92,7 +99,7 @@ class DataTablePlugin(PandasInputPlugin):
 
         df = pd.DataFrame(values)
 
-        index_cols = [ col["name"].value for col in self.parameters["columns"] if col["index"].value ]
+        index_cols = [col["name"].value for col in self.parameters["columns"] if col["index"].value]
         if index_cols:
             df = df.set_index(index_cols)
 
