@@ -21,7 +21,6 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
         "column": ColumnChoiceParam("Input Column", "sequence"),
         "reference": ColumnOrNoneChoiceParam("Reference Column"),
         "sequence": StringParam("*OR* Reference Sequence"),
-        "auto": BooleanParam("Automatic Reference Sequence?", False),
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
         "drop": BooleanParam("Drop unidentified variants", False),
