@@ -52,6 +52,18 @@ delimiter
 quoting
 : whether to quote all string values, even if they don't appear to need it.  This can reduce the chance of data corruption with software which can otherwise confuse string values for dates or numbers.
 
+### Data Table
+
+Sometimes you need a little bit of extra data joined into your tables but don't really want to have a separate CSV file.  Data Table lets you embed small amounts of data into the configuration directly.
+
+#### Parameters
+
+Columns
+: Add columns, giving them names and types. Columns may also be indexed to improve join performance.
+
+Rows
+: Add rows to the data table.
+
 ### Regex Reader
 
 If the CSV Reader isn't flexible enough for your file format, the Regex
@@ -72,6 +84,55 @@ output
 : for each regex group, what colum name and data type should it be stored as.
 
 ## Data Manipulation
+
+### Collate 
+
+Group and sort records, keeping only the first N records in each group.
+
+### Group By
+
+Groups data by one or more columns, and aggregates the rest of the columns.
+
+For each column of the input, select either "Index" or zero or more aggregation functions.
+
+| `name` | `score` |
+|---|---|
+| `A` | `7` |
+| `A` | `8` |
+| `B` | `9` |
+
+For example the above can be indexed by `name` and both count and mean evaluated for `score`, resulting in:
+
+| `name` | `score__count` | `score__mean` |
+|---|---|---|
+| `A` | `2` | `7.5` |
+| `B` | `1` | `9` |
+
+### Join
+
+Join two datatables on indexes or a column.
+
+#### Parameters
+
+For each input datatable, there are three parameters:
+
+Join On
+: Select index to use the table index, or a column
+
+Required
+: Is a match on this table required to output the row?
+
+Drop Column
+: Select if you no longer need the joining column and want to drop it.
+
+The "required" flag on the input datatables lets you select the type of join:
+
+| Input 1 Required | Input 2 Required | Type of Join |
+|---|---|---|
+| ✓ | ✓ | Inner |
+| ✓ | ✗ | Left |
+| ✗ | ✓ | Right | 
+| ✗ | ✗ | Full / Outer |
 
 ### Regex Tool
 
@@ -147,7 +208,7 @@ All Triple Inserts?
 : Include all triple base insertions, eg: aligned insertions, of the sequence
 
 Remove Duplicates?
-: Deletions and Insertions into the sequence can end up with the same sequence from multiple operations, for example inserting `A` into `CAAT` can produce `CAAAT` in three different ways, and single deletions can produce `CAT` in two different ways.  If "Remove Dupliates" is selected, duplicates are removed but an additional column "count" is added to indicate how many ways this sequence can have been produced.
+: Deletions and Insertions into the sequence can end up with the same sequence from multiple operations, for example inserting `A` into `CAAT` can produce `CAAAT` in three different ways, and single deletions can produce `CAT` in two different ways.  If "Remove Duplicates" is selected, duplicates are removed but an additional column "count" is added to indicate how many ways this sequence can have been produced.
 
 ### Variant Caller
 
