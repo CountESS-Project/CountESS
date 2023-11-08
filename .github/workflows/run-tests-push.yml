@@ -15,11 +15,10 @@ jobs:
     - run: pip install --upgrade pip
     - run: pip install .[dev]
 #    - run: xvfb-run pytest tests/
-    - run: tests/cmd_tests.sh
 
   run-tests-ubuntu-22_04-python-3_10-with-coverage:
     runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.10
+    name: Ubuntu 22.04, Python 3.10 (with coverage)
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
@@ -29,12 +28,11 @@ jobs:
     - run: pip install --upgrade pip
     - run: pip install .[dev]
     - run: xvfb-run coverage run --source countess -m pytest tests/
-    - run: coverage html
-    - run: tests/cmd_tests.sh
-    - uses: actions/upload-artifact@v3
-      with:
-        name: test coverage report
-        path: htmlcov/*
+#    - run: coverage html
+#    - uses: actions/upload-artifact@v3
+#      with:
+#        name: test coverage report
+#        path: htmlcov/*
     - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
     - run: coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
@@ -125,7 +123,6 @@ jobs:
     - run: python3.11 -m pip install --upgrade pip
     - run: python3.11 -m pip install -e .[dev]
     - run: xvfb-run python3.11 -mpytest tests/
-    - run: tests/cmd_tests.sh
 
       #  run-tests-ubuntu-22_10-python-3_11_from_apt:
       #runs-on: ubuntu-22.10
@@ -136,7 +133,6 @@ jobs:
       #- run: python3.11 -m pip install --upgrade pip
       #- run: python3.11 -m pip install -e .[dev]
       #- run: xvfb-run python3.11 -mpytest tests/
-      #- run: tests/cmd_tests.sh
 
       #run-tests-ubuntu-23_04-python-3_11_from_apt:
       #runs-on: ubuntu-23.04
@@ -147,7 +143,6 @@ jobs:
       #- run: python3.11 -m pip install --upgrade pip
       #- run: python3.11 -m pip install -e .[dev]
       #- run: xvfb-run python3.11 -mpytest tests/
-      #- run: tests/cmd_tests.sh
 
 #  run-tests-ubuntu-22_04-pypy3:
 #    runs-on: ubuntu-22.04
