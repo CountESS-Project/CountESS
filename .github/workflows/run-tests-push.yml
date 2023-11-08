@@ -14,7 +14,7 @@ jobs:
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-#    - run: xvfb-run pytest tests/
+    - run: xvfb-run pytest tests/
 
   run-tests-ubuntu-22_04-python-3_10-with-coverage:
     runs-on: ubuntu-22.04

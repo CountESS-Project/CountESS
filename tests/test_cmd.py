@@ -10,7 +10,7 @@ expected_output=""""thing","foo","bar","baz","qux","number","zz"
 """
 
 def test_command_invocation():
-    countess_cmd(["countess_cmd", "simple.ini"])
+    countess_cmd(["countess_cmd", "tests/simple.ini"])
 
     with open("tests/output.csv", "r") as fh:
         output = fh.read()
