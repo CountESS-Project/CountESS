@@ -17,7 +17,7 @@ jobs:
 #    - run: xvfb-run pytest tests/
     - run: tests/cmd_tests.sh
 
-  run-tests-ubuntu-22_04-python-3_10:
+  run-tests-ubuntu-22_04-python-3_10-with-coverage:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python 3.10
     steps:
@@ -28,8 +28,13 @@ jobs:
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-    - run: xvfb-run pytest tests/
+    - run: xvfb-run coverage run --source countess -m pytest tests/
+    - run: coverage html
     - run: tests/cmd_tests.sh
+    - uses: actions/upload-artifact@v3
+      with:
+        name: test coverage report
+        path: htmlcov/index.html
 
 #  run-tests-ubuntu-22_04-python-3_11_0rc2:
 #   runs-on: ubuntu-22.04
