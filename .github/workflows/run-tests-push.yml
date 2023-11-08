@@ -34,7 +34,9 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test coverage report
-        path: htmlcov/index.html
+        path: htmlcov/*
+    - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
+    - run: coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
 #  run-tests-ubuntu-22_04-python-3_11_0rc2:
 #   runs-on: ubuntu-22.04
