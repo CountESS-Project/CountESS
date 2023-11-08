@@ -27,3 +27,4 @@ def test_variant_ref_column():
 
     assert output[0]['out'] == 'g.5C>G'
     assert output[1]['out'] == 'g.[7_9dup;11_12insG]'
+

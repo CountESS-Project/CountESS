@@ -119,4 +119,7 @@ def test_mutagenize_del3_dedup():
 
     assert len(output_df) == 4
 
+def test_num_files():
 
+    plugin = MutagenizePlugin()
+    assert plugin.num_files() == 1

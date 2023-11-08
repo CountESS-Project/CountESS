@@ -177,6 +177,9 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
         "ATCGATCGATCGATCGAATCGATCGATCGGGTCCC"))
     ['17_18ins5_15']
 
+    >>> list(find_variant_dna("AAAAAAAAAACCCGGGGGGGGGGTTT", "AAAAAAAAAACCCAAAAAAAAAATTT"))
+    ['14_23delins1_10']
+
     DELETION OF NUCLEOTIDES (checked against Enrich2)
     enrich2 has g.5_5del for the first one which isn't correct though
 
@@ -185,23 +188,11 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     >>> list(find_variant_dna("AGAAGTAGAGG", "AGAAAGAGG"))
     ['5_6del']
 
-    MULTIPLE VARIATIONS
+    INVERSIONS
 
-    >>> find_variant_string("g.", "GATTACA", "GATTACA")
-    'g.='
-    >>> find_variant_string("g.", "GATTACA", "GTTTACA")
-    'g.2A>T'
-    >>> find_variant_string("g.", "GATTACA", "GTTTAGA")
-    'g.[2A>T;6C>G]'
-    >>> find_variant_string("g.", "GATTACA", "GTTCAGA")
-    'g.[2A>T;4T>C;6C>G]'
+    >>> list(find_variant_dna("AAACCCTTT", "AAAGGGTTT"))
+    ['4_6inv']
 
-    >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTC")
-    'g.7_9dup'
-    >>> find_variant_string("g.", "ATGGTTGGTTCG", "ATGGTTGGTGGTTC")
-    'g.[7_9dup;12del]'
-    >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTCG")
-    'g.[7_9dup;11_12insG]'
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -278,18 +269,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
             assert src_seq == ""
             # 'insert' opcode maps to either an HGVS 'dup' or 'ins' operation
 
-            if ref_seq[src_start : src_start + len(dest_seq)] == dest_seq:
-                # This is a duplication of one or more symbols immediately
-                # following this point.
-                src_offset = src_start
-                while ref_seq[src_offset + len(dest_seq) : src_offset + len(dest_seq) * 2] == dest_seq:
-                    src_offset += len(dest_seq)
-
-                if len(dest_seq) == 1:
-                    yield f"{src_offset + 1}dup"
-                else:
-                    yield f"{src_offset + 1}_{src_offset + len(dest_seq)}dup"
-            elif ref_seq[src_start - len(dest_seq) : src_start] == dest_seq:
+            if ref_seq[src_start - len(dest_seq) : src_start] == dest_seq:
                 # This is a duplication of one or more symbols immediately
                 # preceding this point.
                 if len(dest_seq) == 1:
@@ -318,7 +298,51 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
 
 
 def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None) -> str:
-    """As above, but returns a single string instead of a generator"""
+    """As above, but returns a single string instead of a generator
+
+    MULTIPLE VARIATIONS
+
+    >>> find_variant_string("g.", "GATTACA", "GATTACA")
+    'g.='
+    >>> find_variant_string("g.", "GATTACA", "GTTTACA")
+    'g.2A>T'
+    >>> find_variant_string("g.", "GATTACA", "GTTTAGA")
+    'g.[2A>T;6C>G]'
+    >>> find_variant_string("g.", "GATTACA", "GTTCAGA")
+    'g.[2A>T;4T>C;6C>G]'
+
+    >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTC")
+    'g.7_9dup'
+    >>> find_variant_string("g.", "ATGGTTGGTTCG", "ATGGTTGGTGGTTC")
+    'g.[7_9dup;12del]'
+    >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTCG")
+    'g.[7_9dup;11_12insG]'
+
+    CHECK FOR INVALID INPUTS
+
+    >>> find_variant_string("x.", "CAT", "CAT")
+    Traceback (most recent call last):
+     ...
+    ValueError: ...
+
+    >>> find_variant_string("g.", "HELLO", "CAT")
+    Traceback (most recent call last):
+     ...
+    ValueError: Invalid reference sequence
+
+    >>> find_variant_string("g.", "CAT", "HELLO")
+    Traceback (most recent call last):
+     ...
+    ValueError: Invalid variant sequence
+
+    CHECK FOR MAX MUTATIONS
+
+    >>> find_variant_string("g.", "ATTACC", "GATTACA",1)
+    Traceback (most recent call last):
+     ...
+    ValueError: Too many variations...
+
+    """
 
     if not prefix.endswith("g.") and not prefix.endswith("n."):
         raise ValueError("Only prefix types 'g.' and 'n.' accepted at this time")

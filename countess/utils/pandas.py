@@ -41,7 +41,8 @@ def get_all_indexes(dataframe: pd.DataFrame) -> Dict[str, Any]:
     ):
         return dict(zip(dataframe.index.names, dataframe.index.dtypes))
     else:
-        return {}
+        # XXX I'm not sure how or if this ever happens
+        return {}  # pragma: no cover
 
 
 def get_all_columns(dataframe: pd.DataFrame) -> Dict[str, Any]:

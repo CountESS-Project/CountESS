@@ -24,7 +24,7 @@ def mutagenize(
                 yield sequence[0:n] + b2 + sequence[n:], n + 1, None, b2
         if delete:
             yield sequence[0:n] + sequence[n + 1 :], n + 1, b1, None
-        if del3 and n+3 <= len(sequence):
+        if del3 and n + 3 <= len(sequence):
             yield sequence[0:n] + sequence[n + 3 :], n + 1, sequence[n : n + 3], None
         if ins3:
             for ins in product("ACGT", "ACGT", "ACGT"):

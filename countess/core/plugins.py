@@ -46,9 +46,9 @@ def get_plugin_classes():
     try:
         # Python >= 3.10
         entry_points = importlib.metadata.entry_points().select(group="countess_plugins")
-    except AttributeError:
+    except AttributeError:  # pragma: no cover
         # Python < 3.10
-        entry_points = importlib.metadata.entry_points()["countess_plugins"]
+        entry_points = importlib.metadata.entry_points()["countess_plugins"]  # pragma: no cover
 
     for ep in entry_points:
         try:
@@ -190,8 +190,7 @@ class FileInputPlugin(BasePlugin):
         will call code equivalent to
         `[ p.load_file(n, logger, row_limit) for n in range(0, p.num_files() ]`
         although potentially using threads, multiprocessing, etc."""
-
-        return 0
+        raise NotImplementedError("FileInputMixin.num_files")
 
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
         """Called potentially from multiple processes, see FileInputMixin.num_files()"""

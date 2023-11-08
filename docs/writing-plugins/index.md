@@ -144,6 +144,12 @@ class declaration using subclasses of `countess.core.parameters.BaseParameter`.
 Configuration values are provided by a [single configuration file](../config-file-format/)
 which is read and written by the CountESS GUI and read by the CountESS CLI.
 
+## Testing Plugins
+
+Tests for included plugins are included under
+[tests/plugins/](https://github.com/CountESS-Project/CountESS/tree/main/tests/plugins)
+and should provide some guidance on how to write tests for plugins.
+
 ## Example Plugins
 
 Under [example-plugins](../example-plugins/) are files showing the 

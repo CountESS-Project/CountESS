@@ -37,3 +37,39 @@ def test_collect_dataframes_3():
     x = list(collect_dataframes([df1,df2,df4,df5,df6].__iter__(), 300))
     assert_iterable_of_dataframes_equal([df1,df2,df4,df5,df6], x)
     assert len(x) < 5
+
+def test_get_all_indexes_0():
+    df = pd.DataFrame([{'a': 1}])
+    assert list(get_all_indexes(df).keys()) == []
+
+def test_get_all_indexes_1():
+    df = pd.DataFrame([{'a': 1}]).set_index('a')
+    assert list(get_all_indexes(df).keys()) == ['a']
+
+def test_get_all_indexes_2():
+    df = pd.DataFrame([{'a': 1, 'b': 2}]).set_index('a')
+    assert list(get_all_indexes(df).keys()) == ['a']
+
+def test_get_all_indexes_3():
+    df = pd.DataFrame([{'a': 1, 'b': 2}]).set_index(['a', 'b'])
+    assert list(get_all_indexes(df).keys()) == ['a', 'b']
+
+def test_get_all_indexes_4():
+    df = pd.DataFrame([{'a': 1, 'b': 2}]).set_index('b')
+    assert list(get_all_indexes(df).keys()) == ['b']
+
+def test_concat_dataframes_0():
+    df = concat_dataframes([])
+    assert len(df) == 0
+
+def test_concat_dataframes_1():
+    df = concat_dataframes([df0])
+    assert len(df) == 0
+
+def test_concat_dataframes_2():
+    df = concat_dataframes([df0,df1])
+    assert df.equals(df1)
+
+def test_concat_dataframes_3():
+    df = concat_dataframes([df1,df2])
+    assert len(df) == 1000
