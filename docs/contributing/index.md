@@ -31,8 +31,7 @@ Then clone your fork locally and install for development:
 Edit files locally and test using:
 
     script/code-check
-    tests/test_gui.py
-    tests/cmd_tests.sh
+    script/run-tests
 
 Please use code formatting tools to tidy your code up as this makes merging
 changes easier:
