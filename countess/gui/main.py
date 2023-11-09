@@ -314,6 +314,7 @@ class RunWindow:
 
         else:
             self.toplevel.destroy()
+            self.toplevel = None
 
 
 class MainWindow:
