@@ -53,29 +53,10 @@ def test_tabular_scroll():
 
     tt.set_dataframe(dfx)
 
-    root.update()
-    time.sleep(0.1)
-
-    tt.refresh(10)
-
-    root.update()
-    time.sleep(0.1)
-
-    tt.refresh(0)
-
-    root.update()
-    time.sleep(0.1)
-
-    tt.refresh(6666)
-
-    root.update()
-    time.sleep(0.1)
-
-    tt.refresh(3333)
-
-    root.update()
-    time.sleep(0.1)
-
+    for offset in (10, 0, 6666, 6660, 3333):
+        time.sleep(0.1)
+        tt.refresh(offset)
+        root.update()
 
 def test_tabular_copy():
     root = make_root()

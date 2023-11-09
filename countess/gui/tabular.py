@@ -232,8 +232,6 @@ class TabularDataFrame(tk.Frame):
         self.offset = new_offset
         if self.length:
             self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
-        else:
-            self.scrollbar.set(0, 1)
 
     def scrollto(self, new_offset):
         self.offset = min(max(int(new_offset), 0), self.length - self.height)
