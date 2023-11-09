@@ -13,7 +13,9 @@ df1 = pd.DataFrame(
         {"foo": 4, "bar": 5, "baz": 6},
         {"foo": 7, "bar": 8, "baz": 9},
     ],
-).set_index("foo")
+)
+
+df2 = df1.set_index("foo")
 
 code_1 = "qux = bar + baz\n\nquux = bar * baz\n"
 
@@ -60,6 +62,6 @@ def test_expr_3():
     plugin.set_parameter("drop.1", True)
     plugin.prepare(["x"])
 
-    df = next(plugin.process(df1, "x", logger))
+    df = next(plugin.process(df2, "x", logger))
     assert len(df) == 3
     assert set(df.columns) == {"bar", "qux", "quux"}
