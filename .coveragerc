@@ -1,0 +1,9 @@
+[report]
+exclude_also = 
+    raise NotImplementedError
+skip_empty = True
+sort = -cover
+
+[paths]
+source =
+    countess/

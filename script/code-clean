@@ -1,5 +1,5 @@
 #!/bin/bash
 
-isort countess/
+isort countess/ tests/
 
-black countess/
+black countess/ tests/

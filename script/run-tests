@@ -1,8 +1,8 @@
 #!/bin/bash
 
-coverage run --source=countess -m pytest tests/
+coverage run --source=countess -m pytest --doctest-modules countess/ tests/
 
-coverage report
+coverage report --skip-empty --sort=-cover
 
 #coverage html 
 #python -m webbrowser -t htmlcov/index.html

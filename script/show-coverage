@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+coverage html
+
+python -m webbrowser -n htmlcov/index.html
