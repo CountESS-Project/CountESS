@@ -81,3 +81,6 @@ class MultiprocessLogger(Logger):
                 yield self.queue.get_nowait()
         except queue.Empty:
             pass
+
+    def dump(self):
+        return "\n".join("%s\t%s\t%s" % (a, b, c) for a, b, c in self.poll())

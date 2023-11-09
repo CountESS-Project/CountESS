@@ -1,11 +1,12 @@
 import time
+
 import pytest
 
-from countess.gui.main import make_root, MainWindow
 from countess.core.config import write_config
+from countess.gui.main import MainWindow, make_root
+
 
 def test_open_nodes():
-
     root = make_root()
 
     mw = MainWindow(root, "tests/simple.ini")

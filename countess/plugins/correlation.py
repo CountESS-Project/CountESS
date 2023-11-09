@@ -25,7 +25,7 @@ class CorrelationPlugin(PandasSimplePlugin):
     columns: list[str] = []
     dataframes: list[pd.DataFrame] = []
 
-    def prepare(self, sources: list[str], row_limit: Optional[int]):
+    def prepare(self, sources: list[str], row_limit: Optional[int]=None):
         assert isinstance(self.parameters["group"], ColumnOrNoneChoiceParam)
         column1 = self.parameters["column1"].value
         column2 = self.parameters["column2"].value

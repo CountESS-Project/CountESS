@@ -46,9 +46,9 @@ def get_plugin_classes():
     try:
         # Python >= 3.10
         entry_points = importlib.metadata.entry_points().select(group="countess_plugins")
-    except AttributeError:  # pragma: no cover
+    except AttributeError:
         # Python < 3.10
-        entry_points = importlib.metadata.entry_points()["countess_plugins"]  # pragma: no cover
+        entry_points = importlib.metadata.entry_points()["countess_plugins"]
 
     for ep in entry_points:
         try:
@@ -87,7 +87,7 @@ class BasePlugin:
 
     @property
     def version(self) -> str:
-        return sys.modules[self.__module__].VERSION
+        raise NotImplementedError(f"{self.__class__}.version")
 
     def __init__(self, plugin_name=None):
         # Parameters store the actual values they are set to, so we copy them
@@ -145,7 +145,7 @@ class BasePlugin:
 class ProcessPlugin(BasePlugin):
     """A plugin which accepts data from one or more sources"""
 
-    def prepare(self, sources: List[str], row_limit: Optional[int]):
+    def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         pass
 
     def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
@@ -211,7 +211,7 @@ class PandasSimplePlugin(SimplePlugin):
 
     input_columns: Dict[str, np.dtype] = {}
 
-    def prepare(self, sources: list[str], row_limit: Optional[int]):
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         self.input_columns = {}
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
@@ -273,7 +273,7 @@ class PandasProductPlugin(PandasProcessPlugin):
     mem1: Optional[List] = None
     mem2: Optional[List] = None
 
-    def prepare(self, sources: list[str], row_limit: Optional[int]):
+    def prepare(self, sources: list[str], row_limit: Optional[int]=None):
         if len(sources) != 2:
             raise ValueError(f"{self.__class__} required exactly two inputs")
         self.source1, self.source2 = sources

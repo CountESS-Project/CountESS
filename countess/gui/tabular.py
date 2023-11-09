@@ -7,7 +7,7 @@ from tkinter import ttk
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
 # XXX columns should automatically resize based on information
-# from __column_xscrollcommand which can tell if they're
+# from _column_xscrollcommand which can tell if they're
 # overflowing.  Or maybe use
 #    df['seq'].str.len().max() to get max length of a string column
 # etc etc.
@@ -35,6 +35,18 @@ def column_format_for(df_column):
 
 
 def format_value(value, column_format):
+    """Format value for display in a table:
+    >>> format_value(None, "%s")
+    '—'
+    >>> format_value(107, "%4d")
+    ' 107'
+    >>> format_value(1.23, "%15.12f")
+    ' 1.23'
+    >>> format_value("foo", "%15.12f")
+    'foo'
+
+    """
+
     if value is None or (type(value) is float and isnan(value)):
         return "—"
     if value is True:
@@ -133,8 +145,8 @@ class TabularDataFrame(tk.Frame):
             is_index = " (index)" if num < self.index_cols else ""
             label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
             label.grid(row=1, column=num, sticky=tk.EW)
-            label.bind("<Button-1>", partial(self.__label_button_1, num))
-            label.bind("<B1-Motion>", partial(self.__label_b1_motion, num))
+            label.bind("<Button-1>", partial(self._label_button_1, num))
+            label.bind("<B1-Motion>", partial(self._label_b1_motion, num))
             self.subframe.columnconfigure(num, minsize=10, weight=1)
             self.labels.append(label)
 
@@ -147,19 +159,19 @@ class TabularDataFrame(tk.Frame):
         for num, column in enumerate(self.columns):
             column.grid(sticky=tk.NSEW, row=2, column=num)
             column["wrap"] = tk.NONE
-            column["xscrollcommand"] = partial(self.__column_xscrollcommand, num)
-            column["yscrollcommand"] = self.__column_yscrollcommand
-            column.bind("<Button-4>", self.__column_scroll)
-            column.bind("<Button-5>", self.__column_scroll)
-            column.bind("<<Selection>>", partial(self.__column_selection, num))
-            column.bind("<Control-C>", self.__column_copy)
-            column.bind("<<Copy>>", self.__column_copy)
+            column["xscrollcommand"] = partial(self._column_xscrollcommand, num)
+            column["yscrollcommand"] = self._column_yscrollcommand
+            column.bind("<Button-4>", self._column_scroll)
+            column.bind("<Button-5>", self._column_scroll)
+            column.bind("<<Selection>>", partial(self._column_selection, num))
+            column.bind("<Control-C>", self._column_copy)
+            column.bind("<<Copy>>", self._column_copy)
         if self.columns:
-            self.columns[0].bind("<Configure>", self.__column_configure)
+            self.columns[0].bind("<Configure>", self._column_configure)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
         self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
-        self.scrollbar["command"] = self.__scrollbar_command
+        self.scrollbar["command"] = self._scrollbar_command
         self.refresh()
 
     def refresh(self, new_offset=0):
@@ -227,7 +239,7 @@ class TabularDataFrame(tk.Frame):
         self.offset = min(max(int(new_offset), 0), self.length - self.height)
         self.refresh()
 
-    def __label_button_1(self, num, event):
+    def _label_button_1(self, num, event):
         label_width = self.labels[num].winfo_width()
         if 2 * label_width / 5 < event.x < 3 * label_width / 5:
             self.sort_ascending = (num != self.sort_by_col) or not self.sort_ascending
@@ -240,7 +252,7 @@ class TabularDataFrame(tk.Frame):
                 )
             self.refresh()
 
-    def __label_b1_motion(self, num, event):
+    def _label_b1_motion(self, num, event):
         # Detect label drags left and right.
         # XXX still not quite right
         label = self.labels[num]
@@ -251,7 +263,7 @@ class TabularDataFrame(tk.Frame):
         elif event.x < 0:
             self.subframe.columnconfigure(num, minsize=label_width + event.x)
 
-    def __scrollbar_command(self, command, *parameters):
+    def _scrollbar_command(self, command, *parameters):
         # Detect scrollbar movement and move self.offset
         # to compensate.
         if command == "moveto":
@@ -261,7 +273,7 @@ class TabularDataFrame(tk.Frame):
         else:
             self.refresh()
 
-    def __column_xscrollcommand(self, num, x1, x2):
+    def _column_xscrollcommand(self, num, x1, x2):
         # XXX this gets called as the table is displayed
         # if x2 < 1.0 this column is partially hidden.
         pass
@@ -270,7 +282,7 @@ class TabularDataFrame(tk.Frame):
     # very efficient!  There's got to be a nicer way of
     # detecting this surely?
 
-    def __column_yscrollcommand(self, y1, y2):
+    def _column_yscrollcommand(self, y1, y2):
         # All this actually does is to detect if there's
         # too many rows for the window, in which case it
         # trims them off.  Once there's the right number
@@ -280,22 +292,22 @@ class TabularDataFrame(tk.Frame):
             self.height = span
             self.refresh()
 
-    def __column_configure(self, *_):
+    def _column_configure(self, *_):
         # If we've resized the window, start with a huge
-        # number of rows and let __cw_yscrollcommand trim
+        # number of rows and let _cw_yscrollcommand trim
         # it back down again.  Probably could be more
         # sensible.
         self.height = min(self.length, 1000)
         self.refresh()
 
-    def __column_scroll(self, event):
+    def _column_scroll(self, event):
         # Detect scrollwheel motion on any of the columns
         if event.num == 4:
             self.refresh(self.offset - 5)
         elif event.num == 5:
             self.refresh(self.offset + 5)
 
-    def __column_selection(self, num, _):
+    def _column_selection(self, num, _):
         # If there's a multi-row selection, then mark the
         # whole rows and set self.select_rows so we know
         # to copy the whole rows if <<Copy>> occurs.
@@ -318,7 +330,7 @@ class TabularDataFrame(tk.Frame):
         else:
             self.select_rows = None
 
-    def __column_copy(self, event):
+    def _column_copy(self, _):
         # If this was a multi-row selection, then replace
         # the copy buffer with a copy of those whole rows.
         if not self.select_rows:

@@ -14,7 +14,7 @@ def process(df: pd.DataFrame, codes, logger: Logger):
         try:
             result = df.eval(code)
         except Exception as exc:  # pylint: disable=W0718
-            logger.error(str(exc))
+            logger.exception(exc)
             continue
 
         if isinstance(result, pd.Series):
