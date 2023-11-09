@@ -19,29 +19,6 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasInputFilesPlugin, PandasProcessPlugin
 from countess.utils.pandas import flatten_columns
 
-# XXX it would be better to do the same this Regex Tool does and get the user to assign
-# data types to each column
-
-
-def maybe_number(x):
-    """CSV is never clear on if something is actually a number so ... try it I guess ..."""
-    try:
-        return int(x)
-    except ValueError:
-        pass
-
-    try:
-        return float(x)
-    except ValueError:
-        pass
-
-    return x
-
-
-def clean_row(row):
-    return [maybe_number(x) for x in row]
-
-
 class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
 

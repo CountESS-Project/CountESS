@@ -18,13 +18,6 @@ from countess.core.pipeline import PipelineNode
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
-
-def _snap(value, scale, steps=21):
-    step_size = scale / steps
-    value = _limit(value, 0, scale)
-    return ((round(value / step_size)) + 0.5) * step_size
-
-
 def _geometry(widget):
     return (
         widget.winfo_x(),
