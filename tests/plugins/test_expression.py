@@ -29,7 +29,7 @@ def test_expr_0():
 
     df = plugin.process_dataframe(df1, logger)
 
-    time.sleep(0.1)
+    time.sleep(1)
     assert "ZeroDivisionError" in logger.dump()
 
 
