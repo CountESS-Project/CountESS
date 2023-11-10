@@ -88,6 +88,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         dataframe = super().series_to_dataframe(series)
 
         if self.parameters["multi"].value:
+            
             if self.parameters["split"].value:
                 dataframe = dataframe.explode(["var", "loc"])
             else:

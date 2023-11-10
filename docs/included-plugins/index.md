@@ -217,3 +217,22 @@ The reference sequence can either be provided directly as a configuration parame
 
 *See also: [countess-minimap2 plugin](https://github.com/CountESS-Project/countess-minimap2), a variant caller which uses 'minimap2' to find sequences within a genome.*
 
+#### Parameters
+
+Input Column
+: the input column with the variant sequence
+
+Reference
+: (optional) select column which contains the reference sequence ...
+
+Sequence
+: (optional) ... or supply a reference sequence as a value
+
+Output Column
+: Column name for HGVS string
+
+Max Mutations
+: Maximum number of mutations, if no variant with this number or less mutations is found then return a null value for the output
+
+Drop
+: Drop rows which would have null values for output
