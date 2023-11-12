@@ -28,7 +28,7 @@ class PivotPlugin(PandasProcessPlugin):
 
     dataframes: List[pd.DataFrame] = []
 
-    def prepare(self, sources: List[str], row_limit: Optional[int]=None):
+    def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         self.input_columns = {}
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger):

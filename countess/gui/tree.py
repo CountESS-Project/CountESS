@@ -18,6 +18,7 @@ from countess.core.pipeline import PipelineNode
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
+
 def _geometry(widget):
     return (
         widget.winfo_x(),

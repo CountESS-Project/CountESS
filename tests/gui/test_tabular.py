@@ -58,6 +58,7 @@ def test_tabular_scroll():
         tt.refresh(offset)
         root.update()
 
+
 def test_tabular_copy():
     root = make_root()
     tt = TabularDataFrame(root)

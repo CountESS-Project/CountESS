@@ -45,7 +45,7 @@ class ExpressionPlugin(PandasSimplePlugin):
         codes = [c.replace("\n", " ").strip() for c in self.parameters["code"].value.split("\n\n")]
         df = process(dataframe, codes, logger)
 
-        drop_names = [ label for label, param in self.parameters["drop"].get_column_params() if param.value ]
+        drop_names = [label for label, param in self.parameters["drop"].get_column_params() if param.value]
 
         drop_indexes = [col for col in drop_names if col in df.index.names]
         if drop_indexes:

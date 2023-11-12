@@ -19,7 +19,6 @@ import importlib
 import importlib.metadata
 import logging
 import os.path
-import sys
 from collections.abc import Mapping, MutableMapping
 from typing import Dict, Iterable, List, Optional, Union
 
@@ -273,7 +272,7 @@ class PandasProductPlugin(PandasProcessPlugin):
     mem1: Optional[List] = None
     mem2: Optional[List] = None
 
-    def prepare(self, sources: list[str], row_limit: Optional[int]=None):
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         if len(sources) != 2:
             raise ValueError(f"{self.__class__} required exactly two inputs")
         self.source1, self.source2 = sources

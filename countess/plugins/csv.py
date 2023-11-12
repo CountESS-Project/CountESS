@@ -19,6 +19,7 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasInputFilesPlugin, PandasProcessPlugin
 from countess.utils.pandas import flatten_columns
 
+
 class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
 

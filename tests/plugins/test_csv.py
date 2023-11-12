@@ -11,6 +11,7 @@ def test_load_csv():
     assert list(output_df.columns) == ["thing", "count"]
     assert len(output_df) == 4
 
+
 def test_load_tsv():
     plugin = LoadCsvPlugin()
     plugin.set_parameter("files.0.filename", "tests/input1.tsv")
@@ -18,6 +19,7 @@ def test_load_tsv():
     output_df = next(plugin.load_file(0, logger))
     assert list(output_df.columns) == ["thing", "count"]
     assert len(output_df) == 4
+
 
 def test_load_txt():
     plugin = LoadCsvPlugin()
@@ -27,19 +29,22 @@ def test_load_txt():
     assert list(output_df.columns) == ["thing", "count"]
     assert len(output_df) == 4
 
+
 def test_load_quoting_double():
     plugin = LoadCsvPlugin()
     plugin.set_parameter("files.0.filename", "tests/input2.csv")
     plugin.set_parameter("quoting", "Double-Quote")
     output_df = next(plugin.load_file(0, logger))
-    assert output_df['y'].iloc[0] == 'this line has a comma, and a double " quote'
+    assert output_df["y"].iloc[0] == 'this line has a comma, and a double " quote'
+
 
 def test_load_quoting_escaped():
     plugin = LoadCsvPlugin()
     plugin.set_parameter("files.0.filename", "tests/input2.csv")
     plugin.set_parameter("quoting", "Quote with Escape")
     output_df = next(plugin.load_file(0, logger))
-    assert output_df['y'].iloc[1] == 'this line has a comma, and an escaped " quote'
+    assert output_df["y"].iloc[1] == 'this line has a comma, and an escaped " quote'
+
 
 def test_load_comment():
     plugin = LoadCsvPlugin()
@@ -47,12 +52,13 @@ def test_load_comment():
     plugin.set_parameter("quoting", "Double-Quote")
     plugin.set_parameter("comment", "#")
     output_df = next(plugin.load_file(0, logger))
-    assert output_df['y'].iloc[2] == "this line has a comment "
+    assert output_df["y"].iloc[2] == "this line has a comment "
+
 
 def test_filename_column():
     plugin = LoadCsvPlugin()
     plugin.set_parameter("files.0.filename", "tests/input1.csv")
-    plugin.set_parameter("filename_column", 'filename')
+    plugin.set_parameter("filename_column", "filename")
     output_df = next(plugin.load_file(0, logger))
-    assert 'filename' in output_df.columns
-    assert output_df['filename'].iloc[1] == "./tests/input1.csv"
+    assert "filename" in output_df.columns
+    assert output_df["filename"].iloc[1] == "./tests/input1.csv"
