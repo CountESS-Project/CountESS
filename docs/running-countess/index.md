@@ -49,7 +49,8 @@ Multiple connections can be highlighted at once where they overlap.
 ### Selecting Nodes
 
 Primary click on a node to select it and make its configuration visible
-in the configuration pane.
+in the configuration pane.  You can also primary click-and-drag to move nodes
+within the graph.
 
 ### Adding new nodes 
 
@@ -71,19 +72,14 @@ To delete a node, highlight it and press the Delete Key.
 Connections will be retained between the parents and children of the
 deleted node.  To prevent this, hold Shift and press the Delete Key.
 
-To select a node for configuration, primary click it.  You can also move it
-around on the scren with primary click and drag.  To remove a node, select it
-and then press the Delete key.
-
-To link nodes, secondary click and drag a new link between them.  Nodes cannot be
-linked to themselves, or in cycles.  To remove a link between nodes, hover over 
-the link and press the Delete key.
-
-
 ### Tidying the Graph
 
-Rearranging nodes by hand can be tedious, so there's a "Tidy Graph" button at the top of the screen which realigns nodes in a tidy way.
-Node positions are stored in the configuration file in a way which is independent of the display dimensions and orientation.
+You can primary click-and-drag nodes to rearrange them in the graph.
+
+Rearranging nodes by hand can be tedious, so there's a "Tidy Graph"
+button at the top of the screen which realigns nodes in a tidy way.
+Node positions are stored in the configuration file in a way which
+is independent of the display dimensions and orientation.
 
 ## Configuring Nodes
 
