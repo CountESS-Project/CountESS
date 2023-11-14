@@ -24,6 +24,8 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         "multi": BooleanParam("Multiple rows", False),
     }
 
+    tags = ["bioinformatics"]
+
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["guides_col"], ColumnOrNoneChoiceParam)
         try:

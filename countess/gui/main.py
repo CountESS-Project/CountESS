@@ -12,7 +12,7 @@ import psutil
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
 from countess.core.pipeline import PipelineGraph
-from countess.core.plugins import get_plugin_classes
+from countess.core.plugins import get_plugin_classes_by_tag
 from countess.gui.config import PluginConfigurator
 from countess.gui.logger import LoggerFrame
 from countess.gui.tabular import TabularDataFrame
@@ -25,8 +25,6 @@ from countess.utils.pandas import concat_dataframes
 
 UNICODE_INFO = "\u2139"
 
-plugin_classes = sorted(get_plugin_classes(), key=lambda x: x.name)
-
 
 class PluginChooserFrame(tk.Frame):
     def __init__(self, master, title, callback, *a, **k):
@@ -34,17 +32,21 @@ class PluginChooserFrame(tk.Frame):
 
         self.columnconfigure(0, weight=1)
 
-        label_frame = tk.LabelFrame(self, text=title, padx=10, pady=10)
-        label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
+        notebook = ttk.Notebook(self)
+        notebook.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
-        for n, plugin_class in enumerate(plugin_classes):
-            label_text = plugin_class.description
-            tk.Button(
-                label_frame,
-                text=plugin_class.name,
-                command=lambda plugin_class=plugin_class: callback(plugin_class),
-            ).grid(row=n + 1, column=0, sticky=tk.EW)
-            tk.Label(label_frame, text=label_text).grid(row=n + 1, column=1, sticky=tk.W, padx=10)
+        for tag, pcl in sorted(get_plugin_classes_by_tag().items()):
+            frame = tk.Frame(padx=10, pady=10)
+            notebook.add(frame, text=tag)
+
+            for n, plugin_class in enumerate(pcl):
+                label_text = plugin_class.description
+                tk.Button(
+                    frame,
+                    text=plugin_class.name,
+                    command=lambda plugin_class=plugin_class: callback(plugin_class),
+                ).grid(row=n + 1, column=0, sticky=tk.EW)
+                tk.Label(frame, text=label_text).grid(row=n + 1, column=1, sticky=tk.W, padx=10)
 
 
 class ConfiguratorWrapper:

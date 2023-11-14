@@ -19,6 +19,7 @@ import importlib
 import importlib.metadata
 import logging
 import os.path
+from collections import defaultdict
 from collections.abc import Mapping, MutableMapping
 from typing import Dict, Iterable, List, Optional, Union
 
@@ -38,6 +39,8 @@ from countess.core.parameters import (
 from countess.utils.pandas import get_all_columns
 
 PRERUN_ROW_LIMIT = 100000
+
+VALID_TAGS = {"bioinformatics"}
 
 
 def get_plugin_classes():
@@ -64,6 +67,22 @@ def get_plugin_classes():
     return plugin_classes
 
 
+def get_plugin_classes_by_tag():
+    plugin_classes_by_tag = defaultdict(list)
+    for pc in get_plugin_classes():
+        if not pc.tags:
+            plugin_classes_by_tag[" Core"].append(pc)
+        else:
+            for tag in pc.tags:
+                if tag in VALID_TAGS:
+                    plugin_classes_by_tag[tag].append(pc)
+                else:
+                    logging.warning("Plugin %s Tag %s not in valid tags %s", pc.name, tag, VALID_TAGS)
+    for plugin_class_list in plugin_classes_by_tag.values():
+        plugin_class_list.sort(key=lambda x: x.name)
+    return plugin_classes_by_tag
+
+
 def load_plugin(module_name, class_name):
     module = importlib.import_module(module_name)
     plugin_class = getattr(module, class_name)
@@ -80,6 +99,7 @@ class BasePlugin:
     description: str = ""
     additional: str = ""
     link: Optional[str] = None
+    tags: List[str] = []
 
     parameters: MutableMapping[str, BaseParam] = {}
     show_preview: bool = True

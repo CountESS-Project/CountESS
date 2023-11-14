@@ -48,6 +48,7 @@ class MutagenizePlugin(PandasInputPlugin):
     description = "Provides all mutations of a sequence"
     link = "https://countess-project.github.io/CountESS/included-plugins/#mutagenize"
     version = VERSION
+    tags = ["bioinformatics"]
 
     character_set = set(("A", "C", "G", "T", "N"))
 
