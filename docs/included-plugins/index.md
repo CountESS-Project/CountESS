@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Included Plugins
 
 CountESS is designed to be easy to write plugins for, but plugins are included for common file formats and simple data transformations.

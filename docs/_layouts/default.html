@@ -1,14 +1,22 @@
+<!DOCTYPE html>
 <html>
   <head>
      <title>{{ page.title }}</title>
-     <link rel="stylesheet" href="{{ site.baseurl }}/css/vanilla.css">
-     <link rel="stylesheet" href="{{ site.baseurl }}/css/custom.css">
+     <link rel="stylesheet" href="{{ site.url }}{{ site.baseurl }}/css/vanilla.css">
+     <link rel="stylesheet" href="{{ site.url }}{{ site.baseurl }}/css/custom.css">
+     <script src="{{ site.url }}{{ site.baseurl }}/js/toc.js"></script>
   </head>
   <body>
-    {% if page.url != "/" %}
-      <div class="navbar"><a href="{{ site.baseurl }}/">CountESS Documentation</a></div>
-      {% if page.parent %}/ <a href="../">{{ page.parent }}</a>{% endif %}
-    {% endif %}
+    <div id="toc" class="sidebar">
+      <p>
+        {% if page.url != "/" %}
+          <a href="{{ site.url }}{{ site.baseurl }}">CountESS Documentation</a></p>
+          {% if page.parent %}/ <a href="../">{{ page.parent }}</a>{% endif %}
+        {% endif %} 
+      </p>
+    </div>
+    <div class="content" id="content">
     {{ content }}
+    </div>
   </body>
 </html>
