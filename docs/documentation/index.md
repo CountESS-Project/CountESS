@@ -4,16 +4,18 @@ layout: default
 
 # CountESS Documentation
 
-This site is generated
-[from markdown source](https://github.com/CountESS-Project/CountESS/tree/main/docs)
+The [CountESS Documentation](https://countess-project.github.io/CountESS/)
+site is automatically generated from
+[markdown source](https://github.com/CountESS-Project/CountESS/tree/main/docs)
 by Github Pages.
 
-To contribute to documentation, [raise a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
+To contribute to the documentation,
+[raise a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
 
 ## Building Documentation Locally
 
-Documentation is built automatically by Github Pages, but you can build it locally 
-as well using 'jekyll' to check it is all working properly.
+Documentation is built automatically by Github Pages when changes are merged,
+but you can preview changes locally using 'jekyll'.
 
 ### Installing Jekyll
 
@@ -33,7 +35,7 @@ To build the documentation once, run:
 
         jekyll build
 
-or to run a local HTTP server run:
+or to run a local HTTP server, run:
 
         jekyll serve --incremental
 
@@ -43,3 +45,6 @@ The theming is minimal, using [vanilla.css](https://vanillacss.com/) and
 very little else.  Page tables of contents aren't really necessary for 
 navigation but for convenience they are generated on page load by
 [a very small piece of javascript](https://github.com/CountESS-Project/CountESS/tree/main/docs/js/toc.js).
+
+For issues with these pages, especially accessibility issues, please
+[raise a github issue](https://github.com/CountESS-Project/CountESS/issues).
