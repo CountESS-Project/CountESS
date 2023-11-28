@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Installing CountESS
 
 ## ... using pip
@@ -64,6 +68,12 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
 
    The CountESS binaries `countess_gui` and `countess_cli` should now be available from your shell.
 
+4. Installing with HDF5 support
+
+        brew install hdf5
+        pip3.10 install countess[hdf5]
+
+   
 # NEXT
 
 Now CountESS is installed, see [Running CountESS](../running-countess/)

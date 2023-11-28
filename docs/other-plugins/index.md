@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Other Plugins
 
 [CountESS comes with many plugins included](../included-plugins/) and anyone can

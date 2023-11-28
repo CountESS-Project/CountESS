@@ -9,3 +9,8 @@ build/
 .direnv/
 result*
 junk/
+docs/_site/
+docs/.jekyll-metadata
+*.backup
+coverage.json
+.coverage

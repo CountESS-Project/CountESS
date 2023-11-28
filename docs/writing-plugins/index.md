@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Writing CountESS Plugins
 
 CountESS is a framework which connects together many components which do the actual

@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Licensing
 
 CountESS, including this documentation, is licensed under the

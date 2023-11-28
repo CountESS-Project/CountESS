@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # Contributing to CountESS
 
 CountESS is an open source project and we welcome contributions.
