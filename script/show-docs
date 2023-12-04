@@ -1,0 +1,13 @@
+#!/bin/bash
+
+TEMPDIR=`mktemp -d`
+
+control_c()
+{
+    rm -r $TEMPDIR
+    exit 0
+}
+trap control_c SIGINT
+
+jekyll serve --source docs --destination $TEMPDIR --incremental --open-url
+
