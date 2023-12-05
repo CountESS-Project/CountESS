@@ -17,11 +17,13 @@ Plugin lifecycle:
 import hashlib
 import importlib
 import importlib.metadata
+from itertools import chain
 import logging
 import os.path
 from collections.abc import Mapping, MutableMapping
 from typing import Dict, Iterable, List, Optional, Union
 
+from more_itertools import interleave_longest
 import numpy as np
 import pandas as pd
 
@@ -140,16 +142,36 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
+    def execute(self, name: str, sources: dict[str,Iterable], logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        raise NotImplementedError(f"{self.__class__}.execute")
+
 
 class ProcessPlugin(BasePlugin):
     """A plugin which accepts data from one or more sources"""
+
+    def execute(self, name: str, sources: dict[str,Iterable], logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+
+        # XXX should actually do something like multi_iterator_map did before
+
+        source_iters_dict = { source_name: iter(source_result) for source_name, source_result in sources.items() }
+        self.prepare(list(source_iters_dict.keys()), row_limit)
+        logger.progress(name, None)
+        while source_iters_dict:
+            for source_name, source_iter in list(source_iters_dict.items()):
+                try:
+                    yield from self.process(next(source_iter), source_name, logger)
+                except StopIteration:
+                    del source_iters_dict[source_name]
+                    yield from self.finished(source_name, logger)
+                logger.progress(name, None)
+        yield from self.finalize(logger)
+        logger.progress(name, 100)
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         pass
 
     def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
-        """Called with each `data` input from `source`, calls
-        `callback` to send messages to the next plugin"""
+        """Called with each `data` input from `source`, yields results"""
         raise NotImplementedError(f"{self.__class__}.process")
 
     def finished(self, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
@@ -167,6 +189,7 @@ class ProcessPlugin(BasePlugin):
 
 
 class SimplePlugin(ProcessPlugin):
+
     def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         """Called with each `data` input from `source`, calls
         `callback` to send messages to the next plugin"""
@@ -183,6 +206,18 @@ class FileInputPlugin(BasePlugin):
     # used by the GUI file dialog
     file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
+
+    def execute(self, name: str, sources: dict[str,Iterable], logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+        # sources is ignored, that's just there for compatibility.
+        assert len(sources) == 0
+
+        # XXX should use multi_iterator_map
+        num_files = self.num_files()
+        logger.progress(name, 0)
+        for file_number in range(0, num_files):
+            yield from self.load_file(file_number, logger, row_limit // num_files)
+            logger.progress(name, 100 * file_number // num_files)
+        logger.progress(name, 100)
 
     def num_files(self) -> int:
         """return the number of 'files' which are to be loaded.  The pipeline
