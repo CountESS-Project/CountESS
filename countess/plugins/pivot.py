@@ -48,7 +48,7 @@ class PivotPlugin(PandasProcessPlugin):
             values=expand_cols,
             index=index_cols,
             columns=pivot_cols,
-            aggfunc=np.sum,
+            aggfunc="sum",
             fill_value=0,
         )
 
