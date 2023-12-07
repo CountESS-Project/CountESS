@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
-
+from threading import Thread
 
 from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, get_plugin_classes
@@ -33,25 +33,6 @@ class PipelineNode:
     def is_descendant_of(self, node):
         return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
-    def process_parent_iterables(self, logger):
-        """Combines the values from all the input interables and processes
-        them"""
-        # XXX this really should be multiprocess and asynchronous.
-
-        iters_dict = {p.name: iter(p.result) for p in self.parent_nodes}
-        while iters_dict:
-            logger.progress(self.name, None)
-
-            for name, it in list(iters_dict.items()):
-                try:
-                    yield from self.plugin.process(next(it), name, logger)
-                except StopIteration:
-                    del iters_dict[name]
-                    yield from self.plugin.finished(name, logger)
-        yield from self.plugin.finalize(logger)
-
-        logger.progress(self.name, 100)
-
     def plugin_process(self, x):
         self.plugin.process(*x)
 
@@ -65,7 +46,7 @@ class PipelineNode:
         elif row_limit is not None and self.result and not self.is_dirty:
             return
 
-        sources = { pn.name: pn.result for pn in self.parent_nodes }
+        sources = {pn.name: pn.result for pn in self.parent_nodes}
         self.result = self.plugin.execute(self.name, sources, logger, row_limit)
 
         # XXX at the moment, we freeze the results into an array
@@ -113,6 +94,9 @@ class PipelineNode:
         self.parent_nodes.discard(parent)
         parent.child_nodes.discard(self)
         self.mark_dirty()
+
+    def has_sibling(self):
+        return any(len(pn.child_nodes) > 1 for pn in self.parent_nodes)
 
     def configure_plugin(self, key, value, base_dir="."):
         self.plugin.set_parameter(key, value, base_dir)
@@ -173,6 +157,11 @@ class PipelineGraph:
             # XXX TODO there's some opportunity for easy parallelization here,
             # by pushing each node into a pool as soon as its parents are
             # complete.
+
+            if len(node.parent_nodes) == 0:
+                # this is an input node
+
+            if any(len(n.child_nodes)
             node.load_config(logger)
             node.execute(logger)
 
