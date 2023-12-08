@@ -2,7 +2,7 @@ import csv
 
 import pytest
 
-from countess.core.cmd import main as countess_cmd
+from countess.core.cmd import run as cmd_run
 
 expected_output = """"thing","foo","bar","baz","qux","number","zz"
 "bar",10,2,1,4,232,0.08620689655172414
@@ -12,7 +12,7 @@ expected_output = """"thing","foo","bar","baz","qux","number","zz"
 
 
 def test_command_invocation():
-    countess_cmd(["countess_cmd", "tests/simple.ini"])
+    cmd_run(["countess_cmd", "tests/simple.ini"])
 
     with open("tests/output.csv", "r") as fh:
         output = fh.read()

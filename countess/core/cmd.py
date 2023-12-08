@@ -17,10 +17,12 @@ def process_ini(config_filename):
     graph.run(logger)
 
 
-def main(argv):
-    for config_filename in argv[1:]:
+def run(argv):
+    for config_filename in argv:
         process_ini(config_filename)
 
+def main():
+    run(sys.argv[1:])
 
 if __name__ == "__main__":
-    main(sys.argv)  # pragma: no cover
+    main()  # pragma: no cover
