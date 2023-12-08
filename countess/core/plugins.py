@@ -149,7 +149,9 @@ class BasePlugin:
 
 
 class ProcessPlugin(BasePlugin):
-    """A plugin which accepts data from one or more sources"""
+    """A plugin which accepts data from one or more sources.  Each source is 
+    executed in its own thread and the results are collated through a thread-safe
+    queue."""
 
     def execute(
         self, name: str, sources: dict[str, Iterable], logger: Logger, row_limit: Optional[int] = None
@@ -236,6 +238,11 @@ class FileInputPlugin(BasePlugin):
             yield from self.load_file(file_number, logger, row_limit_per_file)
             logger.progress(name, 100 * file_number // num_files)
         logger.progress(name, 100)
+
+    def execute_into_queue(self, name: str, logger, queues):
+        for x in self.execute(name, [], logger):
+            for q in queues:
+                q.put(x)
 
     def num_files(self) -> int:
         """return the number of 'files' which are to be loaded.  The pipeline

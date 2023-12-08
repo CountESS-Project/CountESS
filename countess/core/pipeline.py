@@ -1,12 +1,19 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 from threading import Thread
+from queue import Queue
+import time
 
 from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
 
+# Indicates that a node is "finished" and will not send any further
+# data
+# XXX probably better ways to be a sentinel
+class FINISHED_SENTINEL:
+    pass
 
 @dataclass
 class PipelineNode:
@@ -19,6 +26,9 @@ class PipelineNode:
     config: Optional[list[tuple[str, str, str]]] = None
     result: Any = None
     is_dirty: bool = True
+
+    queue: Optional[Queue] = None
+    counter: int = 0
 
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
@@ -35,6 +45,40 @@ class PipelineNode:
 
     def plugin_process(self, x):
         self.plugin.process(*x)
+
+    def queue_to_child_nodes(self, data_iterable):
+        for data in data_iterable:
+            # XXX can we do this out-of-order if any queues are full?
+            for child_node in self.child_nodes:
+                child_node.queue.put((self.name, data))
+
+    def run_thread(self, logger, row_limit: Optional[int] = None):
+        # XXX using node.name for sources isn't great
+        # XXX this is not a good sentinel value either
+
+        self.queue = Queue(maxsize=3)
+        self.counter = 0
+
+        sources = { pn.name for pn in self.parent_nodes }
+        if not sources:
+            for data_out in self.plugin.execute(self.name, {}, logger, row_limit):
+                self.counter += 1
+                self.queue_to_child_nodes([data_out])
+        else:
+            self.plugin.prepare(list(sources), row_limit)
+            while sources:
+                source, data_in = self.queue.get()
+                self.counter += 1
+                assert source in sources
+                if data_in is FINISHED_SENTINEL:
+                    self.queue_to_child_nodes(self.plugin.finished(source, logger))
+                    sources.remove(source)
+                else:
+                    self.queue_to_child_nodes(self.plugin.process(data_in, source, logger))
+            self.queue_to_child_nodes(self.plugin.finalize(logger))
+
+        self.queue_to_child_nodes([FINISHED_SENTINEL])
+        self.queue = None
 
     def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
@@ -127,6 +171,8 @@ class PipelineNode:
 class PipelineGraph:
     # XXX doesn't actually do much except hold a bag of nodes
 
+    # XXX should be an actual sentinel
+
     def __init__(self):
         self.plugin_classes = get_plugin_classes()
         self.nodes = []
@@ -148,22 +194,37 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
+    def traverse_nodes_backwards(self):
+        found_nodes = set(node for node in self.nodes if not node.child_nodes)
+        yield from found_nodes
+
+        while len(found_nodes) < len(self.nodes):
+            for node in self.nodes:
+                if node not in found_nodes and node.child_nodes.issubset(found_nodes):
+                    yield node
+                    found_nodes.add(node)
+
+
     def run(self, logger):
         # XXX this is the last thing PipelineGraph actually does!
         # might be easier to just keep a set of nodes and sort through
         # them for output nodes, or something.
 
-        for node in self.traverse_nodes():
-            # XXX TODO there's some opportunity for easy parallelization here,
-            # by pushing each node into a pool as soon as its parents are
-            # complete.
-
-            if len(node.parent_nodes) == 0:
-                # this is an input node
-
-            if any(len(n.child_nodes)
+        threads = []
+        for node in self.traverse_nodes_backwards():
             node.load_config(logger)
-            node.execute(logger)
+            threads.append(Thread(target=node.run_thread, args=(logger,)))
+
+        for thread in threads:
+            thread.start()
+
+        while True:
+            print("------------------")
+            for node in self.traverse_nodes():
+                print("%-40s %d %d" % (node.name, node.counter, node.queue.qsize() if node.queue else -1))
+            if not any(t.is_alive() for t in threads):
+                break
+            time.sleep(1)
 
     def reset(self):
         for node in self.nodes:
