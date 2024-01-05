@@ -20,8 +20,6 @@ import importlib.metadata
 import logging
 import os.path
 from collections.abc import Mapping, MutableMapping
-from queue import Empty, Queue
-from threading import Thread
 from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
@@ -38,6 +36,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.utils.pandas import get_all_columns
+#from countess.utils.parallel import multiprocess_map
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -142,48 +141,11 @@ class BasePlugin:
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
-    def execute(
-        self, name: str, sources: dict[str, Iterable], logger: Logger, row_limit: Optional[int] = None
-    ) -> Iterable:
-        raise NotImplementedError(f"{self.__class__}.execute")
-
 
 class ProcessPlugin(BasePlugin):
-    """A plugin which accepts data from one or more sources.  Each source is 
+    """A plugin which accepts data from one or more sources.  Each source is
     executed in its own thread and the results are collated through a thread-safe
     queue."""
-
-    def execute(
-        self, name: str, sources: dict[str, Iterable], logger: Logger, row_limit: Optional[int] = None
-    ) -> Iterable:
-        self.prepare(list(sources.keys()), row_limit)
-
-        queue : Queue = Queue(maxsize=3)
-        threads = [
-            Thread(target=self.execute_thread, args=(source_name, source_result, queue, logger))
-            for source_name, source_result in sources.items()
-        ]
-        for thread in threads:
-            thread.start()
-
-        while not queue.empty() or any(thread.is_alive() for thread in threads):
-            logger.progress(name, None)
-            try:
-                yield queue.get(timeout=0.1)
-            except Empty:
-                pass
-
-        yield from self.finalize(logger)
-        logger.progress(name, 100)
-
-    def execute_thread(self, source_name: str, source_result: Iterable, queue: Queue, logger: Logger):
-        try:
-            for data in source_result:
-                for data_out in self.process(data, source_name, logger):
-                    queue.put(data_out)
-        finally:
-            for data_out in self.finished(source_name, logger):
-                queue.put(data_out)
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         pass
@@ -224,26 +186,6 @@ class FileInputPlugin(BasePlugin):
     file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
 
-    def execute(
-        self, name: str, sources: dict[str, Iterable], logger: Logger, row_limit: Optional[int] = None
-    ) -> Iterable:
-        # file input plugins don't accept sources
-        assert len(sources) == 0
-
-        # XXX need to consider multiprocessing
-        num_files = self.num_files()
-        logger.progress(name, 0)
-        row_limit_per_file = row_limit // num_files if row_limit and num_files else None
-        for file_number in range(0, num_files):
-            yield from self.load_file(file_number, logger, row_limit_per_file)
-            logger.progress(name, 100 * file_number // num_files)
-        logger.progress(name, 100)
-
-    def execute_into_queue(self, name: str, logger, queues):
-        for x in self.execute(name, [], logger):
-            for q in queues:
-                q.put(x)
-
     def num_files(self) -> int:
         """return the number of 'files' which are to be loaded.  The pipeline
         will call code equivalent to
@@ -254,6 +196,22 @@ class FileInputPlugin(BasePlugin):
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
         """Called potentially from multiple processes, see FileInputMixin.num_files()"""
         raise NotImplementedError("FileInputMixin.load_file")
+
+    def prepare(self, sources: List[str], row_limit: Optional[int] = None):
+        pass
+
+    def finalize(self, logger: Logger) -> Iterable:
+        num_files = self.num_files()
+        #row_limit_per_file = row_limit // num_files if row_limit else None
+        row_limit_per_file = 1000
+        #if num_files > 1:
+        #    yield from multiprocess_map(self.load_file, range(0, num_files), logger, row_limit_per_file)
+        #else:
+        #    yield from self.load_file(0, logger, row_limit)
+
+        # XXX need to consider multiprocessing
+        for file_number in range(0, num_files):
+            yield from self.load_file(file_number, logger, row_limit_per_file)
 
 
 class PandasProcessPlugin(ProcessPlugin):
@@ -326,6 +284,9 @@ class PandasProductPlugin(PandasProcessPlugin):
     which is tricky in a pipelined environment.  This superclass handles the two
     input sources and calls .process_dataframes with pairs of dataframes.
     It is currently only used by JoinPlugin"""
+
+    # XXX with process and finished being called from multiple threads now,
+    # there need to be some locks put around things
 
     source1 = None
     source2 = None
