@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from typing import Any, Optional
 from threading import Thread
 from queue import Queue
@@ -15,14 +14,13 @@ PRERUN_ROW_LIMIT = 100000
 class FINISHED_SENTINEL:
     pass
 
-@dataclass
 class PipelineNode:
     name: str
     plugin: Optional[BasePlugin] = None
     position: Optional[tuple[float, float]] = None
     notes: Optional[str] = None
-    parent_nodes: set["PipelineNode"] = field(default_factory=set)
-    child_nodes: set["PipelineNode"] = field(default_factory=set)
+    parent_nodes: set["PipelineNode"]
+    child_nodes: set["PipelineNode"]
     config: Optional[list[tuple[str, str, str]]] = None
     result: Any = None
     is_dirty: bool = True
@@ -33,6 +31,16 @@ class PipelineNode:
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
+
+    def __init__(self, name, plugin=None, config=None, position=None, notes=None):
+        self.name = name
+        self.plugin = plugin
+        self.config = config or []
+        self.position = position
+        self.notes = notes
+        self.parent_nodes = set()
+        self.child_nodes = set()
+        self.output_queues = set()
 
     def __hash__(self):
         return id(self)

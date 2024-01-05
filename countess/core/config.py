@@ -57,12 +57,16 @@ def read_config(
 
         # XXX check version and hash_digest and emit warnings.
 
+        config = [
+            (key, ast.literal_eval(val), base_dir) for key, val in config_dict.items() if not key.startswith("_")
+        ]
+
         node = PipelineNode(
             name=section_name,
             plugin=plugin,
+            config=config,
             position=position,
             notes=notes,
-            is_dirty=True,
         )
         pipeline_graph.nodes.append(node)
 
@@ -70,9 +74,6 @@ def read_config(
             if key.startswith("_parent."):
                 node.add_parent(nodes_by_name[val])
 
-        node.config = [
-            (key, ast.literal_eval(val), base_dir) for key, val in config_dict.items() if not key.startswith("_")
-        ]
 
         nodes_by_name[section_name] = node
 
