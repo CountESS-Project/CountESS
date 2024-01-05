@@ -8,11 +8,44 @@ from countess.core.plugins import BasePlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
 
-# Indicates that a node is "finished" and will not send any further
-# data
-# XXX probably better ways to be a sentinel
-class FINISHED_SENTINEL:
-    pass
+class SentinelQueue(Queue):
+
+    """This is an easy and a bit lazy way of making a queue iterable.
+    The writer is expected to call `queue.finish()` when it is done and
+    the reader can treat the queue like an iterable."""
+
+    # XXX this is an attempt to handle multiple threads reading from the
+    # queue in parallel: they should all get StopIterations.
+    stopped = False
+
+    class SENTINEL:
+        pass
+
+    def finish(self):
+        self.put(self.SENTINEL)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.stopped:
+            raise StopIteration
+        val = super().get()
+        if val is self.SENTINEL:
+            self.stopped = True
+            raise StopIteration
+        return val
+
+    def get(self, block=True, timeout=None):
+        if self.stopped:
+            raise ValueError("SentinelQueue stopped")
+        return super().get(block, timeout)
+
+    def put(self, item, block=True, timeout=None):
+        if self.stopped:
+            raise ValueError("SentinelQueue stopped")
+        super().put(item, block, timeout)
+
 
 class PipelineNode:
     name: str
