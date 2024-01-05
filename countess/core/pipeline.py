@@ -58,8 +58,9 @@ class PipelineNode:
     result: Any = None
     is_dirty: bool = True
 
-    queue: Optional[Queue] = None
-    counter: int = 0
+    output_queues: set[SentinelQueue]
+    counter_in: int = 0
+    counter_out: int = 0
 
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
@@ -87,39 +88,59 @@ class PipelineNode:
     def plugin_process(self, x):
         self.plugin.process(*x)
 
-    def queue_to_child_nodes(self, data_iterable):
-        for data in data_iterable:
+    def add_output_queue(self, queue):
+        self.output_queues.add(queue)
+
+    def clear_output_queues(self):
+        self.output_queues = set()
+
+    def queue_output(self, result):
+        for data in result:
+            self.counter_out += 1
             # XXX can we do this out-of-order if any queues are full?
-            for child_node in self.child_nodes:
-                child_node.queue.put((self.name, data))
+            for queue in self.output_queues:
+                queue.put(data)
 
-    def run_thread(self, logger, row_limit: Optional[int] = None):
-        # XXX using node.name for sources isn't great
-        # XXX this is not a good sentinel value either
+    def finish_output(self):
+        for queue in self.output_queues:
+            queue.finish()
 
-        self.queue = Queue(maxsize=3)
-        self.counter = 0
+    def run_subthread(self, parent_node: "PipelineNode", logger: Logger, row_limit: Optional[int] = None):
+        queue = SentinelQueue(maxsize=3)
+        parent_node.add_output_queue(queue)
+        for data_in in queue:
+            self.counter_in += 1
+            self.queue_output(
+                self.plugin.process(data_in, parent_node.name, logger)
+            )
+        self.queue_output(
+            self.plugin.finished(parent_node.name, logger)
+        )
 
-        sources = { pn.name for pn in self.parent_nodes }
-        if not sources:
-            for data_out in self.plugin.execute(self.name, {}, logger, row_limit):
-                self.counter += 1
-                self.queue_to_child_nodes([data_out])
-        else:
-            self.plugin.prepare(list(sources), row_limit)
-            while sources:
-                source, data_in = self.queue.get()
-                self.counter += 1
-                assert source in sources
-                if data_in is FINISHED_SENTINEL:
-                    self.queue_to_child_nodes(self.plugin.finished(source, logger))
-                    sources.remove(source)
-                else:
-                    self.queue_to_child_nodes(self.plugin.process(data_in, source, logger))
-            self.queue_to_child_nodes(self.plugin.finalize(logger))
+    def run_thread(self, logger: Logger, row_limit: Optional[int] = None):
+        """For each PipelineNode, this is run in its own thread."""
 
-        self.queue_to_child_nodes([FINISHED_SENTINEL])
-        self.queue = None
+        self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
+
+        if len(self.parent_nodes) == 1:
+            # there is only a single parent node so everything is simpler,
+            # just run this code in this thread.
+            only_parent_node = list(self.parent_nodes)[0]
+            self.run_subthread(only_parent_node, logger, row_limit)
+        elif len(self.parent_nodes) > 1:
+            # there are multiple parent nodes: spawn off a subthread to handle
+            # each of them.
+            threads = [
+                Thread(target=self.run_subthread, args=(parent_node, logger, row_limit))
+                for parent_node in self.parent_nodes
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+        self.queue_output(self.plugin.finalize(logger))
+        self.finish_output()
 
     def execute(self, logger: Logger, row_limit: Optional[int] = None):
         assert row_limit is None or isinstance(row_limit, int)
@@ -210,9 +231,6 @@ class PipelineNode:
 
 
 class PipelineGraph:
-    # XXX doesn't actually do much except hold a bag of nodes
-
-    # XXX should be an actual sentinel
 
     def __init__(self):
         self.plugin_classes = get_plugin_classes()
@@ -245,11 +263,7 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-
     def run(self, logger):
-        # XXX this is the last thing PipelineGraph actually does!
-        # might be easier to just keep a set of nodes and sort through
-        # them for output nodes, or something.
 
         threads = []
         for node in self.traverse_nodes_backwards():
@@ -262,7 +276,7 @@ class PipelineGraph:
         while True:
             print("------------------")
             for node in self.traverse_nodes():
-                print("%-40s %d %d" % (node.name, node.counter, node.queue.qsize() if node.queue else -1))
+                print("%-40s %d %d" % (node.name, node.counter_in, node.counter_out))
             if not any(t.is_alive() for t in threads):
                 break
             time.sleep(1)
