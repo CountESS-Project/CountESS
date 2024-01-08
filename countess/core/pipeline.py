@@ -1,6 +1,6 @@
 from typing import Any, Optional
 from threading import Thread
-from queue import Queue
+from queue import Queue, Empty
 import time
 
 from countess.core.logger import Logger
@@ -27,10 +27,17 @@ class SentinelQueue(Queue):
     def __iter__(self):
         return self
 
+    def get_or_raise_on_stopped(self):
+        while True:
+            if self.stopped:
+                raise StopIteration
+            try:
+                return super().get(timeout=1)
+            except Empty:
+                pass
+
     def __next__(self):
-        if self.stopped:
-            raise StopIteration
-        val = super().get()
+        val = self.get_or_raise_on_stopped()
         if val is self.SENTINEL:
             self.stopped = True
             raise StopIteration
@@ -88,8 +95,10 @@ class PipelineNode:
     def plugin_process(self, x):
         self.plugin.process(*x)
 
-    def add_output_queue(self, queue):
+    def add_output_queue(self):
+        queue = SentinelQueue(maxsize=3)
         self.output_queues.add(queue)
+        return queue
 
     def clear_output_queues(self):
         self.output_queues = set()
@@ -105,16 +114,21 @@ class PipelineNode:
         for queue in self.output_queues:
             queue.finish()
 
-    def run_subthread(self, parent_node: "PipelineNode", logger: Logger, row_limit: Optional[int] = None):
-        queue = SentinelQueue(maxsize=3)
-        parent_node.add_output_queue(queue)
+    def run_multithread(self, queue: Queue, name: str, logger: Logger, row_limit: Optional[int] = None):
         for data_in in queue:
             self.counter_in += 1
             self.queue_output(
-                self.plugin.process(data_in, parent_node.name, logger)
+                self.plugin.process(data_in, name, logger)
+            )
+
+    def run_subthread(self, queue: Queue, name: str, logger: Logger, row_limit: Optional[int] = None):
+        for data_in in queue:
+            self.counter_in += 1
+            self.queue_output(
+                self.plugin.process(data_in, name, logger)
             )
         self.queue_output(
-            self.plugin.finished(parent_node.name, logger)
+            self.plugin.finished(name, logger)
         )
 
     def run_thread(self, logger: Logger, row_limit: Optional[int] = None):
@@ -123,47 +137,48 @@ class PipelineNode:
         self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
         if len(self.parent_nodes) == 1:
-            # there is only a single parent node so everything is simpler,
-            # just run this code in this thread.
+            # there is only a single parent node, run several subthreads to
+            # do the processing
             only_parent_node = list(self.parent_nodes)[0]
-            self.run_subthread(only_parent_node, logger, row_limit)
+            only_parent_queue = only_parent_node.add_output_queue()
+            subthreads = [
+                Thread(target=self.run_multithread, args=(
+                    only_parent_queue,
+                    only_parent_node.name,
+                    logger,
+                    row_limit
+                ))
+                for _ in range(0,4)
+            ]
+            for subthread in subthreads:
+                subthread.start()
+            for subthread in subthreads:
+                subthread.join()
+            self.queue_output(
+                self.plugin.finished(only_parent_node.name, logger)
+            )
+
         elif len(self.parent_nodes) > 1:
             # there are multiple parent nodes: spawn off a subthread to handle
             # each of them.
-            threads = [
-                Thread(target=self.run_subthread, args=(parent_node, logger, row_limit))
+            subthreads = [
+                Thread(target=self.run_subthread, args=(
+                    parent_node.add_output_queue(),
+                    parent_node.name,
+                    logger,
+                    row_limit
+                ))
                 for parent_node in self.parent_nodes
             ]
-            for thread in threads:
-                thread.start()
-            for thread in threads:
-                thread.join()
+            for subthread in subthreads:
+                subthread.start()
+            for subthread in subthreads:
+                subthread.join()
 
+        print(f">>> {self.name} finalize")
         self.queue_output(self.plugin.finalize(logger))
+        print(f">>> {self.name} finish")
         self.finish_output()
-
-    def execute(self, logger: Logger, row_limit: Optional[int] = None):
-        assert row_limit is None or isinstance(row_limit, int)
-
-        if self.plugin is None:
-            self.result = []
-            return
-
-        elif row_limit is not None and self.result and not self.is_dirty:
-            return
-
-        sources = {pn.name: pn.result for pn in self.parent_nodes}
-        self.result = self.plugin.execute(self.name, sources, logger, row_limit)
-
-        # XXX at the moment, we freeze the results into an array
-        # if we have multiple children, as *both children* will be
-        # drawing items from the array.  This isn't the most efficient
-        # strategy.
-
-        if row_limit is not None or len(self.child_nodes) != 1:
-            self.result = list(self.result)
-
-        self.is_dirty = False
 
     def load_config(self, logger: Logger):
         assert isinstance(self.plugin, BasePlugin)
@@ -176,13 +191,24 @@ class PipelineNode:
             self.config = None
 
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
-        assert isinstance(logger, Logger)
-
+        self.load_config(logger)
         if self.is_dirty and self.plugin:
+            self.result = []
+            self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
+
             for parent_node in self.parent_nodes:
                 parent_node.prerun(logger, row_limit)
-            self.load_config(logger)
-            self.execute(logger, row_limit)
+                if parent_node.result:
+                    for data_in in parent_node.result:
+                        self.result += list(
+                            self.plugin.process(data_in, parent_node.name, logger)
+                        )
+                self.result += list(
+                    self.plugin.finished(parent_node.name, logger)
+                )
+            self.result += list(
+                self.plugin.finalize(logger)
+            )
             self.is_dirty = False
 
     def mark_dirty(self):
@@ -264,20 +290,19 @@ class PipelineGraph:
                     found_nodes.add(node)
 
     def run(self, logger):
-
-        threads = []
+        threads_and_nodes = []
         for node in self.traverse_nodes_backwards():
             node.load_config(logger)
-            threads.append(Thread(target=node.run_thread, args=(logger,)))
+            threads_and_nodes.append((Thread(target=node.run_thread, args=(logger,)), node))
 
-        for thread in threads:
+        for thread, _ in threads_and_nodes:
             thread.start()
 
         while True:
             print("------------------")
-            for node in self.traverse_nodes():
-                print("%-40s %d %d" % (node.name, node.counter_in, node.counter_out))
-            if not any(t.is_alive() for t in threads):
+            for thread, node in threads_and_nodes[::-1]:
+                print("%-40s %d %d %s" % (node.name, node.counter_in, node.counter_out, thread.is_alive()))
+            if not any(t.is_alive() for t, _ in threads_and_nodes):
                 break
             time.sleep(1)
 
