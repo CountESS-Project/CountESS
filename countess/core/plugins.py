@@ -36,7 +36,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.utils.pandas import get_all_columns
-#from countess.utils.parallel import multiprocess_map
+from countess.utils.parallel import multiprocess_map
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -181,6 +181,7 @@ class FileInputPlugin(BasePlugin):
 
     file_number = 0
     name = ""
+    row_limit = None
 
     # used by the GUI file dialog
     file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
@@ -198,20 +199,15 @@ class FileInputPlugin(BasePlugin):
         raise NotImplementedError("FileInputMixin.load_file")
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
-        pass
+        self.row_limit = row_limit
 
     def finalize(self, logger: Logger) -> Iterable:
         num_files = self.num_files()
-        #row_limit_per_file = row_limit // num_files if row_limit else None
-        row_limit_per_file = 1000
-        #if num_files > 1:
-        #    yield from multiprocess_map(self.load_file, range(0, num_files), logger, row_limit_per_file)
-        #else:
-        #    yield from self.load_file(0, logger, row_limit)
-
-        # XXX need to consider multiprocessing
-        for file_number in range(0, num_files):
-            yield from self.load_file(file_number, logger, row_limit_per_file)
+        if num_files > 1:
+            row_limit_per_file = self.row_limit // num_files if self.row_limit else None
+            yield from multiprocess_map(self.load_file, range(0, num_files), logger, row_limit_per_file)
+        else:
+            yield from self.load_file(0, logger, self.row_limit)
 
 
 class PandasProcessPlugin(ProcessPlugin):
