@@ -12,7 +12,7 @@ D = TypeVar('D')
 V = TypeVar('V')
 P = ParamSpec('P')
 
-def multiprocess_map(function : Callable[Concatenate[V, P], D], values : Iterable[V],
+def multiprocess_map(function : Callable[Concatenate[V, P], Iterable[D]], values : Iterable[V],
                      *args : P.args, **kwargs : P.kwargs) -> Iterable[D]:
     """Pretty much equivalent to:
 
@@ -21,7 +21,8 @@ def multiprocess_map(function : Callable[Concatenate[V, P], D], values : Iterabl
 
     but runs in multiple processes using an input_queue
     to organize `values` and an output_queue to organize the
-    returned values."""
+    returned values.  Or to look at it from a different direction, because
+    `multiprocessing.Pool.imap_unordered` doesn't take `args`."""
 
     # Start up several workers.
     nproc = ((cpu_count() or 1) + 1) // 2
