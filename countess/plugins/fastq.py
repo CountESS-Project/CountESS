@@ -9,10 +9,10 @@ from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputFilesPlugin
 
 
-def _file_reader(file_handle, min_avg_quality, row_limit=None):
+def _file_reader(file_handle, min_avg_quality, row_limit=None, filename=''):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
-            yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:]}
+            yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:], "filename": filename}
 
 
 class LoadFastqPlugin(PandasInputFilesPlugin):
@@ -29,6 +29,8 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
     parameters = {
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
+        "header_column": BooleanParam("Header Column?", False),
+        "filename_column": BooleanParam("Filename Column?", False),
         "group": BooleanParam("Group by Sequence?", True),
     }
 
@@ -38,20 +40,30 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
         else:
             with open(filename, "r", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
+
+        group_columns = ['sequence']
+
+        if self.parameters["header_column"].value:
+            # find maximum common length of the 'header' field in this file
+            for common_length in range(0, dataframe["header"].str.len().min() - 1):
+                if dataframe["header"].str.slice(0, common_length + 1).nunique() > 1:
+                    break
+            if common_length > 0:
+                dataframe["header"] = dataframe["header"].str.slice(0, common_length)
+                group_columns.append('header')
+        else:
+            dataframe.drop(columns="header", inplace=True)
+
+        if self.parameters["filename_column"].value:
+            group_columns.append('filename')
+        else:
+            dataframe.drop(columns="filename", inplace=True)
 
         if self.parameters["group"].value:
-            for comm_len in range(0, dataframe["header"].str.len().min() - 1):
-                if dataframe["header"].str.slice(0, comm_len + 1).nunique() > 1:
-                    break
-
-            if comm_len > 0:
-                dataframe["header"] = dataframe["header"].str.slice(0, comm_len)
-                dataframe = dataframe.assign(count=1).groupby(["sequence", "header"]).count()
-            else:
-                dataframe = dataframe.groupby("sequence").count()
-
-        return dataframe
+            return dataframe.assign(count=1).groupby(group_columns).count()
+        else:
+            return dataframe
