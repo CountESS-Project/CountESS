@@ -206,7 +206,7 @@ class FileInputPlugin(BasePlugin):
         if num_files > 1:
             row_limit_per_file = self.row_limit // num_files if self.row_limit else None
             yield from multiprocess_map(self.load_file, range(0, num_files), logger, row_limit_per_file)
-        else:
+        elif num_files == 1:
             yield from self.load_file(0, logger, self.row_limit)
 
 
