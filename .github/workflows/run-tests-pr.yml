@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python 3.10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
       with:
         python-version: "3.10"
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python from Apt
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: sudo apt install python3.11-full python3-pip xvfb
     - run: python3.11 -m pip install --upgrade pip
     - run: python3.11 -m pip install -e .[dev]
@@ -32,7 +32,7 @@ jobs:
     runs-on: windows-2019
     name: Windows Server 2019
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
       with:
         python-version: 3.x
@@ -44,7 +44,7 @@ jobs:
     runs-on: windows-2022
     name: Windows Server 2022
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
       with:
         python-version: 3.x
@@ -56,7 +56,7 @@ jobs:
     runs-on: macos-11
     name: macOS 11
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
       with:
         python-version: 3.x
@@ -68,7 +68,7 @@ jobs:
     runs-on: macos-12
     name: macOS 12
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
       with:
         python-version: 3.x
