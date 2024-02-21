@@ -8,6 +8,7 @@ import re
 from typing import Iterable, Optional
 
 from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
+from fqfa.util.translate import translate_dna
 
 # Insertions shorter than this won't be searched for, just included.
 MIN_SEARCH_LENGTH = 10
@@ -64,7 +65,7 @@ def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN
     return var_seq
 
 
-def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
+def find_variant_dna(ref_seq: str, var_seq: str, as_protein: bool = False) -> Iterable[str]:
     """ finds HGVS variants between DNA sequences in ref_seq and var_seq.
     https://varnomen.hgvs.org/recommendations/DNA/variant/insertion/
     Doesn't look for things like complex insertions (yet)
@@ -204,6 +205,10 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     if not re.match("[AGTCN]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
+    if as_protein:
+        ref_seq = translate_dna(ref_seq)[0]
+        var_seq = translate_dna(var_seq)[0]
+
     # Levenshtein algorithm finds the overlapping parts of our reference and
     # variant sequences.
     #
@@ -276,6 +281,8 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
                     yield f"{src_start}dup"
                 else:
                     yield f"{src_start - len(dest_seq) + 1}_{src_start}dup"
+            elif as_protein:
+                yield f"{src_start}_{src_start+1}ins{dest_seq}"
             else:
                 inserted_sequence = search_for_sequence(ref_seq, dest_seq)
                 yield f"{src_start}_{src_start+1}ins{inserted_sequence}"
@@ -288,7 +295,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
             # together affecting one amino acid, should be described as a “delins”",
             # as this code has no concept of amino acid alignment.
 
-            if len(src_seq) == 1 and len(dest_seq) == 1:
+            if as_protein or len(src_seq) == 1 and len(dest_seq) == 1:
                 yield f"{src_start+1}{src_seq}>{dest_seq}"
             elif len(src_seq) == len(dest_seq) and dest_seq == invert_dna_sequence(src_seq):
                 yield f"{src_start+1}_{src_end}inv"
@@ -318,12 +325,29 @@ def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: 
     >>> find_variant_string("g.", "ATGGTTGGTTC", "ATGGTTGGTGGTTCG")
     'g.[7_9dup;11_12insG]'
 
+    PROTEINS
+
+    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGTTGGTTCA")
+    'p.='
+
+    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGTTCCATCA")
+    'p.3G>P'
+
+    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGGTTCA")
+    'p.2del'
+
+    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGTTGGTGGTTCA")
+    'p.3dup'
+
+    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGGTGGTGGTTCA")
+    'p.[1_2insG;2V>G]'
+
     CHECK FOR INVALID INPUTS
 
     >>> find_variant_string("x.", "CAT", "CAT")
     Traceback (most recent call last):
      ...
-    ValueError: ...
+    ValueError: Only prefix types 'g.', 'n.' and 'p.' accepted at this time
 
     >>> find_variant_string("g.", "HELLO", "CAT")
     Traceback (most recent call last):
@@ -340,14 +364,18 @@ def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: 
     >>> find_variant_string("g.", "ATTACC", "GATTACA",1)
     Traceback (most recent call last):
      ...
-    ValueError: Too many variations...
+    ValueError: Too many variations (2) in GATTACA
 
     """
 
-    if not prefix.endswith("g.") and not prefix.endswith("n."):
-        raise ValueError("Only prefix types 'g.' and 'n.' accepted at this time")
+    if prefix.endswith("g.") and not prefix.endswith("n."):
+        as_protein = False
+    elif prefix.endswith("p."):
+        as_protein = True
+    else:
+        raise ValueError("Only prefix types 'g.', 'n.' and 'p.' accepted at this time")
 
-    variations = list(find_variant_dna(ref_seq, var_seq))
+    variations = list(find_variant_dna(ref_seq, var_seq, as_protein))
 
     if len(variations) == 0:
         return prefix + "="
