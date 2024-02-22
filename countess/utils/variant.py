@@ -9,19 +9,25 @@ from typing import Iterable, Optional
 
 from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
 from fqfa.util.translate import translate_dna
+from fqfa.constants.iupac.protein import AA_CODES
+from fqfa.util.nucleotide import reverse_complement
 
 # Insertions shorter than this won't be searched for, just included.
 MIN_SEARCH_LENGTH = 10
 
 
-def invert_dna_sequence(seq: str) -> str:
-    """Invert a DNA sequence: swaps A <-> T and C <-> G and also reverses the direction
+def translate_aa(aa_seq: str) -> str:
+    """translate a sequence of single-letter amino acid codes
+    to a sequence of three-letter amindo acid codes
 
-    >>> invert_dna_sequence("GATTACA")
-    'TGTAATC'
+    >>> translate_aa("HYPERSENSITIVITIES")
+    'HisTyrProGluArgSerGluAsnSerIleThrIleValIleThrIleGluSer'
     """
 
-    return seq.translate(str.maketrans("ACGT", "TGCA"))[::-1]
+    try:
+        return ''.join(AA_CODES[x] for x in aa_seq)
+    except KeyError as exc:
+        raise ValueError("Invalid AA Sequence") from exc
 
 
 def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN_SEARCH_LENGTH) -> str:
@@ -57,7 +63,7 @@ def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN
     if idx >= 0:
         return f"{idx+1}_{idx+len(var_seq)}"
 
-    inv_seq = invert_dna_sequence(var_seq)
+    inv_seq = reverse_complement(var_seq)
     idx = ref_seq.rfind(inv_seq)
     if idx >= 0:
         return f"{idx+1}_{idx+len(var_seq)}inv"
@@ -65,7 +71,7 @@ def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN
     return var_seq
 
 
-def find_variant_dna(ref_seq: str, var_seq: str, as_protein: bool = False) -> Iterable[str]:
+def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
     """ finds HGVS variants between DNA sequences in ref_seq and var_seq.
     https://varnomen.hgvs.org/recommendations/DNA/variant/insertion/
     Doesn't look for things like complex insertions (yet)
@@ -205,9 +211,6 @@ def find_variant_dna(ref_seq: str, var_seq: str, as_protein: bool = False) -> It
     if not re.match("[AGTCN]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
-    if as_protein:
-        ref_seq = translate_dna(ref_seq)[0]
-        var_seq = translate_dna(var_seq)[0]
 
     # Levenshtein algorithm finds the overlapping parts of our reference and
     # variant sequences.
@@ -281,8 +284,6 @@ def find_variant_dna(ref_seq: str, var_seq: str, as_protein: bool = False) -> It
                     yield f"{src_start}dup"
                 else:
                     yield f"{src_start - len(dest_seq) + 1}_{src_start}dup"
-            elif as_protein:
-                yield f"{src_start}_{src_start+1}ins{dest_seq}"
             else:
                 inserted_sequence = search_for_sequence(ref_seq, dest_seq)
                 yield f"{src_start}_{src_start+1}ins{inserted_sequence}"
@@ -295,13 +296,84 @@ def find_variant_dna(ref_seq: str, var_seq: str, as_protein: bool = False) -> It
             # together affecting one amino acid, should be described as a “delins”",
             # as this code has no concept of amino acid alignment.
 
-            if as_protein or len(src_seq) == 1 and len(dest_seq) == 1:
+            if len(src_seq) == 1 and len(dest_seq) == 1:
                 yield f"{src_start+1}{src_seq}>{dest_seq}"
-            elif len(src_seq) == len(dest_seq) and dest_seq == invert_dna_sequence(src_seq):
+            elif len(src_seq) == len(dest_seq) and dest_seq == reverse_complement(src_seq):
                 yield f"{src_start+1}_{src_end}inv"
             else:
                 inserted_sequence = search_for_sequence(ref_seq, dest_seq)
                 yield f"{src_start+1}_{src_end}delins{inserted_sequence}"
+
+
+def find_variant_protein(ref_seq: str, var_seq: str):
+    """Find changes between two DNA sequences, expressed
+    as amino acid changes per HGVS standard.
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTTCA"))
+    []
+
+    this is a synonym: both GGT and GGC => Gly.
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGCTCA"))
+    []
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTCCATCA"))
+    ['Gly3Pro']
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGGTTCA"))
+    ['Val2del']
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTGGTTCA"))
+    ['Gly3dup']
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGCTGCTTCA"))
+    ['Val2_Gly3delinsAlaAla']
+    """
+
+    ref_seq = ref_seq.strip().upper()
+    var_seq = var_seq.strip().upper()
+
+    if not re.match("[AGTCN]+$", ref_seq):
+        raise ValueError("Invalid reference sequence")
+
+    if not re.match("[AGTCN]+$", var_seq):
+        raise ValueError("Invalid variant sequence")
+
+    ref_pro = translate_dna(ref_seq)[0]
+    var_pro = translate_dna(var_seq)[0]
+
+    def _ref(offset):
+        return f"{AA_CODES[ref_pro[offset]]}{offset+1}"
+
+    opcodes = list(levenshtein_opcodes(ref_pro, var_pro))
+
+    for opcode in opcodes:
+        src_start, src_end = opcode.src_start, opcode.src_end
+        src_pro = ref_pro[src_start:src_end]
+        dest_pro = var_pro[opcode.dest_start : opcode.dest_end]
+
+        if opcode.tag == "delete":
+            assert dest_pro == ""
+            if len(src_pro) == 1:
+                yield f"{_ref(src_start)}del"
+            else:
+                yield f"{_ref(src_start)}_{_ref(src_end-1)}del"
+
+        elif opcode.tag == "insert":
+            assert src_pro == ""
+
+            if ref_pro[src_start - len(dest_pro) : src_start] == dest_pro:
+                if len(dest_pro) == 1:
+                    yield f"{_ref(src_start-1)}dup"
+                else:
+                    yield f"{_ref(src_start-len(dest_pro))}_{_ref(src_start)}dup"
+            else:
+                yield f"{_ref(src_start)}_{_ref(src_end)}ins{translate_aa(dest_pro)}"
+
+        elif opcode.tag == "replace":
+            if len(src_pro) == 1 and len(dest_pro) == 1:
+                yield f"{_ref(src_start)}{translate_aa(dest_pro)}"
+            else:
+                yield f"{_ref(src_start)}_{_ref(src_end-1)}delins{translate_aa(dest_pro)}"
 
 
 def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None) -> str:
@@ -331,16 +403,16 @@ def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: 
     'p.='
 
     >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGTTCCATCA")
-    'p.3G>P'
+    'p.Gly3Pro'
 
     >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGGTTCA")
-    'p.2del'
+    'p.Val2del'
 
     >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGTTGGTGGTTCA")
-    'p.3dup'
+    'p.Gly3dup'
 
-    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGGTGGTGGTTCA")
-    'p.[1_2insG;2V>G]'
+    >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGCTGCTTCA")
+    'p.Val2_Gly3delinsAlaAla'
 
     CHECK FOR INVALID INPUTS
 
@@ -369,13 +441,11 @@ def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: 
     """
 
     if prefix.endswith("g.") and not prefix.endswith("n."):
-        as_protein = False
+        variations = list(find_variant_dna(ref_seq, var_seq))
     elif prefix.endswith("p."):
-        as_protein = True
+        variations = list(find_variant_protein(ref_seq, var_seq))
     else:
         raise ValueError("Only prefix types 'g.', 'n.' and 'p.' accepted at this time")
-
-    variations = list(find_variant_dna(ref_seq, var_seq, as_protein))
 
     if len(variations) == 0:
         return prefix + "="
