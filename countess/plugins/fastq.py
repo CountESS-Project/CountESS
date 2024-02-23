@@ -1,5 +1,6 @@
 import gzip
 from itertools import islice
+import os.path
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -9,10 +10,10 @@ from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputFilesPlugin
 
 
-def _file_reader(file_handle, min_avg_quality, row_limit=None):
+def _file_reader(file_handle, min_avg_quality, filename, row_limit=None):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
-            yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:]}
+            yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:], "filename": filename}
 
 
 class LoadFastqPlugin(PandasInputFilesPlugin):
@@ -34,14 +35,15 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         filename = file_params["filename"].value
+        basename = os.path.basename(filename)
         min_avg_quality = self.parameters["min_avg_quality"].value
 
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, basename, row_limit))
         else:
             with open(filename, "r", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit))
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, basename, row_limit))
 
         if self.parameters["group"].value:
             for comm_len in range(0, dataframe["header"].str.len().min() - 1):
@@ -50,8 +52,8 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
             if comm_len > 0:
                 dataframe["header"] = dataframe["header"].str.slice(0, comm_len)
-                dataframe = dataframe.assign(count=1).groupby(["sequence", "header"]).count()
+                dataframe = dataframe.assign(count=1).groupby(["sequence", "header", "filename"]).count()
             else:
-                dataframe = dataframe.groupby("sequence").count()
+                dataframe = dataframe.groupby("sequence", "filename").count()
 
         return dataframe
