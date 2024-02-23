@@ -309,24 +309,45 @@ def find_variant_protein(ref_seq: str, var_seq: str):
     """Find changes between two DNA sequences, expressed
     as amino acid changes per HGVS standard.
 
+    identical sequences:
+
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTTCA"))
     []
 
-    this is a synonym: both GGT and GGC => Gly.
+    this is a synonym: both GGT and GGC => Gly:
+
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGCTCA"))
     []
+
+    a single AA substitution:
 
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTCCATCA"))
     ['Gly3Pro']
 
+    a single AA deletion:
+
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGGTTCA"))
     ['Val2del']
+
+    a single AA duplication:
 
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTGGTTCA"))
     ['Gly3dup']
 
+    a single AA insertion
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTAAATCA"))
+    ['Gly3_Ser4insLys']
+
+    two substitutions are coded as a delins:
+
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGCTGCTTCA"))
     ['Val2_Gly3delinsAlaAla']
+
+    TODO: this isn't quite correct according to
+    https://hgvs-nomenclature.org/stable/recommendations/protein/extension/
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTTCAAAACAG"))
+    ['Ser4extLysGln']
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -366,8 +387,11 @@ def find_variant_protein(ref_seq: str, var_seq: str):
                     yield f"{_ref(src_start-1)}dup"
                 else:
                     yield f"{_ref(src_start-len(dest_pro))}_{_ref(src_start)}dup"
+            elif src_start == len(ref_pro):
+                # 'extension', not quite standards compliant
+                yield f"{_ref(src_start-1)}ext{translate_aa(dest_pro)}"
             else:
-                yield f"{_ref(src_start)}_{_ref(src_end)}ins{translate_aa(dest_pro)}"
+                yield f"{_ref(src_start-1)}_{_ref(src_end)}ins{translate_aa(dest_pro)}"
 
         elif opcode.tag == "replace":
             if len(src_pro) == 1 and len(dest_pro) == 1:

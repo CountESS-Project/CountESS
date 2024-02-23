@@ -5,11 +5,11 @@ import pandas as pd
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
-from countess.core.plugins import PandasTransformDictToSinglePlugin
+from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
 
 
-class VariantPlugin(PandasTransformDictToSinglePlugin):
+class VariantPlugin(PandasTransformDictToDictPlugin):
     """Turns a DNA sequence into a HGVS variant code"""
 
     name = "Variant Translator"
@@ -23,27 +23,41 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
         "sequence": StringParam("*OR* Reference Sequence"),
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
+        "protein": StringParam("Protein Column", ""),
+        "max_protein": IntegerParam("Max Protein Variations", 10),
         "drop": BooleanParam("Drop unidentified variants", False),
         "drop_columns": BooleanParam("Drop Input Column(s)", False),
     }
 
-    def process_dict(self, data, logger: Logger) -> Optional[str]:
+    def process_dict(self, data, logger: Logger) -> dict:
         assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
+        sequence = data[self.parameters["column"].value]
+        if self.parameters["reference"].is_none():
+            reference = self.parameters["sequence"].value
+        else:
+            reference = data[self.parameters["reference"].value]
+
         if not self.parameters["column"].value:
             return None
-        try:
-            sequence = data[self.parameters["column"].value]
-            max_mutations = self.parameters["max_mutations"].value
-            if self.parameters["reference"].is_none():
-                reference = self.parameters["sequence"].value
-            else:
-                reference = data[self.parameters["reference"].value]
-            return find_variant_string("g.", reference, sequence, max_mutations)
-        except ValueError:
-            return None
-        except (TypeError, KeyError) as exc:
-            logger.exception(exc)
-            return None
+
+        r = {}
+
+        if self.parameters["output"].value:
+            try:
+                max_mutations = self.parameters["max_mutations"].value
+                r[self.parameters["output"].value] = find_variant_string("g.", reference, sequence, max_mutations)
+            except (ValueError, TypeError, KeyError, IndexError) as exc:
+                logger.exception(exc)
+
+        if self.parameters["protein"].value:
+            try:
+                max_protein = self.parameters["max_protein"].value
+                r[self.parameters["protein"].value] = find_variant_string("p.", reference, sequence, max_protein)
+            except (ValueError, TypeError, KeyError, IndexError) as exc:
+                logger.exception(exc)
+
+        return r
+
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
@@ -51,7 +65,10 @@ class VariantPlugin(PandasTransformDictToSinglePlugin):
 
         if df_out is not None:
             if self.parameters["drop"].value:
-                df_out.dropna(subset=self.parameters["output"].value, inplace=True)
+                if self.parameters["output"].value:
+                    df_out.dropna(subset=self.parameters["output"].value, inplace=True)
+                if self.parameters["protein"].value:
+                    df_out.dropna(subset=self.parameters["protein"].value, inplace=True)
             if self.parameters["drop_columns"].value:
                 try:
                     df_out.drop(columns=self.parameters["column"].value, inplace=True)
