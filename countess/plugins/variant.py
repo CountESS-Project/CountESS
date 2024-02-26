@@ -46,14 +46,18 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             try:
                 max_mutations = self.parameters["max_mutations"].value
                 r[self.parameters["output"].value] = find_variant_string("g.", reference, sequence, max_mutations)
-            except (ValueError, TypeError, KeyError, IndexError) as exc:
+            except ValueError:
+                pass
+            except (TypeError, KeyError, IndexError) as exc:
                 logger.exception(exc)
 
         if self.parameters["protein"].value:
             try:
                 max_protein = self.parameters["max_protein"].value
                 r[self.parameters["protein"].value] = find_variant_string("p.", reference, sequence, max_protein)
-            except (ValueError, TypeError, KeyError, IndexError) as exc:
+            except ValueError:
+                pass
+            except (TypeError, KeyError, IndexError) as exc:
                 logger.exception(exc)
 
         return r
