@@ -4,9 +4,9 @@ from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
 from typing import Iterable, Callable, TypeVar, ParamSpec, Concatenate
+import gc
 
 import psutil
-
 
 D = TypeVar('D')
 V = TypeVar('V')
@@ -65,6 +65,7 @@ def multiprocess_map(function : Callable[Concatenate[V, P], Iterable[D]], values
                         # go around for the next loop
                         del data_out
                     del data_in
+                    gc.collect()
 
             except Empty:
                 if not enqueue_running.value:
@@ -78,4 +79,5 @@ def multiprocess_map(function : Callable[Concatenate[V, P], Iterable[D]], values
         try:
             yield output_queue.get(timeout=0.1)
         except Empty:
-            pass
+            # Waiting for the next input, might as well tidy up
+            gc.collect()
