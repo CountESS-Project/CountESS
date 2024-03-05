@@ -53,8 +53,10 @@ class GroupByPlugin(PandasProcessPlugin):
         # that can wait for a more general MapReduceFinalizePlugin class though.
         assert self.dataframes is not None
 
-        self.dataframes.append(data)
         self.input_columns.update(get_all_columns(data))
+        column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
+        keep_columns = [col for col, col_param in column_parameters if any(cp.value for cp in col_param.values())]
+        self.dataframes.append(data[keep_columns])
         return []
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
@@ -88,5 +90,5 @@ class GroupByPlugin(PandasProcessPlugin):
                 yield data_in.merge(data_out, how="left", left_on=index_cols, right_on=index_cols)
             else:
                 yield data_out
-        except ValueError:
-            pass
+        except ValueError as exc:
+            logger.exception(exc)
