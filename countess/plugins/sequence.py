@@ -1,10 +1,11 @@
 from typing import Optional
 
+from fqfa.util.nucleotide import reverse_complement
+
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformSingleToSinglePlugin
-from countess.utils.variant import invert_dna_sequence
 
 
 class SequencePlugin(PandasTransformSingleToSinglePlugin):
@@ -30,7 +31,7 @@ class SequencePlugin(PandasTransformSingleToSinglePlugin):
             return None
 
         if self.parameters["invert"].value:
-            value = invert_dna_sequence(value)
+            value = reverse_complement(value)
         if self.parameters["offset"].value:
             offset = self.parameters["offset"].value
             value = value[offset:]

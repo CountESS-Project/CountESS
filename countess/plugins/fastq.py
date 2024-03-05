@@ -1,5 +1,6 @@
 import gzip
 from itertools import islice
+import os.path
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -36,6 +37,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         filename = file_params["filename"].value
+        basename = os.path.basename(filename)
         min_avg_quality = self.parameters["min_avg_quality"].value
 
         if filename.endswith(".gz"):
