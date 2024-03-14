@@ -55,7 +55,13 @@ class GroupByPlugin(PandasProcessPlugin):
 
         self.input_columns.update(get_all_columns(data))
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
-        keep_columns = [col for col, col_param in column_parameters if any(cp.value for cp in col_param.values())]
+
+        # Dispose of any columns we don't use in the aggregations.
+        # TODO: Reindex as well?
+        keep_columns = [
+            col for col, col_param in column_parameters
+            if any(cp.value for cp in col_param.values()) and col in data.columns
+        ]
         self.dataframes.append(data[keep_columns])
         return []
 
@@ -77,17 +83,37 @@ class GroupByPlugin(PandasProcessPlugin):
             if any(pp.value for k, pp in col_param.params.items() if k != "index")
         )
 
-        if not index_cols or not agg_ops:
-            return
-
         data_in = pd.concat(self.dataframes)
+        data_in.reset_index([
+            col for col in agg_ops.keys()
+            if col in data_in.index.names
+        ], inplace=True)
 
         try:
-            data_out = data_in.groupby(index_cols or data_in.index).agg(agg_ops)
+            # If there are no columns to index by, add a dummy column and group by that so we
+            # still get a DataFrameGroupBy for the next operation
+            if index_cols:
+                data_grouped = data_in.groupby(index_cols)
+            else:
+                data_grouped = data_in.assign(__temp=1).groupby('__temp')
+
+            # If no aggregation operations have been selected then just count the groups.
+            if agg_ops:
+                data_out = data_grouped.agg(agg_ops)
+            else:
+                data_out = pd.DataFrame(data_grouped.size(), columns=['count'])
+
+            # Get rid of that dummy column if we added it.
+            if '__temp' in data_out.index.names:
+                data_out.reset_index('__temp', drop=True, inplace=True)
+
             flatten_columns(data_out, inplace=True)
 
             if self.parameters["join"].value:
-                yield data_in.merge(data_out, how="left", left_on=index_cols, right_on=index_cols)
+                if index_cols:
+                    yield data_in.merge(data_out, how="left", left_on=index_cols, right_on=index_cols)
+                else:
+                    yield data_in.assign(**data_out.to_dict('records')[0])
             else:
                 yield data_out
         except ValueError as exc:
