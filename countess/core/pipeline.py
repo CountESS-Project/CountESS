@@ -4,7 +4,7 @@ from threading import Thread
 from typing import Any, Optional
 
 from countess.core.logger import Logger
-from countess.core.plugins import BasePlugin, ProcessPlugin, get_plugin_classes
+from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -116,7 +116,7 @@ class PipelineNode:
             queue.finish()
 
     def run_multithread(self, queue: SentinelQueue, name: str, logger: Logger, row_limit: Optional[int] = None):
-        assert isinstance(self.plugin, ProcessPlugin)
+        assert isinstance(self.plugin, (ProcessPlugin,FileInputPlugin))
         for data_in in queue:
             self.counter_in += 1
             self.queue_output(self.plugin.process(data_in, name, logger))
@@ -131,7 +131,7 @@ class PipelineNode:
 
     def run_thread(self, logger: Logger, row_limit: Optional[int] = None):
         """For each PipelineNode, this is run in its own thread."""
-        assert isinstance(self.plugin, ProcessPlugin)
+        assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
 
         self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
@@ -180,9 +180,9 @@ class PipelineNode:
             self.config = None
 
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
-        assert isinstance(self.plugin, ProcessPlugin)
         self.load_config(logger)
         if self.is_dirty and self.plugin:
+            assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
             self.result = []
             self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
