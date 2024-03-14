@@ -1,11 +1,12 @@
 import builtins
-from types import CodeType
+from types import CodeType, NoneType
+import math
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
+from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam, ChoiceParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 
 # XXX pretty sure this is a job for ast.parse rather than just
@@ -16,7 +17,7 @@ from countess.core.plugins import PandasTransformDictToDictPlugin
 # These types will get copied to columns, anything else
 # (eg: classes, methods, functions) won't.
 
-SIMPLE_TYPES = set((bool, int, float, str, tuple, list))
+SIMPLE_TYPES = set((bool, int, float, str, tuple, list, NoneType))
 
 SAFE_BUILTINS = {
     x: builtins.__dict__[x]
@@ -24,7 +25,11 @@ SAFE_BUILTINS = {
     "enumerate filter float format frozenset hash hex id int len list map max min "
     "oct ord pow range reversed round set slice sorted str sum tuple type zip".split()
 }
-
+MATH_FUNCTIONS = {
+    k: v
+    for k, v in math.__dict__.items()
+    if not k.startswith("__")
+}
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
     name = "Python Code"
@@ -38,26 +43,26 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     version = VERSION
 
     parameters = {
-        "columns": PerColumnArrayParam("columns", BooleanParam("keep", True)),
         "code": TextParam("Python Code"),
+        "dropna": BooleanParam("Drop Null Columns?"),
     }
 
     code_object = None
+    code_globals = {
+        "__builtins__": SAFE_BUILTINS,
+        **MATH_FUNCTIONS,
+    }
 
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
-        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         assert isinstance(self.code_object, CodeType)
 
         try:
-            exec(self.code_object, {"__builtins__": SAFE_BUILTINS}, data)  # pylint: disable=exec-used
+            exec(self.code_object, self.code_globals, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
 
-        column_parameters = list(zip(self.input_columns, self.parameters["columns"].params))
-        columns_to_remove = set(col for col, param in column_parameters if not param.value)
-
-        return dict((k, v) for k, v in data.items() if k not in columns_to_remove and type(v) in SIMPLE_TYPES)
+        return dict((k, v) for k, v in data.items() if type(v) in SIMPLE_TYPES)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         """Override parent class because we a) want to reset
@@ -67,11 +72,19 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         # XXX cache this?
         self.code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
 
+        index_names = dataframe.index.names
         dataframe = dataframe.reset_index(drop=False)
         series = self.dataframe_to_series(dataframe, logger)
         dataframe = self.series_to_dataframe(series)
 
         if "__filter" in dataframe.columns:
             dataframe = dataframe.query("__filter").drop(columns="__filter")
+
+        if self.parameters["dropna"].value:
+            dataframe.dropna(axis=1, how="all", inplace=True)
+
+        index_names = [ n for n in index_names if n in dataframe.columns ]
+        if index_names:
+            dataframe.set_index(index_names, inplace=True)
 
         return dataframe
