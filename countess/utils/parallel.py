@@ -4,12 +4,12 @@ import time
 from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
-from typing import Callable, Concatenate, Iterable, TypeVar
+from typing import Callable, Iterable
 try:
-    from typing import ParamSpec
+    from typing import Concatenate, ParamSpec, TypeVar
 except ImportError:
     # for Python 3.9 compatibility
-    from typing_extensions import ParamSpec  # type: ignore
+    from typing_extensions import Concatenate, ParamSpec, TypeVar  # type: ignore
 
 import psutil
 

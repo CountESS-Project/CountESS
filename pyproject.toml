@@ -27,6 +27,7 @@ dependencies = [
     'psutil~=5.9.5',
     'rapidfuzz~=2.15.1',
     'ttkthemes~=3.2.2',
+    'typing_extensions~=4.8.0',
 ]
 
 [project.optional-dependencies]
