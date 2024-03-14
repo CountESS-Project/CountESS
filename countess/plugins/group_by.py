@@ -56,13 +56,16 @@ class GroupByPlugin(PandasProcessPlugin):
         self.input_columns.update(get_all_columns(data))
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
 
-        # Dispose of any columns we don't use in the aggregations.
-        # TODO: Reindex as well?
-        keep_columns = [
-            col for col, col_param in column_parameters
-            if any(cp.value for cp in col_param.values()) and col in data.columns
-        ]
-        self.dataframes.append(data[keep_columns])
+        if not self.parameters["join"].value:
+            # Dispose of any columns we don't use in the aggregations.
+            # TODO: Reindex as well?
+            keep_columns = [
+                col for col, col_param in column_parameters
+                if any(cp.value for cp in col_param.values()) and col in data.columns
+            ]
+            data = data[keep_columns]
+
+        self.dataframes.append(data)
         return []
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
