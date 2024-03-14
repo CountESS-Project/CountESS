@@ -7,10 +7,10 @@
 import re
 from typing import Iterable, Optional
 
-from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
-from fqfa.util.translate import translate_dna
 from fqfa.constants.iupac.protein import AA_CODES
 from fqfa.util.nucleotide import reverse_complement
+from fqfa.util.translate import translate_dna
+from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
 
 # Insertions shorter than this won't be searched for, just included.
 MIN_SEARCH_LENGTH = 10
@@ -25,7 +25,7 @@ def translate_aa(aa_seq: str) -> str:
     """
 
     try:
-        return ''.join(AA_CODES[x] for x in aa_seq)
+        return "".join(AA_CODES[x] for x in aa_seq)
     except KeyError as exc:
         raise ValueError("Invalid AA Sequence") from exc
 
@@ -210,7 +210,6 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
 
     if not re.match("[AGTCN]+$", var_seq):
         raise ValueError("Invalid variant sequence")
-
 
     # Levenshtein algorithm finds the overlapping parts of our reference and
     # variant sequences.

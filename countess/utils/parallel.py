@@ -1,22 +1,29 @@
+import gc
 import threading
 import time
 from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
-from typing import Iterable, Callable, TypeVar, ParamSpec, Concatenate
-import gc
+from typing import Callable, Concatenate, Iterable, TypeVar
+try:
+    from typing import ParamSpec
+except ImportError:
+    # for Python 3.9 compatibility
+    from typing_extensions import ParamSpec  # type: ignore
 
 import psutil
 
-D = TypeVar('D')
-V = TypeVar('V')
-P = ParamSpec('P')
+D = TypeVar("D")
+V = TypeVar("V")
+P = ParamSpec("P")
 
-def multiprocess_map(function : Callable[Concatenate[V, P], Iterable[D]], values : Iterable[V],
-                     *args : P.args, **kwargs : P.kwargs) -> Iterable[D]:
+
+def multiprocess_map(
+    function: Callable[Concatenate[V, P], Iterable[D]], values: Iterable[V], *args: P.args, **kwargs: P.kwargs
+) -> Iterable[D]:
     """Pretty much equivalent to:
 
-        def multiprocess_map(function, values, *args, **kwargs): 
+        def multiprocess_map(function, values, *args, **kwargs):
             yield from interleave_longest(function(v, *args, **kwargs) for v in values)
 
     but runs in multiple processes using an input_queue

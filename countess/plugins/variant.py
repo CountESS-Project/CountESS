@@ -32,13 +32,13 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     def process_dict(self, data, logger: Logger) -> dict:
         assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
         sequence = data[self.parameters["column"].value]
+        if not sequence:
+            return {}
+
         if self.parameters["reference"].is_none():
             reference = self.parameters["sequence"].value
         else:
             reference = data[self.parameters["reference"].value]
-
-        if not self.parameters["column"].value:
-            return None
 
         r = {}
 
@@ -61,7 +61,6 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
                 logger.exception(exc)
 
         return r
-
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)

@@ -21,8 +21,10 @@ def run(argv):
     for config_filename in argv:
         process_ini(config_filename)
 
+
 def main():
     run(sys.argv[1:])
+
 
 if __name__ == "__main__":
     main()  # pragma: no cover

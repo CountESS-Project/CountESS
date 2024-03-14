@@ -1,12 +1,12 @@
 import builtins
-from types import CodeType, NoneType
 import math
+from types import CodeType, NoneType
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam, ChoiceParam
+from countess.core.parameters import BooleanParam, TextParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 
 # XXX pretty sure this is a job for ast.parse rather than just
@@ -25,11 +25,8 @@ SAFE_BUILTINS = {
     "enumerate filter float format frozenset hash hex id int len list map max min "
     "oct ord pow range reversed round set slice sorted str sum tuple type zip".split()
 }
-MATH_FUNCTIONS = {
-    k: v
-    for k, v in math.__dict__.items()
-    if not k.startswith("__")
-}
+MATH_FUNCTIONS = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}
+
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
     name = "Python Code"
@@ -83,7 +80,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         if self.parameters["dropna"].value:
             dataframe.dropna(axis=1, how="all", inplace=True)
 
-        index_names = [ n for n in index_names if n in dataframe.columns ]
+        index_names = [n for n in index_names if n in dataframe.columns]
         if index_names:
             dataframe.set_index(index_names, inplace=True)
 

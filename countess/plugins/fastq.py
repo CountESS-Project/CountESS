@@ -1,6 +1,6 @@
 import gzip
-from itertools import islice
 import os.path
+from itertools import islice
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -10,7 +10,7 @@ from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputFilesPlugin
 
 
-def _file_reader(file_handle, min_avg_quality, row_limit=None, filename=''):
+def _file_reader(file_handle, min_avg_quality, row_limit=None, filename=""):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
             yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:], "filename": filename}
@@ -37,7 +37,6 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         filename = file_params["filename"].value
-        basename = os.path.basename(filename)
         min_avg_quality = self.parameters["min_avg_quality"].value
 
         if filename.endswith(".gz"):
@@ -47,7 +46,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
             with open(filename, "r", encoding="utf-8") as fh:
                 dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
 
-        group_columns = ['sequence']
+        group_columns = ["sequence"]
 
         if self.parameters["header_column"].value:
             # find maximum common length of the 'header' field in this file
@@ -56,12 +55,12 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
                     break
             if common_length > 0:
                 dataframe["header"] = dataframe["header"].str.slice(0, common_length)
-                group_columns.append('header')
+                group_columns.append("header")
         else:
             dataframe.drop(columns="header", inplace=True)
 
         if self.parameters["filename_column"].value:
-            group_columns.append('filename')
+            group_columns.append("filename")
         else:
             dataframe.drop(columns="filename", inplace=True)
 

@@ -312,7 +312,7 @@ class RunWindow:
             self.logger.info("Stopped")
             self.logger_frame.poll()
 
-        else:
+        elif self.toplevel:
             self.toplevel.destroy()
             self.toplevel = None
 
