@@ -1,5 +1,4 @@
 import gzip
-import os.path
 from itertools import islice
 
 import pandas as pd

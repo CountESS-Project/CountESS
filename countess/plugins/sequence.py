@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fqfa.util.nucleotide import reverse_complement
+from fqfa.util.nucleotide import reverse_complement  # type: ignore
 
 from countess import VERSION
 from countess.core.logger import Logger

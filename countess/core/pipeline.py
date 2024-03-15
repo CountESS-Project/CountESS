@@ -116,7 +116,7 @@ class PipelineNode:
             queue.finish()
 
     def run_multithread(self, queue: SentinelQueue, name: str, logger: Logger, row_limit: Optional[int] = None):
-        assert isinstance(self.plugin, (ProcessPlugin,FileInputPlugin))
+        assert isinstance(self.plugin, ProcessPlugin)
         for data_in in queue:
             self.counter_in += 1
             self.queue_output(self.plugin.process(data_in, name, logger))
@@ -136,6 +136,7 @@ class PipelineNode:
         self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
         if len(self.parent_nodes) == 1:
+            assert isinstance(self.plugin, ProcessPlugin)
             # there is only a single parent node, run several subthreads to
             # do the processing
             only_parent_node = list(self.parent_nodes)[0]
@@ -152,6 +153,7 @@ class PipelineNode:
             self.queue_output(self.plugin.finished(only_parent_node.name, logger))
 
         elif len(self.parent_nodes) > 1:
+            assert isinstance(self.plugin, ProcessPlugin)
             # there are multiple parent nodes: spawn off a subthread to handle
             # each of them.
             subthreads = [
@@ -187,6 +189,7 @@ class PipelineNode:
             self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
             for parent_node in self.parent_nodes:
+                assert isinstance(self.plugin, ProcessPlugin)
                 parent_node.prerun(logger, row_limit)
                 if parent_node.result:
                     for data_in in parent_node.result:

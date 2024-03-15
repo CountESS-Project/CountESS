@@ -7,9 +7,9 @@
 import re
 from typing import Iterable, Optional
 
-from fqfa.constants.iupac.protein import AA_CODES
-from fqfa.util.nucleotide import reverse_complement
-from fqfa.util.translate import translate_dna
+from fqfa.constants.iupac.protein import AA_CODES  # type: ignore
+from fqfa.util.nucleotide import reverse_complement  # type: ignore
+from fqfa.util.translate import translate_dna  # type: ignore
 from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
 
 # Insertions shorter than this won't be searched for, just included.
