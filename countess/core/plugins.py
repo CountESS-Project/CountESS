@@ -428,16 +428,35 @@ class PandasTransformDictToXMixin:
     """Transformer which takes a row as a dictionary"""
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        # XXX there is a bug in Pandas 2.1.x which prevents
-        # args and kwargs getting passed through when raw=True
-        # this seems to be fixed in Pandas 2.2.0.dev so
-        # hopefully this lambda can be removed some day.
-        # https://github.com/pandas-dev/pandas/issues/55009
-        return dataframe.apply(
-            lambda x: self.process_raw(x, list(dataframe.columns), logger),
-            axis=1,
-            raw=True,
-        )
+        if dataframe.index.names == [None]:
+            # unnamed index,
+            # XXX there is a bug in Pandas 2.1.x which prevents
+            # args and kwargs getting passed through when raw=True
+            # this seems to be fixed in Pandas 2.2.0.dev so
+            # hopefully this lambda can be removed some day.
+            # https://github.com/pandas-dev/pandas/issues/55009
+            return dataframe.apply(
+                lambda x: self.process_raw(x, list(dataframe.columns), logger),
+                axis=1,
+                raw=True,
+            )
+
+        columns = list(dataframe.index.names) + list(dataframe.columns)
+
+        if len(dataframe.index.names) == 1:
+            # single index
+            values = (
+                self.process_raw(list(index_and_data_tuple), columns, logger)
+                for index_and_data_tuple in dataframe.itertuples(name=None)
+            )
+        else:
+            # multiindex
+            values = (
+                self.process_raw(list(index_tuple) + list(data_tuple), columns, logger)
+                for index_tuple, *data_tuple in dataframe.itertuples(name=None)
+            )
+
+        return pd.Series(values, index=dataframe.index)
 
     def process_dict(self, data, logger: Logger):
         raise NotImplementedError(f"{self.__class__}.process_dict()")
