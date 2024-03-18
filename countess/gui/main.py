@@ -92,7 +92,6 @@ class ConfiguratorWrapper:
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
         self.logger_subframe = LoggerFrame(self.frame)
-        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
         self.logger = self.logger_subframe.get_logger(self.node.name)
 
         if self.node.plugin:
@@ -204,6 +203,8 @@ class ConfiguratorWrapper:
         self.node_update_thread = threading.Thread(target=self.node.prerun, args=(self.logger,))
         self.node_update_thread.start()
 
+        self.logger_subframe.clear()
+        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
         self.logger_subframe.after(100, self.config_change_task_callback_2)
         self.change_callback(self.node)
 

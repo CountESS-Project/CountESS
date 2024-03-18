@@ -13,7 +13,6 @@ from enum import Enum, IntFlag
 from functools import partial
 
 from countess.core.pipeline import PipelineNode
-from countess.gui.unicode import UNICODE_INFO
 
 
 def _limit(value, min_value, max_value):

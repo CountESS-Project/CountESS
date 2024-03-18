@@ -12,6 +12,9 @@ class LoggerTreeview(ttk.Treeview):
         self.heading(0, text="name")
         self.heading(1, text="message")
 
+    def clear(self):
+        self.delete(*self.get_children())
+
 
 class LabeledProgressbar(ttk.Progressbar):
     """A progress bar with a label on top of it, the progress bar value can be set in the
@@ -117,6 +120,14 @@ class LoggerFrame(ttk.Frame):
         if message in self.progress_bars:
             self.progress_bars[message].destroy()
             del self.progress_bars[message]
+
+    def clear(self):
+        self.logger.clear()
+        self.treeview.clear()
+        self.count = 0
+        self.details = {}
+        for message in self.progress_bars:
+            self.remove_pbar(message)
 
 
 class TreeviewDetailWindow(tk.Toplevel):

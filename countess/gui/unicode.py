@@ -15,4 +15,3 @@ else:
     UNICODE_CROSS = "\u2715"
     UNICODE_PLUS = "\u2795"
     UNICODE_INFO = "\u2139"
-
