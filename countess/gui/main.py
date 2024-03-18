@@ -18,13 +18,12 @@ from countess.gui.config import PluginConfigurator
 from countess.gui.logger import LoggerFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
+from countess.gui.unicode import UNICODE_INFO
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
 # faulthandler.enable(all_threads=True)
 
-
-UNICODE_INFO = "\u2139"
 
 plugin_classes = sorted(get_plugin_classes(), key=lambda x: x.name)
 

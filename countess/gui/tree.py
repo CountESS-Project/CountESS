@@ -13,6 +13,7 @@ from enum import Enum, IntFlag
 from functools import partial
 
 from countess.core.pipeline import PipelineNode
+from countess.gui.unicode import UNICODE_INFO
 
 
 def _limit(value, min_value, max_value):
@@ -54,8 +55,6 @@ class TkCursors(Enum):
     ARROWS = "fleur"
     PLUS = "plus"
 
-
-UNICODE_INFO = "\u2139"
 
 DraggableMixinState = Enum("DraggableMixinState", ["READY", "DRAG_WAIT", "LINK_WAIT", "DRAGGING", "LINKING"])
 
