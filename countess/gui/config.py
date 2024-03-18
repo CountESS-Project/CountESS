@@ -22,7 +22,7 @@ from ..core.parameters import (
     TextParam,
 )
 from ..core.plugins import BasePlugin
-from .unicode import UNICODE_CHECK, UNICODE_UNCHECK, UNICODE_CROSS, UNICODE_PLUS
+from .unicode import UNICODE_CHECK, UNICODE_CROSS, UNICODE_PLUS, UNICODE_UNCHECK
 
 
 def is_nan(v):

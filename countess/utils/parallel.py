@@ -5,6 +5,7 @@ from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
 from typing import Callable, Iterable
+
 try:
     from typing import Concatenate, ParamSpec, TypeVar
 except ImportError:

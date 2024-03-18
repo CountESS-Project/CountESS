@@ -64,8 +64,9 @@ class GroupByPlugin(PandasProcessPlugin):
             keep_columns = [
                 col
                 for col, col_param in column_parameters
-                if isinstance(col_param, TabularMultiParam) and
-                    any(cp.value for cp in col_param.values()) and col in data.columns
+                if isinstance(col_param, TabularMultiParam)
+                and any(cp.value for cp in col_param.values())
+                and col in data.columns
             ]
             data = data[keep_columns]
 
@@ -96,10 +97,8 @@ class GroupByPlugin(PandasProcessPlugin):
         try:
             # If there are no columns to index by, add a dummy column and group by that so we
             # still get a DataFrameGroupBy for the next operation
-            data_grouped : DataFrameGroupBy = (
-                data_in.groupby(index_cols)
-                if index_cols else
-                data_in.assign(__temp=1).groupby("__temp")
+            data_grouped: DataFrameGroupBy = (
+                data_in.groupby(index_cols) if index_cols else data_in.assign(__temp=1).groupby("__temp")
             )
 
             # If no aggregation operations have been selected then just count the groups.
