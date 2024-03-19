@@ -3,6 +3,7 @@ import math
 from types import CodeType, NoneType
 
 import pandas as pd
+import numpy as np
 
 from countess import VERSION
 from countess.core.logger import Logger
@@ -55,11 +56,12 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         assert isinstance(self.code_object, CodeType)
 
         try:
+            print(data)
             exec(self.code_object, self.code_globals, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
 
-        return dict((k, v) for k, v in data.items() if type(v) in SIMPLE_TYPES)
+        return dict((k, v) for k, v in data.items() if type(v) in SIMPLE_TYPES or isinstance(v, np.generic))
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         """Override parent class because we a) want to reset
