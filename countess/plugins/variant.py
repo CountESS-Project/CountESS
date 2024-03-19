@@ -24,6 +24,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
         "protein": StringParam("Protein Column", ""),
+        "offset": IntegerParam("Protein Offset", 0),
         "max_protein": IntegerParam("Max Protein Variations", 10),
         "drop": BooleanParam("Drop unidentified variants", False),
         "drop_columns": BooleanParam("Drop Input Column(s)", False),
@@ -45,7 +46,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         if self.parameters["output"].value:
             try:
                 max_mutations = self.parameters["max_mutations"].value
-                r[self.parameters["output"].value] = find_variant_string("g.", reference, sequence, max_mutations)
+                r[self.parameters["output"].value] = find_variant_string("g.", reference, sequence, max_mutations, 0)
             except ValueError:
                 pass
             except (TypeError, KeyError, IndexError) as exc:
@@ -53,8 +54,11 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
         if self.parameters["protein"].value:
             try:
+                offset = self.parameters["offset"].value
                 max_protein = self.parameters["max_protein"].value
-                r[self.parameters["protein"].value] = find_variant_string("p.", reference, sequence, max_protein)
+                r[self.parameters["protein"].value] = find_variant_string(
+                    "p.", reference, sequence, max_protein, offset
+                )
             except ValueError:
                 pass
             except (TypeError, KeyError, IndexError) as exc:

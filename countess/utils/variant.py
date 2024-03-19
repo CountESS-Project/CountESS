@@ -71,7 +71,7 @@ def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN
     return var_seq
 
 
-def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
+def find_variant_dna(ref_seq: str, var_seq: str, offset: Optional[int] = 0) -> Iterable[str]:
     """ finds HGVS variants between DNA sequences in ref_seq and var_seq.
     https://varnomen.hgvs.org/recommendations/DNA/variant/insertion/
     Doesn't look for things like complex insertions (yet)
@@ -202,8 +202,8 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
 
     """
 
-    ref_seq = ref_seq.strip().upper()
-    var_seq = var_seq.strip().upper()
+    ref_seq = ref_seq.strip().upper()[offset:]
+    var_seq = var_seq.strip().upper()[offset:]
 
     if not re.match("[AGTCN]+$", ref_seq):
         raise ValueError("Invalid reference sequence")
@@ -304,7 +304,7 @@ def find_variant_dna(ref_seq: str, var_seq: str) -> Iterable[str]:
                 yield f"{src_start+1}_{src_end}delins{inserted_sequence}"
 
 
-def find_variant_protein(ref_seq: str, var_seq: str):
+def find_variant_protein(ref_seq: str, var_seq: str, offset: Optional[int] = 0):
     """Find changes between two DNA sequences, expressed
     as amino acid changes per HGVS standard.
 
@@ -347,6 +347,14 @@ def find_variant_protein(ref_seq: str, var_seq: str):
 
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTTCAAAACAG"))
     ['Ser4extLysGln']
+
+    Protein calling should stop at the first Ter encountered:
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTTAGACA"))
+    ['Gly3Ter']
+
+    Offset lets you set the frame offset (0, 1 or 2, practically)
+
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -358,11 +366,17 @@ def find_variant_protein(ref_seq: str, var_seq: str):
     if not re.match("[AGTCN]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
-    ref_pro = translate_dna(ref_seq)[0]
-    var_pro = translate_dna(var_seq)[0]
+    ref_pro = translate_dna(ref_seq[offset:])[0]
+    var_pro = translate_dna(var_seq[offset:])[0]
 
-    def _ref(offset):
-        return f"{AA_CODES[ref_pro[offset]]}{offset+1}"
+    # cut protein translations off at first '*' (terminator)
+    if "*" in ref_pro:
+        ref_pro = ref_pro[: ref_pro.find("*") + 1]
+    if "*" in var_pro:
+        var_pro = var_pro[: var_pro.find("*") + 1]
+
+    def _ref(ref_offset):
+        return f"{AA_CODES[ref_pro[ref_offset]]}{ref_offset+1}"
 
     opcodes = list(levenshtein_opcodes(ref_pro, var_pro))
 
@@ -393,13 +407,21 @@ def find_variant_protein(ref_seq: str, var_seq: str):
                 yield f"{_ref(src_start-1)}_{_ref(src_end)}ins{translate_aa(dest_pro)}"
 
         elif opcode.tag == "replace":
+            # XXX handle extension if src_pro[-1] == '*'
+
             if len(src_pro) == 1 and len(dest_pro) == 1:
                 yield f"{_ref(src_start)}{translate_aa(dest_pro)}"
             else:
                 yield f"{_ref(src_start)}_{_ref(src_end-1)}delins{translate_aa(dest_pro)}"
 
+            # If the variant protein terminated, stop translating now:
+            if dest_pro[-1] == "*":
+                return
 
-def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None) -> str:
+
+def find_variant_string(
+    prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None, offset: Optional[int] = 0
+) -> str:
     """As above, but returns a single string instead of a generator
 
     MULTIPLE VARIATIONS
@@ -464,9 +486,9 @@ def find_variant_string(prefix: str, ref_seq: str, var_seq: str, max_mutations: 
     """
 
     if prefix.endswith("g.") and not prefix.endswith("n."):
-        variations = list(find_variant_dna(ref_seq, var_seq))
+        variations = list(find_variant_dna(ref_seq, var_seq, offset))
     elif prefix.endswith("p."):
-        variations = list(find_variant_protein(ref_seq, var_seq))
+        variations = list(find_variant_protein(ref_seq, var_seq, offset))
     else:
         raise ValueError("Only prefix types 'g.', 'n.' and 'p.' accepted at this time")
 
