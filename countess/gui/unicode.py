@@ -7,6 +7,7 @@ import tkinter.font as tk_font
 # check if the string "\u2795" (one unicode codepoint) renders over
 # three em wide, in which case the Unicode support is fonts are broken.
 
+
 def unicode_is_broken():
     root = tk.Tk()
     font = tk_font.Font(root)
