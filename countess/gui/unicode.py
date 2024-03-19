@@ -1,12 +1,6 @@
 import tkinter as tk
-import tkinter.font as tk_font
 
-# We found a shared remote system where these unicode icons are
-# displayed as escaped strings, literally "\u2795" on what should
-# be the "+" button.  This is very confusing, so as a workaround
-# check if the string "\u2795" (one unicode codepoint) renders over
-# three em wide, in which case the Unicode support is fonts are broken.
-
+# Tcl support for unicode starts in version 8.1, April 1999.
 
 def unicode_is_broken():
     root = tk.Tk()
@@ -15,8 +9,7 @@ def unicode_is_broken():
     root.destroy()
     return is_broken
 
-
-if unicode_is_broken():
+if tk.TclVersion < 8.1:
     UNICODE_CHECK = "Y"
     UNICODE_UNCHECK = "N"
     UNICODE_CROSS = "X"
