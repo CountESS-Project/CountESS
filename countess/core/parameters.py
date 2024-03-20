@@ -309,8 +309,8 @@ class ChoiceParam(BaseParam):
 
 class DataTypeChoiceParam(ChoiceParam):
     DATA_TYPES: Mapping[str, tuple[type, Any, Type[SimpleParam]]] = {
-        "string": (str, None, StringParam),
-        "number": (float, None, FloatParam),
+        "string": (str, "", StringParam),
+        "number": (float, 0.0, FloatParam),
         "integer": (int, 0, IntegerParam),
         "boolean": (bool, False, BooleanParam),
     }
@@ -327,8 +327,6 @@ class DataTypeChoiceParam(ChoiceParam):
             return self.DATA_TYPES[self.value][0]
 
     def cast_value(self, value):
-        if self.value is None:
-            return None
         if value is None:
             return self.DATA_TYPES[self.value][1]
         else:
