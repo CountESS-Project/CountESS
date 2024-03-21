@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eu
+
+docker build -t testing . 
+docker run -it testing
