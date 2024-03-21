@@ -3,9 +3,9 @@ on:
   push:
 
 jobs:
-  run-tests-ubuntu-22_04-python-3_11:
+  testing-123:
     runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.11
+    name: name
     continue-on-error: true
     steps:
     - uses: actions/checkout@v4
@@ -15,7 +15,7 @@ jobs:
         cache: "pip"
     - run: sudo apt install xvfb fonts-ubuntu fonts-opensymbol xfonts-utils xfonts-encodings xfonts-base tcl-ttkthemes
     - run: pip install --upgrade pip
-    - run: pip install .[dev]
-    - run: xvfb-run strace -o test_font.strace python test_font.py
+    - run: pip install ttkthemes
+    - run: xvfb-run strace -o test_font.strace python test_font.py || true
     - run: echo '### STRACE' >> $GITHUB_STEP_SUMMARY
     - run: cat test_font.strace >> $GITHUB_STEP_SUMMARY
