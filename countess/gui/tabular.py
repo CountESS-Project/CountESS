@@ -3,7 +3,9 @@ import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
 from tkinter import ttk
+from typing import Optional, Union
 
+import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
 # XXX columns should automatically resize based on information
@@ -13,7 +15,7 @@ from pandas.api.types import is_integer_dtype, is_numeric_dtype
 # etc etc.
 
 
-def column_format_for(df_column):
+def column_format_for(df_column: Union[pd.Index,pd.Series]) -> str:
     if is_numeric_dtype(df_column.dtype):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
@@ -34,7 +36,7 @@ def column_format_for(df_column):
         return "%s"
 
 
-def format_value(value, column_format):
+def format_value(value: Optional[Union[int,float,str]], column_format: str) -> str:
     """Format value for display in a table:
     >>> format_value(None, "%s")
     '—'
@@ -71,8 +73,8 @@ class TabularDataFrame(tk.Frame):
     only hold the currently displayed rows.
     Tested up to a million or so rows."""
 
-    subframe = None
-    dataframe = None
+    subframe : Optional[tk.Frame] = None
+    dataframe : Optional[pd.DataFrame] = None
     offset = 0
     height = 1000
     length = 0
@@ -96,8 +98,10 @@ class TabularDataFrame(tk.Frame):
         self.subframe.rowconfigure(2, weight=1)
         self.subframe.grid(sticky=tk.NSEW)
 
-    def set_dataframe(self, dataframe):
+    def set_dataframe(self, dataframe: pd.DataFrame):
         self.reset()
+        assert self.subframe
+
         self.dataframe = dataframe
         self.length = len(dataframe)
 
@@ -233,6 +237,22 @@ class TabularDataFrame(tk.Frame):
         if self.length:
             self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
 
+    def set_sort_order(self, column_num: int, descending: Optional[bool]=None):
+        assert self.dataframe is not None
+
+        if descending is None and column_num == self.sort_by_col:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            self.sort_by_col = column_num
+            self.sort_ascending = not descending
+        if column_num < self.index_cols:
+            self.dataframe = self.dataframe.sort_index(level=column_num, ascending=self.sort_ascending)
+        else:
+            self.dataframe = self.dataframe.sort_values(
+                self.dataframe.columns[column_num - self.index_cols], ascending=self.sort_ascending
+            )
+        self.refresh()
+
     def scrollto(self, new_offset):
         self.offset = min(max(int(new_offset), 0), self.length - self.height)
         self.refresh()
@@ -240,15 +260,7 @@ class TabularDataFrame(tk.Frame):
     def _label_button_1(self, num, event):
         label_width = self.labels[num].winfo_width()
         if 2 * label_width / 5 < event.x < 3 * label_width / 5:
-            self.sort_ascending = (num != self.sort_by_col) or not self.sort_ascending
-            self.sort_by_col = num
-            if num < self.index_cols:
-                self.dataframe = self.dataframe.sort_index(level=num, ascending=self.sort_ascending)
-            else:
-                self.dataframe = self.dataframe.sort_values(
-                    self.dataframe.columns[num - self.index_cols], ascending=self.sort_ascending
-                )
-            self.refresh()
+            self.set_sort_order(num)
 
     def _label_b1_motion(self, num, event):
         # Detect label drags left and right.
