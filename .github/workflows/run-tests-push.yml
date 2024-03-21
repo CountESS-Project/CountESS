@@ -16,6 +16,6 @@ jobs:
     - run: sudo apt install xvfb fonts-ubuntu fonts-opensymbol xfonts-utils xfonts-encodings xfonts-base tcl-ttkthemes
     - run: pip install --upgrade pip
     - run: pip install ttkthemes
-    - run: xvfb-run strace -o test_font.strace python test_font.py || true
+    - run: xvfb-run strace -o test_font.strace python countess/gui/widgets.py || true
     - run: echo '### STRACE' >> $GITHUB_STEP_SUMMARY
     - run: cat test_font.strace >> $GITHUB_STEP_SUMMARY

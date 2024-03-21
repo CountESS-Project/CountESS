@@ -6,8 +6,13 @@ import tkinter.font as tk_font
 
 @cache
 def unicode_is_broken():
-    font = tk_font.Font()
-    return font.measure("\u2795") > 3 * font.measure("m")
+    root = tk.Tk()
+    font = tk_font.Font(root)
+    en_width = font.measure("n")
+    x_width = font.measure("\u2715")
+    root.destroy()
+
+    return x_width > 3 * en_width
 
 def info_button(parent, *args, **kwargs):
     kwargs["text"] = "i" if unicode_is_broken() else "\u2139"
@@ -47,3 +52,5 @@ class BooleanCheckbox(tk.Button):
             self["fg"] = "grey"
             self["state"] = tk.NORMAL
             self["bd"] = 1
+
+print(unicode_is_broken())
