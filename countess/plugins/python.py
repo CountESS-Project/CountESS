@@ -56,7 +56,6 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         assert isinstance(self.code_object, CodeType)
 
         try:
-            print(data)
             exec(self.code_object, self.code_globals, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)

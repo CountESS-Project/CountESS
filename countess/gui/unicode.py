@@ -2,13 +2,6 @@ import tkinter as tk
 
 # Tcl support for unicode starts in version 8.1, April 1999.
 
-def unicode_is_broken():
-    root = tk.Tk()
-    font = tk_font.Font(root)
-    is_broken = font.measure("\u2795") > 3 * font.measure("m")
-    root.destroy()
-    return is_broken
-
 if tk.TclVersion < 8.1:
     UNICODE_CHECK = "Y"
     UNICODE_UNCHECK = "N"
