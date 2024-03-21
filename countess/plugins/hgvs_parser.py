@@ -37,7 +37,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         output = {}
 
         guides = []
-        if not self.parameters["guides_col"].is_none():
+        if self.parameters["guides_col"].is_not_none():
             guides += str(data[self.parameters["guides_col"].value]).split(";")
         if self.parameters["guides_str"].value:
             guides += self.parameters["guides_str"].value.split(";")

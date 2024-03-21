@@ -79,7 +79,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             if self.parameters["drop_columns"].value:
                 try:
                     df_out.drop(columns=self.parameters["column"].value, inplace=True)
-                    if not self.parameters["reference"].is_none():
+                    if self.parameters["reference"].is_not_none():
                         df_out.drop(columns=self.parameters["reference"].value, inplace=True)
                 except KeyError:
                     pass

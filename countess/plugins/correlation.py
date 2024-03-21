@@ -30,7 +30,7 @@ class CorrelationPlugin(PandasSimplePlugin):
         column1 = self.parameters["column1"].value
         column2 = self.parameters["column2"].value
         self.columns = [column1, column2]
-        if not self.parameters["group"].is_none():
+        if self.parameters["group"].is_not_none():
             self.columns.append(self.parameters["group"].value)
         self.dataframes = []
 

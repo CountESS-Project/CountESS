@@ -359,6 +359,9 @@ class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
     def is_none(self):
         return self.value == self.DEFAULT_VALUE
 
+    def is_not_none(self):
+        return self.value != self.DEFAULT_VALUE
+
 
 def _dataframe_get_column(df: pd.DataFrame, col: str):
     if col in df.columns:
@@ -391,6 +394,9 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
     def is_none(self):
         return self.value == self.DEFAULT_VALUE
 
+    def is_not_none(self):
+        return self.value != self.DEFAULT_VALUE
+
     def get_column(self, df):
         if self.value == self.DEFAULT_VALUE:
             return None
@@ -406,6 +412,9 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
 
     def is_index(self):
         return self.value == self.DEFAULT_VALUE
+
+    def is_not_index(self):
+        return self.value != self.DEFAULT_VALUE
 
     def get_column(self, df):
         if self.value == self.DEFAULT_VALUE:

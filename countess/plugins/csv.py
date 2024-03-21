@@ -67,7 +67,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
 
             for n, pp in enumerate(self.parameters["columns"]):
                 options["names"].append(pp["name"].value or f"column_{n}")
-                if not pp["type"].is_none():
+                if pp["type"].is_not_none():
                     if pp["index"].value:
                         index_col_numbers.append(len(options["usecols"]))
                     options["usecols"].append(n)
