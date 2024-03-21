@@ -17,7 +17,7 @@ jobs:
     - run: pip install .[dev]
     - run: xvfb-run pytest tests/
 
-  run-tests-windows-python-3_11
+  run-tests-windows-python-3_11:
     name: Windows / Python 3.11
     runs-on: windows-latest
     steps:
@@ -30,7 +30,7 @@ jobs:
     - run: pip install .[dev]
     - run: pytest tests/
 
-  run-tests-macos-13-python-3_11
+  run-tests-macos-13-python-3_11:
     name: MacOS 13 / Python 3.11
     runs-on: macos-13
     steps:
