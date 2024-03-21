@@ -15,6 +15,6 @@ jobs:
     - run: sudo apt install xvfb fonts-ubuntu fonts-opensymbol xfonts-utils xfonts-encodings xfonts-base tcl-ttkthemes
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-    - run: xvfb-run strace -o test_font.strace test_font.py
+    - run: xvfb-run strace -o test_font.strace python test_font.py
     - run: echo '### STRACE' >> $GITHUB_STEP_SUMMARY
     - run: cat test_font.strace >> $GITHUB_STEP_SUMMARY
