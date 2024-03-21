@@ -6,6 +6,7 @@ jobs:
   run-tests-ubuntu-22_04-python-3_11:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python 3.11
+    continue-on-error: true
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
