@@ -44,14 +44,9 @@ dev = [
     'pytest~=7.2',
 ]
 
-hdf = [
-     'tables~=3.8.0',
-]
-
 [project.entry-points.countess_plugins]
 collate = "countess.plugins.collate:CollatePlugin"
 load_fastq = "countess.plugins.fastq:LoadFastqPlugin"
-load_hdf = "countess.plugins.hdf5:LoadHdfPlugin"
 load_csv = "countess.plugins.csv:LoadCsvPlugin"
 group_by = "countess.plugins.group_by:GroupByPlugin"
 expression = "countess.plugins.expression:ExpressionPlugin"
