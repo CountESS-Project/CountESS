@@ -6,8 +6,13 @@ import tkinter.font as tk_font
 
 @cache
 def unicode_is_broken():
-    font = tk_font.Font()
-    return font.measure("\u2795") > 3 * font.measure("m")
+    root = tk.Tk()
+    font = tk_font.Font(root)
+    width_1 = font.measure("m")
+    width_2 = font.measure("\u2795")
+    root.destroy()
+
+    return width_2 > 3 * width_1
 
 def info_button(parent, *args, **kwargs):
     kwargs["text"] = "i" if unicode_is_broken() else "\u2139"
