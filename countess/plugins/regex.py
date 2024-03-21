@@ -36,7 +36,6 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
                         "Column Type",
                         "string",
                     ),
-                    "index": BooleanParam("Index?"),
                 },
             ),
         ),
@@ -67,10 +66,6 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
                     df = df.reset_index(column_name, drop=True)
                 except KeyError:
                     pass
-
-        index_names = [pp.name.value for pp in self.parameters["output"] if pp.index.value]
-        if index_names:
-            df = df.set_index(index_names)
 
         return df
 
@@ -137,7 +132,6 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
                         "Column Type",
                         "string",
                     ),
-                    "index": BooleanParam("Index?", False),
                 },
             ),
         ),
@@ -153,9 +147,6 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
 
         output_parameters = list(self.parameters["output"])[: compiled_re.groups]
         columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
-        index_columns = [
-            p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters) if p.index.value
-        ] or None
 
         records = []
         with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
@@ -171,11 +162,11 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
                     if len(records) >= row_limit or num > 100 * row_limit:
                         break
                 elif len(records) >= 100000:
-                    pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
+                    pdfs.append(pd.DataFrame.from_records(records, columns=columns))
                     records = []
 
         if len(records) > 0:
-            pdfs.append(pd.DataFrame.from_records(records, columns=columns, index=index_columns))
+            pdfs.append(pd.DataFrame.from_records(records, columns=columns))
 
         if len(pdfs) == 0:
             return pd.DataFrame([], columns=columns)
