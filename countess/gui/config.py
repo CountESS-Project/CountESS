@@ -22,7 +22,8 @@ from ..core.parameters import (
     TextParam,
 )
 from ..core.plugins import BasePlugin
-from .widgets import add_button, delete_button, BooleanCheckbox
+from .widgets import BooleanCheckbox, add_button, delete_button
+
 
 def is_nan(v):
     return v is None or v is np.nan or (isinstance(v, float) and math.isnan(v))
