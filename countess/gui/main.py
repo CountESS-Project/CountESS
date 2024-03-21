@@ -18,7 +18,7 @@ from countess.gui.config import PluginConfigurator
 from countess.gui.logger import LoggerFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.unicode import UNICODE_INFO
+from countess.gui.widgets import info_button
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -111,9 +111,7 @@ class ConfiguratorWrapper:
                 descr,
             )
             if self.node.plugin.link:
-                tk.Button(self.frame, text=UNICODE_INFO, fg="blue", command=self.on_info_button_press).place(
-                    anchor=tk.NE, relx=1, y=50
-                )
+                info_button(self.frame, command=self.on_info_button_press).place(anchor=tk.NE, relx=1, y=50)
             # self.node.prepare(self.logger)
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)

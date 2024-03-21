@@ -22,8 +22,7 @@ from ..core.parameters import (
     TextParam,
 )
 from ..core.plugins import BasePlugin
-from .unicode import UNICODE_CHECK, UNICODE_CROSS, UNICODE_PLUS, UNICODE_UNCHECK
-
+from .widgets import add_button, delete_button, BooleanCheckbox
 
 def is_nan(v):
     return v is None or v is np.nan or (isinstance(v, float) and math.isnan(v))
@@ -74,7 +73,7 @@ class ParameterWrapper:
             else:
                 self.entry["state"] = "readonly"
         elif isinstance(parameter, BooleanParam):
-            self.entry = tk.Button(tk_parent, width=2, command=self.toggle_checkbox_callback)
+            self.entry = BooleanCheckbox(tk_parent, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
         elif isinstance(parameter, FileParam):
             self.entry = tk.Label(tk_parent, text=parameter.value)
@@ -115,12 +114,7 @@ class ParameterWrapper:
             tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
             self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
             if not parameter.read_only:
-                self.button = tk.Button(
-                    label_frame_label,
-                    text=UNICODE_PLUS,
-                    width=2,
-                    command=self.add_row_callback,
-                )
+                self.button = add_button(label_frame_label, command=self.add_row_callback)
                 self.button.grid(row=0, column=1, padx=10)
 
             drc = self.delete_row_callback if not parameter.read_only else None
@@ -145,7 +139,7 @@ class ParameterWrapper:
             if isinstance(parameter, ArrayParam):
                 drc = self.delete_row_callback if not parameter.read_only else None
                 self.update_subwrappers(parameter.params, drc)
-                self.button = tk.Button(tk_parent, text=UNICODE_PLUS, width=2, command=self.add_row_callback)
+                self.button = add_button(tk_parent, command=self.add_row_callback)
             else:
                 self.update_subwrappers(parameter.params.values(), None)
         else:
@@ -156,12 +150,7 @@ class ParameterWrapper:
 
         # XXX hang on, what if it's an array in an array?
         if delete_callback and not self.button:
-            self.button = tk.Button(
-                tk_parent,
-                text=UNICODE_CROSS,
-                width=2,
-                command=lambda: delete_callback(self),
-            )
+            self.button = delete_button(tk_parent, command=lambda: delete_callback(self))
 
         if not isinstance(parameter, BooleanParam):
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
@@ -272,12 +261,7 @@ class ParameterWrapper:
                     )
                 self.subwrappers[pp].entry.grid(row=n + 1, column=m + 1, padx=10)
             if delete_row_callback:
-                button = tk.Button(
-                    self.entry,
-                    text=UNICODE_CROSS,
-                    width=2,
-                    command=partial(delete_row_callback, self, n),
-                )
+                button = delete_button(self.entry, command=partial(delete_row_callback, self, n))
                 button.grid(row=n + 1, column=len(subparams) + 1, padx=10)
                 self.subwrapper_buttons.append(button)
 
@@ -306,12 +290,7 @@ class ParameterWrapper:
                     level=self.level + 1,
                 )
                 if delete_row_callback:
-                    button = tk.Button(
-                        label_frame_label,
-                        text=UNICODE_CROSS,
-                        width=2,
-                        command=partial(_command_drc, p, label_frame),
-                    )
+                    button = delete_button(label_frame_label, command=partial(_command_drc, p, label_frame))
                     button.grid(row=0, column=1, padx=10)
 
             self.subwrappers[p].entry.grid(row=n, column=0, padx=10)
@@ -403,20 +382,11 @@ class ParameterWrapper:
 
     def set_checkbox_value(self):
         if self.parameter.hide:
-            self.entry["text"] = ""
-            self.entry["fg"] = self.entry["bg"]
-            self.entry["state"] = tk.DISABLED
-            self.entry["bd"] = 0
+            self.entry.set_value(None)
         elif self.parameter.value:
-            self.entry["text"] = UNICODE_CHECK
-            self.entry["fg"] = "black"
-            self.entry["state"] = tk.NORMAL
-            self.entry["bd"] = 1
+            self.entry.set_value(True)
         else:
-            self.entry["text"] = UNICODE_UNCHECK
-            self.entry["fg"] = "grey"
-            self.entry["state"] = tk.NORMAL
-            self.entry["bd"] = 1
+            self.entry.set_value(False)
 
     def toggle_checkbox_callback(self, *_):
         if self.parameter.read_only or self.parameter.hide:
