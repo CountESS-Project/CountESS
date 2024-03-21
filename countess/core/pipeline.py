@@ -287,10 +287,11 @@ class PipelineGraph:
         while True:
             print("------------------")
             for thread, node in threads_and_nodes[::-1]:
-                print("%-40s %d %d %s" % (node.name, node.counter_in, node.counter_out, thread.is_alive()))
+                if thread.is_alive():
+                    print("%-40s %d %d" % (node.name, node.counter_in, node.counter_out))
             if not any(t.is_alive() for t, _ in threads_and_nodes):
                 break
-            time.sleep(1)
+            time.sleep(10)
 
     def reset(self):
         for node in self.nodes:
