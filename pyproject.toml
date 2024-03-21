@@ -67,6 +67,7 @@ mutagenize = "countess.plugins.mutagenize:MutagenizePlugin"
 data_table = "countess.plugins.data_table:DataTablePlugin"
 correlation = "countess.plugins.correlation:CorrelationPlugin"
 hgvs_parser = "countess.plugins.hgvs_parser:HgvsParserPlugin"
+column = "countess.plugins.column:ColumnToolPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
