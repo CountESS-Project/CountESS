@@ -115,9 +115,14 @@ class ConfiguratorWrapper:
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
+            self.frame.rowconfigure(3, weight=1)
+            self.frame.rowconfigure(4, weight=1)
 
         else:
             self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
+            self.config_subframe.grid(sticky=tk.NSEW)
+            self.frame.rowconfigure(3, weight=1)
+            self.frame.rowconfigure(4, weight=0)
 
         self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
         self.config_subframe.bind(
@@ -350,7 +355,7 @@ class MainWindow:
         # The right (or bottom) pane, which contains everything else.
         # 0: The node label
         # 1: The plugin description
-        # 2: Node nodes / add notes button
+        # 2: Node notes / add notes button
         # 3: Configuration
         # 4: Preview pane
         # 5: Log output
