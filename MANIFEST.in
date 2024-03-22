@@ -1,1 +1,2 @@
 include countess/py.typed
+include countess/gui/icons/*.gif
