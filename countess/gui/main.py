@@ -1,5 +1,4 @@
 import multiprocessing
-import platform
 import re
 import sys
 import threading
@@ -471,11 +470,9 @@ def make_root():
         themes = set(root.get_themes())
         for t in ["clam", "aqua", "winnative"]:
             if t in themes:
-                print(f"Using Ttk Theme: {t}")
                 root.set_theme(t)
                 break
     except ImportError:
-        print("Ttkthemes not found: falling back to default Tk")
         root = tk.Tk()
         # XXX some kind of ttk style setup goes here as a fallback
 
@@ -495,11 +492,6 @@ def make_root():
 
 
 def main():
-    print(f"Starting CountESS version {VERSION}")
-    vm = psutil.virtual_memory()
-    print(f"Platform {platform.platform()} CPUs {psutil.cpu_count()} RAM {vm.available>>30} / {vm.total>>30}")
-    print(f"TkVersion {tk.TkVersion} TclVersion {tk.Tcl().call('info', 'patchlevel')}")
-
     root = make_root()
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 
