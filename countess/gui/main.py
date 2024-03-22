@@ -461,14 +461,17 @@ class MainWindow:
             self.canvas.place(x=0, y=0, w=event.width, h=y)
             self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
 
+
 class SplashScreen:
 
     def __init__(self, tk_root):
-        self.splash = tk.Toplevel(tk_root, bg="skyblue")
+        bg = "skyblue"
+        self.splash = tk.Toplevel(tk_root, bg=bg)
         self.splash.attributes('-type', 'dialog')
 
-        tk.Label(self.splash, text=f"CountESS {VERSION}", font=("TkHeadingFont", 16, "bold"), bg="skyblue").grid()
-        tk.Label(self.splash, image=get_bitmap_image(tk_root, "countess"), bg="skyblue").grid()
+        font = ("TkHeadingFont", 16, "bold")
+        tk.Label(self.splash, text=f"CountESS {VERSION}", font=font, bg=bg).grid(padx=10,pady=10)
+        tk.Label(self.splash, image=get_bitmap_image(tk_root, "countess"), bg=bg).grid(padx=10)
 
         self.splash.after(3500, self.destroy)
 
