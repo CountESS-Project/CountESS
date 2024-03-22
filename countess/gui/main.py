@@ -17,7 +17,7 @@ from countess.gui.config import PluginConfigurator
 from countess.gui.logger import LoggerFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import info_button
+from countess.gui.widgets import info_button, get_bitmap_image
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -461,6 +461,21 @@ class MainWindow:
             self.canvas.place(x=0, y=0, w=event.width, h=y)
             self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
 
+class SplashScreen:
+
+    def __init__(self, tk_root):
+        self.splash = tk.Toplevel(tk_root, bg="skyblue")
+        self.splash.attributes('-type', 'dialog')
+
+        tk.Label(self.splash, text=f"CountESS {VERSION}", font=("TkHeadingFont", 16, "bold"), bg="skyblue").grid()
+        tk.Label(self.splash, image=get_bitmap_image(tk_root, "countess"), bg="skyblue").grid()
+
+        self.splash.after(3500, self.destroy)
+
+    def destroy(self):
+        self.splash.destroy()
+
+
 
 def make_root():
     try:
@@ -493,6 +508,7 @@ def make_root():
 
 def main():
     root = make_root()
+    SplashScreen(root)
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 
     root.mainloop()
