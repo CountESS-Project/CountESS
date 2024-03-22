@@ -55,6 +55,8 @@ def read_config(
                     int(position_match.group(2)) / 1000,
                 )
 
+        sort = config_dict.get("_sort", "0 0").split()
+
         # XXX check version and hash_digest and emit warnings.
 
         config = [(key, ast.literal_eval(val), base_dir) for key, val in config_dict.items() if not key.startswith("_")]
@@ -65,6 +67,8 @@ def read_config(
             config=config,
             position=position,
             notes=notes,
+            sort_column=int(sort[0]),
+            sort_descending=bool(int(sort[1])),
         )
         pipeline_graph.nodes.append(node)
 
@@ -101,6 +105,7 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
                     "_class": node.plugin.__class__.__name__,
                     "_version": node.plugin.version,
                     "_hash": node.plugin.hash(),
+                    "_sort": "%d %d" % (node.sort_column, 1 if node.sort_descending else 0),
                 }
             )
         if node.position:
