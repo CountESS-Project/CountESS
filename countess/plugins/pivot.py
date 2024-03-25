@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+import functools
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,8 @@ from countess.utils.pandas import get_all_columns
 
 AGG_FUNCTIONS = ["first", "sum", "count", "mean"]
 
+def _product(iterable):
+    return functools.reduce(lambda x, y: x*y, iterable, 1)
 
 class PivotPlugin(PandasProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
@@ -41,6 +44,11 @@ class PivotPlugin(PandasProcessPlugin):
         expand_cols = [col for col, param in column_parameters if param.value == "Expand"]
 
         if not pivot_cols:
+            return []
+
+        n_pivot = _product(data[pc].nunique() for pc in pivot_cols)
+        if n_pivot > 100:
+            logger.error("Too many pivot combinations on (%d)" % n_pivot)
             return []
 
         df = pd.pivot_table(
