@@ -5,7 +5,7 @@ layout: default
 
 # CountESS Documentation
 
-This is CountESS 0.0.50, a modular, Python 3 reimplementation of Enrich2.
+This is CountESS 0.0.51, a modular, Python 3 reimplementation of Enrich2.
 
 [Source code is available](https://github.com/CountESS-Project/CountESS)
 and contributions to code and documentation are welcomed.
