@@ -70,8 +70,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         # XXX cache this?
         self.code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
 
-        index_names = dataframe.index.names
-        dataframe = dataframe.reset_index(drop=False)
+        dataframe = dataframe.reset_index(drop=dataframe.index.names == [None])
         series = self.dataframe_to_series(dataframe, logger)
         dataframe = self.series_to_dataframe(series)
 
@@ -80,9 +79,5 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
 
         if self.parameters["dropna"].value:
             dataframe.dropna(axis=1, how="all", inplace=True)
-
-        index_names = [n for n in index_names if n in dataframe.columns]
-        if index_names:
-            dataframe.set_index(index_names, inplace=True)
 
         return dataframe
