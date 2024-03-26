@@ -435,12 +435,11 @@ class ColumnOrStringParam(ColumnChoiceParam):
             return self.value[len(self.PREFIX) :]
         return None
 
-    def get_column(self, df):
+    def get_value(self, data: dict):
         if self.value.startswith(self.PREFIX):
-            col = self.value[len(self.PREFIX) :]
-            return _dataframe_get_column(df, col)
+            return data[self.value[len(self.PREFIX):]]
         else:
-            return None
+            return self.value
 
 
 class ColumnOrIntegerParam(ColumnOrStringParam):
@@ -561,6 +560,9 @@ class ArrayParam(BaseParam):
 
 
 class PerColumnArrayParam(ArrayParam):
+    """An ArrayParam where each value in the array corresponds to a column
+    in the input dataframe, as set by set_column_choices."""
+
     def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
         self.read_only = True
@@ -679,4 +681,5 @@ class MultiParam(BaseParam):
 
 
 class TabularMultiParam(MultiParam):
-    pass
+    """This is just used to drop a hint to the GUI as to how the MultiParam
+    is to be presented ... as a hierarchy or as a table ..."""
