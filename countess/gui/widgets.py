@@ -1,12 +1,12 @@
 import tkinter as tk
 from functools import cache
+from importlib.resources import as_file, files
 from typing import Optional
-from importlib.resources import files, as_file
 
 
 @cache
 def get_bitmap_image(parent: tk.Widget, name: str) -> tk.PhotoImage:
-    source = files('countess.gui').joinpath('icons').joinpath(f"{name}.gif")
+    source = files("countess.gui").joinpath("icons").joinpath(f"{name}.gif")
     with as_file(source) as filepath:
         return tk.PhotoImage(master=parent, file=filepath)
 

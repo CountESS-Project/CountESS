@@ -383,11 +383,7 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
             # in Step 4, so we add in an extra RangeIndex to guarantee uniqueness,
             # and remove it again afterwards in Step 5.
             if dataframe.index.has_duplicates:
-                dataframe.set_index(
-                    pd.RangeIndex(0, len(dataframe), name="__tmpidx"),
-                    append=True,
-                    inplace=True
-                )
+                dataframe.set_index(pd.RangeIndex(0, len(dataframe), name="__tmpidx"), append=True, inplace=True)
 
             # 2. the dataframe is transformed into
             # a series of results by PandasTransform...ToXMixin.dataframe_to_series,
@@ -401,9 +397,10 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
 
             # 4. The expanded result is merged back into the original dataframe
             dataframe_merged = dataframe.merge(dataframe_out, left_index=True, right_index=True)
+
             # 5. Remove extra RangeIndex if we added it in step 1.
-            if '__tmpidx' in dataframe_merged.index.names:
-                dataframe_merged.reset_index('__tmpidx', drop=True, inplace=True)
+            if "__tmpidx" in dataframe_merged.index.names:
+                dataframe_merged.reset_index("__tmpidx", drop=True, inplace=True)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
