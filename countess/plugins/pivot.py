@@ -10,8 +10,6 @@ from countess.core.parameters import ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import PandasProcessPlugin
 from countess.utils.pandas import get_all_columns
 
-AGG_FUNCTIONS = ["first", "sum", "count", "mean"]
-
 
 def _product(iterable):
     return functools.reduce(lambda x, y: x * y, iterable, 1)
@@ -21,12 +19,16 @@ class PivotPlugin(PandasProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
-    description = "Groups a dataframe and pivots column values into columns"
+    description = """Groups a dataframe and pivots column values into columns.
+        Expanded column values are duplicated for each combination of pivot values.
+        Missing values default to 0, and duplicate values are summed."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
     parameters = {
-        "columns": PerColumnArrayParam("Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
+        "columns": PerColumnArrayParam(
+            "Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"])
+        ),
     }
 
     input_columns: Dict[str, np.dtype] = {}
@@ -57,7 +59,7 @@ class PivotPlugin(PandasProcessPlugin):
 
         n_pivot = _product(data[pc].nunique() for pc in pivot_cols) * len(expand_cols)
         if n_pivot > 200:
-            pivot_cols_str = ', '.join(pivot_cols)
+            pivot_cols_str = ", ".join(pivot_cols)
             logger.error(f"Too many pivot combinations on {pivot_cols_str} ({n_pivot})")
             return []
 
