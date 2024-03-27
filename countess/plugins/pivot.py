@@ -1,3 +1,4 @@
+import functools
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -9,19 +10,25 @@ from countess.core.parameters import ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import PandasProcessPlugin
 from countess.utils.pandas import get_all_columns
 
-AGG_FUNCTIONS = ["first", "sum", "count", "mean"]
+
+def _product(iterable):
+    return functools.reduce(lambda x, y: x * y, iterable, 1)
 
 
 class PivotPlugin(PandasProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
-    description = "Groups a dataframe and pivots column values into columns"
+    description = """Groups a dataframe and pivots column values into columns.
+        Expanded column values are duplicated for each combination of pivot values.
+        Missing values default to 0, and duplicate values are summed."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
     parameters = {
-        "columns": PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["Index", "Pivot", "Expand", "Drop"]))
+        "columns": PerColumnArrayParam(
+            "Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"])
+        ),
     }
 
     input_columns: Dict[str, np.dtype] = {}
@@ -40,7 +47,20 @@ class PivotPlugin(PandasProcessPlugin):
         pivot_cols = [col for col, param in column_parameters if param.value == "Pivot"]
         expand_cols = [col for col, param in column_parameters if param.value == "Expand"]
 
+        if not index_cols:
+            logger.warning("No columns to index!")
+
+        if not expand_cols:
+            logger.warning("No columns to expand!")
+
         if not pivot_cols:
+            logger.error("No columns to pivot on!")
+            return []
+
+        n_pivot = _product(data[pc].nunique() for pc in pivot_cols) * len(expand_cols)
+        if n_pivot > 200:
+            pivot_cols_str = ", ".join(pivot_cols)
+            logger.error(f"Too many pivot combinations on {pivot_cols_str} ({n_pivot})")
             return []
 
         df = pd.pivot_table(
@@ -66,8 +86,10 @@ class PivotPlugin(PandasProcessPlugin):
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
         index_cols = [col for col, param in column_parameters if param.value == "Index"]
         if self.dataframes:
-            df = pd.concat(self.dataframes).groupby(by=index_cols, group_keys=True).sum()
+            df = pd.concat(self.dataframes)
             self.dataframes = []
+            if index_cols:
+                df = df.groupby(by=index_cols, group_keys=True).sum()
             yield df
 
         for p in self.parameters.values():

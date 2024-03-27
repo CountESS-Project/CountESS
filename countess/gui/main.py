@@ -1,5 +1,4 @@
 import multiprocessing
-import platform
 import re
 import sys
 import threading
@@ -116,9 +115,14 @@ class ConfiguratorWrapper:
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
+            self.frame.rowconfigure(3, weight=1)
+            self.frame.rowconfigure(4, weight=1)
 
         else:
             self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
+            self.config_subframe.grid(sticky=tk.NSEW)
+            self.frame.rowconfigure(3, weight=1)
+            self.frame.rowconfigure(4, weight=0)
 
         self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
         self.config_subframe.bind(
@@ -153,7 +157,7 @@ class ConfiguratorWrapper:
         if not self.node.plugin.show_preview:
             self.frame.rowconfigure(4, weight=0)
             return
-        elif self.node.result is None:
+        elif not self.node.result:
             self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.columnconfigure(0, weight=1)
             tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
@@ -351,7 +355,7 @@ class MainWindow:
         # The right (or bottom) pane, which contains everything else.
         # 0: The node label
         # 1: The plugin description
-        # 2: Node nodes / add notes button
+        # 2: Node notes / add notes button
         # 3: Configuration
         # 4: Preview pane
         # 5: Log output
@@ -471,11 +475,9 @@ def make_root():
         themes = set(root.get_themes())
         for t in ["clam", "aqua", "winnative"]:
             if t in themes:
-                print(f"Using Ttk Theme: {t}")
                 root.set_theme(t)
                 break
     except ImportError:
-        print("Ttkthemes not found: falling back to default Tk")
         root = tk.Tk()
         # XXX some kind of ttk style setup goes here as a fallback
 
@@ -495,11 +497,6 @@ def make_root():
 
 
 def main():
-    print(f"Starting CountESS version {VERSION}")
-    vm = psutil.virtual_memory()
-    print(f"Platform {platform.platform()} CPUs {psutil.cpu_count()} RAM {vm.available>>30} / {vm.total>>30}")
-    print(f"TkVersion {tk.TkVersion} TclVersion {tk.Tcl().call('info', 'patchlevel')}")
-
     root = make_root()
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 

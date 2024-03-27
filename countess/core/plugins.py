@@ -379,13 +379,34 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         try:
+            # 1. A dataframe with duplicates in its index can't be merged back correctly
+            # in Step 4, so we add in an extra RangeIndex to guarantee uniqueness,
+            # and remove it again afterwards in Step 5.
+            if dataframe.index.has_duplicates:
+                dataframe.set_index(pd.RangeIndex(0, len(dataframe), name="__tmpidx"), append=True, inplace=True)
+
+            # 2. the dataframe is transformed into
+            # a series of results by PandasTransform...ToXMixin.dataframe_to_series,
+            # which is expected to take each row of the dataframe, do something with
+            # it and return a series of objects (values, tuples or dicts).
             series = self.dataframe_to_series(dataframe, logger)
-            df2 = self.series_to_dataframe(series)
+
+            # 3. the series is expanded back out into rows by
+            # PandasTransformXTo...Mixin.series_to_dataframe()
+            dataframe_out = self.series_to_dataframe(series)
+
+            # 4. The expanded result is merged back into the original dataframe
+            dataframe_merged = dataframe.merge(dataframe_out, left_index=True, right_index=True)
+
+            # 5. Remove extra RangeIndex if we added it in step 1.
+            if "__tmpidx" in dataframe_merged.index.names:
+                dataframe_merged.reset_index("__tmpidx", drop=True, inplace=True)
+
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
             return None
-        df3 = dataframe.merge(df2, left_index=True, right_index=True)
-        return df3
+
+        return dataframe_merged
 
 
 # XXX instead of just asserting the existence of the parameters should we

@@ -150,7 +150,7 @@ class ParameterWrapper:
             self.var.trace("w", self.value_changed_callback)
 
         # XXX hang on, what if it's an array in an array?
-        if delete_callback and not self.button:
+        if not parameter.read_only and delete_callback and not self.button:
             self.button = delete_button(tk_parent, command=lambda: delete_callback(self))
 
         if not isinstance(parameter, BooleanParam):
@@ -261,7 +261,7 @@ class ParameterWrapper:
                         level=self.level + 1,
                     )
                 self.subwrappers[pp].entry.grid(row=n + 1, column=m + 1, padx=10)
-            if delete_row_callback:
+            if not self.parameter.read_only and delete_row_callback:
                 button = delete_button(self.entry, command=partial(delete_row_callback, self, n))
                 button.grid(row=n + 1, column=len(subparams) + 1, padx=10)
                 self.subwrapper_buttons.append(button)
@@ -290,7 +290,7 @@ class ParameterWrapper:
                     delete_row_callback,
                     level=self.level + 1,
                 )
-                if delete_row_callback:
+                if not self.parameter.read_only and delete_row_callback:
                     button = delete_button(label_frame_label, command=partial(_command_drc, p, label_frame))
                     button.grid(row=0, column=1, padx=10)
 

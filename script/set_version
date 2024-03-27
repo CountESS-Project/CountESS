@@ -1,11 +1,14 @@
 #!/bin/bash
 set -eu
 
+git diff --quiet || { echo "There are unstaged changes!"; exit 1; }
+git diff --cached --quiet || { echo "There are staged changes!"; exit 2; }
+
 VERSION=$1
 
 sed -i "s/\# CountESS .*/# CountESS $VERSION/" README.md
 sed -i "s/VERSION = .*/VERSION = \"$VERSION\"/" countess/__init__.py
-sed -i "s/title: CountESS .* Documentation/title: CountESS $VERSION Documentation/;s/\# CountESS .* Documentation/\# CountESS $VERSION Documentation/" docs/index.md
+sed -i "s/This is CountESS [0-9\.]\+/This is CountESS $VERSION/" docs/index.md
 
-git commit -m "Bump to v$VERSION"
+git commit -m "Bump to v$VERSION" README.md countess/__init__.py docs/index.md
 git tag -m "CountESS version $VERSION" v$VERSION
