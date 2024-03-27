@@ -4,25 +4,30 @@ from importlib.resources import as_file, files
 from typing import Optional
 
 
+# To keep the cache of bitmaps smaller, we always associate the image with
+# the toplevel, not the individual widget it appears on.
+
 @cache
-def get_bitmap_image(parent: tk.Widget, name: str) -> tk.PhotoImage:
+def get_icon_toplevel(toplevel: tk.Toplevel, name: str) -> tk.Image:
     source = files("countess.gui").joinpath("icons").joinpath(f"{name}.gif")
     with as_file(source) as filepath:
-        return tk.PhotoImage(master=parent, file=filepath)
+        return tk.PhotoImage(master=toplevel, file=filepath)
 
+def get_icon(widget: tk.Widget, name: str) -> tk.Image:
+    return get_icon_toplevel(widget.winfo_toplevel(), name)
 
 def info_button(parent: tk.Widget, *args, **kwargs) -> tk.Button:
-    kwargs["image"] = get_bitmap_image(parent.winfo_toplevel(), "info")
+    kwargs["image"] = get_icon(parent, "info")
     return tk.Button(parent, *args, **kwargs)
 
 
 def add_button(parent: tk.Widget, *args, **kwargs) -> tk.Button:
-    kwargs["image"] = get_bitmap_image(parent.winfo_toplevel(), "add")
+    kwargs["image"] = get_icon(parent, "add")
     return tk.Button(parent, *args, **kwargs)
 
 
 def delete_button(parent: tk.Widget, *args, **kwargs) -> tk.Button:
-    kwargs["image"] = get_bitmap_image(parent.winfo_toplevel(), "del")
+    kwargs["image"] = get_icon(parent, "del")
     return tk.Button(parent, *args, **kwargs)
 
 
@@ -36,10 +41,10 @@ class BooleanCheckbox(tk.Button):
             self["state"] = tk.DISABLED
             self["bd"] = 0
         elif value:
-            self["image"] = get_bitmap_image(self.winfo_toplevel(), "check")
+            self["image"] = get_icon(self, "check")
             self["state"] = tk.NORMAL
             self["bd"] = 1
         else:
-            self["image"] = get_bitmap_image(self.winfo_toplevel(), "uncheck")
+            self["image"] = get_icon(self, "uncheck")
             self["state"] = tk.NORMAL
             self["bd"] = 1

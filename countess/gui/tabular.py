@@ -8,7 +8,7 @@ from typing import Optional, Union
 import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
-from countess.gui.widgets import get_bitmap_image
+from countess.gui.widgets import get_icon
 
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
@@ -17,7 +17,7 @@ from countess.gui.widgets import get_bitmap_image
 # etc etc.
 
 
-def column_format_for(df_column: Union[pd.Index,pd.Series]) -> str:
+def column_format_for(df_column: Union[pd.Index, pd.Series]) -> str:
     if is_numeric_dtype(df_column.dtype):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
@@ -38,7 +38,7 @@ def column_format_for(df_column: Union[pd.Index,pd.Series]) -> str:
         return "%s"
 
 
-def format_value(value: Optional[Union[int,float,str]], column_format: str) -> str:
+def format_value(value: Optional[Union[int, float, str]], column_format: str) -> str:
     """Format value for display in a table:
     >>> format_value(None, "%s")
     '—'
@@ -75,8 +75,8 @@ class TabularDataFrame(tk.Frame):
     only hold the currently displayed rows.
     Tested up to a million or so rows."""
 
-    subframe : Optional[tk.Frame] = None
-    dataframe : Optional[pd.DataFrame] = None
+    subframe: Optional[tk.Frame] = None
+    dataframe: Optional[pd.DataFrame] = None
     offset = 0
     height = 1000
     length = 0
@@ -149,7 +149,12 @@ class TabularDataFrame(tk.Frame):
             else:
                 name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
-            label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}", image=get_bitmap_image(self, "sort_un"), compound=tk.RIGHT)
+            label = tk.Label(
+                self.subframe,
+                text=f"{name}\n{dtype}{is_index}",
+                image=get_icon(self, "sort_un"),
+                compound=tk.RIGHT,
+            )
             label.grid(row=1, column=num, sticky=tk.EW)
             label.bind("<Button-1>", partial(self._label_button_1, num))
             label.bind("<B1-Motion>", partial(self._label_b1_motion, num))
@@ -239,7 +244,7 @@ class TabularDataFrame(tk.Frame):
         if self.length:
             self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
 
-    def set_sort_order(self, column_num: int, descending: Optional[bool]=None):
+    def set_sort_order(self, column_num: int, descending: Optional[bool] = None):
         assert self.dataframe is not None
 
         if descending is None and column_num == self.sort_by_col:
@@ -256,7 +261,7 @@ class TabularDataFrame(tk.Frame):
 
         for n, label in enumerate(self.labels):
             icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
-            label.configure(image=get_bitmap_image(self.winfo_toplevel(), icon))
+            label.configure(image=get_icon(self, icon))
 
         self.refresh()
 
