@@ -8,6 +8,8 @@ from typing import Optional, Union
 import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
+from countess.gui.widgets import get_bitmap_image
+
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
 # overflowing.  Or maybe use
@@ -147,7 +149,7 @@ class TabularDataFrame(tk.Frame):
             else:
                 name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
-            label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
+            label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}", image=get_bitmap_image(self, "sort_un"), compound=tk.RIGHT)
             label.grid(row=1, column=num, sticky=tk.EW)
             label.bind("<Button-1>", partial(self._label_button_1, num))
             label.bind("<B1-Motion>", partial(self._label_b1_motion, num))
@@ -251,6 +253,11 @@ class TabularDataFrame(tk.Frame):
             self.dataframe = self.dataframe.sort_values(
                 self.dataframe.columns[column_num - self.index_cols], ascending=self.sort_ascending
             )
+
+        for n, label in enumerate(self.labels):
+            icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
+            label.configure(image=get_bitmap_image(self.winfo_toplevel(), icon))
+
         self.refresh()
 
     def scrollto(self, new_offset):
