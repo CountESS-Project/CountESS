@@ -59,6 +59,8 @@ class PipelineNode:
     name: str
     plugin: Optional[BasePlugin] = None
     position: Optional[tuple[float, float]] = None
+    sort_column: int = 0
+    sort_descending: bool = False
     notes: Optional[str] = None
     parent_nodes: set["PipelineNode"]
     child_nodes: set["PipelineNode"]
@@ -74,11 +76,13 @@ class PipelineNode:
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
 
-    def __init__(self, name, plugin=None, config=None, position=None, notes=None):
+    def __init__(self, name, plugin=None, config=None, position=None, notes=None, sort_column=0, sort_descending=0):
         self.name = name
         self.plugin = plugin
         self.config = config or []
         self.position = position
+        self.sort_column = sort_column
+        self.sort_descending = sort_descending
         self.notes = notes
         self.parent_nodes = set()
         self.child_nodes = set()
