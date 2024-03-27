@@ -13,7 +13,7 @@ from enum import Enum, IntFlag
 from functools import partial
 
 from countess.core.pipeline import PipelineNode
-from countess.gui.widgets import get_bitmap_image
+from countess.gui.widgets import get_icon
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -260,7 +260,7 @@ class NodeWrapper(DraggableLabel):
         right_bar = node.plugin and node.plugin.num_outputs == 0
         self.configure(
             text=node.name,
-            image=get_bitmap_image(self, "redbar") if left_bar or right_bar else None,
+            image=get_icon(self, "redbar") if left_bar or right_bar else None,
             compound = tk.LEFT if left_bar else tk.RIGHT,
         )
 
