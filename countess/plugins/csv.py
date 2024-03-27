@@ -16,7 +16,7 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasInputFilesPlugin, PandasProcessPlugin
+from countess.core.plugins import PandasInputFilesPlugin, PandasOutputPlugin
 from countess.utils.pandas import flatten_columns
 
 
@@ -119,7 +119,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
         return df
 
 
-class SaveCsvPlugin(PandasProcessPlugin):
+class SaveCsvPlugin(PandasOutputPlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/included-plugins/#csv-writer"

@@ -81,6 +81,8 @@ class BasePlugin:
     description: str = ""
     additional: str = ""
     link: Optional[str] = None
+    num_inputs: int = 1
+    num_outputs: int = 1
 
     parameters: MutableMapping[str, BaseParam] = {}
     show_preview: bool = True
@@ -182,6 +184,7 @@ class FileInputPlugin(BasePlugin):
     file_number = 0
     name = ""
     row_limit = None
+    num_inputs = 0
 
     # used by the GUI file dialog
     file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
@@ -288,6 +291,7 @@ class PandasProductPlugin(PandasProcessPlugin):
     source2 = None
     mem1: Optional[List] = None
     mem2: Optional[List] = None
+    num_inputs = 2
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         if len(sources) != 2:
@@ -655,17 +659,4 @@ class PandasInputFilesPlugin(PandasInputPlugin):
 
 
 class PandasOutputPlugin(PandasProcessPlugin):
-    def process_inputs(self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]):
-        iterators = set(iter(input) for input in inputs.values())
-
-        while iterators:
-            for it in list(iterators):
-                try:
-                    df_in = next(it)
-                    assert isinstance(df_in, pd.DataFrame)
-                    self.output_dataframe(df_in, logger)
-                except StopIteration:
-                    iterators.remove(it)
-
-    def output_dataframe(self, dataframe: pd.DataFrame, logger: Logger):
-        raise NotImplementedError(f"{self.__class__}.output_dataframe")
+    num_outputs = 0
