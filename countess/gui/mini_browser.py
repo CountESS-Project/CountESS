@@ -1,8 +1,8 @@
 import tkinter as tk
-from urllib.parse import urlparse
 import webbrowser
+from urllib.parse import urlparse
 
-from tkinterweb import HtmlFrame #import the HTML browser
+from tkinterweb import HtmlFrame  # type: ignore
 
 MINI_CSS = """
     * { padding: 10px; line-height: 150% }
@@ -11,8 +11,8 @@ MINI_CSS = """
     th code, td code { border: 0px; }
 """
 
-class MiniBrowserFrame(tk.Frame):
 
+class MiniBrowserFrame(tk.Frame):
     def __init__(self, tk_parent, start_url, *a, **k):
         super().__init__(tk_parent, *a, **k)
         tk.Label(self, text="Documentation Preview").pack(fill="both")
@@ -47,7 +47,7 @@ class MiniBrowserFrame(tk.Frame):
             webbrowser.open_new_tab(link_url)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     root = tk.Tk()
     url = "https://countess-project.github.io/CountESS/"
     MiniBrowserFrame(root, url).pack(fill="both", expand=True)
