@@ -182,8 +182,10 @@ class PipelineNode:
             self.config = None
 
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
+        if not self.plugin:
+            return
         self.load_config(logger)
-        if self.is_dirty and self.plugin:
+        if self.is_dirty:
             assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
             self.result = []
             self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)

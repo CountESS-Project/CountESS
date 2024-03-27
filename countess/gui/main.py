@@ -28,7 +28,7 @@ plugin_classes = sorted(get_plugin_classes(), key=lambda x: x.name)
 
 
 class PluginChooserFrame(tk.Frame):
-    def __init__(self, master, title, callback, *a, **k):
+    def __init__(self, master, title, callback, has_parents, has_children, *a, **k):
         super().__init__(master, *a, **k)
 
         self.columnconfigure(0, weight=1)
@@ -37,6 +37,13 @@ class PluginChooserFrame(tk.Frame):
         label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
+            if (
+                (has_parents and plugin_class.num_inputs == 0)
+                or (not has_parents and plugin_class.num_inputs > 0)
+                or (has_children and plugin_class.num_outputs == 0)
+            ):
+                continue
+
             label_text = plugin_class.description
             tk.Button(
                 label_frame,
@@ -119,7 +126,11 @@ class ConfiguratorWrapper:
             self.frame.rowconfigure(4, weight=1)
 
         else:
-            self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
+            has_parents = len(self.node.parent_nodes) > 0
+            has_children = len(self.node.child_nodes) > 0
+            self.config_subframe = PluginChooserFrame(
+                self.config_canvas, "Choose Plugin", self.choose_plugin, has_parents, has_children
+            )
             self.config_subframe.grid(sticky=tk.NSEW)
             self.frame.rowconfigure(3, weight=1)
             self.frame.rowconfigure(4, weight=0)
