@@ -207,9 +207,10 @@ class PipelineNode:
                 child_node.mark_dirty()
 
     def add_parent(self, parent):
-        self.parent_nodes.add(parent)
-        parent.child_nodes.add(self)
-        self.mark_dirty()
+        if (not self.plugin or self.plugin.num_inputs) and (not parent.plugin or parent.plugin.num_outputs):
+            self.parent_nodes.add(parent)
+            parent.child_nodes.add(self)
+            self.mark_dirty()
 
     def del_parent(self, parent):
         self.parent_nodes.discard(parent)
