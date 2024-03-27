@@ -137,7 +137,7 @@ class TabularDataFrame(tk.Frame):
             return
 
         title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
-        title.grid(row=0, column=0, columnspan=len(column_names)*2+1, sticky=tk.NSEW, pady=5)
+        title.grid(row=0, column=0, columnspan=len(column_names) * 2 + 1, sticky=tk.NSEW, pady=5)
 
         ### XXX add in proper handling for MultiIndexes here
 
@@ -156,17 +156,17 @@ class TabularDataFrame(tk.Frame):
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
-            label.grid(row=1, column=num*2, sticky=tk.EW)
+            label.grid(row=1, column=num * 2, sticky=tk.EW)
             label.bind("<Button-1>", partial(self._label_button_1, num))
-            self.subframe.columnconfigure(num*2, minsize=10, weight=1)
+            self.subframe.columnconfigure(num * 2, minsize=10, weight=1)
             self.labels.append(label)
 
         # Between them are blank columns which provide a handle for adjusting the column
         # widths left and right
 
-        for num in range(0, len(column_names)-1):
+        for num in range(0, len(column_names) - 1):
             adjuster = tk.Frame(self.subframe, width=3, cursor="sb_h_double_arrow")
-            adjuster.grid(row=1, rowspan=2, column=num*2+1, sticky=tk.NSEW)
+            adjuster.grid(row=1, rowspan=2, column=num * 2 + 1, sticky=tk.NSEW)
             adjuster.bind("<B1-Motion>", partial(self._column_adjust, num))
 
         if len(self.dataframe) == 0:
@@ -176,7 +176,7 @@ class TabularDataFrame(tk.Frame):
 
         self.columns = [tk.Text(self.subframe) for _ in column_names]
         for num, column in enumerate(self.columns):
-            column.grid(sticky=tk.NSEW, row=2, column=num*2)
+            column.grid(sticky=tk.NSEW, row=2, column=num * 2)
             column["wrap"] = tk.NONE
             column["xscrollcommand"] = partial(self._column_xscrollcommand, num)
             column["yscrollcommand"] = self._column_yscrollcommand
@@ -189,7 +189,7 @@ class TabularDataFrame(tk.Frame):
             self.columns[0].bind("<Configure>", self._column_configure)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns)*2-1)
+        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns) * 2 - 1)
         self.scrollbar["command"] = self._scrollbar_command
         self.refresh(offset)
 
@@ -288,9 +288,9 @@ class TabularDataFrame(tk.Frame):
     def _column_adjust(self, num, event):
         """Adjust column widths left and right by dragging the dummy columns"""
         w0 = self.labels[num].winfo_width()
-        w1 = self.labels[num+1].winfo_width()
-        self.subframe.columnconfigure(num*2, minsize=w0 + event.x)
-        self.subframe.columnconfigure(num*2+2, minsize=w1 - event.x)
+        w1 = self.labels[num + 1].winfo_width()
+        self.subframe.columnconfigure(num * 2, minsize=w0 + event.x)
+        self.subframe.columnconfigure(num * 2 + 2, minsize=w1 - event.x)
 
     def _scrollbar_command(self, command, *parameters):
         # Detect scrollbar movement and move self.offset

@@ -18,7 +18,7 @@ def test_chooser():
     callback = MagicMock()
 
     root = make_root()
-    choose = PluginChooserFrame(root, "X", callback)
+    choose = PluginChooserFrame(root, "X", callback, True, True)
 
     for x in descendants(choose):
         if isinstance(x, tk.Button):

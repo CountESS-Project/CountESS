@@ -15,6 +15,7 @@ from functools import partial
 from countess.core.pipeline import PipelineNode
 from countess.gui.widgets import get_icon
 
+
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
@@ -255,7 +256,6 @@ class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Label):
 
 
 class NodeWrapper(DraggableLabel):
-
     def update_node(self, node, vertical=False):
         input_bar = node.plugin and node.plugin.num_inputs == 0
         output_bar = node.plugin and node.plugin.num_outputs == 0
@@ -263,12 +263,12 @@ class NodeWrapper(DraggableLabel):
             image = None
             compound = tk.NONE
         elif vertical:
-            image=get_icon(self, "hbar")
+            image = get_icon(self, "hbar")
             compound = tk.TOP if input_bar else tk.BOTTOM
         else:
-            image=get_icon(self, "vbar")
+            image = get_icon(self, "vbar")
             compound = tk.LEFT if input_bar else tk.RIGHT
-        self.configure( text=node.name, image=image, compound=compound)
+        self.configure(text=node.name, image=image, compound=compound)
 
 
 class GraphWrapper:

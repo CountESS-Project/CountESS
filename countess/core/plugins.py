@@ -19,7 +19,7 @@ import importlib
 import importlib.metadata
 import logging
 import os.path
-from collections.abc import Mapping, MutableMapping
+from collections.abc import MutableMapping
 from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
@@ -660,3 +660,6 @@ class PandasInputFilesPlugin(PandasInputPlugin):
 
 class PandasOutputPlugin(PandasProcessPlugin):
     num_outputs = 0
+
+    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError(f"{self.__class__}.process")
