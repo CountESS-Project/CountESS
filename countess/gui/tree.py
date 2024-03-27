@@ -253,16 +253,22 @@ class FlippyCanvas(FixedUnbindMixin, tk.Canvas):
 class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Label):
     pass
 
+
 class NodeWrapper(DraggableLabel):
 
-    def update_node(self, node):
-        left_bar = node.plugin and node.plugin.num_inputs == 0
-        right_bar = node.plugin and node.plugin.num_outputs == 0
-        self.configure(
-            text=node.name,
-            image=get_icon(self, "redbar") if left_bar or right_bar else None,
-            compound = tk.LEFT if left_bar else tk.RIGHT,
-        )
+    def update_node(self, node, vertical=False):
+        input_bar = node.plugin and node.plugin.num_inputs == 0
+        output_bar = node.plugin and node.plugin.num_outputs == 0
+        if not input_bar and not output_bar:
+            image = None
+            compound = tk.NONE
+        elif vertical:
+            image=get_icon(self, "hbar")
+            compound = tk.TOP if input_bar else tk.BOTTOM
+        else:
+            image=get_icon(self, "vbar")
+            compound = tk.LEFT if input_bar else tk.RIGHT
+        self.configure( text=node.name, image=image, compound=compound)
 
 
 class GraphWrapper:
@@ -292,7 +298,6 @@ class GraphWrapper:
 
     def label_for_node(self, node):
         label = NodeWrapper(self.canvas, wraplength=125, cursor="hand1", takefocus=True)
-        label.update_node(node)
         if not node.position:
             node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
         # XXX should be more elegant way of answering the question "are we flipped?"
@@ -338,14 +343,16 @@ class GraphWrapper:
 
     def on_configure(self, node, label, event):
         """Stores the updated position of the label in node.position"""
-        xx = float(label.place_info()["relx"]) * self.canvas.winfo_width()
-        yy = float(label.place_info()["rely"]) * self.canvas.winfo_height()
+        height = self.canvas.winfo_height()
+        width = self.canvas.winfo_width()
+
+        xx = float(label.place_info()["relx"]) * width
+        yy = float(label.place_info()["rely"]) * height
         node.position = self.new_node_position(xx, yy)
+        label.update_node(node, width < height)
 
         # Adapt label sizes to suit the window size, as best we can ...
         # XXX very arbitrary and definitely open to tweaking
-        height = self.canvas.winfo_height()
-        width = self.canvas.winfo_width()
         if height > width:
             label_max_width = max(width // 9, 25)
             label_font_size = int(math.sqrt(width) / 3)
@@ -530,7 +537,8 @@ class GraphWrapper:
     def node_changed(self, node):
         """Called when something external updates the node's name, status
         or configuration."""
-        self.labels[node].update_node(node)
+        flipped = self.canvas.winfo_width() >= self.canvas.winfo_height()
+        self.labels[node].update_node(node, not flipped)
 
     def destroy(self):
         for node_lines in self.lines.values():
