@@ -3,9 +3,9 @@ from functools import cache
 from importlib.resources import as_file, files
 from typing import Optional
 
-
 # To keep the cache of bitmaps smaller, we always associate the image with
 # the toplevel, not the individual widget it appears on.
+
 
 @cache
 def get_icon_toplevel(toplevel: tk.Toplevel, name: str) -> tk.Image:
@@ -13,8 +13,10 @@ def get_icon_toplevel(toplevel: tk.Toplevel, name: str) -> tk.Image:
     with as_file(source) as filepath:
         return tk.PhotoImage(master=toplevel, file=filepath)
 
+
 def get_icon(widget: tk.Widget, name: str) -> tk.Image:
     return get_icon_toplevel(widget.winfo_toplevel(), name)
+
 
 def info_button(parent: tk.Widget, *args, **kwargs) -> tk.Button:
     kwargs["image"] = get_icon(parent, "info")

@@ -3,7 +3,7 @@ import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
 from tkinter import ttk
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
@@ -88,6 +88,7 @@ class TabularDataFrame(tk.Frame):
     index_cols = 0
     sort_by_col = None
     sort_ascending = True
+    callback: Optional[Callable[[int, int, bool], None]] = None
 
     def reset(self):
         if self.subframe:
@@ -100,7 +101,7 @@ class TabularDataFrame(tk.Frame):
         self.subframe.rowconfigure(2, weight=1)
         self.subframe.grid(sticky=tk.NSEW)
 
-    def set_dataframe(self, dataframe: pd.DataFrame):
+    def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
         self.reset()
         assert self.subframe
 
@@ -183,7 +184,7 @@ class TabularDataFrame(tk.Frame):
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
         self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
         self.scrollbar["command"] = self._scrollbar_command
-        self.refresh()
+        self.refresh(offset)
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
@@ -244,6 +245,12 @@ class TabularDataFrame(tk.Frame):
         if self.length:
             self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
 
+        if self.callback:
+            self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
+
+    def set_callback(self, callback) -> None:
+        self.callback = callback
+
     def set_sort_order(self, column_num: int, descending: Optional[bool] = None):
         assert self.dataframe is not None
 
@@ -265,14 +272,12 @@ class TabularDataFrame(tk.Frame):
 
         self.refresh()
 
-    def scrollto(self, new_offset):
-        self.offset = min(max(int(new_offset), 0), self.length - self.height)
-        self.refresh()
-
     def _label_button_1(self, num, event):
         label_width = self.labels[num].winfo_width()
         if 2 * label_width / 5 < event.x < 3 * label_width / 5:
             self.set_sort_order(num)
+            if self.callback:
+                self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
 
     def _label_b1_motion(self, num, event):
         # Detect label drags left and right.

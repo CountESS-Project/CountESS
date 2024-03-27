@@ -177,12 +177,18 @@ class ConfiguratorWrapper:
                 df = concat_dataframes(self.node.result)
                 self.preview_subframe = TabularDataFrame(self.frame, highlightbackground="black", highlightthickness=3)
                 self.preview_subframe.set_dataframe(df)
+                self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
+                self.preview_subframe.set_callback(self.preview_changed_callback)
             except (TypeError, ValueError):
                 self.preview_subframe = tk.Frame(self.frame)
                 self.preview_subframe.columnconfigure(0, weight=1)
                 tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
+
+    def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
+        self.node.sort_column = sort_col
+        self.node.sort_descending = sort_desc
 
     def name_changed_callback(self, *_):
         name = self.name_var.get()
@@ -197,7 +203,7 @@ class ConfiguratorWrapper:
         self.node.mark_dirty()
         if self.config_change_task:
             self.frame.after_cancel(self.config_change_task)
-        self.config_change_task = self.frame.after(500, self.config_change_task_callback)
+        self.config_change_task = self.frame.after(1000, self.config_change_task_callback)
 
     def config_change_task_callback(self):
         self.config_change_task = None
