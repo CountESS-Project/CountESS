@@ -69,11 +69,9 @@ def format_value(value: Optional[Union[int, float, str]], column_format: str) ->
 
 
 class TabularDataFrame(tk.Frame):
-    """A frame for displaying a pandas (or similar)
-    dataframe.  Columns are displayed as individual tk.Text
-    widgets which seems to be relatively efficient as they
-    only hold the currently displayed rows.
-    Tested up to a million or so rows."""
+    """A frame for displaying a pandas (or similar) dataframe.
+    Columns are displayed as individual tk.Text widgets which seems to be relatively efficient
+    as they only hold the currently displayed rows.  Tested up to a million or so rows."""
 
     subframe: Optional[tk.Frame] = None
     dataframe: Optional[pd.DataFrame] = None
@@ -139,9 +137,11 @@ class TabularDataFrame(tk.Frame):
             return
 
         title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
-        title.grid(row=0, column=0, columnspan=len(column_names), sticky=tk.NSEW, pady=5)
+        title.grid(row=0, column=0, columnspan=len(column_names)*2+1, sticky=tk.NSEW, pady=5)
 
         ### XXX add in proper handling for MultiIndexes here
+
+        # Even-numbered columns are the data columns
 
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
@@ -156,11 +156,18 @@ class TabularDataFrame(tk.Frame):
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
-            label.grid(row=1, column=num, sticky=tk.EW)
+            label.grid(row=1, column=num*2, sticky=tk.EW)
             label.bind("<Button-1>", partial(self._label_button_1, num))
-            label.bind("<B1-Motion>", partial(self._label_b1_motion, num))
-            self.subframe.columnconfigure(num, minsize=10, weight=1)
+            self.subframe.columnconfigure(num*2, minsize=10, weight=1)
             self.labels.append(label)
+
+        # Between them are blank columns which provide a handle for adjusting the column
+        # widths left and right
+
+        for num in range(0, len(column_names)-1):
+            adjuster = tk.Frame(self.subframe, width=3, cursor="sb_h_double_arrow")
+            adjuster.grid(row=1, rowspan=2, column=num*2+1, sticky=tk.NSEW)
+            adjuster.bind("<B1-Motion>", partial(self._column_adjust, num))
 
         if len(self.dataframe) == 0:
             label = tk.Label(self.subframe, text="no data")
@@ -169,7 +176,7 @@ class TabularDataFrame(tk.Frame):
 
         self.columns = [tk.Text(self.subframe) for _ in column_names]
         for num, column in enumerate(self.columns):
-            column.grid(sticky=tk.NSEW, row=2, column=num)
+            column.grid(sticky=tk.NSEW, row=2, column=num*2)
             column["wrap"] = tk.NONE
             column["xscrollcommand"] = partial(self._column_xscrollcommand, num)
             column["yscrollcommand"] = self._column_yscrollcommand
@@ -182,7 +189,7 @@ class TabularDataFrame(tk.Frame):
             self.columns[0].bind("<Configure>", self._column_configure)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
+        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns)*2-1)
         self.scrollbar["command"] = self._scrollbar_command
         self.refresh(offset)
 
@@ -273,22 +280,17 @@ class TabularDataFrame(tk.Frame):
         self.refresh()
 
     def _label_button_1(self, num, event):
-        label_width = self.labels[num].winfo_width()
-        if 2 * label_width / 5 < event.x < 3 * label_width / 5:
-            self.set_sort_order(num)
-            if self.callback:
-                self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
+        """Click on column labels to set sort order"""
+        self.set_sort_order(num)
+        if self.callback:
+            self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
 
-    def _label_b1_motion(self, num, event):
-        # Detect label drags left and right.
-        # XXX still not quite right
-        label = self.labels[num]
-        label_width = label.winfo_width()
-
-        if event.x > label_width:
-            self.subframe.columnconfigure(num, minsize=event.x)
-        elif event.x < 0:
-            self.subframe.columnconfigure(num, minsize=label_width + event.x)
+    def _column_adjust(self, num, event):
+        """Adjust column widths left and right by dragging the dummy columns"""
+        w0 = self.labels[num].winfo_width()
+        w1 = self.labels[num+1].winfo_width()
+        self.subframe.columnconfigure(num*2, minsize=w0 + event.x)
+        self.subframe.columnconfigure(num*2+2, minsize=w1 - event.x)
 
     def _scrollbar_command(self, command, *parameters):
         # Detect scrollbar movement and move self.offset
