@@ -29,7 +29,8 @@ Under Ubuntu, `apt install jekyll` should be enough.
 ### Running Jekyll
 
 Jekyll will compile the site and write it into the `_site` subdirectory. 
-Please do not add this directory to the repository.
+Please do not add this directory to the repository.  The actual site
+is built automatically by Github Pages.
 
 To build the documentation once, run:
 
@@ -44,7 +45,7 @@ or to run a local HTTP server, run:
 The theming is minimal, using [vanilla.css](https://vanillacss.com/) and
 very little else.  Page tables of contents aren't really necessary for 
 navigation but for convenience they are generated on page load by
-[a very small piece of javascript](https://github.com/CountESS-Project/CountESS/tree/main/docs/js/toc.js).
+[a very small piece of javascript](https://countess-project.github.io/js/toc.js).
 
 For issues with these pages, especially accessibility issues, please
 [raise a github issue](https://github.com/CountESS-Project/CountESS/issues).

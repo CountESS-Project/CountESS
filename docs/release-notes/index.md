@@ -27,7 +27,7 @@
 
 * Dataframe column tool
 * Remove HDF5 plugin due to incompatibilities.  
-  It's now at https://github.com/CountESS-Project/countess-hdf5
+  It's now at [countess-hdf](https://github.com/CountESS-Project/countess-hdf5).
 * Remove index options from regex tool, as you can use
   dataframe column tool instead.
 

@@ -22,7 +22,8 @@ under a [BSD 3-clause license](license/).
 * [Writing Plugins](writing-plugins/)
 * [Configuration File Format](config-file-format/)
 * [Contributing to CountESS](contributing/)
-* [CountESS Dcoumentation](documentation/)
+* [Building Documentation](building-documentation/)
+* [Release Notes](release-notes/)
 
 ## Presentations
 
