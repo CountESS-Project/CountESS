@@ -42,6 +42,8 @@ class PivotPlugin(PandasProcessPlugin):
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         self.input_columns.update(get_all_columns(data))
 
+        data.reset_index(drop=data.index.names == [None], inplace=True)
+
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
         index_cols = [col for col, param in column_parameters if param.value == "Index"]
         pivot_cols = [col for col, param in column_parameters if param.value == "Pivot"]
