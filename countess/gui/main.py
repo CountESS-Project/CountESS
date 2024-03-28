@@ -419,7 +419,7 @@ class MainWindow:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph()
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
-        self.graph_wrapper.add_new_node(select=True)
+        self.graph_wrapper.add_new_node()
 
     def config_load(self, filename=None):
         if not filename:

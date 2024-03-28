@@ -418,13 +418,16 @@ class GraphWrapper:
         #    return
 
         position = self.new_node_position(event.x, event.y)
-        new_node = self.add_new_node(position)
+        new_node = self.add_new_node(position, select=False)
 
         for item in items:
             _, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
             self.add_parent(new_node, child_node)
             self.add_parent(parent_node, new_node)
+
+        self.highlight_node(new_node)
+        self.node_select_callback(new_node)
 
     def on_canvas_delete(self, event):
         """Delete key on canvas: delete line(s)."""
@@ -460,7 +463,7 @@ class GraphWrapper:
             event.widget.destroy()
 
         if len(self.graph.nodes) == 0:
-            self.add_new_node(select=True)
+            new_node = self.add_new_node(select=True)
         elif node == self.selected_node:
             # arbitrarily pick another node to show
             new_node = parent_nodes[0] if parent_nodes else child_nodes[0] if child_nodes else list(self.graph.nodes)[0]
@@ -474,7 +477,7 @@ class GraphWrapper:
                 return node
         return None
 
-    def add_new_node(self, position=(0.5, 0.5), select=True):
+    def add_new_node(self, position=(0.5, 0.5), select: bool = True):
         new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
         self.graph.add_node(new_node)
         self.labels[new_node] = self.label_for_node(new_node)
@@ -491,7 +494,7 @@ class GraphWrapper:
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
             position = self.new_node_position(event.x + xl, event.y + yl)
-            other_node = self.add_new_node(position)
+            other_node = self.add_new_node(position, select=False)
         elif other_node == start_node:
             return
         elif start_node in other_node.parent_nodes:
