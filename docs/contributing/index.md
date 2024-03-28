@@ -6,6 +6,11 @@ layout: default
 
 CountESS is an open source project and we welcome contributions.
 
+[CountESS source code](https://github.com/CountESS-Project/CountESS/)
+is maintained on github.
+CountESS is Copyright (C) 2022- CountESS Developers.
+It is released under [a BSD 3-clause license](https://github.com/CountESS-Project/CountESS/blob/main/LICENSE.txt).
+
 ## Writing your own plugins
 
 You don't need to change anything in CountESS to write your own 
