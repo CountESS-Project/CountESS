@@ -19,7 +19,7 @@ import importlib
 import importlib.metadata
 import logging
 import os.path
-from collections.abc import Mapping, MutableMapping
+from collections.abc import MutableMapping
 from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
@@ -81,6 +81,8 @@ class BasePlugin:
     description: str = ""
     additional: str = ""
     link: Optional[str] = None
+    num_inputs: int = 1
+    num_outputs: int = 1
 
     parameters: MutableMapping[str, BaseParam] = {}
     show_preview: bool = True
@@ -182,6 +184,7 @@ class FileInputPlugin(BasePlugin):
     file_number = 0
     name = ""
     row_limit = None
+    num_inputs = 0
 
     # used by the GUI file dialog
     file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
@@ -288,6 +291,7 @@ class PandasProductPlugin(PandasProcessPlugin):
     source2 = None
     mem1: Optional[List] = None
     mem2: Optional[List] = None
+    num_inputs = 2
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         if len(sources) != 2:
@@ -379,13 +383,34 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         try:
+            # 1. A dataframe with duplicates in its index can't be merged back correctly
+            # in Step 4, so we add in an extra RangeIndex to guarantee uniqueness,
+            # and remove it again afterwards in Step 5.
+            if dataframe.index.has_duplicates:
+                dataframe.set_index(pd.RangeIndex(0, len(dataframe), name="__tmpidx"), append=True, inplace=True)
+
+            # 2. the dataframe is transformed into
+            # a series of results by PandasTransform...ToXMixin.dataframe_to_series,
+            # which is expected to take each row of the dataframe, do something with
+            # it and return a series of objects (values, tuples or dicts).
             series = self.dataframe_to_series(dataframe, logger)
-            df2 = self.series_to_dataframe(series)
+
+            # 3. the series is expanded back out into rows by
+            # PandasTransformXTo...Mixin.series_to_dataframe()
+            dataframe_out = self.series_to_dataframe(series)
+
+            # 4. The expanded result is merged back into the original dataframe
+            dataframe_merged = dataframe.merge(dataframe_out, left_index=True, right_index=True)
+
+            # 5. Remove extra RangeIndex if we added it in step 1.
+            if "__tmpidx" in dataframe_merged.index.names:
+                dataframe_merged.reset_index("__tmpidx", drop=True, inplace=True)
+
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
             return None
-        df3 = dataframe.merge(df2, left_index=True, right_index=True)
-        return df3
+
+        return dataframe_merged
 
 
 # XXX instead of just asserting the existence of the parameters should we
@@ -634,17 +659,7 @@ class PandasInputFilesPlugin(PandasInputPlugin):
 
 
 class PandasOutputPlugin(PandasProcessPlugin):
-    def process_inputs(self, inputs: Mapping[str, Iterable[pd.DataFrame]], logger: Logger, row_limit: Optional[int]):
-        iterators = set(iter(input) for input in inputs.values())
+    num_outputs = 0
 
-        while iterators:
-            for it in list(iterators):
-                try:
-                    df_in = next(it)
-                    assert isinstance(df_in, pd.DataFrame)
-                    self.output_dataframe(df_in, logger)
-                except StopIteration:
-                    iterators.remove(it)
-
-    def output_dataframe(self, dataframe: pd.DataFrame, logger: Logger):
-        raise NotImplementedError(f"{self.__class__}.output_dataframe")
+    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError(f"{self.__class__}.process")

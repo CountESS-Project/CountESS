@@ -26,6 +26,7 @@ dependencies = [
     'pandas~=2.1.0',
     'psutil~=5.9.5',
     'rapidfuzz~=2.15.1',
+    'tkinterweb~=3.23.5',
     'ttkthemes~=3.2.2',
     'typing_extensions~=4.8.0',
 ]
@@ -97,6 +98,7 @@ disable = [
     "no-else-return",
     "too-many-ancestors",
     "too-many-arguments",
+    "too-many-boolean-expressions",
     "too-many-branches",
     "too-many-instance-attributes",
     "too-many-locals",
