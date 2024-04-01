@@ -1,3 +1,4 @@
+import pytest
 import time
 
 import numpy as np
@@ -33,6 +34,7 @@ df4 = df1.groupby("foo").agg({"bar": ["sum", "count"]})
 dfx = pd.DataFrame([{"foo": n, "bar": n * n} for n in range(0, 10000)])
 
 
+@pytest.mark.gui
 def test_tabular_1():
     root = make_root()
     tt = TabularDataFrame(root)
@@ -47,6 +49,7 @@ def test_tabular_1():
     tt.set_dataframe(df4)
 
 
+@pytest.mark.gui
 def test_tabular_scroll():
     root = make_root()
     tt = TabularDataFrame(root)
@@ -59,6 +62,7 @@ def test_tabular_scroll():
         root.update()
 
 
+@pytest.mark.gui
 def test_tabular_copy():
     root = make_root()
     tt = TabularDataFrame(root)

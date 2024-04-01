@@ -111,3 +111,7 @@ max-line-length = 120
 
 [tool.black]
 line-length = 120
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [ "slow", "gui" ]

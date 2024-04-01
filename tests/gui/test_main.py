@@ -1,3 +1,4 @@
+import pytest
 import time
 import tkinter as tk
 from unittest.mock import MagicMock
@@ -14,6 +15,7 @@ def descendants(widget):
         yield from descendants(w)
 
 
+@pytest.mark.gui
 def test_chooser():
     callback = MagicMock()
 
@@ -30,6 +32,7 @@ def test_chooser():
     root.destroy()
 
 
+@pytest.mark.gui
 def test_main():
     root = make_root()
     node = PipelineNode(name="NEW", plugin=DataTablePlugin())
@@ -42,6 +45,7 @@ def test_main():
     root.destroy()
 
 
+@pytest.mark.gui
 def test_run():
     graph = read_config("tests/simple.ini")
 
