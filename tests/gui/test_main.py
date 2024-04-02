@@ -1,7 +1,8 @@
-import pytest
 import time
 import tkinter as tk
 from unittest.mock import MagicMock
+
+import pytest
 
 from countess.core.config import read_config
 from countess.core.pipeline import PipelineNode

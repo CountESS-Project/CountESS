@@ -1,8 +1,8 @@
-import pytest
 import time
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from countess.gui.main import make_root
 from countess.gui.tabular import TabularDataFrame
