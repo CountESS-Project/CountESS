@@ -20,7 +20,7 @@ import importlib.metadata
 import logging
 import os.path
 from collections.abc import MutableMapping
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -187,7 +187,7 @@ class FileInputPlugin(BasePlugin):
     num_inputs = 0
 
     # used by the GUI file dialog
-    file_types: List[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
+    file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
     file_params: MutableMapping[str, BaseParam] = {}
 
     def num_files(self) -> int:

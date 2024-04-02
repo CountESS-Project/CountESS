@@ -3,7 +3,7 @@ import tkinter as tk
 from functools import cache
 from importlib.resources import as_file, files
 from tkinter import filedialog
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 # To keep the cache of bitmaps smaller, we always associate the image with
 # the toplevel, not the individual widget it appears on.
@@ -90,17 +90,17 @@ def _clean_filetype_extensions(extensions: Union[str, List[str]]):
     return [_clean_filetype_extension(ext) for ext in extensions]
 
 
-def _clean_filetypes(file_types: List[Tuple[str, Union[List[str]]]]):
+def _clean_filetypes(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
     return [(label, _clean_filetype_extensions(extensions)) for label, extensions in file_types]
 
 
-def ask_saveas_filename(file_types: List[Tuple[str, Union[str, List[str]]]]):
+def ask_saveas_filename(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
     return filedialog.asksaveasfilename(filetypes=_clean_filetypes(file_types))
 
 
-def ask_open_filenames(file_types: List[Tuple[str, Union[str, List[str]]]]):
+def ask_open_filenames(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
     return filedialog.askopenfilenames(filetypes=_clean_filetypes(file_types))
 
 
-def ask_open_filename(file_types: List[Tuple[str, Union[str, List[str]]]]):
+def ask_open_filename(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
     return filedialog.askopenfilename(filetypes=_clean_filetypes(file_types))

@@ -1,7 +1,7 @@
 import csv
 import gzip
 from io import BufferedWriter, BytesIO
-from typing import Optional, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
@@ -19,7 +19,12 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasInputFilesPlugin, PandasOutputPlugin
 from countess.utils.pandas import flatten_columns
 
-CSV_FILE_TYPES = [("CSV", [".csv", ".csv.gz"]), ("TSV", [".tsv", ".tsv.gz"]), ("TXT", [".txt", ".txt.gz"])]
+CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
+    ("CSV", [".csv", ".csv.gz"]),
+    ("TSV", [".tsv", ".tsv.gz"]),
+    ("TXT", [".txt", ".txt.gz"]),
+]
+
 
 class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
