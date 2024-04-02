@@ -50,3 +50,16 @@ class BooleanCheckbox(tk.Button):
             self["image"] = get_icon(self, "uncheck")
             self["state"] = tk.NORMAL
             self["bd"] = 1
+
+
+def copy_to_clipboard(s: str):
+    # XXX very cheesy, but self.clipboard_append() etc didn't
+    # seem to work, so this is a terrible workaround ... dump the
+    # string into a new tk.Text, select the whole thing and copy it
+    # into the clipboard.
+    top = tk.Toplevel()
+    text = tk.Text(top)
+    text.insert(tk.END, s)
+    text.tag_add("sel", "1.0", tk.END)
+    text.event_generate("<<Copy>>")
+    top.destroy()

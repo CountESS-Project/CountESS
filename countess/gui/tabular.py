@@ -8,7 +8,7 @@ from typing import Callable, Optional, Union
 import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
-from countess.gui.widgets import get_icon
+from countess.gui.widgets import copy_to_clipboard, get_icon
 
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
@@ -59,6 +59,7 @@ def format_value(value: Optional[Union[int, float, str]], column_format: str) ->
         return "—F"
 
     # remove trailing 0's from floats (%g doesn't align correctly)
+    #     100.0 => "100.000000000000" => "100."
     try:
         if column_format.endswith("f"):
             return (column_format % value).rstrip("0")
@@ -365,18 +366,11 @@ class TabularDataFrame(tk.Frame):
         if not self.select_rows:
             return  # not multi-row, keep it.
 
+        # Dump TSV into a StringIO ...
         r1, r2 = self.select_rows
         df = self.dataframe.iloc[self.offset + r1 - 1 : self.offset + r2]
         buf = io.StringIO()
         df.to_csv(buf, sep="\t")
 
-        # XXX very cheesy, but self.clipboard_append() etc didn't
-        # seem to work, so this is a terrible workaround ... dump the
-        # TSV into a new tk.Text, select the whole thing and copy it
-        # into the clipboard.
-        top = tk.Toplevel()
-        text = tk.Text(top)
-        text.insert(tk.END, buf.getvalue())
-        text.tag_add("sel", "1.0", tk.END)
-        text.event_generate("<<Copy>>")
-        top.destroy()
+        # ... and then push that onto the clipboard
+        copy_to_clipboard(buf.getvalue())

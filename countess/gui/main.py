@@ -268,9 +268,6 @@ class ConfiguratorWrapper:
         self.node.prerun(self.logger)
         self.node.is_dirty = True
         self.show_config_subframe()
-        if self.node.name.startswith("NEW "):
-            self.node.name = self.node.plugin.name + self.node.name.removeprefix("NEW")
-            self.name_var.set(self.node.name)
         self.change_callback(self.node)
 
     def destroy(self):

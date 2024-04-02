@@ -1,3 +1,4 @@
+import re
 import time
 from queue import Empty, Queue
 from threading import Thread
@@ -255,7 +256,17 @@ class PipelineGraph:
         self.plugin_classes = get_plugin_classes()
         self.nodes = []
 
+    def reset_node_name(self, node):
+        node_names_seen = set(n.name for n in self.nodes if n != node)
+        while node.name in node_names_seen:
+            num = 1
+            if match := re.match(r"(.*?)\s+(\d+)$", node.name):
+                node.name = match.group(1)
+                num = int(match.group(2))
+            node.name += f" {num + 1}"
+
     def add_node(self, node):
+        self.reset_node_name(node)
         self.nodes.append(node)
 
     def del_node(self, node):
@@ -304,6 +315,17 @@ class PipelineGraph:
         for node in self.nodes:
             node.result = None
             node.is_dirty = True
+
+    def reset_node_names(self):
+        node_names_seen = set()
+        for node in self.traverse_nodes():
+            while node.name in node_names_seen:
+                num = 0
+                if match := re.match(r"(.*?)\s+(\d+)$", node.name):
+                    node.name = match.group(1)
+                    num = int(match.group(2))
+                node.name += f" {num + 1}"
+            node_names_seen.add(node.name)
 
     def tidy(self):
         """Tidies the graph (sets all the node positions)"""

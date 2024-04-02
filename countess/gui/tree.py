@@ -9,11 +9,13 @@ import math
 import random
 import re
 import tkinter as tk
+from configparser import ConfigParser
 from enum import Enum, IntFlag
 from functools import partial
 
+from countess.core.config import read_config_dict, write_config_node_string
 from countess.core.pipeline import PipelineNode
-from countess.gui.widgets import get_icon
+from countess.gui.widgets import copy_to_clipboard, get_icon
 
 
 def _limit(value, min_value, max_value):
@@ -295,6 +297,7 @@ class GraphWrapper:
         self.canvas.bind("<Leave>", self.on_canvas_leave)
         self.canvas.bind("<Key-Delete>", self.on_canvas_delete)
         self.canvas.bind("<Key-BackSpace>", self.on_canvas_delete)
+        self.canvas.bind("<<Paste>>", self.on_paste)
 
     def label_for_node(self, node):
         label = NodeWrapper(self.canvas, wraplength=125, cursor="hand1", takefocus=True)
@@ -313,6 +316,8 @@ class GraphWrapper:
         label.bind("<Key-BackSpace>", partial(self.on_delete, node), add=True)
         label.bind("<Enter>", partial(self.on_enter, node), add=True)
         label.bind("<Leave>", partial(self.on_leave, node), add=True)
+        label.bind("<<Copy>>", partial(self.on_copy, node), add=True)
+        label.bind("<<Cut>>", partial(self.on_cut, node), add=True)
 
         return label
 
@@ -380,6 +385,33 @@ class GraphWrapper:
             self.canvas.delete(self.highlight_rectangle)
             self.highlight_rectangle = None
         self.canvas.focus_set()
+
+    def on_copy(self, node, event):
+        # Copy the selected node's config to the clipboard
+        copy_to_clipboard(write_config_node_string(node))
+
+    def on_cut(self, node, event):
+        self.on_copy(node, event)
+        self.on_delete(node, event)
+
+    def on_paste(self, event):
+        # Try and interpret whatever is in the clipboard as a config
+        # file section and create it as a node!  This lets users
+        # cut and paste between CountESS instances!
+        cp = ConfigParser()
+        cp.read_string(self.canvas.clipboard_get())
+
+        for section_name in cp.sections():
+            config_dict = cp[section_name]
+            node = read_config_dict(section_name, "", config_dict)
+            node.position = self.new_node_position(event.x, event.y)
+            self.add_node(node)
+
+            # try and reconnect parents if they exist
+            nodes_by_name = {n.name: n for n in self.graph.nodes}
+            for key, val in config_dict.items():
+                if key.startswith("_parent.") and val in nodes_by_name:
+                    self.add_parent(nodes_by_name[val], node)
 
     def on_canvas_motion(self, event):
         """Show a preview of line selection when the cursor is over line(s)"""
@@ -477,8 +509,7 @@ class GraphWrapper:
                 return node
         return None
 
-    def add_new_node(self, position=(0.5, 0.5), select: bool = True):
-        new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
+    def add_node(self, new_node, select: bool = True):
         self.graph.add_node(new_node)
         self.labels[new_node] = self.label_for_node(new_node)
         self.labels[new_node].update()
@@ -486,6 +517,10 @@ class GraphWrapper:
         if select:
             self.highlight_node(new_node)
             self.node_select_callback(new_node)
+
+    def add_new_node(self, position=(0.5, 0.5), select: bool = True):
+        new_node = PipelineNode(name="NEW", position=position)
+        self.add_node(new_node, select)
         return new_node
 
     def on_ghost_release(self, start_node, event):
@@ -541,6 +576,11 @@ class GraphWrapper:
         """Called when something external updates the node's name, status
         or configuration."""
         flipped = self.canvas.winfo_width() >= self.canvas.winfo_height()
+
+        if node.name.startswith("NEW"):
+            node.name = node.plugin.name
+            self.graph.reset_node_name(node)
+
         self.labels[node].update_node(node, not flipped)
 
     def destroy(self):
