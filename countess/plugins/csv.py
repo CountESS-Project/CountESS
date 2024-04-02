@@ -19,6 +19,7 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasInputFilesPlugin, PandasOutputPlugin
 from countess.utils.pandas import flatten_columns
 
+CSV_FILE_TYPES = [("CSV", [".csv", ".csv.gz"]), ("TSV", [".tsv", ".tsv.gz"]), ("TXT", [".txt", ".txt.gz"])]
 
 class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
@@ -27,8 +28,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     description = "Loads data from CSV or similar delimited text files and assigns types to columns"
     link = "https://countess-project.github.io/CountESS/included-plugins/#csv-reader"
     version = VERSION
-
-    file_types = [("CSV", [".csv", ".gz"]), ("TSV", [".tsv", ".gz"]), ("TXT", ".txt")]
+    file_types = CSV_FILE_TYPES
 
     parameters = {
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
@@ -124,8 +124,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/included-plugins/#csv-writer"
     version = VERSION
-
-    file_types = [("CSV", [".csv", ".gz"]), ("TSV", [".tsv", ".gz"]), ("TXT", ".txt")]
+    file_types = CSV_FILE_TYPES
 
     parameters = {
         "header": BooleanParam("CSV header row?", True),

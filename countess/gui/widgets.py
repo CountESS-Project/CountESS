@@ -1,7 +1,9 @@
+import platform
 import tkinter as tk
 from functools import cache
 from importlib.resources import as_file, files
-from typing import Optional
+from tkinter import filedialog
+from typing import List, Optional, Tuple, Union
 
 # To keep the cache of bitmaps smaller, we always associate the image with
 # the toplevel, not the individual widget it appears on.
@@ -63,3 +65,42 @@ def copy_to_clipboard(s: str):
     text.tag_add("sel", "1.0", tk.END)
     text.event_generate("<<Copy>>")
     top.destroy()
+
+
+def _clean_filetype_extension(ext: str):
+    # See https://tcl.tk/man/tcl8.6/TkCmd/getOpenFile.htm#M16
+    # for the rules of file type extensions
+
+    if ext != "*" and ext.startswith("*"):
+        ext = ext[1:]
+
+    if platform.system() == "Darwin":
+        # Mac OSX crashes if given a double-dotted extension like ".csv.gz" #27
+        try:
+            return ext[ext.rindex(".") :]
+        except ValueError:
+            return "." + ext
+    else:
+        return ext
+
+
+def _clean_filetype_extensions(extensions: Union[str, List[str]]):
+    if type(extensions) is str:
+        extensions = extensions.split()
+    return [_clean_filetype_extension(ext) for ext in extensions]
+
+
+def _clean_filetypes(file_types: List[Tuple[str, Union[List[str]]]]):
+    return [(label, _clean_filetype_extensions(extensions)) for label, extensions in file_types]
+
+
+def ask_saveas_filename(file_types: List[Tuple[str, Union[str, List[str]]]]):
+    return filedialog.asksaveasfilename(filetypes=_clean_filetypes(file_types))
+
+
+def ask_open_filenames(file_types: List[Tuple[str, Union[str, List[str]]]]):
+    return filedialog.askopenfilenames(filetypes=_clean_filetypes(file_types))
+
+
+def ask_open_filename(file_types: List[Tuple[str, Union[str, List[str]]]]):
+    return filedialog.askopenfilename(filetypes=_clean_filetypes(file_types))

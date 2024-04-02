@@ -2,7 +2,7 @@
 import math
 import tkinter as tk
 from functools import partial
-from tkinter import filedialog, ttk
+from tkinter import ttk
 from typing import Mapping, MutableMapping, Optional
 
 import numpy as np
@@ -22,7 +22,14 @@ from ..core.parameters import (
     TextParam,
 )
 from ..core.plugins import BasePlugin
-from .widgets import BooleanCheckbox, add_button, delete_button
+from .widgets import (
+    BooleanCheckbox,
+    add_button,
+    ask_open_filename,
+    ask_open_filenames,
+    ask_saveas_filename,
+    delete_button,
+)
 
 
 def is_nan(v):
@@ -319,11 +326,11 @@ class ParameterWrapper:
 
         if isinstance(self.parameter, FileSaveParam):
             file_types = self.parameter.file_types
-            filename = filedialog.asksaveasfilename(filetypes=file_types)
+            filename = ask_saveas_filename(file_types)
             self.parameter.value = filename
         if isinstance(self.parameter, FileArrayParam):
             file_types = self.parameter.file_types
-            filenames = filedialog.askopenfilenames(filetypes=file_types)
+            filenames = ask_open_filenames(file_types)
             self.parameter.add_files(filenames)
         else:
             self.parameter.add_row()
@@ -347,7 +354,7 @@ class ParameterWrapper:
 
     def change_file_callback(self, *_):
         file_types = self.parameter.file_types
-        filename = filedialog.askopenfilename(filetypes=file_types)
+        filename = ask_open_filename(file_types)
         self.parameter.value = filename
         self.entry["text"] = self.parameter.value
         self.callback(self.parameter)
