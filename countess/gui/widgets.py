@@ -94,8 +94,8 @@ def _clean_filetypes(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
     return [(label, _clean_filetype_extensions(extensions)) for label, extensions in file_types]
 
 
-def ask_saveas_filename(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
-    return filedialog.asksaveasfilename(filetypes=_clean_filetypes(file_types))
+def ask_saveas_filename(initial_file: str, file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
+    return filedialog.asksaveasfilename(initialfile=initial_file, filetypes=_clean_filetypes(file_types))
 
 
 def ask_open_filenames(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):

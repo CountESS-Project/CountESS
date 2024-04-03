@@ -3,7 +3,7 @@ import re
 import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 from typing import Optional
 
 import psutil
@@ -17,7 +17,7 @@ from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import info_button
+from countess.gui.widgets import info_button, ask_saveas_filename, ask_open_filename
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -420,7 +420,7 @@ class MainWindow:
 
     def config_load(self, filename=None):
         if not filename:
-            filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
+            filename = ask_open_filename(file_types=[(".INI Config File", "*.ini")])
         if not filename:
             return
         self.config_filename = filename
@@ -432,9 +432,9 @@ class MainWindow:
 
     def config_save(self, filename=None):
         if not filename:
-            filename = filedialog.asksaveasfilename(
-                initialfile=self.config_filename,
-                filetypes=[(".INI Config File", "*.ini")],
+            filename = ask_saveas_filename(
+                initial_file=self.config_filename,
+                file_types=[(".INI Config File", "*.ini")],
             )
         if not filename:
             return
@@ -451,7 +451,7 @@ class MainWindow:
                 initialfile = self.config_filename.removesuffix(".ini") + ".dot"
             else:
                 initialfile = None
-            filename = filedialog.asksaveasfilename(initialfile=initialfile, filetypes=[("Graphviz File", "*.dot")])
+            filename = ask_saveas_filename(initial_file=initialfile, file_types=[("Graphviz File", "*.dot")])
         if not filename:
             return
         export_config_graphviz(self.graph, filename)
