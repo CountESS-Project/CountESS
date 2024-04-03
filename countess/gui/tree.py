@@ -359,10 +359,10 @@ class GraphWrapper:
         # Adapt label sizes to suit the window size, as best we can ...
         # XXX very arbitrary and definitely open to tweaking
         if height > width:
-            label_max_width = max(width // 9, 25)
+            label_max_width = max(width // 6, 25)
             label_font_size = int(math.sqrt(width) / 3)
         else:
-            label_max_width = max(width // 20, 16)
+            label_max_width = max(width // 12, 16)
             label_font_size = int(math.sqrt(width) / 5)
         label["wraplength"] = label_max_width
         label["font"] = ("TkDefaultFont", label_font_size)
