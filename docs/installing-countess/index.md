@@ -6,7 +6,7 @@ layout: default
 
 ## ... using pip
 
-CountESS can be installed from [pypi](https://pypi.org/):
+CountESS can be [installed from pypi](https://pypi.org/project/countess/):
 
     pip install countess
 
