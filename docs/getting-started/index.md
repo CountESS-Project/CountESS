@@ -234,3 +234,17 @@ and even more of the Protein variants turn out to be synonymous (`p.=`).
 [![Example 3 Image 8](img/example_3_8.png)](img/example_3_8.png)
 [![Example 3 Image 11](img/example_3_11.png)](img/example_3_11.png)
 
+## Example 4: FASTQ and Vamp-Seq
+
+Load this example with `countess_gui example_4.ini`.
+
+[![Example 4 Image 1](img/example_4_1.png)](img/example_4_1.png)
+[![Example 4 Image 2](img/example_4_2.png)](img/example_4_2.png)
+<!--
+[![Example 4 Image 3](img/example_4_3.png)](img/example_4_3.png)
+[![Example 4 Image 4](img/example_4_4.png)](img/example_4_4.png)
+[![Example 4 Image 5](img/example_4_5.png)](img/example_4_5.png)
+-->
+[![Example 4 Image 6](img/example_4_6.png)](img/example_4_6.png)
+[![Example 4 Image 7](img/example_4_7.png)](img/example_4_7.png)
+
