@@ -124,8 +124,7 @@ class ConfiguratorWrapper:
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
-            self.frame.rowconfigure(3, weight=1)
-            self.frame.rowconfigure(4, weight=1)
+            self.frame.rowconfigure(3, weight=1, minsize=self.frame.winfo_height()/2)
 
         else:
             has_parents = len(self.node.parent_nodes) > 0
