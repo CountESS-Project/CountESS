@@ -269,7 +269,7 @@ class TabularDataFrame(tk.Frame):
             self.sort_ascending = not descending
         if column_num < self.index_cols:
             self.dataframe = self.dataframe.sort_index(level=column_num, ascending=self.sort_ascending)
-        else:
+        elif column_num < self.index_cols + len(self.dataframe.columns):
             self.dataframe = self.dataframe.sort_values(
                 self.dataframe.columns[column_num - self.index_cols], ascending=self.sort_ascending
             )

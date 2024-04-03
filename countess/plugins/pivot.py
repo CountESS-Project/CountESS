@@ -19,8 +19,8 @@ class PivotPlugin(PandasProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
-    description = """Groups a dataframe and pivots column values into columns.
-        Expanded column values are duplicated for each combination of pivot values.
+    description = "Groups a dataframe and pivots column values into columns."
+    additional = """Expanded column values are duplicated for each combination of pivot values.
         Missing values default to 0, and duplicate values are summed."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
