@@ -136,29 +136,101 @@ AAACACTGGTTAGACCCAAG,88,65,0.7386363636363636
 
 ## Example 2: Translating Barcodes
 
+Load this example with `countess_gui example_2.ini`.
+
 Often, rather than direct sequencing, our sequencing files are full
 of "barcodes", and we need to use a barcode map to translate to an
 actual sequence.
 
+In this example, we're working with a simple barcode map `barcodes.csv`,
+each row of which translates our random 20 base barcodes to a 147-base 
+protein coding sequence.
+
+```
+barcode,sequence
+ATTCCCGTAATCTACGATTA,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
+AGTCACAACCAAACCATGGA,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
+TTACGGTCTGCGTTGGAATC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
+AGGGCCGTGCCAAGTGCAGT,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGACCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
+TGTAGTGCCGTATTTGTGGC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCAGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
+```
+
+### Reading Sequences
+
+First, we modify our reading and grouping steps to rename the sequence column to `barcode`,
+
 [![Example 2 Image 1](img/example_2_1.png)](img/example_2_1.png)
+<!--
 [![Example 2 Image 2](img/example_2_2.png)](img/example_2_2.png)
+-->
+
+### Reading the Barcode File
+
+We can read the barcode file using the CSV Loader:
+
 [![Example 2 Image 3](img/example_2_3.png)](img/example_2_3.png)
+
+### Joining the Barcode File
+
+Now we add in a Join tool, which joins the two tables using the `barcode` column.
+
 [![Example 2 Image 4](img/example_2_4.png)](img/example_2_4.png)
+
+The rest of the steps continue as before, but we are now tabulating our data by
+the longer `sequence` column.
+
+* Note that while there were 1000 distinct barcodes, there are only 357 distinct
+  sequences.  Some barcodes represent duplicate variants.
+
+<!--
 [![Example 2 Image 5](img/example_2_5.png)](img/example_2_5.png)
 [![Example 2 Image 6](img/example_2_6.png)](img/example_2_6.png)
+-->
 [![Example 2 Image 7](img/example_2_7.png)](img/example_2_7.png)
 
 ## Example 3: Calling Variants
 
+Load this example with `countess_gui example_3.ini`.
+
+Working with long sequences is a bit unwieldy: it'd be handy
+to be able to process these in a more compact format.  The "Variant Translator" 
+plugin lets us compare a sequence to a reference sequence and extract
+DNA and Protein variants in [HGVS](https://hgvs-nomenclature.org/stable/) format.
+
+<!--
 [![Example 3 Image 1](img/example_3_1.png)](img/example_3_1.png)
 [![Example 3 Image 2](img/example_3_2.png)](img/example_3_2.png)
 [![Example 3 Image 3](img/example_3_3.png)](img/example_3_3.png)
 [![Example 3 Image 4](img/example_3_4.png)](img/example_3_4.png)
+-->
+
+We configure the Variant Translator with our known reference sequence:
+
+```
+ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
+```
+and it calculates both DNA (`variant`) and Protein (`protein`) variant strings
+for each sequence in the dataframe.
+
+Quite a lot of the DNA variants turn out to be equal to the reference sequence (`g.=`) 
+and even more of the Protein variants turn out to be synonymous (`p.=`).
+
 [![Example 3 Image 5](img/example_3_5.png)](img/example_3_5.png)
+
+### Duplicating Output
+
+#### Pivoting
+
 [![Example 3 Image 6](img/example_3_6.png)](img/example_3_6.png)
-[![Example 3 Image 7](img/example_3_7.png)](img/example_3_7.png)
-[![Example 3 Image 8](img/example_3_8.png)](img/example_3_8.png)
 [![Example 3 Image 9](img/example_3_9.png)](img/example_3_9.png)
+
+#### Scoring
+
+[![Example 3 Image 7](img/example_3_7.png)](img/example_3_7.png)
 [![Example 3 Image 10](img/example_3_10.png)](img/example_3_10.png)
+
+#### Writing CSV
+
+[![Example 3 Image 8](img/example_3_8.png)](img/example_3_8.png)
 [![Example 3 Image 11](img/example_3_11.png)](img/example_3_11.png)
 
