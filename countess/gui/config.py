@@ -326,7 +326,7 @@ class ParameterWrapper:
 
         if isinstance(self.parameter, FileSaveParam):
             file_types = self.parameter.file_types
-            filename = ask_saveas_filename(file_types)
+            filename = ask_saveas_filename(self.parameter.value, file_types)
             self.parameter.value = filename
         if isinstance(self.parameter, FileArrayParam):
             file_types = self.parameter.file_types

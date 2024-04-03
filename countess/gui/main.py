@@ -17,7 +17,7 @@ from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import info_button, ask_saveas_filename, ask_open_filename
+from countess.gui.widgets import ask_open_filename, ask_saveas_filename, info_button
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -124,7 +124,7 @@ class ConfiguratorWrapper:
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
-            self.frame.rowconfigure(3, weight=1, minsize=self.frame.winfo_height()/2)
+            self.frame.rowconfigure(3, weight=1, minsize=self.frame.winfo_height() / 2)
 
         else:
             has_parents = len(self.node.parent_nodes) > 0
