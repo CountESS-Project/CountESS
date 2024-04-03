@@ -70,7 +70,7 @@ time point.
 
 [![Example 1 Image 2](img/example_1_2.png)](img/example_1_2.png)
 
-The "Group By" tool lets us specify some columns to index by.
+The [Group By](../included-plugins/#group-by) tool lets us specify some columns to index by.
 If no other operations are selected, it will count the number of 
 rows corresponding to each index value, and put this into a 
 column called "count".
@@ -84,7 +84,7 @@ column called "count".
 We've now got separate counts for each sequence at each time point,
 but we want to compare counts for each sequence across the time points.
 
-To do this, we use the Pivot Tool:
+To do this, we use the [Pivot Tool](../included-plugins/#pivot-tool):
 
 [![Example 1 Image 3](img/example_1_3.png)](img/example_1_3.png)
 
@@ -106,7 +106,7 @@ one by the other:
 
 [![Example 1 Image 4](img/example_1_4.png)](img/example_1_4.png)
 
-The Python Code tool lets us write small expressions in Python and
+The [Python Code](../included-plugins/#python) tool lets us write small expressions in Python and
 apply them to each row of the table.  In this case we're calculating
 score as the fraction of sequences which have survived from time 1
 to time 2.
@@ -114,7 +114,7 @@ to time 2.
 ### 5. Saving Results
 
 Now we have a score for each sequence, we need to write our data
-out somewhere.  The CSV Save tool lets us save our output in a 
+out somewhere.  The [CSV Save](../included-plugins/#csv-writer) tool lets us save our output in a 
 CSV file for easy use elsewhere.  
 
 [![Example 1 Image 5](img/example_1_5.png)](img/example_1_5.png)
@@ -155,8 +155,6 @@ AGGGCCGTGCCAAGTGCAGT,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTC
 TGTAGTGCCGTATTTGTGGC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCAGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
 ```
 
-### Reading Sequences
-
 First, we modify our reading and grouping steps to rename the sequence column to `barcode`,
 
 [![Example 2 Image 1](img/example_2_1.png)](img/example_2_1.png)
@@ -164,13 +162,9 @@ First, we modify our reading and grouping steps to rename the sequence column to
 [![Example 2 Image 2](img/example_2_2.png)](img/example_2_2.png)
 -->
 
-### Reading the Barcode File
-
-We can read the barcode file using the CSV Loader:
+We can read the barcode map using the [CSV Loader](../included-plugins/#csv-reader:
 
 [![Example 2 Image 3](img/example_2_3.png)](img/example_2_3.png)
-
-### Joining the Barcode File
 
 Now we add in a Join tool, which joins the two tables using the `barcode` column.
 
@@ -193,7 +187,7 @@ the longer `sequence` column.
 Load this example with `countess_gui example_3.ini`.
 
 Working with long sequences is a bit unwieldy: it'd be handy
-to be able to process these in a more compact format.  The "Variant Translator" 
+to be able to process these in a more compact format.  The [Variant Translator](../included-plugins/#variant-caller)
 plugin lets us compare a sequence to a reference sequence and extract
 DNA and Protein variants in [HGVS](https://hgvs-nomenclature.org/stable/) format.
 
@@ -204,7 +198,8 @@ DNA and Protein variants in [HGVS](https://hgvs-nomenclature.org/stable/) format
 [![Example 3 Image 4](img/example_3_4.png)](img/example_3_4.png)
 -->
 
-We configure the Variant Translator with our known reference sequence:
+We add a Variant Translator to our project, and configure it with
+our known reference sequence:
 
 ```
 ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
@@ -217,34 +212,55 @@ and even more of the Protein variants turn out to be synonymous (`p.=`).
 
 [![Example 3 Image 5](img/example_3_5.png)](img/example_3_5.png)
 
-### Duplicating Output
+From here, we perform the same pivot, score and write to CSV steps as 
+before, but duplicated for both DNA and Protein variants.
 
-#### Pivoting
-
+<!--
 [![Example 3 Image 6](img/example_3_6.png)](img/example_3_6.png)
 [![Example 3 Image 9](img/example_3_9.png)](img/example_3_9.png)
-
-#### Scoring
-
 [![Example 3 Image 7](img/example_3_7.png)](img/example_3_7.png)
 [![Example 3 Image 10](img/example_3_10.png)](img/example_3_10.png)
-
-#### Writing CSV
-
 [![Example 3 Image 8](img/example_3_8.png)](img/example_3_8.png)
 [![Example 3 Image 11](img/example_3_11.png)](img/example_3_11.png)
+-->
 
 ## Example 4: FASTQ and Vamp-Seq
 
 Load this example with `countess_gui example_4.ini`.
 
+In the previous examples, we've loaded sequence data from CSV files, but 
+[FASTQ](https://en.wikipedia.org/wiki/FASTQ_format) files are a more common format
+for sequence data and we can read these with the [FASTQ Reader](../included-plugins/#fastq-load)
+
+The CSV files had a convenient `time` column for us to use, but our example
+FASTQ files do not.  We could work around this by using eight FASTQ loaders,
+one for each file, but instead what we can do is select the "Filename Column?" option
+in the FASTQ Loader which will add an extra `filename` column in to the
+dataframe:
+
 [![Example 4 Image 1](img/example_4_1.png)](img/example_4_1.png)
+
+We can then use the [Regex Tool](../included-plugins/#regex-tool) to break this filename down into its 
+useful parts, extracting `bin` and `rep` columns from the filename.
+
 [![Example 4 Image 2](img/example_4_2.png)](img/example_4_2.png)
 <!--
 [![Example 4 Image 3](img/example_4_3.png)](img/example_4_3.png)
 [![Example 4 Image 4](img/example_4_4.png)](img/example_4_4.png)
 [![Example 4 Image 5](img/example_4_5.png)](img/example_4_5.png)
 -->
+
+We can then [pivot](../included-plugins/#pivot-tool) on `bin`, giving us columns 
+`count__bin_1`, `count__bin_2`, `count__bin_3` and `count__bin_4`:
+
 [![Example 4 Image 6](img/example_4_6.png)](img/example_4_6.png)
+
+That's enough to calculate a score for each protein variant:
+
 [![Example 4 Image 7](img/example_4_7.png)](img/example_4_7.png)
+
+<!--
+[![Example 4 Image 8](img/example_4_8.png)](img/example_4_8.png)
+[![Example 4 Image 9](img/example_4_9.png)](img/example_4_9.png)
+-->
 

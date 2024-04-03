@@ -140,6 +140,9 @@ The "required" flag on the input datatables lets you select the type of join:
 
 ### Regex Tool
 
+> "Some people, when confronted with a problem, think "I know, I'll use regular expressions." Now they have two problems."
+> -- Jamie Zawinski
+
 Splits a string value into multiple parts using a regular expression.
 
 Specify a pattern to match and columns to output the matching parts to.

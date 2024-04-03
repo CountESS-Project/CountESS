@@ -1,0 +1,47 @@
+/* little overrides to vanilla.css */
+
+body {
+	max-width: 120ch;
+}
+
+div.navbar {
+    display: block;
+    border-bottom: 2px solid var(--tertiary-color);
+}
+
+dt {
+    font-weight: bold;
+}
+
+table code {
+    border: none;
+    background: none;
+}
+
+table th code {
+    font-weight: bold;
+}
+
+@media (min-width: 48em) {
+    .content {
+	 max-width: 38rem;
+	 margin-left: 18rem;
+	 margin-right: 2rem;
+    }
+    .sidebar {
+	 max-width: 16rem;
+	 position: fixed;
+    }
+}
+
+@media (min-width: 64em) {
+  .content {
+    margin-left: 22rem;
+    margin-right: 2rem;
+  }
+  .sidebar {
+	max-width: 20rem;
+	position: fixed;
+}
+}
+
