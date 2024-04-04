@@ -6,37 +6,47 @@ layout: default
 
 CountESS is more like a toolbox than a single program: it can do all 
 sorts of things, but that makes it a little tricky to work out how
-to get started.  This tutorial attempts to walk you through a simple 
-task to demonstrate how to solve simple bioinformatics tasks with
-CountESS.
+to get started.  This tutorial attempts to walk you through some
+simplified examples to demonstrate how to solve common bioinformatics
+tasks with CountESS.
 
 ## Demo Files
 
 The [countess-demo](https://github.com/CountESS-Project/countess-demo/)
 project provides a collection of demonstration files for use in these examples.
-You can download a ZIP of the files [here](https://github.com/CountESS-Project/countess-demo/archive/refs/heads/main.zip).
-
 Demo files consist of randomly generated data.
 Any resemblance to organisms living or otherwise is coincidental.
 
+You can download a ZIP of the files
+[here](https://github.com/CountESS-Project/countess-demo/archive/refs/heads/main.zip).
+or clone the repository using:
+
+```
+git clone https://github.com/CountESS-Project/countess-demo/
+```
 
 ## Example 1: Reading & Counting Sequences
 
 For this simplified example, we'll load up two CSV files with 
-sequencing data, count the sequences and score them using their 
-counts at two time points.
+DNA sequencing data, count the population of each variant
+at two time points and score the variants using the ratio of
+their counts.
 
 Load this example up with `countess_gui example_1.ini`.
 
 [![Example 1 Image 0](img/example_1_0.png)](img/example_1_0.png)
 
-There are five steps in this CountESS pipeline, each of which
-is described below:
+There are five nodes in this CountESS pipeline, each of which
+transforms the data and then passes it to the next node.
+CountESS can also perform operations in parallel, but for the
+moment we can understand each of these steps as happening
+sequentially.
 
 ### 1. Loading CSV files
 
-Sequences are in the files `sequence_1.csv` and `sequence_2.csv`
-which just contain raw DNA sequences and a `time` column.
+Sequences are in the files `sequences_1.csv` and `sequences_2.csv`
+which just contain a `sequence` column with raw DNA sequences and
+a `time` column.
 
 ```
 sequence,time
@@ -54,12 +64,9 @@ Our first step just reads these two files in.
 [![Example 1 Image 1](img/example_1_1.png)](img/example_1_1.png)
 
 * Sequence data can also be loaded from other file formats such 
-  as FASTQ
+  as FASTQ, see [Example 4](#example-4-fastq-and-vamp-seq)
 * CountESS can also read Gzipped CSV and FASTQ files, and this can
   be faster to read than plain files, depending on your platform.
-* If your data doesn't have a convenient `time` column or equivalent,
-  don't worry, you can include the filename as a column and extract
-  the metadata from the filename.
 * With larger files, reads are limited to 100,000 rows when previewing.
 
 ### 2. Grouping by Sequence
@@ -75,8 +82,9 @@ If no other operations are selected, it will count the number of
 rows corresponding to each index value, and put this into a 
 column called "count".
 
-* You can sort by columns to get a better understanding of your data.
-* If your data already has "counts", select "sum" on that column to
+* The preview pane can be sorted by columns to get a better understanding of your data.
+* The "count" operation will count how many rows belong in the group.
+  If your data already has "counts", select "sum" on that column to
   sum the counts for each group.
 
 ### 3. Pivoting by Time
@@ -94,7 +102,7 @@ data in the "Expand" column(s) into new columns.
 In this case, we're expanding the column `count` into two new columns,
 `count__time_1` and `count__time_2`.
 
-* If there are duplicate values in the index, they get summed.
+* If there are duplicate values in the index, the expanded numbers get summed.
 * If there are missing values, they default to zero.
 * CountESS only supports pivoting up to 200 output columns.
 
@@ -114,8 +122,8 @@ to time 2.
 ### 5. Saving Results
 
 Now we have a score for each sequence, we need to write our data
-out somewhere.  The [CSV Save](../included-plugins/#csv-writer) tool lets us save our output in a 
-CSV file for easy use elsewhere.  
+out somewhere.  The [CSV Save](../included-plugins/#csv-writer)
+tool lets us save our output in a CSV file for easy use elsewhere.  
 
 [![Example 1 Image 5](img/example_1_5.png)](img/example_1_5.png)
 
@@ -143,8 +151,8 @@ of "barcodes", and we need to use a barcode map to translate to an
 actual sequence.
 
 In this example, we're working with a simple barcode map `barcodes.csv`,
-each row of which translates our random 20 base barcodes to a 147-base 
-protein coding sequence.
+each row of which translates our random 20 base barcodes to various
+SNVs of a 147-base protein coding sequence.
 
 ```
 barcode,sequence
@@ -154,33 +162,38 @@ TTACGGTCTGCGTTGGAATC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTC
 AGGGCCGTGCCAAGTGCAGT,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCGGGAAGGACCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
 TGTAGTGCCGTATTTGTGGC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCAGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
 ```
+*(etc)*
 
-First, we modify our reading and grouping steps to rename the sequence column to `barcode`,
+First, we modify our sequence reading and grouping steps to rename the sequence column to `barcode`,
+for clarity.
 
 [![Example 2 Image 1](img/example_2_1.png)](img/example_2_1.png)
 <!--
 [![Example 2 Image 2](img/example_2_2.png)](img/example_2_2.png)
 -->
 
-We can read the barcode map using the [CSV Loader](../included-plugins/#csv-reader:
+Second, we add a new node to read the barcode map using the
+[CSV Loader](../included-plugins/#csv-reader):
 
 [![Example 2 Image 3](img/example_2_3.png)](img/example_2_3.png)
 
-Now we add in a Join tool, which joins the two tables using the `barcode` column.
+Now we add in a Join tool, which takes two inputs and joins them.
 
 [![Example 2 Image 4](img/example_2_4.png)](img/example_2_4.png)
 
 The rest of the steps continue as before, but we are now tabulating our data by
 the longer `sequence` column.
 
-* Note that while there were 1000 distinct barcodes, there are only 357 distinct
-  sequences.  Some barcodes represent duplicate variants.
-
 <!--
 [![Example 2 Image 5](img/example_2_5.png)](img/example_2_5.png)
 [![Example 2 Image 6](img/example_2_6.png)](img/example_2_6.png)
 -->
 [![Example 2 Image 7](img/example_2_7.png)](img/example_2_7.png)
+
+* Note that while there were 1000 distinct barcodes, there are only 357 distinct
+  sequences.  Some barcodes represent duplicate variants.
+* By default both inputs are "required", so this is like an inner join, 
+  but by toggling one or both flags you can perform a left, right or full join.
 
 ## Example 3: Calling Variants
 
