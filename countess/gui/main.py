@@ -17,7 +17,7 @@ from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import ask_open_filename, ask_saveas_filename, info_button
+from countess.gui.widgets import ask_open_filename, ask_saveas_filename, get_icon, info_button
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -492,6 +492,24 @@ class MainWindow:
             self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
 
 
+class SplashScreen:
+
+    def __init__(self, tk_root):
+        bg = "skyblue"
+        self.splash = tk.Toplevel(tk_root, bg=bg)
+        self.splash.attributes('-type', 'dialog')
+
+        font = ("TkHeadingFont", 16, "bold")
+        tk.Label(self.splash, text=f"CountESS {VERSION}", font=font, bg=bg).grid(padx=10,pady=10)
+        tk.Label(self.splash, image=get_icon(tk_root, "countess"), bg=bg).grid(padx=10)
+
+        self.splash.after(3500, self.destroy)
+
+    def destroy(self):
+        self.splash.destroy()
+
+
+
 def make_root():
     try:
         import ttkthemes  # pylint: disable=C0415
@@ -523,6 +541,7 @@ def make_root():
 
 def main():
     root = make_root()
+    SplashScreen(root)
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
 
     root.mainloop()
