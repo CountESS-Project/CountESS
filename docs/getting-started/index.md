@@ -177,7 +177,7 @@ Second, we add a new node to read the barcode map using the
 
 [![Example 2 Image 3](img/example_2_3.png)](img/example_2_3.png)
 
-# Joining
+### Joining
 
 Now we add in a [Join](../included-plugins/#join) tool, which takes two inputs and joins them.
 
@@ -223,7 +223,7 @@ pivot, score and write to CSV steps as before, but duplicated for both DNA and P
 [![Example 2 Image 8](img/example_2_8.png)](img/example_2_8.png)
 [![Example 2 Image 11](img/example_2_11.png)](img/example_2_11.png)
 
-## Example 3: FASTQ and Vamp-Seq
+## Example 3: FASTQ and VAMP-seq
 
 Load this example with `countess_gui example_3.ini`.
 
@@ -266,9 +266,10 @@ on `bin`, giving us columns `count__bin_1`, `count__bin_2`, `count__bin_3` and `
 
 [![Example 3 Image 6](img/example_3_6.png)](img/example_3_6.png)
 
-### Vamp-Seq
+### VAMP-seq
 
-Vamp-Seq uses a weighted sum of the bins to calculate a score for each variant,
+[VAMP-seq](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5980760/)
+uses a weighted sum of the bins to calculate a score for each variant,
 which is easily implemented in [Python Code](../included-pluyins/#python):
 
 [![Example 3 Image 7](img/example_3_7.png)](img/example_3_7.png)
