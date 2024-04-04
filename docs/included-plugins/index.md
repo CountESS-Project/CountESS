@@ -161,20 +161,20 @@ For example this data set:
 
 | `variant` | `replicate` | `count` |
 |:---:|:---:|:---:|
-| `1` | `2` | `3` |
-| `1` | `4` | `5` |
-| `2` | `2` | `6` |
-| `2` | `7` | `8` |
-| `3` | `7` | `9` |
-| `3` | `7` | `10` |
+| `1` | `1` | `1` |
+| `1` | `2` | `2` |
+| `2` | `1` | `3` |
+| `2` | `2` | `4` |
+| `2` | `2` | `5` |
+| `3` | `2` | `6` |
 
 when pivoted with index on Variant, pivot on Replicate and expanding Count becomes:
 
-| `variant` | `count__replicate_2` | `count__replicate_4` | `count__replicate_7` |
-|:---:|:---:|:---:|:---:|
-| `1` | `3` | `5` | `0` |
-| `2` | `6` | `0` | `8` |
-| `3` | `0` | `0` | `19` | 
+| `variant` | `count__replicate_1` | `count__replicate_2` |
+|:---:|:---:|:---:|
+| `1` | `1` | `2` |
+| `2` | `3` | `9` |
+| `3` | `0` | `6` |
 
 ## Bioinformatics
 

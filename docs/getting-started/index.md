@@ -142,7 +142,7 @@ AAACACTGGTTAGACCCAAG,88,65,0.7386363636363636
 * The "Text Preview" is just that, a preview.  Nothing is written
   to the file until you click "Run".
 
-## Example 2: Translating Barcodes
+## Example 2: Translating Barcodes & Calling Variants
 
 Load this example with `countess_gui example_2.ini`.
 
@@ -177,7 +177,9 @@ Second, we add a new node to read the barcode map using the
 
 [![Example 2 Image 3](img/example_2_3.png)](img/example_2_3.png)
 
-Now we add in a Join tool, which takes two inputs and joins them.
+# Joining
+
+Now we add in a [Join](../included-plugins/#join) tool, which takes two inputs and joins them.
 
 [![Example 2 Image 4](img/example_2_4.png)](img/example_2_4.png)
 
@@ -207,8 +209,10 @@ for each sequence in the dataframe.
 Quite a lot of the DNA variants turn out to be equal to the reference sequence (`g.=`) 
 and even more of the Protein variants turn out to be synonymous (`p.=`).
 
-From here, we perform the same pivot, score and write to CSV steps as 
-before, but duplicated for both DNA and Protein variants.
+### Multiple Outputs
+
+CountESS nodes can have multiple outputs.  From here, we perform the same
+pivot, score and write to CSV steps as before, but duplicated for both DNA and Protein variants.
 
 <!--
 [![Example 2 Image 6](img/example_2_6.png)](img/example_2_6.png)
@@ -222,6 +226,8 @@ before, but duplicated for both DNA and Protein variants.
 ## Example 3: FASTQ and Vamp-Seq
 
 Load this example with `countess_gui example_3.ini`.
+
+### Loading FASTQ
 
 In the previous examples, we've loaded sequence data from CSV files, but 
 [FASTQ](https://en.wikipedia.org/wiki/FASTQ_format) files are a more common format
@@ -259,6 +265,8 @@ The two data sources are joined as before.  We can then [pivot](../included-plug
 on `bin`, giving us columns `count__bin_1`, `count__bin_2`, `count__bin_3` and `count__bin_4`:
 
 [![Example 3 Image 6](img/example_3_6.png)](img/example_3_6.png)
+
+### Vamp-Seq
 
 Vamp-Seq uses a weighted sum of the bins to calculate a score for each variant,
 which is easily implemented in [Python Code](../included-pluyins/#python):
