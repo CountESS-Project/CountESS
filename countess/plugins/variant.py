@@ -4,7 +4,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrStringParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
+from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrStringParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
 

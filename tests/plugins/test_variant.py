@@ -6,10 +6,9 @@ from countess.plugins.variant import VariantPlugin
 
 logger = MultiprocessLogger()
 
+
 def test_variant_ref_value():
-    input_df = pd.DataFrame(
-            [{"seq": "TGAAGTAGAGG"}, {"seq": "AGAAGTTGTGG"}, {"seq": "ATAAGAAGAGG"}]
-    )
+    input_df = pd.DataFrame([{"seq": "TGAAGTAGAGG"}, {"seq": "AGAAGTTGTGG"}, {"seq": "ATAAGAAGAGG"}])
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
@@ -24,7 +23,6 @@ def test_variant_ref_value():
     assert output[0]["out"] == "g.1A>T"
     assert output[1]["out"] == "g.[7A>T;9A>T]"
     assert output[2]["out"] == "g.[2G>T;6T>A]"
-
 
 
 def test_variant_ref_column():
