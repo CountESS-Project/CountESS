@@ -9,11 +9,10 @@ import math
 import random
 import re
 import tkinter as tk
-from configparser import ConfigParser
 from enum import Enum, IntFlag
 from functools import partial
 
-from countess.core.config import read_config_dict, write_config_node_string
+from countess.core.config import config_string_to_dicts, read_config_dict, write_config_node_string
 from countess.core.pipeline import PipelineNode
 from countess.gui.widgets import copy_to_clipboard, get_icon
 
@@ -398,11 +397,7 @@ class GraphWrapper:
         # Try and interpret whatever is in the clipboard as a config
         # file section and create it as a node!  This lets users
         # cut and paste between CountESS instances!
-        cp = ConfigParser()
-        cp.read_string(self.canvas.clipboard_get())
-
-        for section_name in cp.sections():
-            config_dict = cp[section_name]
+        for section_name, config_dict in config_string_to_dicts(self.canvas.clipboard_get()):
             node = read_config_dict(section_name, "", config_dict)
             node.position = self.new_node_position(event.x, event.y)
             self.add_node(node)

@@ -27,6 +27,7 @@ dependencies = [
     'psutil~=5.9.5',
     'rapidfuzz~=2.15.1',
     'tkinterweb~=3.23.5',
+    'tomlkit~=0.12.4',
     'ttkthemes~=3.2.2',
     'typing_extensions~=4.8.0',
 ]

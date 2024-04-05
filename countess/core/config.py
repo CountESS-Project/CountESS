@@ -3,6 +3,9 @@ import io
 import os.path
 import re
 import sys
+# import tomlkit
+from typing import Any, Iterable, Mapping
+
 from configparser import ConfigParser
 
 from countess.core.logger import ConsoleLogger, Logger
@@ -83,6 +86,14 @@ def read_config(
         nodes_by_name[section_name] = node
 
     return pipeline_graph
+
+
+def config_string_to_dicts(string: str) -> Iterable[tuple[str,Mapping[str,Any]]]:
+
+    cp = ConfigParser()
+    cp.read_string(string)
+    for section_name in cp.sections():
+        yield section_name, dict(cp[section_name])
 
 
 def write_config(pipeline_graph: PipelineGraph, filename: str):
