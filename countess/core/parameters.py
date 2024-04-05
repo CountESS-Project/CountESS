@@ -417,21 +417,15 @@ class ColumnOrStringParam(ColumnChoiceParam):
 
     def get_value(self, data: dict):
         if self.value.startswith(self.PREFIX):
-            return data[self.value[len(self.PREFIX):]]
+            return data[self.value[len(self.PREFIX) :]]
         else:
             return self.value
 
-
-class ColumnOrIntegerParam(ColumnOrStringParam):
-    def clean_value(self, value):
-        if isinstance(value, str):
-            return int("".join(re.split(r"\D+", value)))
-        else:
-            return int(value)
-
-
-class MultipleChoiceParam(ChoiceParam):
-    pass
+    def set_choices(self, choices: Iterable[str]):
+        self.choices = list(choices)
+        if self._value is not None and self._value.startswith(self.PREFIX) and self._value not in self.choices:
+            self._value = self.DEFAULT_VALUE
+            self._choice = None
 
 
 class ArrayParam(BaseParam):
