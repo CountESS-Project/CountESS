@@ -6,6 +6,7 @@ from countess.core.config import write_config
 from countess.gui.main import MainWindow, make_root
 
 
+@pytest.mark.gui
 def test_open_nodes():
     root = make_root()
 

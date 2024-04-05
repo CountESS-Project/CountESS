@@ -9,10 +9,13 @@ import math
 import random
 import re
 import tkinter as tk
+from configparser import ConfigParser
 from enum import Enum, IntFlag
 from functools import partial
 
+from countess.core.config import read_config_dict, write_config_node_string
 from countess.core.pipeline import PipelineNode
+from countess.gui.widgets import copy_to_clipboard, get_icon
 
 
 def _limit(value, min_value, max_value):
@@ -254,8 +257,20 @@ class DraggableLabel(DraggableMixin, FixedUnbindMixin, tk.Label):
     pass
 
 
-class DraggableMessage(DraggableMixin, FixedUnbindMixin, tk.Message):
-    pass
+class NodeWrapper(DraggableLabel):
+    def update_node(self, node, vertical=False):
+        input_bar = node.plugin and node.plugin.num_inputs == 0
+        output_bar = node.plugin and node.plugin.num_outputs == 0
+        if not input_bar and not output_bar:
+            image = None
+            compound = tk.NONE
+        elif vertical:
+            image = get_icon(self, "hbar")
+            compound = tk.TOP if input_bar else tk.BOTTOM
+        else:
+            image = get_icon(self, "vbar")
+            compound = tk.LEFT if input_bar else tk.RIGHT
+        self.configure(text=node.name, image=image, compound=compound)
 
 
 class GraphWrapper:
@@ -282,9 +297,10 @@ class GraphWrapper:
         self.canvas.bind("<Leave>", self.on_canvas_leave)
         self.canvas.bind("<Key-Delete>", self.on_canvas_delete)
         self.canvas.bind("<Key-BackSpace>", self.on_canvas_delete)
+        self.canvas.bind("<<Paste>>", self.on_paste)
 
     def label_for_node(self, node):
-        label = DraggableLabel(self.canvas, text=node.name, wraplength=125, cursor="hand1", takefocus=True)
+        label = NodeWrapper(self.canvas, wraplength=125, cursor="hand1", takefocus=True)
         if not node.position:
             node.position = (random.random() * 0.8 + 0.1, random.random() * 0.8 + 0.1)
         # XXX should be more elegant way of answering the question "are we flipped?"
@@ -300,6 +316,8 @@ class GraphWrapper:
         label.bind("<Key-BackSpace>", partial(self.on_delete, node), add=True)
         label.bind("<Enter>", partial(self.on_enter, node), add=True)
         label.bind("<Leave>", partial(self.on_leave, node), add=True)
+        label.bind("<<Copy>>", partial(self.on_copy, node), add=True)
+        label.bind("<<Cut>>", partial(self.on_cut, node), add=True)
 
         return label
 
@@ -330,19 +348,21 @@ class GraphWrapper:
 
     def on_configure(self, node, label, event):
         """Stores the updated position of the label in node.position"""
-        xx = float(label.place_info()["relx"]) * self.canvas.winfo_width()
-        yy = float(label.place_info()["rely"]) * self.canvas.winfo_height()
+        height = self.canvas.winfo_height()
+        width = self.canvas.winfo_width()
+
+        xx = float(label.place_info()["relx"]) * width
+        yy = float(label.place_info()["rely"]) * height
         node.position = self.new_node_position(xx, yy)
+        label.update_node(node, width < height)
 
         # Adapt label sizes to suit the window size, as best we can ...
         # XXX very arbitrary and definitely open to tweaking
-        height = self.canvas.winfo_height()
-        width = self.canvas.winfo_width()
         if height > width:
-            label_max_width = max(width // 9, 25)
+            label_max_width = max(width // 6, 25)
             label_font_size = int(math.sqrt(width) / 3)
         else:
-            label_max_width = max(width // 20, 16)
+            label_max_width = max(width // 12, 16)
             label_font_size = int(math.sqrt(width) / 5)
         label["wraplength"] = label_max_width
         label["font"] = ("TkDefaultFont", label_font_size)
@@ -365,6 +385,33 @@ class GraphWrapper:
             self.canvas.delete(self.highlight_rectangle)
             self.highlight_rectangle = None
         self.canvas.focus_set()
+
+    def on_copy(self, node, event):
+        # Copy the selected node's config to the clipboard
+        copy_to_clipboard(write_config_node_string(node))
+
+    def on_cut(self, node, event):
+        self.on_copy(node, event)
+        self.on_delete(node, event)
+
+    def on_paste(self, event):
+        # Try and interpret whatever is in the clipboard as a config
+        # file section and create it as a node!  This lets users
+        # cut and paste between CountESS instances!
+        cp = ConfigParser()
+        cp.read_string(self.canvas.clipboard_get())
+
+        for section_name in cp.sections():
+            config_dict = cp[section_name]
+            node = read_config_dict(section_name, "", config_dict)
+            node.position = self.new_node_position(event.x, event.y)
+            self.add_node(node)
+
+            # try and reconnect parents if they exist
+            nodes_by_name = {n.name: n for n in self.graph.nodes}
+            for key, val in config_dict.items():
+                if key.startswith("_parent.") and val in nodes_by_name:
+                    self.add_parent(nodes_by_name[val], node)
 
     def on_canvas_motion(self, event):
         """Show a preview of line selection when the cursor is over line(s)"""
@@ -403,13 +450,16 @@ class GraphWrapper:
         #    return
 
         position = self.new_node_position(event.x, event.y)
-        new_node = self.add_new_node(position)
+        new_node = self.add_new_node(position, select=False)
 
         for item in items:
             _, child_node, parent_node = self.lines_lookup[item]
             self.del_parent(parent_node, child_node)
             self.add_parent(new_node, child_node)
             self.add_parent(parent_node, new_node)
+
+        self.highlight_node(new_node)
+        self.node_select_callback(new_node)
 
     def on_canvas_delete(self, event):
         """Delete key on canvas: delete line(s)."""
@@ -445,7 +495,7 @@ class GraphWrapper:
             event.widget.destroy()
 
         if len(self.graph.nodes) == 0:
-            self.add_new_node(select=True)
+            new_node = self.add_new_node(select=True)
         elif node == self.selected_node:
             # arbitrarily pick another node to show
             new_node = parent_nodes[0] if parent_nodes else child_nodes[0] if child_nodes else list(self.graph.nodes)[0]
@@ -459,8 +509,7 @@ class GraphWrapper:
                 return node
         return None
 
-    def add_new_node(self, position=(0.5, 0.5), select=True):
-        new_node = PipelineNode(name=f"NEW {len(self.graph.nodes)+1}", position=position)
+    def add_node(self, new_node, select: bool = True):
         self.graph.add_node(new_node)
         self.labels[new_node] = self.label_for_node(new_node)
         self.labels[new_node].update()
@@ -468,6 +517,10 @@ class GraphWrapper:
         if select:
             self.highlight_node(new_node)
             self.node_select_callback(new_node)
+
+    def add_new_node(self, position=(0.5, 0.5), select: bool = True):
+        new_node = PipelineNode(name="NEW", position=position)
+        self.add_node(new_node, select)
         return new_node
 
     def on_ghost_release(self, start_node, event):
@@ -476,7 +529,7 @@ class GraphWrapper:
         other_node = self.find_node_at_position(event.x + xl, event.y + yl)
         if other_node is None:
             position = self.new_node_position(event.x + xl, event.y + yl)
-            other_node = self.add_new_node(position)
+            other_node = self.add_new_node(position, select=False)
         elif other_node == start_node:
             return
         elif start_node in other_node.parent_nodes:
@@ -499,7 +552,11 @@ class GraphWrapper:
         self.node_select_callback(other_node)
 
     def add_parent(self, parent_node, child_node):
-        if parent_node not in child_node.parent_nodes:
+        if (
+            (not parent_node.plugin or parent_node.plugin.num_outputs)
+            and (not child_node.plugin or child_node.plugin.num_inputs)
+            and parent_node not in child_node.parent_nodes
+        ):
             child_node.add_parent(parent_node)
             connecting_line = ConnectingLine(self.canvas, self.labels[parent_node], self.labels[child_node])
             self.lines[child_node][parent_node] = connecting_line
@@ -518,7 +575,13 @@ class GraphWrapper:
     def node_changed(self, node):
         """Called when something external updates the node's name, status
         or configuration."""
-        self.labels[node]["text"] = node.name
+        flipped = self.canvas.winfo_width() >= self.canvas.winfo_height()
+
+        if node.name.startswith("NEW"):
+            node.name = node.plugin.name
+            self.graph.reset_node_name(node)
+
+        self.labels[node].update_node(node, not flipped)
 
     def destroy(self):
         for node_lines in self.lines.values():

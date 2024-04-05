@@ -5,7 +5,7 @@ layout: default
 
 # CountESS Documentation
 
-This is CountESS 0.0.51, a modular, Python 3 reimplementation of Enrich2.
+This is CountESS 0.0.57, a modular, Python 3 reimplementation of Enrich2.
 
 [Source code is available](https://github.com/CountESS-Project/CountESS)
 and contributions to code and documentation are welcomed.
@@ -17,12 +17,13 @@ under a [BSD 3-clause license](license/).
 
 * [Installing CountESS](installing-countess/)
 * [Running CountESS](running-countess/)
+* [Getting Started with CountESS](getting-started/)
 * [Included Plugins](included-plugins/)
 * [Other Plugins](other-plugins/)
 * [Writing Plugins](writing-plugins/)
 * [Configuration File Format](config-file-format/)
 * [Contributing to CountESS](contributing/)
-* [CountESS Dcoumentation](documentation/)
+* [Release Notes](release-notes/)
 
 ## Presentations
 

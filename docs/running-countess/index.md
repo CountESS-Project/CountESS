@@ -109,3 +109,8 @@ To perform a complete run using the entire input file, click 'Run'.
 Plugin configurations can be saved and loaded in .INI file format.
 CountESS can also be run in headless mode with `countess_cmd your_config.ini`.
 In headless mode, all output is to the console.
+
+# NEXT
+
+Now CountESS is running, see [Getting Started with CountESS](../getting-started/)
+to get started on analysing your own data.

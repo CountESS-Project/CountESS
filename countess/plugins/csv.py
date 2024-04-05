@@ -1,7 +1,7 @@
 import csv
 import gzip
 from io import BufferedWriter, BytesIO
-from typing import Optional, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
@@ -16,8 +16,14 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasInputFilesPlugin, PandasProcessPlugin
+from countess.core.plugins import PandasInputFilesPlugin, PandasOutputPlugin
 from countess.utils.pandas import flatten_columns
+
+CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
+    ("CSV", [".csv", ".csv.gz"]),
+    ("TSV", [".tsv", ".tsv.gz"]),
+    ("TXT", [".txt", ".txt.gz"]),
+]
 
 
 class LoadCsvPlugin(PandasInputFilesPlugin):
@@ -27,8 +33,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     description = "Loads data from CSV or similar delimited text files and assigns types to columns"
     link = "https://countess-project.github.io/CountESS/included-plugins/#csv-reader"
     version = VERSION
-
-    file_types = [("CSV", [".csv", ".gz"]), ("TSV", [".tsv", ".gz"]), ("TXT", ".txt")]
+    file_types = CSV_FILE_TYPES
 
     parameters = {
         "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
@@ -119,13 +124,12 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
         return df
 
 
-class SaveCsvPlugin(PandasProcessPlugin):
+class SaveCsvPlugin(PandasOutputPlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
     link = "https://countess-project.github.io/CountESS/included-plugins/#csv-writer"
     version = VERSION
-
-    file_types = [("CSV", [".csv", ".gz"]), ("TSV", [".tsv", ".gz"]), ("TXT", ".txt")]
+    file_types = CSV_FILE_TYPES
 
     parameters = {
         "header": BooleanParam("CSV header row?", True),

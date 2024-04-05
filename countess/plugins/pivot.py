@@ -19,8 +19,8 @@ class PivotPlugin(PandasProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
-    description = """Groups a dataframe and pivots column values into columns.
-        Expanded column values are duplicated for each combination of pivot values.
+    description = "Groups a dataframe and pivots column values into columns."
+    additional = """Expanded column values are duplicated for each combination of pivot values.
         Missing values default to 0, and duplicate values are summed."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
@@ -41,6 +41,8 @@ class PivotPlugin(PandasProcessPlugin):
     def process(self, data: pd.DataFrame, source: str, logger: Logger):
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         self.input_columns.update(get_all_columns(data))
+
+        data.reset_index(drop=data.index.names == [None], inplace=True)
 
         column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
         index_cols = [col for col, param in column_parameters if param.value == "Index"]

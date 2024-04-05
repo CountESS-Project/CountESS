@@ -1,3 +1,4 @@
+import re
 import time
 from queue import Empty, Queue
 from threading import Thread
@@ -59,6 +60,8 @@ class PipelineNode:
     name: str
     plugin: Optional[BasePlugin] = None
     position: Optional[tuple[float, float]] = None
+    sort_column: int = 0
+    sort_descending: bool = False
     notes: Optional[str] = None
     parent_nodes: set["PipelineNode"]
     child_nodes: set["PipelineNode"]
@@ -74,11 +77,13 @@ class PipelineNode:
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
 
-    def __init__(self, name, plugin=None, config=None, position=None, notes=None):
+    def __init__(self, name, plugin=None, config=None, position=None, notes=None, sort_column=0, sort_descending=0):
         self.name = name
         self.plugin = plugin
         self.config = config or []
         self.position = position
+        self.sort_column = sort_column
+        self.sort_descending = sort_descending
         self.notes = notes
         self.parent_nodes = set()
         self.child_nodes = set()
@@ -182,8 +187,10 @@ class PipelineNode:
             self.config = None
 
     def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
+        if not self.plugin:
+            return
         self.load_config(logger)
-        if self.is_dirty and self.plugin:
+        if self.is_dirty:
             assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
             self.result = []
             self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
@@ -205,9 +212,10 @@ class PipelineNode:
                 child_node.mark_dirty()
 
     def add_parent(self, parent):
-        self.parent_nodes.add(parent)
-        parent.child_nodes.add(self)
-        self.mark_dirty()
+        if (not self.plugin or self.plugin.num_inputs) and (not parent.plugin or parent.plugin.num_outputs):
+            self.parent_nodes.add(parent)
+            parent.child_nodes.add(self)
+            self.mark_dirty()
 
     def del_parent(self, parent):
         self.parent_nodes.discard(parent)
@@ -248,7 +256,17 @@ class PipelineGraph:
         self.plugin_classes = get_plugin_classes()
         self.nodes = []
 
+    def reset_node_name(self, node):
+        node_names_seen = set(n.name for n in self.nodes if n != node)
+        while node.name in node_names_seen:
+            num = 1
+            if match := re.match(r"(.*?)\s+(\d+)$", node.name):
+                node.name = match.group(1)
+                num = int(match.group(2))
+            node.name += f" {num + 1}"
+
     def add_node(self, node):
+        self.reset_node_name(node)
         self.nodes.append(node)
 
     def del_node(self, node):
@@ -297,6 +315,17 @@ class PipelineGraph:
         for node in self.nodes:
             node.result = None
             node.is_dirty = True
+
+    def reset_node_names(self):
+        node_names_seen = set()
+        for node in self.traverse_nodes():
+            while node.name in node_names_seen:
+                num = 0
+                if match := re.match(r"(.*?)\s+(\d+)$", node.name):
+                    node.name = match.group(1)
+                    num = int(match.group(2))
+                node.name += f" {num + 1}"
+            node_names_seen.add(node.name)
 
     def tidy(self):
         """Tidies the graph (sets all the node positions)"""

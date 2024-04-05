@@ -353,6 +353,9 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: Optional[int] = 0):
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTTAGACA"))
     ['Gly3Ter']
 
+    >>> list(find_variant_protein("ATGGTTTGGTAG", "ATGGTTTAGTAG"))
+    ['Trp3Ter']
+
     Offset lets you set the frame offset (0, 1 or 2, practically)
 
     """
@@ -387,6 +390,11 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: Optional[int] = 0):
 
         if opcode.tag == "delete":
             assert dest_pro == ""
+            if ref_pro[src_end] == '*':
+                # if the codon just after this deletion is a terminator,
+                # consider this an early termination.
+                yield f"{_ref(src_start)}Ter"
+                return
             if len(src_pro) == 1:
                 yield f"{_ref(src_start)}del"
             else:

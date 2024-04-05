@@ -3,8 +3,12 @@ import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
 from tkinter import ttk
+from typing import Callable, Optional, Union
 
+import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
+
+from countess.gui.widgets import copy_to_clipboard, get_icon
 
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
@@ -13,7 +17,7 @@ from pandas.api.types import is_integer_dtype, is_numeric_dtype
 # etc etc.
 
 
-def column_format_for(df_column):
+def column_format_for(df_column: Union[pd.Index, pd.Series]) -> str:
     if is_numeric_dtype(df_column.dtype):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
@@ -34,7 +38,7 @@ def column_format_for(df_column):
         return "%s"
 
 
-def format_value(value, column_format):
+def format_value(value: Optional[Union[int, float, str]], column_format: str) -> str:
     """Format value for display in a table:
     >>> format_value(None, "%s")
     '—'
@@ -55,6 +59,7 @@ def format_value(value, column_format):
         return "—F"
 
     # remove trailing 0's from floats (%g doesn't align correctly)
+    #     100.0 => "100.000000000000" => "100."
     try:
         if column_format.endswith("f"):
             return (column_format % value).rstrip("0")
@@ -65,14 +70,12 @@ def format_value(value, column_format):
 
 
 class TabularDataFrame(tk.Frame):
-    """A frame for displaying a pandas (or similar)
-    dataframe.  Columns are displayed as individual tk.Text
-    widgets which seems to be relatively efficient as they
-    only hold the currently displayed rows.
-    Tested up to a million or so rows."""
+    """A frame for displaying a pandas (or similar) dataframe.
+    Columns are displayed as individual tk.Text widgets which seems to be relatively efficient
+    as they only hold the currently displayed rows.  Tested up to a million or so rows."""
 
-    subframe = None
-    dataframe = None
+    subframe: Optional[tk.Frame] = None
+    dataframe: Optional[pd.DataFrame] = None
     offset = 0
     height = 1000
     length = 0
@@ -84,6 +87,7 @@ class TabularDataFrame(tk.Frame):
     index_cols = 0
     sort_by_col = None
     sort_ascending = True
+    callback: Optional[Callable[[int, int, bool], None]] = None
 
     def reset(self):
         if self.subframe:
@@ -96,8 +100,10 @@ class TabularDataFrame(tk.Frame):
         self.subframe.rowconfigure(2, weight=1)
         self.subframe.grid(sticky=tk.NSEW)
 
-    def set_dataframe(self, dataframe):
+    def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
         self.reset()
+        assert self.subframe
+
         self.dataframe = dataframe
         self.length = len(dataframe)
 
@@ -132,9 +138,11 @@ class TabularDataFrame(tk.Frame):
             return
 
         title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
-        title.grid(row=0, column=0, columnspan=len(column_names), sticky=tk.NSEW, pady=5)
+        title.grid(row=0, column=0, columnspan=len(column_names) * 2 + 1, sticky=tk.NSEW, pady=5)
 
         ### XXX add in proper handling for MultiIndexes here
+
+        # Even-numbered columns are the data columns
 
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
@@ -143,12 +151,24 @@ class TabularDataFrame(tk.Frame):
             else:
                 name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
-            label = tk.Label(self.subframe, text=f"{name}\n{dtype}{is_index}")
-            label.grid(row=1, column=num, sticky=tk.EW)
+            label = tk.Label(
+                self.subframe,
+                text=f"{name}\n{dtype}{is_index}",
+                image=get_icon(self, "sort_un"),
+                compound=tk.RIGHT,
+            )
+            label.grid(row=1, column=num * 2, sticky=tk.EW)
             label.bind("<Button-1>", partial(self._label_button_1, num))
-            label.bind("<B1-Motion>", partial(self._label_b1_motion, num))
-            self.subframe.columnconfigure(num, minsize=10, weight=1)
+            self.subframe.columnconfigure(num * 2, minsize=10, weight=1)
             self.labels.append(label)
+
+        # Between them are blank columns which provide a handle for adjusting the column
+        # widths left and right
+
+        for num in range(0, len(column_names) - 1):
+            adjuster = tk.Frame(self.subframe, width=3, cursor="sb_h_double_arrow")
+            adjuster.grid(row=1, rowspan=2, column=num * 2 + 1, sticky=tk.NSEW)
+            adjuster.bind("<B1-Motion>", partial(self._column_adjust, num))
 
         if len(self.dataframe) == 0:
             label = tk.Label(self.subframe, text="no data")
@@ -157,7 +177,7 @@ class TabularDataFrame(tk.Frame):
 
         self.columns = [tk.Text(self.subframe) for _ in column_names]
         for num, column in enumerate(self.columns):
-            column.grid(sticky=tk.NSEW, row=2, column=num)
+            column.grid(sticky=tk.NSEW, row=2, column=num * 2)
             column["wrap"] = tk.NONE
             column["xscrollcommand"] = partial(self._column_xscrollcommand, num)
             column["yscrollcommand"] = self._column_yscrollcommand
@@ -170,9 +190,9 @@ class TabularDataFrame(tk.Frame):
             self.columns[0].bind("<Configure>", self._column_configure)
 
         self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns))
+        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns) * 2 - 1)
         self.scrollbar["command"] = self._scrollbar_command
-        self.refresh()
+        self.refresh(offset)
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
@@ -233,33 +253,45 @@ class TabularDataFrame(tk.Frame):
         if self.length:
             self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
 
-    def scrollto(self, new_offset):
-        self.offset = min(max(int(new_offset), 0), self.length - self.height)
+        if self.callback:
+            self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
+
+    def set_callback(self, callback) -> None:
+        self.callback = callback
+
+    def set_sort_order(self, column_num: int, descending: Optional[bool] = None):
+        assert self.dataframe is not None
+
+        if descending is None and column_num == self.sort_by_col:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            self.sort_by_col = column_num
+            self.sort_ascending = not descending
+        if column_num < self.index_cols:
+            self.dataframe = self.dataframe.sort_index(level=column_num, ascending=self.sort_ascending)
+        elif column_num < self.index_cols + len(self.dataframe.columns):
+            self.dataframe = self.dataframe.sort_values(
+                self.dataframe.columns[column_num - self.index_cols], ascending=self.sort_ascending
+            )
+
+        for n, label in enumerate(self.labels):
+            icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
+            label.configure(image=get_icon(self, icon))
+
         self.refresh()
 
     def _label_button_1(self, num, event):
-        label_width = self.labels[num].winfo_width()
-        if 2 * label_width / 5 < event.x < 3 * label_width / 5:
-            self.sort_ascending = (num != self.sort_by_col) or not self.sort_ascending
-            self.sort_by_col = num
-            if num < self.index_cols:
-                self.dataframe = self.dataframe.sort_index(level=num, ascending=self.sort_ascending)
-            else:
-                self.dataframe = self.dataframe.sort_values(
-                    self.dataframe.columns[num - self.index_cols], ascending=self.sort_ascending
-                )
-            self.refresh()
+        """Click on column labels to set sort order"""
+        self.set_sort_order(num)
+        if self.callback:
+            self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
 
-    def _label_b1_motion(self, num, event):
-        # Detect label drags left and right.
-        # XXX still not quite right
-        label = self.labels[num]
-        label_width = label.winfo_width()
-
-        if event.x > label_width:
-            self.subframe.columnconfigure(num, minsize=event.x)
-        elif event.x < 0:
-            self.subframe.columnconfigure(num, minsize=label_width + event.x)
+    def _column_adjust(self, num, event):
+        """Adjust column widths left and right by dragging the dummy columns"""
+        w0 = self.labels[num].winfo_width()
+        w1 = self.labels[num + 1].winfo_width()
+        self.subframe.columnconfigure(num * 2, minsize=w0 + event.x)
+        self.subframe.columnconfigure(num * 2 + 2, minsize=w1 - event.x)
 
     def _scrollbar_command(self, command, *parameters):
         # Detect scrollbar movement and move self.offset
@@ -334,18 +366,11 @@ class TabularDataFrame(tk.Frame):
         if not self.select_rows:
             return  # not multi-row, keep it.
 
+        # Dump TSV into a StringIO ...
         r1, r2 = self.select_rows
         df = self.dataframe.iloc[self.offset + r1 - 1 : self.offset + r2]
         buf = io.StringIO()
         df.to_csv(buf, sep="\t")
 
-        # XXX very cheesy, but self.clipboard_append() etc didn't
-        # seem to work, so this is a terrible workaround ... dump the
-        # TSV into a new tk.Text, select the whole thing and copy it
-        # into the clipboard.
-        top = tk.Toplevel()
-        text = tk.Text(top)
-        text.insert(tk.END, buf.getvalue())
-        text.tag_add("sel", "1.0", tk.END)
-        text.event_generate("<<Copy>>")
-        top.destroy()
+        # ... and then push that onto the clipboard
+        copy_to_clipboard(buf.getvalue())

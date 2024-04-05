@@ -2,6 +2,8 @@ import time
 import tkinter as tk
 from unittest.mock import MagicMock
 
+import pytest
+
 from countess.core.config import read_config
 from countess.core.pipeline import PipelineNode
 from countess.gui.main import ConfiguratorWrapper, PluginChooserFrame, RunWindow, make_root
@@ -14,11 +16,12 @@ def descendants(widget):
         yield from descendants(w)
 
 
+@pytest.mark.gui
 def test_chooser():
     callback = MagicMock()
 
     root = make_root()
-    choose = PluginChooserFrame(root, "X", callback)
+    choose = PluginChooserFrame(root, "X", callback, True, True)
 
     for x in descendants(choose):
         if isinstance(x, tk.Button):
@@ -30,6 +33,7 @@ def test_chooser():
     root.destroy()
 
 
+@pytest.mark.gui
 def test_main():
     root = make_root()
     node = PipelineNode(name="NEW", plugin=DataTablePlugin())
@@ -42,6 +46,7 @@ def test_main():
     root.destroy()
 
 
+@pytest.mark.gui
 def test_run():
     graph = read_config("tests/simple.ini")
 

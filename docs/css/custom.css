@@ -1,0 +1,64 @@
+/* little overrides to vanilla.css */
+
+body {
+	max-width: 120ch;
+}
+
+div.navbar {
+    display: block;
+    border-bottom: 2px solid var(--tertiary-color);
+}
+
+dt {
+    font-weight: bold;
+}
+
+table code, table pre {
+    border: none;
+    background: none;
+}
+
+table th code {
+    font-weight: bold;
+}
+
+ul, ol {
+    margin: 0;
+}
+
+ul li, ol li {
+    margin-bottom: 0.5rem;
+}
+
+blockquote {
+	font: inherit;
+}
+
+table {
+    border-color: var(--primary-color);
+    border-collapse: inherit;
+}
+
+@media (min-width: 48em) {
+    .content {
+	 max-width: 38rem;
+	 margin-left: 18rem;
+	 margin-right: 2rem;
+    }
+    .sidebar {
+	 max-width: 16rem;
+	 position: fixed;
+    }
+}
+
+@media (min-width: 64em) {
+  .content {
+    margin-left: 22rem;
+    margin-right: 2rem;
+  }
+  .sidebar {
+	max-width: 20rem;
+	position: fixed;
+}
+}
+

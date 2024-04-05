@@ -140,6 +140,9 @@ The "required" flag on the input datatables lets you select the type of join:
 
 ### Regex Tool
 
+> "Some people, when confronted with a problem, think "I know, I'll use regular expressions." Now they have two problems."
+> -- Jamie Zawinski
+
 Splits a string value into multiple parts using a regular expression.
 
 Specify a pattern to match and columns to output the matching parts to.
@@ -158,20 +161,20 @@ For example this data set:
 
 | `variant` | `replicate` | `count` |
 |:---:|:---:|:---:|
-| `1` | `2` | `3` |
-| `1` | `4` | `5` |
-| `2` | `2` | `6` |
-| `2` | `7` | `8` |
-| `3` | `7` | `9` |
-| `3` | `7` | `10` |
+| `1` | `1` | `1` |
+| `1` | `2` | `2` |
+| `2` | `1` | `3` |
+| `2` | `2` | `4` |
+| `2` | `2` | `5` |
+| `3` | `2` | `6` |
 
 when pivoted with index on Variant, pivot on Replicate and expanding Count becomes:
 
-| `variant` | `count__replicate_2` | `count__replicate_4` | `count__replicate_7` |
-|:---:|:---:|:---:|:---:|
-| `1` | `3` | `5` | `0` |
-| `2` | `6` | `0` | `8` |
-| `3` | `0` | `0` | `19` | 
+| `variant` | `count__replicate_1` | `count__replicate_2` |
+|:---:|:---:|:---:|
+| `1` | `1` | `2` |
+| `2` | `3` | `9` |
+| `3` | `0` | `6` |
 
 ## Bioinformatics
 

@@ -3,8 +3,7 @@ import re
 import sys
 import threading
 import tkinter as tk
-import webbrowser
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 from typing import Optional
 
 import psutil
@@ -15,9 +14,10 @@ from countess.core.pipeline import PipelineGraph
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
 from countess.gui.logger import LoggerFrame
+from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import info_button
+from countess.gui.widgets import ask_open_filename, ask_saveas_filename, info_button
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -28,7 +28,7 @@ plugin_classes = sorted(get_plugin_classes(), key=lambda x: x.name)
 
 
 class PluginChooserFrame(tk.Frame):
-    def __init__(self, master, title, callback, *a, **k):
+    def __init__(self, master, title, callback, has_parents, has_children, *a, **k):
         super().__init__(master, *a, **k)
 
         self.columnconfigure(0, weight=1)
@@ -37,6 +37,13 @@ class PluginChooserFrame(tk.Frame):
         label_frame.grid(row=1, column=0, sticky=tk.EW, padx=10, pady=10)
 
         for n, plugin_class in enumerate(plugin_classes):
+            if (
+                (has_parents and plugin_class.num_inputs == 0)
+                or (not has_parents and plugin_class.num_inputs > 0)
+                or (has_children and plugin_class.num_outputs == 0)
+            ):
+                continue
+
             label_text = plugin_class.description
             tk.Button(
                 label_frame,
@@ -57,6 +64,8 @@ class ConfiguratorWrapper:
     config_change_task = None
     notes_widget = None
     node_update_thread = None
+    info_toplevel = None
+    info_frame = None
 
     def __init__(self, frame, node, change_callback):
         self.frame = frame
@@ -115,11 +124,14 @@ class ConfiguratorWrapper:
             # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
-            self.frame.rowconfigure(3, weight=1)
-            self.frame.rowconfigure(4, weight=1)
+            self.frame.rowconfigure(3, weight=1, minsize=self.frame.winfo_height() / 3)
 
         else:
-            self.config_subframe = PluginChooserFrame(self.config_canvas, "Choose Plugin", self.choose_plugin)
+            has_parents = len(self.node.parent_nodes) > 0
+            has_children = len(self.node.child_nodes) > 0
+            self.config_subframe = PluginChooserFrame(
+                self.config_canvas, "Choose Plugin", self.choose_plugin, has_parents, has_children
+            )
             self.config_subframe.grid(sticky=tk.NSEW)
             self.frame.rowconfigure(3, weight=1)
             self.frame.rowconfigure(4, weight=0)
@@ -138,7 +150,17 @@ class ConfiguratorWrapper:
         self.label["wraplength"] = self.label.winfo_width() - 20
 
     def on_info_button_press(self, *_):
-        webbrowser.open_new_tab(self.node.plugin.link)
+        if self.info_toplevel is None:
+            self.info_toplevel = tk.Toplevel()
+            self.info_toplevel.protocol("WM_DELETE_WINDOW", self.on_info_toplevel_close)
+            self.info_frame = MiniBrowserFrame(self.info_toplevel, self.node.plugin.link)
+            self.info_frame.pack(fill="both", expand=True)
+        else:
+            self.info_frame.load_url(self.node.plugin.link)
+
+    def on_info_toplevel_close(self):
+        self.info_toplevel.destroy()
+        self.info_toplevel = None
 
     def on_add_notes(self, *_):
         self.notes_widget.destroy()
@@ -177,12 +199,18 @@ class ConfiguratorWrapper:
                 df = concat_dataframes(self.node.result)
                 self.preview_subframe = TabularDataFrame(self.frame, highlightbackground="black", highlightthickness=3)
                 self.preview_subframe.set_dataframe(df)
+                self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
+                self.preview_subframe.set_callback(self.preview_changed_callback)
             except (TypeError, ValueError):
                 self.preview_subframe = tk.Frame(self.frame)
                 self.preview_subframe.columnconfigure(0, weight=1)
                 tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
         self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
+
+    def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
+        self.node.sort_column = sort_col
+        self.node.sort_descending = sort_desc
 
     def name_changed_callback(self, *_):
         name = self.name_var.get()
@@ -197,7 +225,7 @@ class ConfiguratorWrapper:
         self.node.mark_dirty()
         if self.config_change_task:
             self.frame.after_cancel(self.config_change_task)
-        self.config_change_task = self.frame.after(500, self.config_change_task_callback)
+        self.config_change_task = self.frame.after(1000, self.config_change_task_callback)
 
     def config_change_task_callback(self):
         self.config_change_task = None
@@ -239,9 +267,6 @@ class ConfiguratorWrapper:
         self.node.prerun(self.logger)
         self.node.is_dirty = True
         self.show_config_subframe()
-        if self.node.name.startswith("NEW "):
-            self.node.name = self.node.plugin.name + self.node.name.removeprefix("NEW")
-            self.name_var.set(self.node.name)
         self.change_callback(self.node)
 
     def destroy(self):
@@ -390,11 +415,11 @@ class MainWindow:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph()
         self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
-        self.graph_wrapper.add_new_node(select=True)
+        self.graph_wrapper.add_new_node()
 
     def config_load(self, filename=None):
         if not filename:
-            filename = filedialog.askopenfilename(filetypes=[(".INI Config File", "*.ini")])
+            filename = ask_open_filename(file_types=[(".INI Config File", "*.ini")])
         if not filename:
             return
         self.config_filename = filename
@@ -406,9 +431,9 @@ class MainWindow:
 
     def config_save(self, filename=None):
         if not filename:
-            filename = filedialog.asksaveasfilename(
-                initialfile=self.config_filename,
-                filetypes=[(".INI Config File", "*.ini")],
+            filename = ask_saveas_filename(
+                initial_file=self.config_filename,
+                file_types=[(".INI Config File", "*.ini")],
             )
         if not filename:
             return
@@ -425,7 +450,7 @@ class MainWindow:
                 initialfile = self.config_filename.removesuffix(".ini") + ".dot"
             else:
                 initialfile = None
-            filename = filedialog.asksaveasfilename(initialfile=initialfile, filetypes=[("Graphviz File", "*.dot")])
+            filename = ask_saveas_filename(initial_file=initialfile, file_types=[("Graphviz File", "*.dot")])
         if not filename:
             return
         export_config_graphviz(self.graph, filename)

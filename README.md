@@ -1,4 +1,4 @@
-# CountESS 0.0.51
+# CountESS 0.0.57
 
 This is CountESS, a modular, Python 3 reimplementation of Enrich2.
 
@@ -10,7 +10,8 @@ Source code is available at [https://github.com/CountESS-Project/CountESS](https
 
 ## Installing
 
-The latest version of CountESS can be installed from pypi:
+The latest version of
+[CountESS can be installed from pypi](https://pypi.org/project/countess/):
 ```
 pip install CountESS
 ```

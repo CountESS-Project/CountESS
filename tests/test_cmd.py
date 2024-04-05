@@ -11,6 +11,7 @@ expected_output = """"thing","foo","bar","baz","qux","number","zz"
 """
 
 
+@pytest.mark.slow
 def test_command_invocation():
     cmd_run(["countess_cmd", "tests/simple.ini"])
 

@@ -25,7 +25,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#fastq-load"
     version = VERSION
 
-    file_types = [("FASTQ", ".fastq"), ("FASTQ (gzipped)", ".gz")]
+    file_types = [("FASTQ", [".fastq", ".fastq.gz"])]
 
     parameters = {
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
