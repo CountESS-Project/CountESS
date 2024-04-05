@@ -9,13 +9,12 @@
   <body>
     <div id="toc" class="sidebar">
       <div>
-	      <img src="{{ site.url }}{{ site.baseurl }}/img/countess.png" width="100%"/>
+	<img src="{{ site.url }}{{ site.baseurl }}/img/countess.png" width="100%">
+	</br>
+	<a href="{{ site.url }}{{ site.baseurl }}">CountESS {{ site.version }}</a></p>
+        {% if page.parent %}/ <a href="../">{{ page.parent }}</a>{% endif %}
       </div>
       <p>
-        {% if page.url != "/" %}
-          <a href="{{ site.url }}{{ site.baseurl }}">CountESS Documentation</a></p>
-          {% if page.parent %}/ <a href="../">{{ page.parent }}</a>{% endif %}
-        {% endif %} 
       </p>
     </div>
     <div class="content" id="content">

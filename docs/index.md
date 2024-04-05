@@ -5,13 +5,15 @@ layout: default
 
 # CountESS Documentation
 
-This is CountESS 0.0.56, a modular, Python 3 reimplementation of Enrich2.
+This is CountESS, a modular, Python 3 reimplementation of Enrich2.
 
 [Source code is available](https://github.com/CountESS-Project/CountESS)
 and contributions to code and documentation are welcomed.
 
-CountESS is copyright (C) 2022- CountESS Developers, and is made available
-under a [BSD 3-clause license](license/).
+CountESS source code and documentation are copyright &copy; 2022- CountESS Developers,
+and are made available under a [BSD 3-clause license](license/).
+
+CountESS "portrait" logo &copy; 2024 Sayeh Gorjifard, used with permission.
 
 ## Contents
 
