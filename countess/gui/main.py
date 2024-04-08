@@ -17,7 +17,7 @@ from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import ask_open_filename, ask_saveas_filename, info_button
+from countess.gui.widgets import ask_open_filename, ask_saveas_filename, info_button, get_icon
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -373,9 +373,15 @@ class MainWindow:
 
         self.frame = tk.Frame(tk_parent)
         self.frame.grid(sticky=tk.NSEW)
+        self.frame.rowconfigure(0, minsize=100)
+        self.frame.columnconfigure(0, minsize=100)
 
         # The left (or top) pane, which contains the pipeline graph
         self.canvas = FlippyCanvas(self.frame, bg="skyblue")
+
+        # A narrow divider between panes which lets you resize them.
+        self.handle_frame = tk.Frame(self.frame, width=3, height=3)
+        self.handle_frame.bind("<B1-Motion>", self.on_handle_frame_adjust)
 
         # The right (or bottom) pane, which contains everything else.
         # 0: The node label
@@ -399,6 +405,11 @@ class MainWindow:
 
         self.logger_subframe = LoggerFrame(self.subframe)
         self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
+
+        self.frame.rowconfigure(0, weight=1)
+        self.frame.rowconfigure(2, weight=1)
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.columnconfigure(2, weight=1)
 
         if config_filename:
             self.config_load(config_filename)
@@ -483,13 +494,34 @@ class MainWindow:
     def on_frame_configure(self, event):
         """Swaps layout around when the window goes from landscape to portrait"""
         if event.width > event.height:
-            x = event.width // 4
-            self.canvas.place(x=0, y=0, w=x, h=event.height)
-            self.subframe.place(x=x, y=0, w=event.width - x, h=event.height)
+            self.frame.columnconfigure(0, minsize=event.width/4)
+            self.frame.columnconfigure(2, weight=1, minsize=event.width/2)
+            self.frame.rowconfigure(2, minsize=0, weight=0)
+            self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
+            self.handle_frame.configure(cursor="sb_h_double_arrow")
+            self.handle_frame.grid(row=0, column=1, sticky=tk.NS)
+            self.subframe.grid(row=0, column=2, sticky=tk.NSEW)
         else:
-            y = event.height // 4
-            self.canvas.place(x=0, y=0, w=event.width, h=y)
-            self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
+            self.frame.columnconfigure(2, minsize=0, weight=0)
+            self.frame.rowconfigure(0, minsize=event.height/4)
+            self.frame.rowconfigure(2, weight=1, minsize=event.height/2)
+            self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
+            self.handle_frame.configure(cursor="sb_v_double_arrow")
+            self.handle_frame.grid(row=1, column=0, sticky=tk.EW)
+            self.subframe.grid(row=2, column=0, sticky=tk.NSEW)
+
+    def on_handle_frame_adjust(self, event):
+        print(event)
+        width = self.frame.winfo_width()
+        height = self.frame.winfo_height()
+        if width > height:
+            size = min(width/2, max(width/10, self.canvas.winfo_width() + event.x))
+            self.frame.columnconfigure(0, minsize = size)
+            self.frame.columnconfigure(2, minsize = width-size)
+        else:
+            size = min(height/2, max(height/8, self.canvas.winfo_height() + event.y))
+            self.frame.rowconfigure(0, minsize = size)
+            self.frame.rowconfigure(2, minsize = width-size)
 
 
 def make_root():
