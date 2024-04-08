@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from countess import VERSION
 from countess.core.logger import Logger
@@ -58,6 +59,10 @@ class PivotPlugin(PandasProcessPlugin):
         if not pivot_cols:
             logger.error("No columns to pivot on!")
             return []
+
+        for ec in expand_cols:
+            if not is_numeric_dtype(data[ec]):
+                logger.warning(f"Expanding non-numeric column {ec}")
 
         n_pivot = _product(data[pc].nunique() for pc in pivot_cols) * len(expand_cols)
         if n_pivot > 200:
