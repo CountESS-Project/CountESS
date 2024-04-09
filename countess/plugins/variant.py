@@ -4,7 +4,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
+from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrStringParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
 
@@ -19,8 +19,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     parameters = {
         "column": ColumnChoiceParam("Input Column", "sequence"),
-        "reference": ColumnOrNoneChoiceParam("Reference Column"),
-        "sequence": StringParam("*OR* Reference Sequence"),
+        "reference": ColumnOrStringParam("Reference Sequence"),
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
         "protein": StringParam("Protein Column", ""),
@@ -31,15 +30,12 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     }
 
     def process_dict(self, data, logger: Logger) -> dict:
-        assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
+        assert isinstance(self.parameters["reference"], ColumnOrStringParam)
         sequence = data[self.parameters["column"].value]
         if not sequence:
             return {}
 
-        if self.parameters["reference"].is_none():
-            reference = self.parameters["sequence"].value
-        else:
-            reference = data[self.parameters["reference"].value]
+        reference = self.parameters["reference"].get_value(data)
 
         r = {}
 
@@ -67,7 +63,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         return r
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-        assert isinstance(self.parameters["reference"], ColumnOrNoneChoiceParam)
+        assert isinstance(self.parameters["reference"], ColumnOrStringParam)
         df_out = super().process_dataframe(dataframe, logger)
 
         if df_out is not None:
@@ -79,8 +75,8 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             if self.parameters["drop_columns"].value:
                 try:
                     df_out.drop(columns=self.parameters["column"].value, inplace=True)
-                    if self.parameters["reference"].is_not_none():
-                        df_out.drop(columns=self.parameters["reference"].value, inplace=True)
+                    if self.parameters["reference"].get_column_name():
+                        df_out.drop(columns=self.parameters["reference"].get_column_name(), inplace=True)
                 except KeyError:
                     pass
 

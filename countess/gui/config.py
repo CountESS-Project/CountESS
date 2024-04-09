@@ -198,6 +198,7 @@ class ParameterWrapper:
         elif isinstance(self.parameter, ChoiceParam):
             choices = self.parameter.choices or [""]
             self.entry["values"] = choices
+            self.var.set(self.parameter.value)
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
         elif isinstance(self.parameter, TextParam):
