@@ -493,21 +493,19 @@ class MainWindow:
 
 
 class SplashScreen:
-
     def __init__(self, tk_root):
         bg = "skyblue"
         self.splash = tk.Toplevel(tk_root, bg=bg)
-        self.splash.attributes('-type', 'dialog')
+        self.splash.attributes("-type", "dialog")
 
         font = ("TkHeadingFont", 16, "bold")
-        tk.Label(self.splash, text=f"CountESS {VERSION}", font=font, bg=bg).grid(padx=10,pady=10)
+        tk.Label(self.splash, text=f"CountESS {VERSION}", font=font, bg=bg).grid(padx=10, pady=10)
         tk.Label(self.splash, image=get_icon(tk_root, "countess"), bg=bg).grid(padx=10)
 
         self.splash.after(3500, self.destroy)
 
     def destroy(self):
         self.splash.destroy()
-
 
 
 def make_root():
