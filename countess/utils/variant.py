@@ -390,7 +390,7 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: Optional[int] = 0):
 
         if opcode.tag == "delete":
             assert dest_pro == ""
-            if ref_pro[src_end] == '*':
+            if len(ref_pro) > src_end and ref_pro[src_end] == "*":
                 # if the codon just after this deletion is a terminator,
                 # consider this an early termination.
                 yield f"{_ref(src_start)}Ter"
