@@ -9,6 +9,16 @@ div.navbar {
     border-bottom: 2px solid var(--tertiary-color);
 }
 
+div.sidebar div {
+    text-align: center;
+}
+
+div.sidebar div img {
+    display: inline-block;
+    max-width: 50%;
+    margin: 0;
+}
+
 dt {
     font-weight: bold;
 }

@@ -8,7 +8,7 @@ VERSION=$1
 
 sed -i "s/\# CountESS .*/# CountESS $VERSION/" README.md
 sed -i "s/VERSION = .*/VERSION = \"$VERSION\"/" countess/__init__.py
-sed -i "s/This is CountESS [0-9\.]\+/This is CountESS $VERSION/" docs/index.md
+sed -i "s/version:.*/version: $VERSION/" docs/_config.yml
 
 git commit -m "Bump to v$VERSION" README.md countess/__init__.py docs/index.md
 git tag -m "CountESS version $VERSION" v$VERSION
