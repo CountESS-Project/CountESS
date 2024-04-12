@@ -17,7 +17,7 @@ from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import ask_open_filename, ask_saveas_filename, get_icon, info_button
+from countess.gui.widgets import ask_open_filename, ask_saveas_filename, get_icon, info_button, ResizingFrame
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -371,11 +371,12 @@ class MainWindow:
             ],
         )
 
-        self.frame = tk.Frame(tk_parent)
+        self.frame = ResizingFrame(tk_parent, bg="darkgrey")
         self.frame.grid(sticky=tk.NSEW)
 
         # The left (or top) pane, which contains the pipeline graph
         self.canvas = FlippyCanvas(self.frame, bg="skyblue")
+        self.frame.add_child(self.canvas)
 
         # The right (or bottom) pane, which contains everything else.
         # 0: The node label
@@ -386,6 +387,8 @@ class MainWindow:
         # 5: Log output
 
         self.subframe = tk.Frame(self.frame)
+        self.frame.add_child(self.subframe)
+
         self.subframe.columnconfigure(0, weight=1)
         self.subframe.columnconfigure(1, weight=0)
         self.subframe.rowconfigure(0, weight=0)
@@ -394,8 +397,6 @@ class MainWindow:
         self.subframe.rowconfigure(3, weight=1)
         self.subframe.rowconfigure(4, weight=1)
         self.subframe.rowconfigure(5, weight=0)
-
-        self.frame.bind("<Configure>", self.on_frame_configure, add=True)
 
         self.logger_subframe = LoggerFrame(self.subframe)
         self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
@@ -479,17 +480,6 @@ class MainWindow:
     def node_changed(self, node):
         self.config_changed = True
         self.graph_wrapper.node_changed(node)
-
-    def on_frame_configure(self, event):
-        """Swaps layout around when the window goes from landscape to portrait"""
-        if event.width > event.height:
-            x = event.width // 4
-            self.canvas.place(x=0, y=0, w=x, h=event.height)
-            self.subframe.place(x=x, y=0, w=event.width - x, h=event.height)
-        else:
-            y = event.height // 4
-            self.canvas.place(x=0, y=0, w=event.width, h=y)
-            self.subframe.place(x=0, y=y, w=event.width, h=event.height - y)
 
 
 class SplashScreen:

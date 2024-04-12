@@ -158,6 +158,14 @@ class ResizingFrame(tk.Frame):
             return 'sb_h_double_arrow'
 
     def _resize(self):
+        #avail_size = (self._width if self._is_horizontal else self._height) - (len(self._children - 1) * self.BORDER)
+        #for c in self._children:
+        #    if c.size == 0:
+        #        c.size = avail_size / len(self._children)
+        #total_size = sum(c.size for c in self._children)
+        #for c in self._children:
+        #    c.size = c.size * avail_size // total_size
+
         if self._is_horizontal:
             self.configure(cursor = _RESIZE_CURSOR_H)
             width_each = (self._width - (len(self._children) - 1) * self.BORDER) / len(self._children)
@@ -211,20 +219,30 @@ class ResizingFrame(tk.Frame):
     def on_drag(self, event):
         if self._is_horizontal:
             drag = event.x - self._dragging.origin
-            if self._dragging.widget1_size + drag >= self.MINSIZE and self._dragging.widget2_size - drag >= self.MINSIZE:
+            if self._dragging.widget1_size + drag >= self.MINSIZE and \
+                    self._dragging.widget2_size - drag >= self.MINSIZE:
                 self._dragging.widget1.place(w=self._dragging.widget1_size + drag)
-                self._dragging.widget2.place(x=self._dragging.widget2_pos + drag, w = self._dragging.widget2_size - drag)
+                self._dragging.widget2.place(x=self._dragging.widget2_pos + drag,
+                                             w = self._dragging.widget2_size - drag)
         else:
             drag = event.y - self._dragging.origin
-            if self._dragging.widget1_size + drag >= self.MINSIZE and self._dragging.widget2_size - drag >= self.MINSIZE:
+            if self._dragging.widget1_size + drag >= self.MINSIZE and \
+                    self._dragging.widget2_size - drag >= self.MINSIZE:
                 self._dragging.widget1.place(h=self._dragging.widget1_size + drag)
-                self._dragging.widget2.place(y=self._dragging.widget2_pos + drag, h = self._dragging.widget2_size - drag)
+                self._dragging.widget2.place(y=self._dragging.widget2_pos + drag,
+                                             h = self._dragging.widget2_size - drag)
 
-    def add_child(self, index: int, widget: tk.Widget):
+    def add_child(self, widget: tk.Widget, index: Optional[int] = None, weight: int = 1):
+        if index is None:
+            index = len(self._children)
         if not widget.cget('cursor'):
             widget.configure(cursor=self._default_cursor)
         self._children.insert(index, widget)
         self._resize()
 
-    def add_frame(self, index: int, *a, **k):
+    def add_frame(self, *a, index: Optional[int] = None, **k):
         self.add_child(index, tk.Frame(self, *a, **k))
+
+    def remove_child(self, widget: tk.Widget):
+        self._children.remove(widget)
+        self._resize()
