@@ -109,14 +109,14 @@ In this case, we're expanding the column `count` into two new columns,
 ### 4. Calculating Scores
 
 Now we have pivoted the data, for each sequence we have counts at
-two different time points.  We want calculate scores from the counts.
-one by the other:
+two different time points.  We want to calculate scores from the counts
+by dividing one by the other:
 
 [![Example 1 Image 4](img/example_1_4.png)](img/example_1_4.png)
 
 The [Python Code](../included-plugins/#python) tool lets us write small expressions in Python and
 apply them to each row of the table.  In this case we're calculating
-score as the fraction of sequences which have survived from time 1
+a simplified score as the fraction of sequences which have survived from time 1
 to time 2.
 
 ### 5. Saving Results
@@ -165,6 +165,11 @@ AGGGCCGTGCCAAGTGCAGT,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTC
 TGTAGTGCCGTATTTGTGGC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTCGAATTTAGGTACTGCACTATCCTTTGAGGCAGGAAGGGCCACAAGGGCCGACCCTTGTCGGATAAAATTTGCTAAGAGGAAGGTCTAG
 ```
 *(etc)*
+
+The first three barcode map to the same sequence,
+the other two have SNVs but they are hard to spot!
+There are 1000 barcodes in the file, about 1/4 of which
+map to unmodified sequences.
 
 First, we modify our sequence reading and grouping steps to rename the sequence column to `barcode`,
 for clarity.
