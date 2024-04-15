@@ -50,7 +50,7 @@ class LabeledProgressbar(ttk.Progressbar):
         self.style.configure(self.style_name, text=s)
 
 
-class LoggerFrame(ttk.Frame):
+class LoggerFrame(tk.Frame):
     def __init__(self, tk_parent, *a, **k):
         super().__init__(tk_parent, *a, **k)
         self.columnconfigure(0, weight=1)

@@ -67,18 +67,23 @@ class ConfiguratorWrapper:
     info_toplevel = None
     info_frame = None
 
-    def __init__(self, frame, node, change_callback):
-        self.frame = frame
+    def __init__(self, tk_parent, node, logger, change_callback):
         self.node = node
+        self.logger = logger
         self.change_callback = change_callback
 
-        self.name_var = tk.StringVar(self.frame, value=node.name)
-        tk.Entry(self.frame, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")).grid(
+        self.frame = ResizingFrame(tk_parent, orientation=ResizingFrame.Orientation.VERTICAL, bg="darkgrey")
+        self.subframe = self.frame.add_frame()
+        self.subframe.columnconfigure(0,weight=1)
+        self.subframe.rowconfigure(3,weight=1)
+
+        self.name_var = tk.StringVar(self.subframe, value=node.name)
+        tk.Entry(self.subframe, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")).grid(
             row=0, columnspan=2, sticky=tk.EW, padx=10, pady=5
         )
         self.name_var.trace("w", self.name_changed_callback)
 
-        self.label = tk.Label(self.frame, justify=tk.LEFT, wraplength=500)
+        self.label = tk.Label(self.subframe, justify=tk.LEFT, wraplength=500)
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
 
@@ -93,20 +98,18 @@ class ConfiguratorWrapper:
     def show_config_subframe(self):
         if self.config_canvas:
             self.config_canvas.destroy()
-        self.config_canvas = tk.Canvas(self.frame)
-        self.config_scrollbar = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.config_canvas.yview)
+        self.config_canvas = tk.Canvas(self.subframe)
+        self.config_scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL, command=self.config_canvas.yview)
         self.config_canvas.configure(yscrollcommand=self.config_scrollbar.set, bd=0)
         self.config_canvas.grid(row=3, column=0, sticky=tk.NSEW)
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
-        self.logger_subframe = LoggerFrame(self.frame)
-        self.logger = self.logger_subframe.get_logger(self.node.name)
-
         if self.node.plugin:
+            self.node.load_config(self.logger)
             if self.node.notes:
                 self.show_notes_widget(self.node.notes)
             else:
-                self.notes_widget = tk.Button(self.frame, text="add notes", command=self.on_add_notes)
+                self.notes_widget = tk.Button(self.subframe, text="add notes", command=self.on_add_notes)
                 self.notes_widget.grid(row=2, columnspan=2, padx=10, pady=5)
 
             descr = re.sub(r"\s+", " ", self.node.plugin.description)
@@ -120,11 +123,8 @@ class ConfiguratorWrapper:
             )
             if self.node.plugin.link:
                 info_button(self.frame, command=self.on_info_button_press).place(anchor=tk.NE, relx=1, y=50)
-            # self.node.prepare(self.logger)
-            # self.node.plugin.update()
             self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
             self.config_subframe = self.configurator.frame
-            self.frame.rowconfigure(3, weight=1, minsize=self.frame.winfo_height() / 3)
 
         else:
             has_parents = len(self.node.parent_nodes) > 0
@@ -132,9 +132,6 @@ class ConfiguratorWrapper:
             self.config_subframe = PluginChooserFrame(
                 self.config_canvas, "Choose Plugin", self.choose_plugin, has_parents, has_children
             )
-            self.config_subframe.grid(sticky=tk.NSEW)
-            self.frame.rowconfigure(3, weight=1)
-            self.frame.rowconfigure(4, weight=0)
 
         self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
         self.config_subframe.bind(
@@ -167,17 +164,16 @@ class ConfiguratorWrapper:
         self.show_notes_widget()
 
     def show_notes_widget(self, notes=""):
-        self.notes_widget = tk.Text(self.frame, height=5)
+        self.notes_widget = tk.Text(self.subframe, height=5)
         self.notes_widget.insert("1.0", notes)
         self.notes_widget.bind("<<Modified>>", self.notes_modified_callback)
         self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
 
     def show_preview_subframe(self):
         if self.preview_subframe:
-            self.preview_subframe.destroy()
+            self.frame.remove_child(self.preview_subframe).destroy()
 
         if not self.node.plugin.show_preview:
-            self.frame.rowconfigure(4, weight=0)
             return
         elif not self.node.result:
             self.preview_subframe = tk.Frame(self.frame)
@@ -185,7 +181,7 @@ class ConfiguratorWrapper:
             tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
         elif all(isinstance(r, (str, bytes)) for r in self.node.result):
             text_result = "".join(self.node.result)
-            self.preview_subframe = tk.Frame(self.frame, highlightbackground="black", highlightthickness=3)
+            self.preview_subframe = tk.Frame(self.frame)
             self.preview_subframe.columnconfigure(0, weight=1)
             self.preview_subframe.rowconfigure(1, weight=1)
             n_lines = len(text_result.splitlines())
@@ -197,7 +193,7 @@ class ConfiguratorWrapper:
         else:
             try:
                 df = concat_dataframes(self.node.result)
-                self.preview_subframe = TabularDataFrame(self.frame, highlightbackground="black", highlightthickness=3)
+                self.preview_subframe = TabularDataFrame(self.frame)
                 self.preview_subframe.set_dataframe(df)
                 self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
                 self.preview_subframe.set_callback(self.preview_changed_callback)
@@ -206,7 +202,7 @@ class ConfiguratorWrapper:
                 self.preview_subframe.columnconfigure(0, weight=1)
                 tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
-        self.preview_subframe.grid(row=4, columnspan=2, sticky=tk.NSEW)
+        self.frame.add_child(self.preview_subframe)
 
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
         self.node.sort_column = sort_col
@@ -233,16 +229,13 @@ class ConfiguratorWrapper:
         self.node_update_thread = threading.Thread(target=self.node.prerun, args=(self.logger,))
         self.node_update_thread.start()
 
-        self.logger_subframe.clear()
-        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
-        self.logger_subframe.after(100, self.config_change_task_callback_2)
-        self.change_callback(self.node)
+        self.config_change_task_callback_2()
 
     def config_change_task_callback_2(self):
         self.logger.poll()
 
         if self.node_update_thread.is_alive():
-            self.logger_subframe.after(100, self.config_change_task_callback_2)
+            self.frame.after(100, self.config_change_task_callback_2)
             return
 
         self.node_update_thread.join()
@@ -255,12 +248,6 @@ class ConfiguratorWrapper:
         self.frame.update()
         self.config_canvas.yview_moveto(pos1)
         self.config_scrollbar.set(pos1, pos2)
-
-        if self.logger_subframe.count == 0:
-            self.logger_subframe.grid_forget()
-
-    #        else:
-    #            self.logger_subframe.progress_hide()
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
@@ -276,8 +263,6 @@ class ConfiguratorWrapper:
             self.config_subframe.destroy()
         if self.preview_subframe:
             self.preview_subframe.destroy()
-        if self.logger_subframe:
-            self.logger_subframe.destroy()
 
 
 class ButtonMenu:  # pylint: disable=R0903
@@ -371,40 +356,51 @@ class MainWindow:
             ],
         )
 
-        self.frame = ResizingFrame(tk_parent, bg="darkgrey")
+        # +--------------------------------------------+
+        # | ButtonMenu                                 |
+        # +--------------+-----------------------------+
+        # | tree_canvas  | config_wrapper.subframe     |
+        # |              |                             |
+        # |              +-----------------------------+
+        # |              | configw_wrapper.preview     |
+        # |              |                             |
+        # +--------------+-----------------------------+
+        # | logger_subframe                            |
+        # +--------------------------------------------+
+
+        # top level is a vertical layout with logs along the bottom
+        self.frame = ResizingFrame(tk_parent, orientation=ResizingFrame.Orientation.VERTICAL, bg="darkgrey")
         self.frame.grid(sticky=tk.NSEW)
 
-        # The left (or top) pane, which contains the pipeline graph
-        self.canvas = FlippyCanvas(self.frame, bg="skyblue")
-        self.frame.add_child(self.canvas)
+        # next is a division between the tree view and the configuration
+        self.main_subframe = ResizingFrame(self.frame, orientation=ResizingFrame.Orientation.AUTOMATIC, bg="darkgrey")
+        self.frame.add_child(self.main_subframe, weight=4)
 
-        # The right (or bottom) pane, which contains everything else.
-        # 0: The node label
-        # 1: The plugin description
-        # 2: Node notes / add notes button
-        # 3: Configuration
-        # 4: Preview pane
-        # 5: Log output
+        self.logger_subframe = LoggerFrame(self.frame)
+        self.logger = self.logger_subframe.get_logger('')
+        self.logger_subframe_show_task()
 
-        self.subframe = tk.Frame(self.frame)
-        self.frame.add_child(self.subframe)
-
-        self.subframe.columnconfigure(0, weight=1)
-        self.subframe.columnconfigure(1, weight=0)
-        self.subframe.rowconfigure(0, weight=0)
-        self.subframe.rowconfigure(1, weight=0)
-        self.subframe.rowconfigure(2, weight=0)
-        self.subframe.rowconfigure(3, weight=1)
-        self.subframe.rowconfigure(4, weight=1)
-        self.subframe.rowconfigure(5, weight=0)
-
-        self.logger_subframe = LoggerFrame(self.subframe)
-        self.logger_subframe.grid(row=5, columnspan=2, sticky=tk.NSEW)
+        self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")
+        self.main_subframe.add_child(self.tree_canvas)
 
         if config_filename:
             self.config_load(config_filename)
         else:
             self.config_new()
+
+    def logger_subframe_show_task(self):
+        if self.logger_subframe.count > 0:
+            self.frame.add_child(self.logger_subframe)
+            self.frame.after(100, self.logger_subframe_hide_task)
+        else:
+            self.frame.after(100, self.logger_subframe_show_task)
+
+    def logger_subframe_hide_task(self):
+        if self.logger_subframe.count == 0:
+            self.frame.remove_child(self.logger_subframe)
+            self.frame.after(100, self.logger_subframe_show_task)
+        else:
+            self.frame.after(100, self.logger_subframe_hide_task)
 
     def config_new(self):
         if self.config_changed:
@@ -415,7 +411,7 @@ class MainWindow:
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph()
-        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+        self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.graph_wrapper.add_new_node()
 
     def config_load(self, filename=None):
@@ -427,7 +423,7 @@ class MainWindow:
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = read_config(filename)
-        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+        self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.node_select(None)
 
     def config_save(self, filename=None):
@@ -440,10 +436,9 @@ class MainWindow:
             return
         write_config(self.graph, filename)
         self.config_changed = False
-        # XXX there should be a self.graph_wrapper.refresh()
-        # Names may have changed on save
+        # Names may have changed on save so redraw the tree
         self.graph_wrapper.destroy()
-        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+        self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
 
     def config_export(self, filename=None):
         if not filename:
@@ -458,9 +453,8 @@ class MainWindow:
 
     def graph_tidy(self):
         self.graph.tidy()
-        # XXX there should be a self.graph_wrapper.refresh()
         self.graph_wrapper.destroy()
-        self.graph_wrapper = GraphWrapper(self.canvas, self.graph, self.node_select)
+        self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
 
     def program_run(self):
         RunWindow(self.graph)
@@ -470,12 +464,18 @@ class MainWindow:
             self.tk_parent.quit()
 
     def node_select(self, node):
-        for widget in self.subframe.winfo_children():
-            widget.destroy()
         if node:
+            new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.logger, self.node_changed)
             if self.config_wrapper:
-                self.config_wrapper.destroy()
-            self.config_wrapper = ConfiguratorWrapper(self.subframe, node, self.node_changed)
+                self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
+            else:
+                self.main_subframe.add_child(new_config_wrapper.frame, weight=4)
+
+            self.config_wrapper = new_config_wrapper
+
+        elif self.config_wrapper:
+            self.main_subframe.remove_child(self.config_wrapper.frame).destroy()
+            self.config_wrapper = None
 
     def node_changed(self, node):
         self.config_changed = True
@@ -492,7 +492,7 @@ class SplashScreen:
         tk.Label(self.splash, text=f"CountESS {VERSION}", font=font, bg=bg).grid(padx=10, pady=10)
         tk.Label(self.splash, image=get_icon(tk_root, "countess"), bg=bg).grid(padx=10)
 
-        self.splash.after(3500, self.destroy)
+        self.splash.after(2500, self.destroy)
 
     def destroy(self):
         self.splash.destroy()

@@ -144,7 +144,7 @@ class ResizingFrame(tk.Frame):
         widget: tk.Widget
         weight: float
 
-    def __init__(self, tk_parent, *a, orientation: Orientation = Orientation.AUTOMATIC, **k):
+    def __init__(self, tk_parent, *a, orientation: Orientation = Orientation.HORIZONTAL, **k):
         self._orientation = orientation
         self._is_horizontal = orientation != self.Orientation.VERTICAL
         self._children : list[self.ChildInfo] = []
@@ -238,9 +238,21 @@ class ResizingFrame(tk.Frame):
         self._children.insert(index, self.ChildInfo(widget, weight))
         self._resize()
 
-    def add_frame(self, *a, index: Optional[int] = None, weight: float = 1.0, **k):
-        self.add_child(tk.Frame(self, *a, **k), index, weight)
+    def add_frame(self, *a, index: Optional[int] = None, weight: float = 1.0, **k) -> tk.Frame:
+        frame = tk.Frame(self, *a, **k)
+        self.add_child(frame, index, weight)
+        return frame
 
-    def remove_child(self, widget: tk.Widget):
-        self._children.remove(widget)
+    def remove_child(self, widget: tk.Widget) -> tk.Widget:
+        self._children = [ c for c in self._children if c.widget != widget ]
+        self._resize()
+        return widget
+
+    def replace_child(self, old_widget: tk.Widget, new_widget: tk.Widget):
+        self._children = [
+            self.ChildInfo(
+                widget = new_widget if c.widget == old_widget else c.widget,
+                weight = c.weight,
+            ) for c in self._children
+        ]
         self._resize()

@@ -425,17 +425,13 @@ class PluginConfigurator:
         self.plugin = plugin
         self.change_callback = change_callback
 
-        self.frame = tk.Frame(tk_parent)
-        self.frame.columnconfigure(0, weight=1)
+        self.frame = tk.Frame(tk_parent, highlightcolor="purple", highlightthickness=3)
+        self.frame.columnconfigure(0, weight=0)
+        self.frame.columnconfigure(1, weight=0)
+        self.frame.columnconfigure(2, weight=1)
         self.frame.grid(sticky=tk.NSEW)
 
         self.wrapper_cache: MutableMapping[str, ParameterWrapper] = {}
-
-        self.subframe = tk.Frame(self.frame)
-        self.subframe.columnconfigure(0, weight=0)
-        self.subframe.columnconfigure(1, weight=0)
-        self.subframe.columnconfigure(2, weight=1)
-        self.subframe.grid(row=1, sticky=tk.NSEW)
 
         self.update()
 
@@ -447,6 +443,7 @@ class PluginConfigurator:
             self.change_callback(self)
 
     def update(self) -> None:
+
         # If there's only a single parameter it is presented a little differently.
         top_level = 0 if len(self.plugin.parameters) == 1 else 1
 
@@ -456,7 +453,7 @@ class PluginConfigurator:
                 self.wrapper_cache[key].update()
             else:
                 self.wrapper_cache[key] = ParameterWrapper(
-                    self.subframe, parameter, self.change_parameter, level=top_level
+                    self.frame, parameter, self.change_parameter, level=top_level
                 )
             self.wrapper_cache[key].set_row(n + 1)
 
