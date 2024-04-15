@@ -150,51 +150,36 @@ class ResizingFrame(tk.Frame):
         self._children : list[self.ChildInfo] = []
         super().__init__(tk_parent, *a, **k)
         self._default_cursor = self.cget("cursor") or 'arrow'
+        self.configure(cursor = _RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
         self.bind("<Configure>", self.on_configure)
         self.bind("<Button-1>", self.on_click)
         self.bind("<B1-Motion>", self.on_drag)
         self._dragging : tuple(int, tk.Widget, int, tk.Widget, int, int) = None
 
-    def resize_cursor(self):
-        if platform.system() == 'Darwin':
-            return 'resizeleftright'
-        elif platform.system() == 'Windows':
-            return 'size_we'
-        else:
-            return 'sb_h_double_arrow'
-
     def _resize(self):
-        # normalize weights so that sum(weights) == 1
-        total_weight = sum(c.weight for c in self._children)
-        for n, c in enumerate(self._children):
-            c.weight = c.weight / total_weight
-            print(f"{n} {c.weight}")
-        
-        # XXX may end up with a couple of pixels left over due to rounding
 
-        if self._is_horizontal:
-            self.configure(cursor = _RESIZE_CURSOR_H)
-            avail_width = self._width - (len(self._children)-1) * self.BORDER
-            x = 0
-            for c in self._children:
-                width = int(c.weight * avail_width)
-                c.widget.place(x=x,w=width,y=0,h=self._height)
-                x += width + self.BORDER
-        else:
-            self.configure(cursor = _RESIZE_CURSOR_V)
-            avail_height = self._height - (len(self._children)-1) * self.BORDER
-            y = 0
-            for c in self._children:
-                height = int(c.weight * avail_height)
-                c.widget.place(x=0,w=self._width,y=y,h=height)
-                y += height + self.BORDER
+        # XXX may end up with a couple of pixels left over due to rounding errors
+        total_pixels = (self._width if self._is_horizontal else self._height) - (len(self._children)-1) * self.BORDER
+        total_weight = sum(c.weight for c in self._children)
+
+        pos = 0
+        for c in self._children:
+            child_size = (c.weight * total_pixels) // total_weight
+            if self._is_horizontal:
+                c.widget.place(x=pos,w=child_size,y=0,h=self._height)
+            else:
+                c.widget.place(x=0,w=self._width,y=pos,h=child_size)
+            pos += child_size + self.BORDER
 
     def on_configure(self, event):
         self._width = event.width
         self._height = event.height
         if self._orientation == self.Orientation.AUTOMATIC:
             self._is_horizontal = self._width > self._height
+            self.configure(cursor = _RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
         self._resize()
+
+    # XXX this whole DragInfo thing seems overcomplicated, revisit it later.
 
     def on_click(self, event):
         prev = None
@@ -250,7 +235,7 @@ class ResizingFrame(tk.Frame):
             index = len(self._children)
         if not widget.cget('cursor'):
             widget.configure(cursor=self._default_cursor)
-        self._children.insert(index, self.ChildInfo(widget, weight / (len(self._children) or 1)))
+        self._children.insert(index, self.ChildInfo(widget, weight))
         self._resize()
 
     def add_frame(self, *a, index: Optional[int] = None, weight: float = 1.0, **k):
