@@ -17,7 +17,7 @@ from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import ask_open_filename, ask_saveas_filename, get_icon, info_button, ResizingFrame
+from countess.gui.widgets import ResizingFrame, ask_open_filename, ask_saveas_filename, get_icon, info_button
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -74,8 +74,8 @@ class ConfiguratorWrapper:
 
         self.frame = ResizingFrame(tk_parent, orientation=ResizingFrame.Orientation.VERTICAL, bg="darkgrey")
         self.subframe = self.frame.add_frame()
-        self.subframe.columnconfigure(0,weight=1)
-        self.subframe.rowconfigure(3,weight=1)
+        self.subframe.columnconfigure(0, weight=1)
+        self.subframe.rowconfigure(3, weight=1)
 
         self.name_var = tk.StringVar(self.subframe, value=node.name)
         tk.Entry(self.subframe, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")).grid(
@@ -377,7 +377,7 @@ class MainWindow:
         self.frame.add_child(self.main_subframe, weight=4)
 
         self.logger_subframe = LoggerFrame(self.frame)
-        self.logger = self.logger_subframe.get_logger('')
+        self.logger = self.logger_subframe.get_logger("")
         self.logger_subframe_show_task()
 
         self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")

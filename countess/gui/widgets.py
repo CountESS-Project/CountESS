@@ -1,11 +1,12 @@
 import platform
 import tkinter as tk
+from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from importlib.resources import as_file, files
 from tkinter import filedialog
 from typing import List, NamedTuple, Optional, Sequence, Tuple, Union
-from dataclasses import dataclass
+
 # To keep the cache of bitmaps smaller, we always associate the image with
 # the toplevel, not the individual widget it appears on.
 
@@ -107,19 +108,33 @@ def ask_open_filename(file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
     return filedialog.askopenfilename(filetypes=_clean_filetypes(file_types))
 
 
-if platform.system() == 'Darwin':
-    _RESIZE_CURSOR_H = 'resizeleftright'
-    _RESIZE_CURSOR_V = 'resizeupdown'
-elif platform.system() == 'Windows':
-    _RESIZE_CURSOR_H = 'size_we'
-    _RESIZE_CURSOR_V = 'size_ns'
+if platform.system() == "Darwin":
+    _RESIZE_CURSOR_H = "resizeleftright"
+    _RESIZE_CURSOR_V = "resizeupdown"
+elif platform.system() == "Windows":
+    _RESIZE_CURSOR_H = "size_we"
+    _RESIZE_CURSOR_V = "size_ns"
 else:
-    _RESIZE_CURSOR_H = 'sb_h_double_arrow'
-    _RESIZE_CURSOR_V = 'sb_v_double_arrow'
+    _RESIZE_CURSOR_H = "sb_h_double_arrow"
+    _RESIZE_CURSOR_V = "sb_v_double_arrow"
+
+
+@dataclass
+class _ChildInfo:
+    widget: tk.Widget
+    weight: float
+
+
+class _DragInfo(NamedTuple):
+    origin: int
+    widget1: tk.Widget
+    widget2: tk.Widget
+    widget1_size: int
+    widget2_pos: int
+    widget2_size: int
 
 
 class ResizingFrame(tk.Frame):
-
     BORDER = 5
     MINSIZE = 50
 
@@ -131,44 +146,30 @@ class ResizingFrame(tk.Frame):
         VERTICAL = 2
         AUTOMATIC = 3
 
-    class DragInfo(NamedTuple):
-        origin: int
-        widget1 : tk.Widget
-        widget2 : tk.Widget
-        widget1_size: int
-        widget2_pos: int
-        widget2_size: int
-
-    @dataclass
-    class ChildInfo:
-        widget: tk.Widget
-        weight: float
-
     def __init__(self, tk_parent, *a, orientation: Orientation = Orientation.HORIZONTAL, **k):
         self._orientation = orientation
         self._is_horizontal = orientation != self.Orientation.VERTICAL
-        self._children : list[self.ChildInfo] = []
+        self._children: list[_ChildInfo] = []
         super().__init__(tk_parent, *a, **k)
-        self._default_cursor = self.cget("cursor") or 'arrow'
-        self.configure(cursor = _RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
+        self._default_cursor = self.cget("cursor") or "arrow"
+        self.configure(cursor=_RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
         self.bind("<Configure>", self.on_configure)
         self.bind("<Button-1>", self.on_click)
         self.bind("<B1-Motion>", self.on_drag)
-        self._dragging : tuple(int, tk.Widget, int, tk.Widget, int, int) = None
+        self._dragging: Optional[_DragInfo]
 
     def _resize(self):
-
         # XXX may end up with a couple of pixels left over due to rounding errors
-        total_pixels = (self._width if self._is_horizontal else self._height) - (len(self._children)-1) * self.BORDER
+        total_pixels = (self._width if self._is_horizontal else self._height) - (len(self._children) - 1) * self.BORDER
         total_weight = sum(c.weight for c in self._children)
 
         pos = 0
         for c in self._children:
             child_size = (c.weight * total_pixels) // total_weight
             if self._is_horizontal:
-                c.widget.place(x=pos,w=child_size,y=0,h=self._height)
+                c.widget.place(x=pos, w=child_size, y=0, h=self._height)
             else:
-                c.widget.place(x=0,w=self._width,y=pos,h=child_size)
+                c.widget.place(x=0, w=self._width, y=pos, h=child_size)
             pos += child_size + self.BORDER
 
     def on_configure(self, event):
@@ -176,7 +177,7 @@ class ResizingFrame(tk.Frame):
         self._height = event.height
         if self._orientation == self.Orientation.AUTOMATIC:
             self._is_horizontal = self._width > self._height
-            self.configure(cursor = _RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
+            self.configure(cursor=_RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
         self._resize()
 
     # XXX this whole DragInfo thing seems overcomplicated, revisit it later.
@@ -186,24 +187,24 @@ class ResizingFrame(tk.Frame):
         for c in self._children:
             if self._is_horizontal:
                 if c.widget.winfo_x() > event.x:
-                    self._dragging = self.DragInfo(
-                        origin = event.x,
-                        widget1 = prev,
-                        widget2 = c.widget,
-                        widget1_size = prev.winfo_width(),
-                        widget2_pos = c.widget.winfo_x(),
-                        widget2_size = c.widget.winfo_width(),
+                    self._dragging = _DragInfo(
+                        origin=event.x,
+                        widget1=prev,
+                        widget2=c.widget,
+                        widget1_size=prev.winfo_width(),
+                        widget2_pos=c.widget.winfo_x(),
+                        widget2_size=c.widget.winfo_width(),
                     )
                     return
             else:
                 if c.widget.winfo_y() > event.y:
-                    self._dragging = self.DragInfo(
-                        origin = event.y,
-                        widget1 = prev,
-                        widget2 = c.widget,
-                        widget1_size = prev.winfo_height(),
-                        widget2_pos = c.widget.winfo_y(),
-                        widget2_size = c.widget.winfo_height(),
+                    self._dragging = _DragInfo(
+                        origin=event.y,
+                        widget1=prev,
+                        widget2=c.widget,
+                        widget1_size=prev.winfo_height(),
+                        widget2_pos=c.widget.winfo_y(),
+                        widget2_size=c.widget.winfo_height(),
                     )
                     return
             prev = c.widget
@@ -211,20 +212,22 @@ class ResizingFrame(tk.Frame):
     def on_drag(self, event):
         if self._is_horizontal:
             drag = event.x - self._dragging.origin
-            if self._dragging.widget1_size + drag >= self.MINSIZE and \
-                    self._dragging.widget2_size - drag >= self.MINSIZE:
+            if (
+                self._dragging.widget1_size + drag >= self.MINSIZE
+                and self._dragging.widget2_size - drag >= self.MINSIZE
+            ):
                 self._dragging.widget1.place(w=self._dragging.widget1_size + drag)
-                self._dragging.widget2.place(x=self._dragging.widget2_pos + drag,
-                                             w = self._dragging.widget2_size - drag)
-            sizes = [ c.widget.winfo_width() for c in self._children ]
+                self._dragging.widget2.place(x=self._dragging.widget2_pos + drag, w=self._dragging.widget2_size - drag)
+            sizes = [c.widget.winfo_width() for c in self._children]
         else:
             drag = event.y - self._dragging.origin
-            if self._dragging.widget1_size + drag >= self.MINSIZE and \
-                    self._dragging.widget2_size - drag >= self.MINSIZE:
+            if (
+                self._dragging.widget1_size + drag >= self.MINSIZE
+                and self._dragging.widget2_size - drag >= self.MINSIZE
+            ):
                 self._dragging.widget1.place(h=self._dragging.widget1_size + drag)
-                self._dragging.widget2.place(y=self._dragging.widget2_pos + drag,
-                                             h = self._dragging.widget2_size - drag)
-            sizes = [ c.widget.winfo_height() for c in self._children ]
+                self._dragging.widget2.place(y=self._dragging.widget2_pos + drag, h=self._dragging.widget2_size - drag)
+            sizes = [c.widget.winfo_height() for c in self._children]
 
         total_size = sum(sizes)
         for n, c in enumerate(self._children):
@@ -233,9 +236,9 @@ class ResizingFrame(tk.Frame):
     def add_child(self, widget: tk.Widget, index: Optional[int] = None, weight: float = 1.0):
         if index is None:
             index = len(self._children)
-        if not widget.cget('cursor'):
-            widget.configure(cursor=self._default_cursor)
-        self._children.insert(index, self.ChildInfo(widget, weight))
+        if not widget.cget("cursor"):
+            widget["cursor"] = self._default_cursor
+        self._children.insert(index, _ChildInfo(widget, weight))
         self._resize()
 
     def add_frame(self, *a, index: Optional[int] = None, weight: float = 1.0, **k) -> tk.Frame:
@@ -244,15 +247,16 @@ class ResizingFrame(tk.Frame):
         return frame
 
     def remove_child(self, widget: tk.Widget) -> tk.Widget:
-        self._children = [ c for c in self._children if c.widget != widget ]
+        self._children = [c for c in self._children if c.widget != widget]
         self._resize()
         return widget
 
     def replace_child(self, old_widget: tk.Widget, new_widget: tk.Widget):
         self._children = [
-            self.ChildInfo(
-                widget = new_widget if c.widget == old_widget else c.widget,
-                weight = c.weight,
-            ) for c in self._children
+            _ChildInfo(
+                widget=new_widget if c.widget == old_widget else c.widget,
+                weight=c.weight,
+            )
+            for c in self._children
         ]
         self._resize()

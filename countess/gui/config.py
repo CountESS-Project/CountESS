@@ -443,7 +443,6 @@ class PluginConfigurator:
             self.change_callback(self)
 
     def update(self) -> None:
-
         # If there's only a single parameter it is presented a little differently.
         top_level = 0 if len(self.plugin.parameters) == 1 else 1
 
