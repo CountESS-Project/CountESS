@@ -8,7 +8,7 @@ from typing import Callable, Optional, Union
 import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
-from countess.gui.widgets import copy_to_clipboard, get_icon
+from countess.gui.widgets import copy_to_clipboard, get_icon, ResizingFrame
 
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
@@ -89,21 +89,33 @@ class TabularDataFrame(tk.Frame):
     sort_ascending = True
     callback: Optional[Callable[[int, int, bool], None]] = None
 
-    def reset(self):
-        if self.subframe:
-            self.subframe.destroy()
-        self.rowconfigure(0, weight=1)
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.rowconfigure(0, weight=0)
+        self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
-        self.subframe = tk.Frame(self)
-        self.subframe.rowconfigure(0, weight=0)
-        self.subframe.rowconfigure(1, weight=0)
-        self.subframe.rowconfigure(2, weight=1)
-        self.subframe.grid(sticky=tk.NSEW)
+        self.columnconfigure(1, weight=0)
+
+        self.label = tk.Label(self, text="Dataframe Preview")
+        self.label.grid(sticky=tk.EW, row=0, columnspan=2)
+
+        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL)
+        self.scrollbar.grid(sticky=tk.NS, row=1, column=1)
+        self.scrollbar["command"] = self._scrollbar_command
+
+        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
+        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
+
+
+    def reset(self):
+        self.dataframe = None
+        self.length = 0
+        self.label["text"] = "Dataframe Preview"
+        self.subframe.destroy()
+        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL)
+        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
 
     def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
-        self.reset()
-        assert self.subframe
-
         self.dataframe = dataframe
         self.length = len(dataframe)
 
@@ -133,66 +145,49 @@ class TabularDataFrame(tk.Frame):
             self.index_cols = 0
 
         if len(column_names) == 0:
-            label = tk.Label(self.subframe, text="Dataframe Preview\n\nno data")
-            label.grid(row=0, column=0, sticky=tk.NSEW)
+            self.label["text"] = "Dataframe Preview\n\nno data"
             return
 
-        title = tk.Label(self.subframe, text=f"Dataframe Preview {len(self.dataframe)} rows")
-        title.grid(row=0, column=0, columnspan=len(column_names) * 2 + 1, sticky=tk.NSEW, pady=5)
+        self.label["text"] = f"Dataframe Preview {len(self.dataframe)} rows"
 
         ### XXX add in proper handling for MultiIndexes here
 
-        # Even-numbered columns are the data columns
-
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
+            column_frame = self.subframe.add_frame()
+            column_frame.columnconfigure(0, weight=1)
+            column_frame.rowconfigure(1, weight=1)
+
             if type(name) is tuple:
                 name = "\n".join([str(n) for n in name])
             else:
                 name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
-            label = tk.Label(
-                self.subframe,
+            column_label = tk.Label(
+                column_frame,
                 text=f"{name}\n{dtype}{is_index}",
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
-            label.grid(row=1, column=num * 2, sticky=tk.EW)
-            label.bind("<Button-1>", partial(self._label_button_1, num))
-            self.subframe.columnconfigure(num * 2, minsize=10, weight=1)
-            self.labels.append(label)
+            column_label.bind("<Button-1>", partial(self._label_button_1, num))
+            self.labels.append(column_label)
+            column_label.grid(sticky=tk.EW, row=0)
 
-        # Between them are blank columns which provide a handle for adjusting the column
-        # widths left and right
+            column_text = tk.Text(column_frame)
+            column_text.insert(tk.END, "hello\nworld")
+            column_text.grid(sticky=tk.NSEW, row=1)
+            column_text["wrap"] = tk.NONE
+            column_text["xscrollcommand"] = partial(self._column_xscrollcommand, num)
+            column_text["yscrollcommand"] = self._column_yscrollcommand
+            column_text.bind("<Button-4>", self._column_scroll)
+            column_text.bind("<Button-5>", self._column_scroll)
+            column_text.bind("<<Selection>>", partial(self._column_selection, num))
+            column_text.bind("<Control-C>", self._column_copy)
+            column_text.bind("<<Copy>>", self._column_copy)
+            self.columns.append(column_text)
 
-        for num in range(0, len(column_names) - 1):
-            adjuster = tk.Frame(self.subframe, width=3, cursor="sb_h_double_arrow")
-            adjuster.grid(row=1, rowspan=2, column=num * 2 + 1, sticky=tk.NSEW)
-            adjuster.bind("<B1-Motion>", partial(self._column_adjust, num))
-
-        if len(self.dataframe) == 0:
-            label = tk.Label(self.subframe, text="no data")
-            label.grid(row=2, column=0, columnspan=len(column_names), sticky=tk.NSEW)
-            return
-
-        self.columns = [tk.Text(self.subframe) for _ in column_names]
-        for num, column in enumerate(self.columns):
-            column.grid(sticky=tk.NSEW, row=2, column=num * 2)
-            column["wrap"] = tk.NONE
-            column["xscrollcommand"] = partial(self._column_xscrollcommand, num)
-            column["yscrollcommand"] = self._column_yscrollcommand
-            column.bind("<Button-4>", self._column_scroll)
-            column.bind("<Button-5>", self._column_scroll)
-            column.bind("<<Selection>>", partial(self._column_selection, num))
-            column.bind("<Control-C>", self._column_copy)
-            column.bind("<<Copy>>", self._column_copy)
         if self.columns:
             self.columns[0].bind("<Configure>", self._column_configure)
-
-        self.scrollbar = ttk.Scrollbar(self.subframe, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=2, column=len(self.columns) * 2 - 1)
-        self.scrollbar["command"] = self._scrollbar_command
-        self.refresh(offset)
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
@@ -285,13 +280,6 @@ class TabularDataFrame(tk.Frame):
         self.set_sort_order(num)
         if self.callback:
             self.callback(self.offset, self.sort_by_col, not self.sort_ascending)
-
-    def _column_adjust(self, num, event):
-        """Adjust column widths left and right by dragging the dummy columns"""
-        w0 = self.labels[num].winfo_width()
-        w1 = self.labels[num + 1].winfo_width()
-        self.subframe.columnconfigure(num * 2, minsize=w0 + event.x)
-        self.subframe.columnconfigure(num * 2 + 2, minsize=w1 - event.x)
 
     def _scrollbar_command(self, command, *parameters):
         # Detect scrollbar movement and move self.offset
