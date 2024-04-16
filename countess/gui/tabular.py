@@ -8,7 +8,7 @@ from typing import Callable, Optional, Union
 import pandas as pd
 from pandas.api.types import is_integer_dtype, is_numeric_dtype
 
-from countess.gui.widgets import copy_to_clipboard, get_icon, ResizingFrame
+from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
 
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
@@ -104,7 +104,7 @@ class TabularDataFrame(tk.Frame):
         self.label_frame.pack(fill="x")
 
         self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL)
-        self.scrollbar.pack(side='right', fill='y')
+        self.scrollbar.pack(side="right", fill="y")
         self.scrollbar["command"] = self._scrollbar_command
 
         self.bind("<Configure>", self._configure)
@@ -172,7 +172,7 @@ class TabularDataFrame(tk.Frame):
         if self.subframe:
             self.subframe.destroy()
         self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
-        self.subframe.pack(side='left', fill='both', expand=True)
+        self.subframe.pack(side="left", fill="both", expand=True)
 
         self.label["text"] = f"Dataframe Preview {len(self.dataframe)} rows"
 
@@ -189,7 +189,6 @@ class TabularDataFrame(tk.Frame):
             column_text.bind("<<Copy>>", self._column_copy)
             column_text.bind("<Configure>", partial(self._column_configure, num))
             self.columns.append(column_text)
-
 
     def _column_configure(self, num, ev):
         # when the column changes position, move the labels around

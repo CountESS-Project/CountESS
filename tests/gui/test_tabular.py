@@ -39,8 +39,6 @@ def test_tabular_1():
     root = make_root()
     tt = TabularDataFrame(root)
 
-    tt.reset()
-
     tt.set_dataframe(df0)
     tt.set_dataframe(df00)
     tt.set_dataframe(df1)

@@ -38,7 +38,9 @@ def test_main():
     root = make_root()
     node = PipelineNode(name="NEW", plugin=DataTablePlugin())
     callback = MagicMock()
-    wrap = ConfiguratorWrapper(root, node, callback)
+    logger = MagicMock()
+
+    wrap = ConfiguratorWrapper(root, node, logger, callback)
     wrap.on_add_notes()
 
     root.update()
