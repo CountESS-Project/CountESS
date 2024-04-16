@@ -98,10 +98,13 @@ class TabularDataFrame(tk.Frame):
         self.columnconfigure(1, weight=0)
 
         self.label = tk.Label(self, text="Dataframe Preview")
-        self.label.grid(sticky=tk.EW, row=0, columnspan=2)
+        self.label.pack(fill="x")
+
+        self.label_frame = tk.Frame(self, height=60)
+        self.label_frame.pack(fill="x")
 
         self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=2, column=1)
+        self.scrollbar.pack(side='right', fill='y')
         self.scrollbar["command"] = self._scrollbar_command
 
         self.bind("<Configure>", self._configure)
@@ -109,6 +112,8 @@ class TabularDataFrame(tk.Frame):
     def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
         self.dataframe = dataframe
         self.length = len(dataframe)
+
+        # clean up column names
 
         if hasattr(self.dataframe.index, "names") and hasattr(self.dataframe.index, "dtypes"):
             # MultiIndex case
@@ -140,57 +145,56 @@ class TabularDataFrame(tk.Frame):
             self.label["text"] = "Dataframe Preview\n\nno data"
             return
 
-        self.label.grid(columnspan=n_columns)
-        self.scrollbar.grid(column=n_columns)
-        self.subframe.grid(columnspan=n_columns)
-
-        self.label["text"] = f"Dataframe Preview {len(self.dataframe)} rows"
-
+        # make labels for all the columns
         ### XXX add in proper handling for MultiIndexes here
 
-        if self.subframe:
-            self.subframe.destroy()
-        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
-        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
+        for label in self.labels:
+            label.destroy()
 
-        self.columns = []
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
-            column_frame = self.subframe.add_frame()
-            column_frame.columnconfigure(0, weight=1)
-            column_frame.rowconfigure(1, weight=1)
-
             if type(name) is tuple:
                 name = "\n".join([str(n) for n in name])
             else:
                 name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
             column_label = tk.Label(
-                self,
+                self.label_frame,
                 text=f"{name}\n{dtype}{is_index}",
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
             column_label.bind("<Button-1>", partial(self._label_button_1, num))
             self.labels.append(column_label)
-            column_label.grid(sticky=tk.EW, row=1, column=num)
 
-            column_text = tk.Text(column_frame)
-            column_text.grid(sticky=tk.NSEW, row=1)
+        # make a subframe to hold the column texts
+
+        if self.subframe:
+            self.subframe.destroy()
+        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
+        self.subframe.pack(side='left', fill='both', expand=True)
+
+        self.label["text"] = f"Dataframe Preview {len(self.dataframe)} rows"
+
+        self.columns = []
+        for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
+            column_text = tk.Text(self.subframe)
+            self.subframe.add_child(column_text)
             column_text["wrap"] = tk.NONE
-            column_text["xscrollcommand"] = partial(self._column_xscrollcommand, num)
             column_text["yscrollcommand"] = self._column_yscrollcommand
             column_text.bind("<Button-4>", self._column_scroll)
             column_text.bind("<Button-5>", self._column_scroll)
             column_text.bind("<<Selection>>", partial(self._column_selection, num))
             column_text.bind("<Control-C>", self._column_copy)
             column_text.bind("<<Copy>>", self._column_copy)
+            column_text.bind("<Configure>", partial(self._column_configure, num))
             self.columns.append(column_text)
 
-            column_text.bind("<Configure>", partial(self._column_configure, num, column_label, column_frame))
 
-    def _column_configure(self, num, column_label, column_frame, ev):
-        self.columnconfigure(num, minsize=column_frame.winfo_width())
+    def _column_configure(self, num, ev):
+        # when the column changes position, move the labels around
+        # to match
+        self.labels[num].place(x=ev.x, width=ev.width)
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
@@ -294,11 +298,6 @@ class TabularDataFrame(tk.Frame):
         else:
             self.refresh()
 
-    def _column_xscrollcommand(self, num, x1, x2):
-        # XXX this gets called as the table is displayed
-        # if x2 < 1.0 this column is partially hidden.
-        pass
-
     # XXX the following two functions are clever but not
     # very efficient!  There's got to be a nicer way of
     # detecting this surely?
@@ -314,7 +313,9 @@ class TabularDataFrame(tk.Frame):
             self.refresh()
 
     def _configure(self, *_):
-        self.after(100, self._reset_height)
+        # the delay lets the sub-elements configure
+        # themselves before we try to measure them.
+        self.after(10, self._reset_height)
 
     def _reset_height(self):
         # Start with a huge number of rows and let
