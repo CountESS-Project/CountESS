@@ -103,18 +103,6 @@ class TabularDataFrame(tk.Frame):
         self.scrollbar.grid(sticky=tk.NS, row=1, column=1)
         self.scrollbar["command"] = self._scrollbar_command
 
-        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
-        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
-
-
-    def reset(self):
-        self.dataframe = None
-        self.length = 0
-        self.label["text"] = "Dataframe Preview"
-        self.subframe.destroy()
-        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL)
-        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
-
     def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
         self.dataframe = dataframe
         self.length = len(dataframe)
@@ -152,6 +140,12 @@ class TabularDataFrame(tk.Frame):
 
         ### XXX add in proper handling for MultiIndexes here
 
+        if self.subframe:
+            self.subframe.destroy()
+        self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
+        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
+
+        self.columns = []
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
             column_frame = self.subframe.add_frame()
