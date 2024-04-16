@@ -92,7 +92,8 @@ class TabularDataFrame(tk.Frame):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.rowconfigure(0, weight=0)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(1, weight=0)
+        self.rowconfigure(2, weight=1)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=0)
 
@@ -100,12 +101,12 @@ class TabularDataFrame(tk.Frame):
         self.label.grid(sticky=tk.EW, row=0, columnspan=2)
 
         self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL)
-        self.scrollbar.grid(sticky=tk.NS, row=1, column=1)
+        self.scrollbar.grid(sticky=tk.NS, row=2, column=1)
         self.scrollbar["command"] = self._scrollbar_command
 
         self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
-        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
-
+        self.subframe.grid(sticky=tk.NSEW, row=2)
+        self.bind("<Configure>", self._configure)
 
     def reset(self):
         self.dataframe = None
@@ -113,7 +114,7 @@ class TabularDataFrame(tk.Frame):
         self.label["text"] = "Dataframe Preview"
         self.subframe.destroy()
         self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL)
-        self.subframe.grid(sticky=tk.NSEW, row=1, column=0)
+        self.subframe.grid(sticky=tk.NSEW, row=2, column=0)
 
     def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
         self.dataframe = dataframe
@@ -144,9 +145,14 @@ class TabularDataFrame(tk.Frame):
             self.column_formats = [column_format_for(dataframe[name]) for name in dataframe.columns]
             self.index_cols = 0
 
-        if len(column_names) == 0:
+        n_columns = len(column_names)
+        if n_columns == 0:
             self.label["text"] = "Dataframe Preview\n\nno data"
             return
+
+        self.label.grid(columnspan=n_columns)
+        self.scrollbar.grid(column=n_columns)
+        self.subframe.grid(columnspan=n_columns)
 
         self.label["text"] = f"Dataframe Preview {len(self.dataframe)} rows"
 
@@ -164,17 +170,16 @@ class TabularDataFrame(tk.Frame):
                 name = str(name)
             is_index = " (index)" if num < self.index_cols else ""
             column_label = tk.Label(
-                column_frame,
+                self,
                 text=f"{name}\n{dtype}{is_index}",
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
             column_label.bind("<Button-1>", partial(self._label_button_1, num))
             self.labels.append(column_label)
-            column_label.grid(sticky=tk.EW, row=0)
+            column_label.grid(sticky=tk.EW, row=1, column=num)
 
             column_text = tk.Text(column_frame)
-            column_text.insert(tk.END, "hello\nworld")
             column_text.grid(sticky=tk.NSEW, row=1)
             column_text["wrap"] = tk.NONE
             column_text["xscrollcommand"] = partial(self._column_xscrollcommand, num)
@@ -186,8 +191,10 @@ class TabularDataFrame(tk.Frame):
             column_text.bind("<<Copy>>", self._column_copy)
             self.columns.append(column_text)
 
-        if self.columns:
-            self.columns[0].bind("<Configure>", self._column_configure)
+            column_text.bind("<Configure>", partial(self._column_configure, num, column_label, column_frame))
+
+    def _column_configure(self, num, column_label, column_frame, ev):
+        self.columnconfigure(num, minsize=column_frame.winfo_width())
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
@@ -305,16 +312,18 @@ class TabularDataFrame(tk.Frame):
         # too many rows for the window, in which case it
         # trims them off.  Once there's the right number
         # of rows, this won't get called any more.
-        span = int((float(y2) - float(y1)) * self.height)
+        span = int((float(y2) - float(y1)) * self.height) + 1
         if span > 0 and span != self.height:
             self.height = span
             self.refresh()
 
-    def _column_configure(self, *_):
-        # If we've resized the window, start with a huge
-        # number of rows and let _cw_yscrollcommand trim
-        # it back down again.  Probably could be more
-        # sensible.
+    def _configure(self, *_):
+        self.after(100, self._reset_height)
+
+    def _reset_height(self):
+        # Start with a huge number of rows and let
+        # _cw_yscrollcommand trim it back down again.
+        # Probably could be more efficient.
         self.height = min(self.length, 1000)
         self.refresh()
 
