@@ -306,7 +306,7 @@ class TabularDataFrame(tk.Frame):
         # too many rows for the window, in which case it
         # trims them off.  Once there's the right number
         # of rows, this won't get called any more.
-        span = int((float(y2) - float(y1)) * self.height) + 1
+        span = int((float(y2) - float(y1)) * self.height)
         if span > 0 and span != self.height:
             self.height = span
             self.refresh()
