@@ -47,7 +47,10 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
         group_columns = ["sequence"]
 
-        if self.parameters["header_column"].value:
+        if not self.parameters["header_column"].value:
+            dataframe.drop(columns="header", inplace=True)
+        elif self.parameters["group"].value:
+            # if we've got a header column and we're grouping by sequence,
             # find maximum common length of the 'header' field in this file
             for common_length in range(0, dataframe["header"].str.len().min() - 1):
                 if dataframe["header"].str.slice(0, common_length + 1).nunique() > 1:
@@ -55,8 +58,6 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
             if common_length > 0:
                 dataframe["header"] = dataframe["header"].str.slice(0, common_length)
                 group_columns.append("header")
-        else:
-            dataframe.drop(columns="header", inplace=True)
 
         if self.parameters["filename_column"].value:
             group_columns.append("filename")
