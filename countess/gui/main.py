@@ -468,6 +468,7 @@ class MainWindow:
             new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.logger, self.node_changed)
             if self.config_wrapper:
                 self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
+                self.config_wrapper.destroy()
             else:
                 self.main_subframe.add_child(new_config_wrapper.frame, weight=4)
 
