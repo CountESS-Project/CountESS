@@ -193,7 +193,7 @@ class ConfiguratorWrapper:
         else:
             try:
                 df = concat_dataframes(self.node.result)
-                self.preview_subframe = TabularDataFrame(self.frame)
+                self.preview_subframe = TabularDataFrame(self.frame, cursor='arrow')
                 self.preview_subframe.set_dataframe(df)
                 self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
                 self.preview_subframe.set_callback(self.preview_changed_callback)
