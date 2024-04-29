@@ -29,5 +29,5 @@ CountESS "portrait" logo &copy; 2024 Sayeh Gorjifard, used with permission.
 
 ## Presentations
 
-* [CountESS: Count-based Experimental Scoring and Statistics](https://www.youtube.com/watch?v=JzU6cbvZ0a0) at [PyConAU 2023](https://2023.pycon.org.au/)
+* [CountESS: Count-based Experimental Scoring and Statistics](https://www.youtube.com/watch?v=JzU6cbvZ0a0) at [PyConAU 2023](https://2023.pycon.org.au/) ([slides](https://nick.zoic.org/talk/pycon2023/countess/))
 

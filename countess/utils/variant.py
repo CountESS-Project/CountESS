@@ -71,7 +71,7 @@ def search_for_sequence(ref_seq: str, var_seq: str, min_search_length: int = MIN
     return var_seq
 
 
-def find_variant_dna(ref_seq: str, var_seq: str, offset: Optional[int] = 0) -> Iterable[str]:
+def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[str]:
     """ finds HGVS variants between DNA sequences in ref_seq and var_seq.
     https://varnomen.hgvs.org/recommendations/DNA/variant/insertion/
     Doesn't look for things like complex insertions (yet)
@@ -304,7 +304,7 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: Optional[int] = 0) -> I
                 yield f"{start+1}_{end}delins{inserted_sequence}"
 
 
-def find_variant_protein(ref_seq: str, var_seq: str, offset: Optional[int] = 0):
+def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
     """Find changes between two DNA sequences, expressed
     as amino acid changes per HGVS standard.
 
@@ -427,7 +427,7 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: Optional[int] = 0):
 
 
 def find_variant_string(
-    prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None, offset: Optional[int] = 0
+    prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None, offset: int = 0
 ) -> str:
     """As above, but returns a single string instead of a generator
 
