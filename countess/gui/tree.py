@@ -577,7 +577,7 @@ class GraphWrapper:
         or configuration."""
         flipped = self.canvas.winfo_width() >= self.canvas.winfo_height()
 
-        if node.name.startswith("NEW"):
+        if node.plugin and node.name.startswith("NEW"):
             node.name = node.plugin.name
             self.graph.reset_node_name(node)
 

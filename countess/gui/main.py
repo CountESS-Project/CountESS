@@ -96,6 +96,9 @@ class ConfiguratorWrapper:
                 self.show_preview_subframe()
 
     def show_config_subframe(self):
+
+        if self.config_subframe:
+            self.config_subframe.destroy()
         if self.config_canvas:
             self.config_canvas.destroy()
         self.config_canvas = tk.Canvas(self.subframe)
@@ -250,6 +253,7 @@ class ConfiguratorWrapper:
         self.config_scrollbar.set(pos1, pos2)
 
     def choose_plugin(self, plugin_class):
+        print(f"choose {self} {plugin_class}")
         self.node.plugin = plugin_class()
         self.node.prerun(self.logger)
         self.node.is_dirty = True
@@ -259,10 +263,7 @@ class ConfiguratorWrapper:
     def destroy(self):
         if self.config_change_task:
             self.frame.after_cancel(self.config_change_task)
-        if self.config_subframe:
-            self.config_subframe.destroy()
-        if self.preview_subframe:
-            self.preview_subframe.destroy()
+        self.frame.destroy()
 
 
 class ButtonMenu:  # pylint: disable=R0903
