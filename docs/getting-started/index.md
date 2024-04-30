@@ -64,7 +64,7 @@ Our first step just reads these two files in.
 [![Example 1 Image 1](img/example_1_1.png)](img/example_1_1.png)
 
 * Sequence data can also be loaded from other file formats such 
-  as FASTQ, see [Example 4](#example-4-fastq-and-vamp-seq)
+  as FASTQ, see [Example 3](#example-3-fastq-and-vamp-seq)
 * CountESS can also read Gzipped CSV and FASTQ files, and this can
   be faster to read than plain files, depending on your platform.
 * With larger files, reads are limited to 100,000 rows when previewing.
@@ -166,7 +166,7 @@ TGTAGTGCCGTATTTGTGGC,ATGCTTTGTACGGGTGGTGCCCTGGCTTATCTATCTAGATCCGTCTCCGAGTCACGGTC
 ```
 *(etc)*
 
-The first three barcode map to the same sequence,
+The first three barcodes map to the same sequence,
 the other two have SNVs but they are hard to spot!
 There are 1000 barcodes in the file, about 1/4 of which
 map to unmodified sequences.
