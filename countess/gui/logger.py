@@ -1,19 +1,12 @@
 import datetime
 import tkinter as tk
 from tkinter import ttk
+from typing import Optional
+
+import pandas as pd
 
 from countess.core.logger import MultiprocessLogger
-
-
-class LoggerTreeview(ttk.Treeview):
-    def __init__(self, tk_parent, *a, **k):
-        super().__init__(tk_parent, *a, **k)
-        self["columns"] = ["name", "message"]
-        self.heading(0, text="name")
-        self.heading(1, text="message")
-
-    def clear(self):
-        self.delete(*self.get_children())
+from countess.gui.tabular import TabularDataFrame
 
 
 class LabeledProgressbar(ttk.Progressbar):
@@ -51,36 +44,33 @@ class LabeledProgressbar(ttk.Progressbar):
 
 
 class LoggerFrame(tk.Frame):
-    def __init__(self, tk_parent, *a, **k):
+    def __init__(self, tk_parent: tk.Widget, *a, **k):
         super().__init__(tk_parent, *a, **k)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        self.treeview = LoggerTreeview(self)
-        self.treeview.grid(row=0, column=0, sticky=tk.NSEW)
-        self.treeview.bind("<<TreeviewSelect>>", self.on_click)
+        self.messages: list[dict] = []
 
-        self.scrollbar_x = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.treeview.xview)
-        self.scrollbar_x.grid(row=1, column=0, sticky=tk.EW)
-        self.treeview.configure(xscrollcommand=self.scrollbar_x.set)
-
-        self.scrollbar_y = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.treeview.yview)
-        self.scrollbar_y.grid(row=0, column=1, sticky=tk.NS)
-        self.treeview.configure(yscrollcommand=self.scrollbar_y.set)
+        self.tabular = TabularDataFrame(self)
+        self.tabular.grid(row=0, column=0, sticky=tk.NSEW)
+        self.tabular.set_click_callback(self.click_callback)
+        self.dataframe = pd.DataFrame()
 
         self.progress_frame = tk.Frame(self)
-        self.progress_frame.grid(row=2, columnspan=2, sticky=tk.EW)
+        self.progress_frame.grid(row=1, columnspan=2, sticky=tk.EW)
         self.progress_frame.columnconfigure(0, weight=1)
 
+        self.detail_window: Optional[tk.Toplevel] = None
+
         self.logger = MultiprocessLogger()
+        self.progress_bars: dict[str, tk.Widget] = {}
         self.count = 0
-        self.details = {}
-        self.progress_bars = {}
 
         self.poll()
 
     def poll(self):
         datetime_now = datetime.datetime.now()
+        update = False
         for level, message, detail in self.logger.poll():
             if level == "progress":
                 try:
@@ -103,18 +93,30 @@ class LoggerFrame(tk.Frame):
                     pbar.update_label(f"{message}")
 
             else:
+                update = True
+                self.messages.append(
+                    {
+                        "row": {
+                            "datetime": datetime_now,
+                            "level": level,
+                            "message": message,
+                        },
+                        "detail": detail,
+                    }
+                )
                 self.count += 1
-                iid = self.treeview.insert("", "end", text=datetime_now.isoformat(), values=(level, message))
-                if detail:
-                    self.details[iid] = detail
+        if update:
+            self.tabular.set_dataframe(pd.DataFrame([x["row"] for x in self.messages]))
         self.after(100, self.poll)
 
     def get_logger(self, name: str):
         return self.logger
 
-    def on_click(self, _):
-        # XXX display detail more nicely
-        TreeviewDetailWindow(self.details[self.treeview.focus()])
+    def click_callback(self, col: int, row: int, char: int):
+        if self.detail_window:
+            self.detail_window.destroy()
+        if row in self.messages:
+            self.detail_window = TreeviewDetailWindow(self.messages[row]["detail"])
 
     def remove_pbar(self, message):
         if message in self.progress_bars:
@@ -123,9 +125,9 @@ class LoggerFrame(tk.Frame):
 
     def clear(self):
         self.logger.clear()
-        self.treeview.clear()
+        self.messages = []
         self.count = 0
-        self.details = {}
+        self.tabular.set_dataframe(pd.DataFrame())
         for message in self.progress_bars:
             self.remove_pbar(message)
 

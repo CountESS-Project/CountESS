@@ -88,6 +88,7 @@ class TabularDataFrame(tk.Frame):
     sort_by_col = None
     sort_ascending = True
     callback: Optional[Callable[[int, int, bool], None]] = None
+    click_callback: Optional[Callable[[int, int, int], None]] = None
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
@@ -182,6 +183,7 @@ class TabularDataFrame(tk.Frame):
             self.subframe.add_child(column_text)
             column_text["wrap"] = tk.NONE
             column_text["yscrollcommand"] = self._column_yscrollcommand
+            column_text.bind("<Button-1>", partial(self._column_click, num))
             column_text.bind("<Button-4>", self._column_scroll)
             column_text.bind("<Button-5>", self._column_scroll)
             column_text.bind("<<Selection>>", partial(self._column_selection, num))
@@ -194,6 +196,12 @@ class TabularDataFrame(tk.Frame):
         # when the column changes position, move the labels around
         # to match
         self.labels[num].place(x=ev.x, width=ev.width)
+
+    def _column_click(self, col, ev):
+        if self.click_callback:
+            line, char = ev.widget.index("current").split(".")
+            row = min(self.offset + int(line), self.length) - 1
+            self.click_callback(col, row, int(char))
 
     def refresh(self, new_offset=0):
         # Refreshes the column widgets.
@@ -259,6 +267,9 @@ class TabularDataFrame(tk.Frame):
 
     def set_callback(self, callback) -> None:
         self.callback = callback
+
+    def set_click_callback(self, click_callback) -> None:
+        self.click_callback = click_callback
 
     def set_sort_order(self, column_num: int, descending: Optional[bool] = None):
         assert self.dataframe is not None
