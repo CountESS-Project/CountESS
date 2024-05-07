@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from importlib.resources import as_file, files
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from typing import List, NamedTuple, Optional, Sequence, Tuple, Union
 
 # To keep the cache of bitmaps smaller, we always associate the image with
@@ -260,3 +260,37 @@ class ResizingFrame(tk.Frame):
             for c in self._children
         ]
         self._resize()
+
+
+class LabeledProgressbar(ttk.Progressbar):
+    """A progress bar with a label on top of it, the progress bar value can be set in the
+    usual way and the label can be set with self.update_label"""
+
+    # see https://stackoverflow.com/a/40348163/90927 for how the styling works.
+
+    style_data = [
+        (
+            "LabeledProgressbar.trough",
+            {
+                "children": [
+                    ("LabeledProgressbar.pbar", {"side": "left", "sticky": tk.NS}),
+                    ("LabeledProgressbar.label", {"sticky": ""}),
+                ],
+                "sticky": tk.NSEW,
+            },
+        )
+    ]
+
+    def __init__(self, master, *args, **kwargs):
+        self.style = ttk.Style(master)
+        # make up a new style name so we don't interfere with other LabeledProgressbars
+        # and accidentally change their color or label (uses arbitrary object ID)
+        self.style_name = f"_id_{id(self)}"
+        self.style.layout(self.style_name, self.style_data)
+        self.style.configure(self.style_name, background="green")
+
+        kwargs["style"] = self.style_name
+        super().__init__(master, *args, **kwargs)
+
+    def update_label(self, s):
+        self.style.configure(self.style_name, text=s)

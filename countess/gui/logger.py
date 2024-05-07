@@ -1,46 +1,12 @@
 import datetime
 import tkinter as tk
-from tkinter import ttk
 from typing import Optional
 
 import pandas as pd
 
 from countess.core.logger import MultiprocessLogger
 from countess.gui.tabular import TabularDataFrame
-
-
-class LabeledProgressbar(ttk.Progressbar):
-    """A progress bar with a label on top of it, the progress bar value can be set in the
-    usual way and the label can be set with self.update_label"""
-
-    # see https://stackoverflow.com/a/40348163/90927 for how the styling works.
-
-    style_data = [
-        (
-            "LabeledProgressbar.trough",
-            {
-                "children": [
-                    ("LabeledProgressbar.pbar", {"side": "left", "sticky": tk.NS}),
-                    ("LabeledProgressbar.label", {"sticky": ""}),
-                ],
-                "sticky": tk.NSEW,
-            },
-        )
-    ]
-
-    def __init__(self, master, *args, **kwargs):
-        self.style = ttk.Style(master)
-        # make up a new style name so we don't interfere with other LabeledProgressbars
-        # and accidentally change their color or label (uses arbitrary object ID)
-        self.style_name = f"_id_{id(self)}"
-        self.style.layout(self.style_name, self.style_data)
-        self.style.configure(self.style_name, background="green")
-
-        kwargs["style"] = self.style_name
-        super().__init__(master, *args, **kwargs)
-
-    def update_label(self, s):
-        self.style.configure(self.style_name, text=s)
+from countess.gui.widgets import LabeledProgressbar
 
 
 class LoggerFrame(tk.Frame):
@@ -64,9 +30,12 @@ class LoggerFrame(tk.Frame):
 
         self.logger = MultiprocessLogger()
         self.progress_bars: dict[str, tk.Widget] = {}
-        self.count = 0
 
         self.poll()
+
+    @property
+    def count(self):
+        return len(self.messages)
 
     def poll(self):
         datetime_now = datetime.datetime.now()
@@ -104,7 +73,6 @@ class LoggerFrame(tk.Frame):
                         "detail": detail,
                     }
                 )
-                self.count += 1
         if update:
             self.tabular.set_dataframe(pd.DataFrame([x["row"] for x in self.messages]))
         self.after(100, self.poll)
@@ -115,8 +83,8 @@ class LoggerFrame(tk.Frame):
     def click_callback(self, col: int, row: int, char: int):
         if self.detail_window:
             self.detail_window.destroy()
-        if row in self.messages:
-            self.detail_window = TreeviewDetailWindow(self.messages[row]["detail"])
+        if self.messages[row]["detail"]:
+            self.detail_window = LoggerDetailWindow(self.messages[row]["detail"])
 
     def remove_pbar(self, message):
         if message in self.progress_bars:
@@ -126,13 +94,12 @@ class LoggerFrame(tk.Frame):
     def clear(self):
         self.logger.clear()
         self.messages = []
-        self.count = 0
         self.tabular.set_dataframe(pd.DataFrame())
         for message in self.progress_bars:
             self.remove_pbar(message)
 
 
-class TreeviewDetailWindow(tk.Toplevel):
+class LoggerDetailWindow(tk.Toplevel):
     def __init__(self, detail, *a, **k):
         super().__init__(*a, **k)
 
