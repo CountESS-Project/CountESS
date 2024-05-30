@@ -34,13 +34,15 @@ class PivotPlugin(PandasProcessPlugin):
 
     input_columns: Dict[str, np.dtype] = {}
 
-    dataframes: List[pd.DataFrame] = []
+    dataframes: List[pd.DataFrame] = None
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         self.input_columns = {}
+        self.dataframes = []
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger):
         assert isinstance(self.parameters["columns"], PerColumnArrayParam)
+        assert self.dataframes is not None
         self.input_columns.update(get_all_columns(data))
 
         data.reset_index(drop=data.index.names == [None], inplace=True)
