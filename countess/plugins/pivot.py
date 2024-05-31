@@ -22,7 +22,7 @@ class PivotPlugin(PandasProcessPlugin):
     name = "Pivot Tool"
     description = "Groups a dataframe and pivots column values into columns."
     additional = """Expanded column values are duplicated for each combination of pivot values.
-        Missing values default to 0, and duplicate values are summed."""
+        Missing values default to 0, and duplicate values are aggregated."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
@@ -30,6 +30,9 @@ class PivotPlugin(PandasProcessPlugin):
         "columns": PerColumnArrayParam(
             "Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"])
         ),
+        "aggfunc": ChoiceParam(
+            "Aggregation Function", "sum", choices=["sum", "mean", "min", "max"]
+        )
     }
 
     input_columns: Dict[str, np.dtype] = {}
@@ -77,7 +80,7 @@ class PivotPlugin(PandasProcessPlugin):
             values=expand_cols,
             index=index_cols,
             columns=pivot_cols,
-            aggfunc="sum",
+            aggfunc=self.parameters["aggfunc"].value,
             fill_value=0,
         )
 
