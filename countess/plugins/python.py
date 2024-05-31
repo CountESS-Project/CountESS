@@ -1,6 +1,7 @@
 import builtins
 import math
-from types import CodeType, NoneType
+import re
+from types import CodeType, FunctionType, ModuleType, NoneType
 
 import numpy as np
 import pandas as pd
@@ -20,14 +21,22 @@ from countess.core.plugins import PandasTransformDictToDictPlugin
 
 SIMPLE_TYPES = set((bool, int, float, str, tuple, list, NoneType))
 
+def _module_functions(mod: ModuleType):
+    """Extracts just the public functions from a module"""
+    return {
+        k: v
+        for k, v in mod.__dict__.items()
+        if not k.startswith("_") and type(v) is FunctionType
+    }
+
 SAFE_BUILTINS = {
     x: builtins.__dict__[x]
     for x in "abs all any ascii bin bool bytearray bytes chr complex dict divmod "
     "enumerate filter float format frozenset hash hex id int len list map max min "
     "oct ord pow range reversed round set slice sorted str sum tuple type zip".split()
 }
-MATH_FUNCTIONS = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}
-
+MATH_FUNCTIONS = _module_functions(math)
+RE_FUNCTIONS = _module_functions(re)
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
     name = "Python Code"
@@ -49,6 +58,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     code_globals = {
         "__builtins__": SAFE_BUILTINS,
         **MATH_FUNCTIONS,
+        **RE_FUNCTIONS
     }
 
     def process_dict(self, data: dict, logger: Logger):
