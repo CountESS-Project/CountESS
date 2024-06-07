@@ -313,11 +313,6 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTTCA"))
     []
 
-    this is a synonym: both GGT and GGC => Gly:
-
-    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGCTCA"))
-    []
-
     a single AA substitution:
 
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTCCATCA"))
@@ -355,6 +350,20 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
 
     >>> list(find_variant_protein("ATGGTTTGGTAG", "ATGGTTTAGTAG"))
     ['Trp3Ter']
+
+    Call specific synonyms:
+
+    >>> list(find_variant_protein("ATGGCCTAA", "ATGGCGTAA"))
+    ['Ala2=']
+
+    >>> list(find_variant_protein("ATGGCCAAACCCTAA", "ATGGCGAAGCCATAA"))
+    ['Ala2_Pro4=']
+
+    >>> list(find_variant_protein("ATGGCCAAACCCTAA", "ATGGCGAATCCATAA"))
+    ['Ala2=', 'Lys3Asn', 'Pro4=']
+
+    >>> list(find_variant_protein("ATGGCCCCCAAATAA", "ATGGCGCCAAATTAA"))
+    ['Ala2_Pro3=', 'Lys4Asn']
 
     """
 
@@ -424,6 +433,28 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
             # If the variant protein terminated, stop translating now:
             if dest_pro[-1] == "*":
                 return
+
+        elif opcode.tag == "equal":
+            # Handle calling synonymous changes
+            assert end - start == opcode.dest_end - opcode.dest_start
+            start_ofs = None
+            for ofs in range(0, end-start):
+                src_dna = ref_seq[(start+ofs)*3+frame:][:3]
+                dest_dna = var_seq[(opcode.dest_start+ofs)*3+frame:][:3]
+                if src_dna == dest_dna:
+                    if start_ofs is not None:
+                        if start_ofs == ofs-1:
+                            yield f"{_ref(start+start_ofs)}="
+                        else:
+                            yield f"{_ref(start+start_ofs)}_{_ref(start+ofs-1)}="
+                        start_ofs = None
+                elif start_ofs is None:
+                    start_ofs = ofs
+            if start_ofs is not None:
+                if start_ofs == ofs:
+                    yield f"{_ref(start+start_ofs)}="
+                else:
+                    yield f"{_ref(start+start_ofs)}_{_ref(start+ofs)}="
 
 
 def find_variant_string(
