@@ -21,13 +21,11 @@ from countess.core.plugins import PandasTransformDictToDictPlugin
 
 SIMPLE_TYPES = set((bool, int, float, str, tuple, list, NoneType))
 
+
 def _module_functions(mod: ModuleType):
     """Extracts just the public functions from a module"""
-    return {
-        k: v
-        for k, v in mod.__dict__.items()
-        if not k.startswith("_") and type(v) is FunctionType
-    }
+    return {k: v for k, v in mod.__dict__.items() if not k.startswith("_") and type(v) is FunctionType}
+
 
 SAFE_BUILTINS = {
     x: builtins.__dict__[x]
@@ -37,6 +35,7 @@ SAFE_BUILTINS = {
 }
 MATH_FUNCTIONS = _module_functions(math)
 RE_FUNCTIONS = _module_functions(re)
+
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
     name = "Python Code"
@@ -55,11 +54,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     }
 
     code_object = None
-    code_globals = {
-        "__builtins__": SAFE_BUILTINS,
-        **MATH_FUNCTIONS,
-        **RE_FUNCTIONS
-    }
+    code_globals = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS}
 
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
