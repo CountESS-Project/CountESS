@@ -438,12 +438,12 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
             # Handle calling synonymous changes
             assert end - start == opcode.dest_end - opcode.dest_start
             start_ofs = None
-            for ofs in range(0, end-start):
-                src_dna = ref_seq[(start+ofs)*3+frame:][:3]
-                dest_dna = var_seq[(opcode.dest_start+ofs)*3+frame:][:3]
+            for ofs in range(0, end - start):
+                src_dna = ref_seq[(start + ofs) * 3 + frame :][:3]
+                dest_dna = var_seq[(opcode.dest_start + ofs) * 3 + frame :][:3]
                 if src_dna == dest_dna:
                     if start_ofs is not None:
-                        if start_ofs == ofs-1:
+                        if start_ofs == ofs - 1:
                             yield f"{_ref(start+start_ofs)}="
                         else:
                             yield f"{_ref(start+start_ofs)}_{_ref(start+ofs-1)}="

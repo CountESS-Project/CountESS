@@ -30,14 +30,12 @@ class PivotPlugin(PandasProcessPlugin):
         "columns": PerColumnArrayParam(
             "Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"])
         ),
-        "aggfunc": ChoiceParam(
-            "Aggregation Function", "sum", choices=["sum", "mean", "min", "max"]
-        )
+        "aggfunc": ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "min", "max"]),
     }
 
     input_columns: Dict[str, np.dtype] = {}
 
-    dataframes: List[pd.DataFrame] = None
+    dataframes: Optional[List[pd.DataFrame]] = None
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         self.input_columns = {}
