@@ -7,12 +7,17 @@ from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from countess import VERSION
 from countess.core.parameters import BooleanParam, FloatParam
 from countess.core.plugins import PandasInputFilesPlugin
+from countess.utils.files import clean_filename
 
 
 def _file_reader(file_handle, min_avg_quality, row_limit=None, filename=""):
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
-            yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:], "filename": filename}
+            yield {
+                "sequence": fastq_read.sequence,
+                "header": fastq_read.header[1:],
+                "filename": clean_filename(filename),
+            }
 
 
 class LoadFastqPlugin(PandasInputFilesPlugin):

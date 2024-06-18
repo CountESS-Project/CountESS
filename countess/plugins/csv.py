@@ -17,6 +17,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import PandasInputFilesPlugin, PandasOutputPlugin
+from countess.utils.files import clean_filename
 from countess.utils.pandas import flatten_columns
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
@@ -116,7 +117,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
 
         filename_column = self.parameters["filename_column"].value
         if filename_column:
-            df[filename_column] = filename
+            df[filename_column] = clean_filename(filename)
 
         if index_col_numbers:
             df = df.set_index([df.columns[n] for n in index_col_numbers])
