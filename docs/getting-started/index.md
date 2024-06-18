@@ -285,3 +285,42 @@ Files are then written out as before.
 [![Example 3 Image 9](img/example_3_9.png)](img/example_3_9.png)
 -->
 
+## Example 4: External Metadata
+
+Load this example with `countess_gui example_4.ini`.
+
+The metadata you need isn't always present in the data files or their filenames:
+for example your files may just be named after the order they were sequenced, or
+if you've obtained a dataset from
+[NCBI SRA](https://www.ncbi.nlm.nih.gov/sra) you might
+have just a bunch of files called `SRR*.fastq.gz` and an `SraRunTable.txt` which
+provides all the metadata.
+
+In this example our data files are named `data12345.fastq` and
+so on, and we have a `metadata.tsv` file which maps the filenames
+to replicate number and a time:
+
+```
+filename	repl	time
+data12345	1	0
+data12354	1	1
+data12356	1	2.5
+data12363	2	0
+data12368	2	1.5
+data12377	2	2.7
+```
+
+First we load up the metadata file, splitting the columns using
+"TAB" characters:
+
+[![Example 4 Image 1](img/example_4_1.png)](img/example_4_1.png)
+
+Then we load up the six data files, remembering to select the
+"Filename Column?" option to get the filename as a column:
+
+[![Example 4 Image 2](img/example_4_2.png)](img/example_4_2.png)
+
+Then we can join the two together using the `filename` column
+in each:
+
+[![Example 4 Image 3](img/example_4_3.png)](img/example_4_3.png)
