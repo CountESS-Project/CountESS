@@ -35,6 +35,7 @@ SAFE_BUILTINS = {
 }
 MATH_FUNCTIONS = _module_functions(math)
 RE_FUNCTIONS = _module_functions(re)
+NUMPY_IMPORTS = {"nan": np.nan, "inf": np.inf, "isnan": np.isnan, "isinf": np.isinf}
 
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
@@ -54,7 +55,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     }
 
     code_object = None
-    code_globals = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS}
+    code_globals = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
 
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
@@ -80,7 +81,9 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         dataframe = self.series_to_dataframe(series)
 
         if "__filter" in dataframe.columns:
-            dataframe = dataframe.query("__filter").drop(columns="__filter")
+            dataframe = dataframe.query("not `__filter`.isnull() and `__filter` not in (False, 0, '')").drop(
+                columns="__filter"
+            )
 
         if self.parameters["dropna"].value:
             dataframe.dropna(axis=1, how="all", inplace=True)
