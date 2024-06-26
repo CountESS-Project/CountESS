@@ -155,8 +155,9 @@ class ResizingFrame(tk.Frame):
         self.configure(cursor=_RESIZE_CURSOR_H if self._is_horizontal else _RESIZE_CURSOR_V)
         self.bind("<Configure>", self.on_configure)
         self.bind("<Button-1>", self.on_click)
+        self.bind("<ButtonRelease-1>", self.on_release)
         self.bind("<B1-Motion>", self.on_drag)
-        self._dragging: Optional[_DragInfo]
+        self._dragging: Optional[_DragInfo] = None
 
     def _resize(self):
         # XXX may end up with a couple of pixels left over due to rounding errors
@@ -209,7 +210,13 @@ class ResizingFrame(tk.Frame):
                     return
             prev = c.widget
 
+    def on_release(self, event):
+        self._dragging = None
+
     def on_drag(self, event):
+        if not self._dragging:
+            return
+
         if self._is_horizontal:
             drag = event.x - self._dragging.origin
             if (
