@@ -68,8 +68,8 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
 
         if len(self.parameters["columns"]):
             options["names"] = []
-            options["dtype"] = {}
             options["usecols"] = []
+            options["converters"] = {}
 
             for n, pp in enumerate(self.parameters["columns"]):
                 options["names"].append(pp["name"].value or f"column_{n}")
@@ -77,7 +77,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
                     if pp["index"].value:
                         index_col_numbers.append(len(options["usecols"]))
                     options["usecols"].append(n)
-                    options["dtype"][n] = pp["type"].get_selected_type()
+                    options["converters"][n] = pp["type"].cast_value
 
         delimiter = self.parameters["delimiter"].value
         if delimiter == "TAB":

@@ -1,4 +1,5 @@
 import hashlib
+import math
 import os.path
 import re
 from typing import Any, Iterable, Mapping, Optional, Type, Union
@@ -290,7 +291,7 @@ class ChoiceParam(BaseParam):
 class DataTypeChoiceParam(ChoiceParam):
     DATA_TYPES: Mapping[str, tuple[type, Any, Type[SimpleParam]]] = {
         "string": (str, "", StringParam),
-        "number": (float, 0.0, FloatParam),
+        "number": (float, math.nan, FloatParam),
         "integer": (int, 0, IntegerParam),
         "boolean": (bool, False, BooleanParam),
     }
@@ -307,10 +308,12 @@ class DataTypeChoiceParam(ChoiceParam):
             return self.DATA_TYPES[self.value][0]
 
     def cast_value(self, value):
-        if value is None:
-            return self.DATA_TYPES[self.value][1]
-        else:
-            return self.DATA_TYPES[self.value][0](value)
+        if value is not None:
+            try:
+                return self.DATA_TYPES[self.value][0](value)
+            except ValueError:
+                pass
+        return self.DATA_TYPES[self.value][1]
 
     def get_parameter(self, label: str, value=None) -> BaseParam:
         return self.DATA_TYPES[self.value][2](label, value)

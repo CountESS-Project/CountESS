@@ -56,7 +56,10 @@ class ColumnToolPlugin(PandasSimplePlugin):
             if parameter.rename.value and parameter.rename.value.strip() and parameter.datatype.is_not_none()
         }
 
-        dataframe = dataframe.reset_index().drop(columns=drop_columns).astype(type_columns)
+        if dataframe.index.name is not None:
+            dataframe = dataframe.reset_index()
+
+        dataframe = dataframe.drop(columns=drop_columns).astype(type_columns)
 
         if index_columns:
             dataframe = dataframe.set_index(index_columns)
