@@ -56,17 +56,17 @@ class GroupByPlugin(PandasProcessPlugin):
         assert isinstance(self.parameters["columns"], ArrayParam)
 
         self.input_columns.update(get_all_columns(data))
-        column_parameters = list(zip(self.input_columns.keys(), self.parameters["columns"].params))
+        column_parameters = self.parameters["columns"].params
 
         if not self.parameters["join"].value:
             # Dispose of any columns we don't use in the aggregations.
             # TODO: Reindex as well?
             keep_columns = [
-                col
-                for col, col_param in column_parameters
+                col_param.label
+                for col_param in column_parameters
                 if isinstance(col_param, TabularMultiParam)
                 and any(cp.value for cp in col_param.values())
-                and col in data.columns
+                and col_param.label in data.columns
             ]
             data = data[keep_columns]
 
@@ -120,5 +120,5 @@ class GroupByPlugin(PandasProcessPlugin):
                     yield data_in.assign(**data_out.to_dict("records")[0])
             else:
                 yield data_out
-        except ValueError as exc:
+        except (KeyError, ValueError) as exc:
             logger.exception(exc)

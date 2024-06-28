@@ -553,12 +553,11 @@ class PerColumnArrayParam(ArrayParam):
         params_by_label = {p.label: p for p in self.params}
         self.params = [None] * len(choices)
         for num, name in enumerate(choices):
-            label = f'"{name}"'
-            if label in params_by_label:
-                self.params[num] = params_by_label[label]
+            if name in params_by_label:
+                self.params[num] = params_by_label[name]
             else:
                 self.params[num] = self.param.copy()
-                self.params[num].label = label
+                self.params[num].label = name
             self.params[num].set_column_choices(choices)
 
     def get_column_params(self):
