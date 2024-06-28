@@ -26,6 +26,7 @@ dependencies = [
     'pandas~=2.1.0',
     'psutil~=5.9.5',
     'rapidfuzz~=2.15.1',
+    'scipy~=1.14.0',
     'tkinterweb~=3.23.5',
     'ttkthemes~=3.2.2',
     'typing_extensions~=4.8.0',
@@ -64,6 +65,7 @@ data_table = "countess.plugins.data_table:DataTablePlugin"
 correlation = "countess.plugins.correlation:CorrelationPlugin"
 hgvs_parser = "countess.plugins.hgvs_parser:HgvsParserPlugin"
 column = "countess.plugins.column:ColumnToolPlugin"
+curve_fit = "countess.plugins.curve_fit:CurveFitPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"

@@ -2,11 +2,21 @@ import hashlib
 import math
 import os.path
 import re
-from typing import Any, Iterable, Mapping, Optional, Type, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Type, Union
 
 import pandas as pd
 
+from countess.utils.pandas import get_all_columns
+
 PARAM_DIGEST_HASH = "sha256"
+
+
+def make_prefix_groups(strings: List[str]) -> Dict[str, List[str]]:
+    groups : Dict[str, List[str]] = {}
+    for s in strings:
+        if m := re.match(r'(.*?)_+([^_]+)$', s):
+            groups.setdefault(m.group(1), []).append(s)
+    return { k: v for k, v in groups.items() if len(v) > 1 }
 
 
 class BaseParam:
@@ -385,6 +395,29 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
             return None
         else:
             return _dataframe_get_column(df, self.value)
+
+
+class ColumnGroupChoiceParam(ChoiceParam):
+
+    def set_column_choices(self, choices):
+        self.set_choices(make_prefix_groups(choices))
+
+    def get_column_names(self, df):
+        column_names = get_all_columns(df).keys()
+        return [ n for n in column_names if n.startswith(self.value) ]
+
+
+class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
+    DEFAULT_VALUE = "— NONE —"
+
+    def set_choices(self, choices: Iterable[str]):
+        super().set_choices([self.DEFAULT_VALUE] + list(choices))
+
+    def is_none(self):
+        return self.value == self.DEFAULT_VALUE
+
+    def is_not_none(self):
+        return self.value != self.DEFAULT_VALUE
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
