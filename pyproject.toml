@@ -118,3 +118,9 @@ line-length = 120
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
 markers = [ "slow", "gui" ]
+
+[tool.mypy]
+plugins = [
+    "numpy.typing.mypy_plugin",
+]
+mypy_path = "mypy_stubs"
