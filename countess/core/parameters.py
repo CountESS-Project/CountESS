@@ -12,11 +12,11 @@ PARAM_DIGEST_HASH = "sha256"
 
 
 def make_prefix_groups(strings: List[str]) -> Dict[str, List[str]]:
-    groups : Dict[str, List[str]] = {}
+    groups: Dict[str, List[str]] = {}
     for s in strings:
-        if m := re.match(r'(.*?)_+([^_]+)$', s):
+        if m := re.match(r"(.*?)_+([^_]+)$", s):
             groups.setdefault(m.group(1), []).append(s)
-    return { k: v for k, v in groups.items() if len(v) > 1 }
+    return {k: v for k, v in groups.items() if len(v) > 1}
 
 
 class BaseParam:
@@ -398,13 +398,12 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
 
 class ColumnGroupChoiceParam(ChoiceParam):
-
     def set_column_choices(self, choices):
         self.set_choices(make_prefix_groups(choices))
 
     def get_column_names(self, df):
         column_names = get_all_columns(df).keys()
-        return [ n for n in column_names if n.startswith(self.value) ]
+        return [n for n in column_names if n.startswith(self.value)]
 
 
 class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):

@@ -2,6 +2,7 @@ import builtins
 import math
 import re
 from types import CodeType, FunctionType, ModuleType, NoneType
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -55,7 +56,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     }
 
     code_object = None
-    code_globals = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
+    code_globals: dict[str, Any] = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
 
     def process_dict(self, data: dict, logger: Logger):
         assert isinstance(self.parameters["code"], TextParam)
