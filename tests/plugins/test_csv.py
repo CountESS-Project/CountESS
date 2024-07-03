@@ -61,4 +61,4 @@ def test_filename_column():
     plugin.set_parameter("filename_column", "filename")
     output_df = next(plugin.load_file(0, logger))
     assert "filename" in output_df.columns
-    assert output_df["filename"].iloc[1] == "./tests/input1.csv"
+    assert output_df["filename"].iloc[1] == "input1"
