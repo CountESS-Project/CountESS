@@ -115,7 +115,7 @@ class ParameterWrapper:
                     text=f"Add {parameter.param.label}",
                     command=self.add_row_callback,
                 )
-                self.button.grid(row=len(parameter.params) + 1)
+                self.button.grid(row=len(parameter.params), padx=10)
 
         elif isinstance(parameter, ArrayParam) and (self.level < 3 or isinstance(parameter.param, TabularMultiParam)):
             label_frame_label = tk.Frame(tk_parent)
@@ -175,8 +175,6 @@ class ParameterWrapper:
             and not isinstance(self.parameter.param, TabularMultiParam)
         ):
             self.update_subwrappers_framed(self.parameter.params, self.delete_row_callback)
-            if self.button:
-                self.button.grid(row=len(self.parameter.params) + 1, padx=10)
         elif isinstance(self.parameter, ArrayParam) and isinstance(self.parameter.param, MultiParam) and self.level < 3:
             self.update_subwrappers_tabular(
                 self.parameter.params,
@@ -280,11 +278,12 @@ class ParameterWrapper:
         for n, p in enumerate(params):
             if p in self.subwrappers:
                 self.subwrappers[p].update()
+                self.subwrappers[p].entry.master.grid(row=n)
             else:
                 label_frame_label = tk.Frame(self.entry)
                 tk.Label(label_frame_label, text=p.label).grid(row=0, column=0, padx=10)
                 label_frame = tk.LabelFrame(self.entry, labelwidget=label_frame_label, padx=10)
-                label_frame.grid(sticky=tk.NSEW, padx=10)
+                label_frame.grid(row=n, sticky=tk.EW, padx=10)
                 label_frame.columnconfigure(0, weight=1)
 
                 def _command_drc(param, label_frame):
@@ -302,9 +301,10 @@ class ParameterWrapper:
                     button = delete_button(label_frame_label, command=partial(_command_drc, p, label_frame))
                     button.grid(row=0, column=1, padx=10)
 
-            self.subwrappers[p].entry.grid(row=n, column=0, padx=10)
-
         self.cull_subwrappers(params)
+
+        if self.button:
+            self.button.grid(row=len(params), column=0, padx=10)
 
     def combobox_set(self, event):
         assert isinstance(self.entry, ttk.Combobox)
