@@ -9,6 +9,7 @@ from countess.core.parameters import (
     BooleanParam,
     ChoiceParam,
     ColumnChoiceParam,
+    DataTypeChoiceParam,
     MultiParam,
     StringParam,
     TabularMultiParam,
@@ -56,6 +57,7 @@ class FilterPlugin(PandasSimplePlugin):
                             {
                                 "output": StringParam("Output Column"),
                                 "value": StringParam("Output Value"),
+                                "type": DataTypeChoiceParam("Output Type", "string"),
                             },
                         ),
                     ),
@@ -71,7 +73,7 @@ class FilterPlugin(PandasSimplePlugin):
 
         for filt in self.parameters["filters"]:
             # build a dictionary of columns to assign to matched rows.
-            assign_dict = {p["output"].value: p["value"].value for p in filt["outputs"]}
+            assign_dict = {p["output"].value: p["type"].cast_value(p["value"].value) for p in filt["outputs"]}
 
             if not filt.columns.params:
                 # If there are no filter columns at all, then we match
