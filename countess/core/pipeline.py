@@ -98,9 +98,6 @@ class PipelineNode:
     def is_descendant_of(self, node):
         return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
-    def plugin_process(self, x):
-        self.plugin.process(*x)
-
     def add_output_queue(self):
         queue = SentinelQueue(maxsize=3)
         self.output_queues.add(queue)
@@ -124,6 +121,7 @@ class PipelineNode:
         assert isinstance(self.plugin, ProcessPlugin)
         for data_in in queue:
             self.counter_in += 1
+            self.plugin.preprocess(data_in, name, logger)
             self.queue_output(self.plugin.process(data_in, name, logger))
 
     def run_subthread(self, queue: SentinelQueue, name: str, logger: Logger, row_limit: Optional[int] = None):
@@ -131,6 +129,7 @@ class PipelineNode:
 
         for data_in in queue:
             self.counter_in += 1
+            self.plugin.preprocess(data_in, name, logger)
             self.queue_output(self.plugin.process(data_in, name, logger))
         self.queue_output(self.plugin.finished(name, logger))
 
@@ -199,6 +198,8 @@ class PipelineNode:
                 assert isinstance(self.plugin, ProcessPlugin)
                 parent_node.prerun(logger, row_limit)
                 if parent_node.result:
+                    for data_in in parent_node.result:
+                        self.plugin.preprocess(data_in, parent_node.name, logger)
                     for data_in in parent_node.result:
                         self.result += list(self.plugin.process(data_in, parent_node.name, logger))
                 self.result += list(self.plugin.finished(parent_node.name, logger))
