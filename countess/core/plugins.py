@@ -117,6 +117,13 @@ class BasePlugin:
         param = self.parameters
         for k in key.split("."):
             if k == "_label" and hasattr(param, "label"):
+
+                # XXX backwards compatibility with pre 0.0.63 versions
+                # which accidentally saved labels with quotes around them.
+                # TODO remove this when 0.1.0 is ready.
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+
                 param.label = value
                 return
 
