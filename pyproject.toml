@@ -67,6 +67,7 @@ hgvs_parser = "countess.plugins.hgvs_parser:HgvsParserPlugin"
 column = "countess.plugins.column:ColumnToolPlugin"
 curve_fit = "countess.plugins.curve_fit:CurveFitPlugin"
 filter = "countess.plugins.filter:FilterPlugin"
+score = "countess.plugins.score:ScoringPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
