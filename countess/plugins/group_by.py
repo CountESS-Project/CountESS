@@ -36,13 +36,6 @@ class GroupByPlugin(PandasConcatProcessPlugin):
         "join": BooleanParam("Join Back?"),
     }
 
-    def __init__(self, *a, **k):
-        super().__init__(*a, **k)
-        self.input_columns = {}
-
-    def prepare(self, *_):
-        self.input_columns = {}
-
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
         # XXX should do this in two stages: group each dataframe and then combine.
         # that can wait for a more general MapReduceFinalizePlugin class though.
@@ -66,8 +59,6 @@ class GroupByPlugin(PandasConcatProcessPlugin):
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["columns"], ArrayParam)
-        assert self.dataframes
-        print(self.input_columns)
         self.parameters["columns"].set_column_choices(self.input_columns.keys())
 
         column_parameters = list(zip(self.input_columns.keys(), self.parameters["columns"]))

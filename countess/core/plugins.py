@@ -227,12 +227,21 @@ class FileInputPlugin(BasePlugin):
 class PandasProcessPlugin(ProcessPlugin):
     DATAFRAME_BUFFER_SIZE = 100000
 
+    input_columns: Dict[str, np.dtype] = {}
+
+    def prepare(self, *_):
+        self.input_columns = {}
+
     def preprocess(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
-        pass
+        self.input_columns.update(get_all_columns(data))
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")
 
+    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+        yield from super().finalize(logger)
+        for p in self.parameters.values():
+            p.set_column_choices(self.input_columns.keys())
 
 class PandasConcatProcessPlugin(PandasProcessPlugin):
     # Like PandsaProcessPlugin but collect all the inputs together before trying to do anything
@@ -241,18 +250,13 @@ class PandasConcatProcessPlugin(PandasProcessPlugin):
     def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
         self.dataframes: list[pd.DataFrame] = []
-        self.input_columns: dict[str, np.dtype] = {}
 
-    def prepare(self, *_):
+    def prepare(self, *a, **k):
+        super().prepare(*a, **k)
         self.dataframes = []
-        self.input_columns = {}
-
-    def preprocess(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
-        self.input_columns.update(get_all_columns(data))
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
         self.dataframes.append(data)
-        print(data)
         return []
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
@@ -260,24 +264,17 @@ class PandasConcatProcessPlugin(PandasProcessPlugin):
         data_out = self.process_dataframe(data_in, logger)
         if data_out is not None:
             yield data_out
+        yield from super().finalize(logger)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
 
-class PandasSimplePlugin(SimplePlugin):
+class PandasSimplePlugin(PandasProcessPlugin):
     """Base class for plugins which accept and return pandas DataFrames.
     Subclassing this hides all the distracting aspects of the pipeline
     from the plugin implementor, who only needs to override process_dataframe"""
-
-    input_columns: Dict[str, np.dtype] = {}
-
-    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
-        self.input_columns = {}
-
-    def preprocess(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
-        self.input_columns.update(get_all_columns(data))
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         """Just deal with each dataframe as it comes.  PandasSimplePlugins don't care about `source`."""
@@ -296,11 +293,6 @@ class PandasSimplePlugin(SimplePlugin):
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
-
-    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
-        yield from super().finalize(logger)
-        for p in self.parameters.values():
-            p.set_column_choices(self.input_columns.keys())
 
 
 # class MapReduceFinalizePlugin(BasePlugin):
