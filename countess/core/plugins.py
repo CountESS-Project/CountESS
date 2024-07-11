@@ -121,7 +121,7 @@ class BasePlugin:
                 # XXX backwards compatibility with pre 0.0.63 versions
                 # which accidentally saved labels with quotes around them.
                 # TODO remove this when 0.1.0 is ready.
-                if value.startswith('"') and value.endswith('"'):
+                if type(value) is str and value.startswith('"') and value.endswith('"'):
                     value = value[1:-1]
 
                 param.label = value
@@ -162,7 +162,6 @@ class ProcessPlugin(BasePlugin):
     def preprocess(self, data, source: str, logger: Logger) -> None:
         """Called with each `data` input from `source` before `process` is called
         for that data, to set up config etc.  Can't return anything."""
-        pass
 
     def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         """Called with each `data` input from `source`, yields results"""
