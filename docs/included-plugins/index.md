@@ -93,6 +93,31 @@ output
 
 Group and sort records, keeping only the first N records in each group.
 
+### Filter
+
+Filter records using simple expressions.
+Multiple filters can be chained together.
+Rows which match a filter can have column values set before being passed on to the next plugin.
+Rows which do not match the filter are sent to the next filter.
+Rows which do not match any filter are dropped.
+
+Each filter consists of one or more expressions, each of which compares a column 
+to a value, using the following operators:
+
+| operator | type(s) |
+|---|---|
+| `equals` | numbers, strings, booleans |
+| `greater than` | numbers, strings |
+| `less than` | numbers, strings |
+| `starts with` | strings |
+| `ends with` | strings |
+| `matches regex` | strings |
+
+Each operator can also be negated, so for example a filter can select values which do 
+not start with a substring by negating the `starts with` operator.
+
+Operators are then combined with either `All` or `Any` filters matching.
+
 ### Group By
 
 Groups data by one or more columns, and aggregates the rest of the columns.

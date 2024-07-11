@@ -28,6 +28,7 @@ class FilterPlugin(PandasSimplePlugin):
         The same column can have multiple filters.
         "Negate?" inverts the filter, eg: "not equals", "not greater than", etc.
     """
+    link = "https://countess-project.github.io/CountESS/included-plugins/#filter"
 
     version = VERSION
 
