@@ -117,7 +117,6 @@ class BasePlugin:
         param = self.parameters
         for k in key.split("."):
             if k == "_label" and hasattr(param, "label"):
-
                 # XXX backwards compatibility with pre 0.0.63 versions
                 # which accidentally saved labels with quotes around them.
                 # TODO remove this when 0.1.0 is ready.
@@ -242,6 +241,7 @@ class PandasProcessPlugin(ProcessPlugin):
         yield from super().finalize(logger)
         for p in self.parameters.values():
             p.set_column_choices(self.input_columns.keys())
+
 
 class PandasConcatProcessPlugin(PandasProcessPlugin):
     # Like PandsaProcessPlugin but collect all the inputs together before trying to do anything

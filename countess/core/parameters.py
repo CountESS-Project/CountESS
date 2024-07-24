@@ -14,8 +14,8 @@ PARAM_DIGEST_HASH = "sha256"
 def make_prefix_groups(strings: List[str]) -> Dict[str, List[str]]:
     groups: Dict[str, List[str]] = {}
     for s in strings:
-        if m := re.match(r"(.*?)_+([^_]+)$", s):
-            groups.setdefault(m.group(1), []).append(s)
+        if m := re.match(r"(.*?_+)([^_]+)$", s):
+            groups.setdefault(m.group(1), []).append(m.group(2))
     return {k: v for k, v in groups.items() if len(v) > 1}
 
 
@@ -399,11 +399,19 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
 class ColumnGroupChoiceParam(ChoiceParam):
     def set_column_choices(self, choices):
-        self.set_choices(make_prefix_groups(choices))
+        self.set_choices([n + "*" for n in make_prefix_groups(choices).keys()])
+
+    def get_column_prefix(self):
+        return self.value.removesuffix("*")
 
     def get_column_names(self, df):
+        prefix = self.get_column_prefix()
         column_names = get_all_columns(df).keys()
-        return [n for n in column_names if n.startswith(self.value)]
+        return [n for n in column_names if n.startswith(prefix)]
+
+    def get_column_suffixes(self, df):
+        prefix = self.get_column_prefix()
+        return [n.removeprefix(prefix) for n in self.get_column_names(df)]
 
 
 class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
@@ -417,6 +425,11 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
 
     def is_not_none(self):
         return self.value != self.DEFAULT_VALUE
+
+    def get_column_prefix(self):
+        if self.is_none():
+            return None
+        return self.value.removesuffix("*")
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
