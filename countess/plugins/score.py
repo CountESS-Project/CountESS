@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,7 @@ def func(x, a, b):
     return (2 * a - 1) * np.log2(x + 1) + b
 
 
-def score(xs, ys):
+def score(xs: list[float], ys: list[float]) -> Optional[float]:
     try:
         popt, *_ = curve_fit(func, xs, ys, bounds=(0, 1))
         return popt[0]
@@ -49,7 +49,7 @@ class ScoringPlugin(PandasConcatProcessPlugin):
         "output": StringParam("Score Column", "score"),
     }
 
-    def process_row(self, row, count_prefix, xaxis_prefix, suffixes):
+    def process_row(self, row, count_prefix: str, xaxis_prefix: str, suffixes: List[str]) -> Optional[float]:
         y_values = [row.get(count_prefix + s) for s in suffixes]
         if xaxis_prefix:
             x_values = [row.get(xaxis_prefix + s) for s in suffixes]
@@ -62,6 +62,7 @@ class ScoringPlugin(PandasConcatProcessPlugin):
         assert isinstance(self.parameters["variant"], ColumnChoiceParam)
         assert isinstance(self.parameters["replicate"], ColumnChoiceParam)
         assert isinstance(self.parameters["columns"], ColumnGroupChoiceParam)
+        assert isinstance(self.parameters["xaxis"], ColumnGroupOrNoneChoiceParam)
 
         variant_col = self.parameters["variant"].value
         replicate_col = self.parameters["replicate"].value

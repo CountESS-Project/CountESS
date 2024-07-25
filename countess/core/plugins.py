@@ -228,7 +228,7 @@ class PandasProcessPlugin(ProcessPlugin):
 
     input_columns: Dict[str, np.dtype] = {}
 
-    def prepare(self, *_):
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         self.input_columns = {}
 
     def preprocess(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
@@ -251,8 +251,8 @@ class PandasConcatProcessPlugin(PandasProcessPlugin):
         super().__init__(*a, **k)
         self.dataframes: list[pd.DataFrame] = []
 
-    def prepare(self, *a, **k):
-        super().prepare(*a, **k)
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
+        super().prepare(sources, row_limit)
         self.dataframes = []
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
