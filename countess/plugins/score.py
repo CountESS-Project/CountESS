@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -16,14 +16,14 @@ from countess.core.parameters import (
 from countess.core.plugins import PandasConcatProcessPlugin
 
 
-def float_or_none(s):
+def float_or_none(s: Any) -> Optional[float]:
     try:
         return float(s)
     except ValueError:
         return None
 
 
-def func(x, a, b):
+def func(x: Union[float, np.array], a: float, b: float) -> Union[float, np.array]:
     return (2 * a - 1) * np.log2(x + 1) + b
 
 
