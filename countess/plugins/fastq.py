@@ -1,3 +1,4 @@
+import bz2
 import gzip
 from itertools import islice
 
@@ -30,7 +31,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#fastq-load"
     version = VERSION
 
-    file_types = [("FASTQ", [".fastq", ".fastq.gz"])]
+    file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2"])]
 
     parameters = {
         "min_avg_quality": FloatParam("Minimum Average Quality", 10),
@@ -45,6 +46,9 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
+                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
+        elif filename.endswith(".bz2"):
+            with bz2.open(filename, mode="rt", encoding="utf-8") as fh:
                 dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
         else:
             with open(filename, "r", encoding="utf-8") as fh:
