@@ -1,6 +1,7 @@
 from typing import Iterable
 
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from countess import VERSION
 from countess.core.logger import Logger
@@ -95,6 +96,8 @@ class FilterPlugin(PandasSimplePlugin):
                 column = param["column"].value
                 operator = param["operator"].value
                 value = param["value"].value
+                if is_numeric_dtype(data[column]):
+                    value = float(value)
 
                 if operator == "equals":
                     series = data[column].eq(value)
