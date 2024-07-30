@@ -1,4 +1,5 @@
 from typing import Any, List, Optional, Union
+from math import log
 
 import numpy as np
 import pandas as pd
@@ -7,6 +8,7 @@ from scipy.optimize import curve_fit
 from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import (
+    BooleanParam,
     ChoiceParam,
     ColumnChoiceParam,
     ColumnGroupChoiceParam,
@@ -24,13 +26,14 @@ def float_or_none(s: Any) -> Optional[float]:
 
 
 def func(x: Union[float, np.array], a: float, b: float) -> Union[float, np.array]:
-    return (2 * a - 1) * np.log2(x + 1) + b
-
+    return a * x + b
 
 def score(xs: list[float], ys: list[float]) -> Optional[float]:
+    if len(xs) < 2:
+        return None
     try:
-        popt, *_ = curve_fit(func, xs, ys, bounds=(0, 1))
-        return popt[0]
+        popt, pcov = curve_fit(func, xs, ys, bounds=(-5, 5))
+        return popt[0], pcov[0][0]
     except ValueError:
         return None
 
@@ -45,18 +48,38 @@ class ScoringPlugin(PandasConcatProcessPlugin):
         "replicate": ColumnChoiceParam("Replicate Column"),
         "columns": ColumnGroupChoiceParam("Input Columns"),
         "inputtype": ChoiceParam("Input Type", "counts", ["counts", "fractions"]),
+        "log": BooleanParam("Use log(y+1)"),
+        "normalize": BooleanParam("Normalize (scale Y so max(y) = 1)"),
         "xaxis": ColumnGroupOrNoneChoiceParam("X Axis Columns"),
         "output": StringParam("Score Column", "score"),
+        "variance": StringParam("Variance Column", ""),
     }
 
     def process_row(self, row, count_prefix: str, xaxis_prefix: str, suffixes: List[str]) -> Optional[float]:
-        y_values = [row.get(count_prefix + s) for s in suffixes]
+
         if xaxis_prefix:
             x_values = [row.get(xaxis_prefix + s) for s in suffixes]
         else:
             x_values = [float_or_none(s) for s in suffixes]
 
-        return score(x_values, y_values)
+        y_values = [row.get(count_prefix + s) for s in suffixes]
+        if self.parameters["log"].value:
+            y_values = [ log(y + 1) for y in y_values ]
+        if self.parameters["normalize"].value:
+            max_y = max(y_values)
+            y_values = [ y / max_y if y is not None else None for y in y_values ]
+
+        x_values, y_values = zip(
+            *[ (x, y) for x, y in zip(x_values, y_values) if x > 0 or y > 0 ]
+        )
+        if len(x_values) < len(suffixes) / 2 + 1:
+            return None
+
+        if self.parameters["variance"].value:
+            return score(x_values, y_values)
+        else:
+            s = score(x_values, y_values)
+            return score(x_values, y_values)[0] if s else None
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["variant"], ColumnChoiceParam)
@@ -82,12 +105,18 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             suffix_set.update(self.parameters["xaxis"].get_column_suffixes(dataframe))
         suffixes = sorted(suffix_set)
 
-        dataframe[output] = dataframe.apply(
+        output = dataframe.apply(
             self.process_row,
             axis="columns",
+            result_type="expand",
             count_prefix=self.parameters["columns"].get_column_prefix(),
             xaxis_prefix=self.parameters["xaxis"].get_column_prefix(),
             suffixes=suffixes,
         )
+
+        if self.parameters["variance"].value:
+            dataframe[[self.parameters["output"].value, self.parameters["variance"].value]] = output
+        else:
+            dataframe[self.parameters["output"].value] = output
 
         return dataframe
