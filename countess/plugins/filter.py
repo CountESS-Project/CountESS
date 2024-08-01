@@ -70,6 +70,7 @@ class FilterPlugin(PandasSimplePlugin):
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
         assert isinstance(self.parameters["filters"], ArrayParam)
+        data = data.reset_index(drop = data.index.names == [None])
 
         self.input_columns.update(get_all_columns(data))
 

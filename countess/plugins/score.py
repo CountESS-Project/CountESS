@@ -63,11 +63,14 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             x_values = [float_or_none(s) for s in suffixes]
 
         y_values = [row.get(count_prefix + s) for s in suffixes]
+        if any(y is None for y in y_values):
+            return None
+
         if self.parameters["log"].value:
             y_values = [ log(y + 1) for y in y_values ]
         if self.parameters["normalize"].value:
             max_y = max(y_values)
-            y_values = [ y / max_y if y is not None else None for y in y_values ]
+            y_values = [ y / max_y for y in y_values ]
 
         x_values, y_values = zip(
             *[ (x, y) for x, y in zip(x_values, y_values) if x > 0 or y > 0 ]

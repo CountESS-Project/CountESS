@@ -252,7 +252,6 @@ class ConfiguratorWrapper:
         self.config_scrollbar.set(pos1, pos2)
 
     def choose_plugin(self, plugin_class):
-        print(f"choose {self} {plugin_class}")
         self.node.plugin = plugin_class()
         self.node.prerun(self.logger)
         self.node.is_dirty = True
