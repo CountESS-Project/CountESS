@@ -1,5 +1,5 @@
-from typing import Any, List, Optional, Union
 from math import log
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -25,16 +25,17 @@ def float_or_none(s: Any) -> Optional[float]:
         return None
 
 
-def func(x: Union[float, np.array], a: float, b: float) -> Union[float, np.array]:
+def func(x: Union[float, np.ndarray], a: float, b: float) -> Union[float, np.ndarray]:
     return a * x + b
 
-def score(xs: list[float], ys: list[float]) -> Optional[float]:
+
+def score(xs: list[float], ys: list[float]) -> Optional[tuple[float, float]]:
     if len(xs) < 2:
         return None
     try:
-        popt, pcov = curve_fit(func, xs, ys, bounds=(-5, 5))
-        return popt[0], pcov[0][0]
-    except ValueError:
+        popt, pcov, *_ = curve_fit(func, xs, ys, bounds=(-5, 5))
+        return popt[0], pcov[0][0]  # type: ignore  # mypy: ignore index
+    except (ValueError, TypeError):
         return None
 
 
@@ -55,8 +56,9 @@ class ScoringPlugin(PandasConcatProcessPlugin):
         "variance": StringParam("Variance Column", ""),
     }
 
-    def process_row(self, row, count_prefix: str, xaxis_prefix: str, suffixes: List[str]) -> Optional[float]:
-
+    def process_row(
+        self, row, count_prefix: str, xaxis_prefix: str, suffixes: List[str]
+    ) -> Union[float, tuple[float, float], None]:
         if xaxis_prefix:
             x_values = [row.get(xaxis_prefix + s) for s in suffixes]
         else:
@@ -67,14 +69,12 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             return None
 
         if self.parameters["log"].value:
-            y_values = [ log(y + 1) for y in y_values ]
+            y_values = [log(y + 1) for y in y_values]
         if self.parameters["normalize"].value:
             max_y = max(y_values)
-            y_values = [ y / max_y for y in y_values ]
+            y_values = [y / max_y for y in y_values]
 
-        x_values, y_values = zip(
-            *[ (x, y) for x, y in zip(x_values, y_values) if x > 0 or y > 0 ]
-        )
+        x_values, y_values = zip(*[(x, y) for x, y in zip(x_values, y_values) if x > 0 or y > 0])
         if len(x_values) < len(suffixes) / 2 + 1:
             return None
 
@@ -82,7 +82,7 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             return score(x_values, y_values)
         else:
             s = score(x_values, y_values)
-            return score(x_values, y_values)[0] if s else None
+            return s[0] if s else None
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
         assert isinstance(self.parameters["variant"], ColumnChoiceParam)

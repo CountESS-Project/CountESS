@@ -12,6 +12,7 @@ def curve_fit(
     xdata: Union[ndarray, List],
     ydata: Union[ndarray, List],
     bounds: Tuple[
-        Union[ndarray, List[Union[float, int]], float, int], Union[ndarray, List[Union[float, int]]], float, int
+        Union[ndarray, List[Union[float, int]], float, int],
+        Union[ndarray, List[Union[float, int]], float, int],
     ] = (-inf, inf),
 ) -> Tuple[ndarray, ndarray]: ...
