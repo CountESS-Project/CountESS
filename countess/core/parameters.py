@@ -1,3 +1,4 @@
+from decimal import Decimal
 import hashlib
 import math
 import os.path
@@ -23,7 +24,6 @@ class BaseParam:
     """Represents the parameters which can be set on a plugin."""
 
     label: str = ""
-    value: Any = None
     hide: bool = False
     read_only: bool = False
 
@@ -33,9 +33,44 @@ class BaseParam:
         ArrayParam) can have distinct values"""
         raise NotImplementedError(f"Implement {self.__class__.__name__}.copy()")
 
-    def set_value(self, value):
-        self.value = value
-        return self
+    def copy_and_set_value(self, value):
+        new = self.copy()
+        new.value = value
+        return new
+
+    def get_parameters(self, key, base_dir="."):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.get_parameters()")
+
+    def get_hash_value(self):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.get_hash_value()")
+
+    def set_column_choices(self, choices):
+        pass
+
+
+class ScalarParam(BaseParam):
+    """A ScalarParam has a single value (use one of the subclasses below to give 
+    it a type)."""
+    _value: Any = None
+
+    def __init__(self, label, default=None):
+        super().__init__(label)
+        self.default = default
+        self.reset_value()
+
+    def get_value(self) -> Any:
+        return self._value
+
+    def set_value(self, value: Any):
+        self._value = value
+
+    def reset_value(self):
+        self._value = self.default
+
+    value = property(get_value, set_value, reset_value)
+
+    def copy(self):
+        return self.__class__(self.label, self._value)
 
     def get_parameters(self, key, base_dir="."):
         return ((key, self.value),)
@@ -45,93 +80,127 @@ class BaseParam:
         digest.update(repr(self.value).encode("utf-8"))
         return digest.hexdigest()
 
-    def set_column_choices(self, choices):
-        pass
+
+class StringParam(ScalarParam):
+    """A parameter representing a single string value.  A number 
+    of builtin methods are reproduced here to allow the parameter to be
+    used pretty much like a normal string. In some circumstances it may
+    be necessary to explicitly cast the parameter or use `parameter.value`
+    property to get the value inside the parameter."""
+
+    _value: Optional[str] = None
+
+    def set_value(self, value: Any):
+        self._value = str(value)
+
+    def __add__(self, other):
+        return self._value + other
+
+    def __radd__(self, other):
+        return other + self._value
+
+    def __len__(self):
+        return len(self._value)
+
+    def __str__(self):
+        return str(self._value)
+
+    def __contains__(self, other):
+        return other in self._value
 
 
-class SimpleParam(BaseParam):
-    """A SimpleParam has a single value"""
+class TextParam(StringParam):
+    """This is mostly just a convenience for the GUI, it marks this as a
+    long text field and also removes extra blank lines"""
+
+    def set_value(self, value):
+        self._value = re.sub("\n\n\n+", "\n\n", value)
+
+
+class NumericParam(ScalarParam):
+    """A parameter representing a single numeric value.  A large number 
+    of builtin methods are reproduced here to allow the parameter to be
+    used pretty much like a normal number. In some circumstances it may
+    be necessary to explicitly cast the parameter or use `parameter.value`
+    property to get the value inside the parameter."""
 
     var_type: type = type(None)
 
-    def __init__(self, label: str, value=None, read_only: bool = False):
-        self.label = label
-        if value is not None:
-            self.value = value
-        if read_only:
-            self.read_only = True
-
-    def clean_value(self, value):
+    def set_value(self, value):
         try:
-            return self.var_type(value)
+            self._value = self.var_type(value)
         except ValueError:
-            return None
+            self.reset_value()
 
-    @property
-    def value(self):
-        return self._value
+    def __add__(self, other):
+        return self._value + other
 
-    @value.setter
-    def value(self, value):
-        self._value = self.clean_value(value)
+    def __radd__(self, other):
+        return other + self._value
 
-    @value.deleter
-    def value(self):
-        self._value = None
+    def __sub__(self, other):
+        return self._value - other
 
-    def copy(self) -> "SimpleParam":
-        return self.__class__(self.label, self.value, self.read_only)
+    def __rsub__(self, other):
+        return other - self._value
+
+    def __mul__(self, other):
+        return self._value * other
+
+    def __rmul__(self, other):
+        return other * self._value
+
+    def __int__(self):
+        return int(self._value)
+
+    def __float__(self):
+        return float(self._value)
+
+    def __str__(self):
+        return str(self._value)
+
+    # XXX should include many more operator methods here, see
+    # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
+    #   matmul, truediv, floordiv, mod, divmod, pow, lshift, rshift, and, xor, or,
+    #   rmatmul, rtruediv, rfloordiv, rmod, rdivmod, rpow, rlshift, rrshift, rand, rxor, ror,
+    #   neg, pos, abs, invert, complex, index, round, trunc, floor, ceil
+    #   lt le eq ne gt ge format
+    # it seems like there should be a smarter way to do this but doing it the
+    # dumb way works with mypy and pylint.
 
 
-class BooleanParam(SimpleParam):
-    var_type = bool
+class IntegerParam(NumericParam):
+    _value: int = 0
+    var_type = int
+
+
+class FloatParam(NumericParam):
+    _value: float = 0.0
+    var_type = float
+
+
+class DecimalParam(NumericParam):
+    _value: Decimal = Decimal(0)
+    var_type = Decimal
+
+
+class BooleanParam(ScalarParam):
     _value: bool = False
+    var_type = bool
 
-    def clean_value(self, value):
+    def set_value(self, value):
         if isinstance(value, str):
-            if value in ("true", "True", "1"):
+            if value in ("t", "T", "true", "True", "1"):
                 return True
-            if value in ("false", "False", "0"):
+            if value in ("f", "F", "false", "False", "0"):
                 return False
             raise ValueError(f"Can't convert {value} to boolean")
         return bool(value)
 
+    def __bool__(self):
+        return self._value
 
-class IntegerParam(SimpleParam):
-    var_type = int
-    _value: int = 0
-
-    def clean_value(self, value):
-        if isinstance(value, str):
-            return super().clean_value("".join(re.split(r"\D+", value)))
-        else:
-            return super().clean_value(value)
-
-
-class FloatParam(SimpleParam):
-    var_type = float
-    _value: float = 0.0
-
-    def clean_value(self, value):
-        if isinstance(value, str):
-            try:
-                a, b = value.split(".", 1)
-                s = re.split(r"\D+", a) + ["."] + re.split(r"\D+", b)
-            except ValueError:
-                s = re.split(r"\D+", value)
-            return super().clean_value("".join(s))
-        else:
-            return super().clean_value(value)
-
-
-class StringParam(SimpleParam):
-    var_type = str
-    _value: str = ""
-
-
-class TextParam(StringParam):
-    def clean_value(self, value):
-        return re.sub("\n\n\n+", "\n\n", value)
+    # XXX are there other operator methods which need to be implemented here?
 
 
 class StringCharacterSetParam(StringParam):
@@ -144,11 +213,10 @@ class StringCharacterSetParam(StringParam):
         self,
         label: str,
         value=None,
-        read_only: bool = False,
         *,
         character_set: Optional[set[str]] = None,
     ):
-        super().__init__(label, value, read_only)
+        super().__init__(label, value)
         if character_set is not None:
             self.character_set = character_set
 
@@ -160,25 +228,23 @@ class StringCharacterSetParam(StringParam):
         else:
             return ""
 
-    def clean_value(self, value: Any):
+    def set_value(self, value: Any):
         value_str = str(value)
-        x = "".join([self.clean_character(c) for c in value_str])
-        return x
+        self._value = "".join([self.clean_character(c) for c in value_str])
 
     def copy(self) -> "StringCharacterSetParam":
-        return self.__class__(self.label, self.value, self.read_only, character_set=self.character_set)
+        return self.__class__(self.label, self.value, character_set=self.character_set)
 
 
 class FileParam(StringParam):
-    """A StringParam for holding a filename.  Defaults to `read_only` because
-    it really should be populated from a file dialog or simiar."""
+    """A StringParam for holding a filename."""
 
     file_types = [("Any", "*")]
 
     _hash = None
 
-    def __init__(self, label: str, value=None, read_only: bool = True, file_types=None):
-        super().__init__(label, value, read_only)
+    def __init__(self, label: str, value=None, file_types=None):
+        super().__init__(label, value)
         if file_types is not None:
             self.file_types = file_types
 
@@ -213,7 +279,7 @@ class FileParam(StringParam):
         return [(key, path)]
 
     def copy(self) -> "FileParam":
-        return self.__class__(self.label, self.value, self.read_only, file_types=self.file_types)
+        return self.__class__(self.label, self.value, file_types=self.file_types)
 
     def get_hash_value(self) -> str:
         # For reproducability, we don't actually care about the filename, just
@@ -226,19 +292,13 @@ class FileParam(StringParam):
 class FileSaveParam(StringParam):
     file_types = [("Any", "*")]
 
-    def __init__(self, label: str, value=None, read_only: bool = False, file_types=None):
-        super().__init__(label, value, read_only)
+    def __init__(self, label: str, value=None, file_types=None):
+        super().__init__(label, value)
         if file_types is not None:
             self.file_types = file_types
 
-    def clean_value(self, value: Union[str, tuple, list], file_types=None):
-        try:
-            return os.path.relpath(str(value))
-        except ValueError:
-            return value
 
-
-class ChoiceParam(BaseParam):
+class ChoiceParam(ScalarParam):
     """A drop-down menu parameter choosing between options.
     Defaults to 'None'"""
 
@@ -254,16 +314,11 @@ class ChoiceParam(BaseParam):
         value: Optional[str] = None,
         choices: Optional[Iterable[str]] = None,
     ):
-        self.label = label
+        super().__init__(self, label)
         self.value = value
         self.choices = list(choices or [])
 
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, value):
+    def set_value(self, value):
         if value is None:
             self._value = self.DEFAULT_VALUE
         else:
@@ -273,33 +328,35 @@ class ChoiceParam(BaseParam):
         except ValueError:
             self._choice = None
 
-    @property
-    def choice(self):
+    def get_choice(self):
         return self._choice
 
-    @choice.setter
-    def choice(self, choice):
+    def set_choice(self, choice):
         if choice is not None and 0 <= choice < len(self.choices):
             self._choice = choice
             self._value = self.choices[choice]
         else:
             self._choice = None
-            self._value = None
+            self._value = self.DEFAULT_VALUE
+
+    choice = property(get_choice, set_choice)
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
         if self.choices:
             if self._value not in self.choices:
                 self._value = self.choices[0]
+                self._choice = 0
         else:
             self._value = self.DEFAULT_VALUE
+            self._choice = None
 
     def copy(self) -> "ChoiceParam":
         return self.__class__(self.label, self.value, self.choices)
 
 
 class DataTypeChoiceParam(ChoiceParam):
-    DATA_TYPES: Mapping[str, tuple[type, Any, Type[SimpleParam]]] = {
+    DATA_TYPES: Mapping[str, tuple[type, Any, Type[ScalarParam]]] = {
         "string": (str, "", StringParam),
         "number": (float, math.nan, FloatParam),
         "integer": (int, 0, IntegerParam),
@@ -490,18 +547,16 @@ class ArrayParam(BaseParam):
         self,
         label: str,
         param: BaseParam,
-        read_only: bool = False,
         min_size: int = 0,
         max_size: Optional[int] = None,
     ):
         self.label = label
         self.param = param
-        self.read_only = read_only
 
-        self.params = [param.copy() for n in range(0, min_size)]
-        self.relabel()
         self.min_size = min_size
         self.max_size = max_size
+        self.params = [param.copy() for n in range(0, min_size)]
+        self.relabel()
 
     def add_row(self):
         # XXX probably should throw an exception instead of just ignoring
@@ -526,11 +581,10 @@ class ArrayParam(BaseParam):
 
     def relabel(self):
         for n, param in enumerate(self.params):
-            if param.label.startswith(self.param.label + " "):
-                param.label = self.param.label + f" {n+1}"
+            param.label = self.param.label + f" {n+1}"
 
     def copy(self) -> "ArrayParam":
-        return self.__class__(self.label, self.param, self.read_only, self.min_size, self.max_size)
+        return self.__class__(self.label, self.param, self.min_size, self.max_size)
 
     def __len__(self):
         return len(self.params)
@@ -540,29 +594,34 @@ class ArrayParam(BaseParam):
             self.add_row()
         return self.params[int(key)]
 
+    def __setitem__(self, key, value):
+        self.params[key].value = value
+
     def __contains__(self, item):
         return item in self.params
 
     def __iter__(self):
         return self.params.__iter__()
 
-    @property
-    def value(self):
+    def get_value(self):
         return [p.value for p in self.params]
 
-    @value.setter
-    def value(self, value):
-        # if setting to a dictionary, keep only the values in order
-        # and forget about the numbering.
+    def set_value(self, value):
 
+        # if setting to a dictionary, keep only the values in (hopefully
+        # numeric) order of the keys and forget about the numbering.
         if isinstance(value, dict):
-            values = sorted([(int(k), v) for k, v in value.items()])
-            value = [v[1] for v in values]
+            try:
+                value_pairs = sorted([(int(k), v) for k, v in value.items()])
+            except ValueError:
+                value_pairs = sorted(value.items())
 
-        self.params = [self.param.copy().set_value(v) for v in value]
+            value = [v for _, v in value_pairs]
 
-    @value.deleter
-    def value(self):
+        # make new parameters for each value.
+        self.params = [self.param.copy_and_set_value(v) for v in value]
+
+    def reset_value(self):
         self.params = []
 
     def get_parameters(self, key, base_dir="."):
@@ -584,10 +643,6 @@ class ArrayParam(BaseParam):
 class PerColumnArrayParam(ArrayParam):
     """An ArrayParam where each value in the array corresponds to a column
     in the input dataframe, as set by set_column_choices."""
-
-    def __init__(self, *a, **k) -> None:
-        super().__init__(*a, **k)
-        self.read_only = True
 
     def get_parameters(self, key, base_dir="."):
         for n, p in enumerate(self.params):
@@ -630,8 +685,8 @@ class FileArrayParam(ArrayParam):
 
     def add_files(self, filenames):
         # XXX slightly daft way of doing it.  It is setting the filename
-        # of the 'template' param, and then copying that template to
-        # make the new param.
+        # of the 'template' self.param, and then copying that template to
+        # make the new row param.
         for filename in filenames:
             self.find_fileparam().value = filename
             self.add_row()
