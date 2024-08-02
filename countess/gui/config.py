@@ -17,7 +17,7 @@ from ..core.parameters import (
     FileParam,
     FileSaveParam,
     MultiParam,
-    SimpleParam,
+    ScalarParam,
     TabularMultiParam,
     TextParam,
 )
@@ -96,7 +96,7 @@ class ParameterWrapper:
                 self.entry["state"] = tk.DISABLED
             else:
                 self.entry.bind("<<Modified>>", self.widget_modified_callback)
-        elif isinstance(parameter, SimpleParam):
+        elif isinstance(parameter, ScalarParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = tk.Entry(tk_parent, textvariable=self.var)
             if parameter.read_only:

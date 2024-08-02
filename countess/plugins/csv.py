@@ -109,7 +109,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
         while len(df.columns) > len(self.parameters["columns"]):
             self.parameters["columns"].add_row()
 
-        if self.parameters["header"].value:
+        if self.header:
             for n, col in enumerate(df.columns):
                 if not self.parameters["columns"][n]["name"].value:
                     self.parameters["columns"][n]["name"].value = str(col)
@@ -132,12 +132,10 @@ class SaveCsvPlugin(PandasOutputPlugin):
     version = VERSION
     file_types = CSV_FILE_TYPES
 
-    parameters = {
-        "header": BooleanParam("CSV header row?", True),
-        "filename": FileSaveParam("Filename", file_types=file_types),
-        "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"]),
-        "quoting": BooleanParam("Quote all Strings", False),
-    }
+    header = BooleanParam("CSV header row?", True)
+    filename = FileSaveParam("Filename", file_types=file_types)
+    delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
+    quoting = BooleanParam("Quote all Strings", False)
 
     filehandle: Optional[Union[BufferedWriter, BytesIO]] = None
     csv_columns = None
@@ -147,7 +145,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         if row_limit is None:
-            filename = self.parameters["filename"].value
+            filename = str(self.filename)
             if filename.endswith(".gz"):
                 self.filehandle = gzip.open(filename, "wb")
             else:
@@ -167,7 +165,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
         # include the header or not.
         if self.csv_columns is None:
             self.csv_columns = list(dataframe.columns)
-            emit_header = bool(self.parameters["header"].value)
+            emit_header = bool(self.header)
         else:
             # add in any columns we haven't seen yet in previous dataframes.
             for c in dataframe.columns:
@@ -184,8 +182,8 @@ class SaveCsvPlugin(PandasOutputPlugin):
             header=emit_header,
             columns=self.csv_columns,
             index=False,
-            sep=self.SEPARATORS[self.parameters["delimiter"].value],
-            quoting=self.QUOTING[self.parameters["quoting"].value],
+            sep=self.SEPARATORS[self.delimiter],
+            quoting=self.QUOTING[self.quoting],
         )  # type: ignore [call-overload]
         return []
 

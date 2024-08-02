@@ -3,7 +3,7 @@ import hashlib
 import math
 import os.path
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Type, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Type
 
 import pandas as pd
 
@@ -81,7 +81,39 @@ class ScalarParam(BaseParam):
         return digest.hexdigest()
 
 
-class StringParam(ScalarParam):
+class ScalarWithOperatorsParam(ScalarParam):
+    # Operator Methods which apply to both StringParams and
+    # NumericParams (but not BooleanParam)
+
+    def __add__(self, other):
+        return self._value + other
+
+    def __radd__(self, other):
+        return other + self._value
+
+    def __str__(self):
+        return str(self._value)
+
+    def __eq__(self, other):
+        return self._value == other
+
+    def __ne__(self, other):
+        return self._value != other
+
+    def __gt__(self, other):
+        return self._value > other
+
+    def __gte__(self, other):
+        return self._value >= other
+
+    def __lt__(self, other):
+        return self._value < other
+
+    def __lte__(self, other):
+        return self._value <= other
+
+
+class StringParam(ScalarWithOperatorsParam):
     """A parameter representing a single string value.  A number 
     of builtin methods are reproduced here to allow the parameter to be
     used pretty much like a normal string. In some circumstances it may
@@ -93,20 +125,16 @@ class StringParam(ScalarParam):
     def set_value(self, value: Any):
         self._value = str(value)
 
-    def __add__(self, other):
-        return self._value + other
-
-    def __radd__(self, other):
-        return other + self._value
+    # Operator methods which apply only to strings
 
     def __len__(self):
         return len(self._value)
 
-    def __str__(self):
-        return str(self._value)
-
     def __contains__(self, other):
         return other in self._value
+
+    def __hash__(self):
+        return hash(self._value)
 
 
 class TextParam(StringParam):
@@ -117,7 +145,7 @@ class TextParam(StringParam):
         self._value = re.sub("\n\n\n+", "\n\n", value)
 
 
-class NumericParam(ScalarParam):
+class NumericParam(ScalarWithOperatorsParam):
     """A parameter representing a single numeric value.  A large number 
     of builtin methods are reproduced here to allow the parameter to be
     used pretty much like a normal number. In some circumstances it may
@@ -132,11 +160,7 @@ class NumericParam(ScalarParam):
         except ValueError:
             self.reset_value()
 
-    def __add__(self, other):
-        return self._value + other
-
-    def __radd__(self, other):
-        return other + self._value
+    # Operator methods which apply only to numerics
 
     def __sub__(self, other):
         return self._value - other
@@ -156,15 +180,11 @@ class NumericParam(ScalarParam):
     def __float__(self):
         return float(self._value)
 
-    def __str__(self):
-        return str(self._value)
-
-    # XXX should include many more operator methods here, see
+    # XXX should include many more numeric operator methods here, see
     # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
     #   matmul, truediv, floordiv, mod, divmod, pow, lshift, rshift, and, xor, or,
     #   rmatmul, rtruediv, rfloordiv, rmod, rdivmod, rpow, rlshift, rrshift, rand, rxor, ror,
-    #   neg, pos, abs, invert, complex, index, round, trunc, floor, ceil
-    #   lt le eq ne gt ge format
+    #   neg, pos, abs, invert, complex, index, round, trunc, floor, ceil, format
     # it seems like there should be a smarter way to do this but doing it the
     # dumb way works with mypy and pylint.
 
@@ -199,6 +219,9 @@ class BooleanParam(ScalarParam):
 
     def __bool__(self):
         return self._value
+
+    def __str__(self):
+        return str(self._value)
 
     # XXX are there other operator methods which need to be implemented here?
 
@@ -520,7 +543,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
             return self.value[len(self.PREFIX) :]
         return None
 
-    def get_value(self, data: dict):
+    def get_value_from_dict(self, data: dict):
         if self.value.startswith(self.PREFIX):
             return data[self.value[len(self.PREFIX) :]]
         else:
@@ -695,16 +718,31 @@ class FileArrayParam(ArrayParam):
 class MultiParam(BaseParam):
     params: Mapping[str, BaseParam] = {}
 
-    def __init__(self, label: str, params: Mapping[str, BaseParam]):
+    def __init__(self, label: str, params: Optional[Mapping[str, BaseParam]] = None):
         self.label = label
-        self.params = params
+        self.params = dict((k, v.copy()) for k, v in params.items()) if params else {}
+
+        # Allow new django-esque declarations via subclasses
+
+        for k, p in self.__class__.__dict__.items():
+            if isinstance(p, BaseParam):
+                self.__dict__[k] = self.params[k] = p.copy()
+
 
     def copy(self) -> "MultiParam":
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
         return self.__class__(self.label, pp)
 
+    # XXX decide if the "dict-like" accessors are worth keeping
+
     def __getitem__(self, key):
         return self.params[key]
+
+    def __contains__(self, item):
+        return item in self.params
+
+    def __setitem__(self, key, value):
+        self.params[key].value = value
 
     def keys(self):
         return self.params.keys()
@@ -715,14 +753,22 @@ class MultiParam(BaseParam):
     def items(self):
         return self.params.items()
 
+    # attribute-like accessors
+
     def __getattr__(self, name):
         try:
             return self.params[name]
         except KeyError as exc:
             raise AttributeError(name=name, obj=self) from exc
 
-    def __contains__(self, item):
-        return item in self.params
+    def __setattr__(self, name, value):
+        """Intercepts attempts to set parameters to a value and turns them into parameter.set_value.
+        Any other kind of attribute assignment is passed through."""
+        target_attr = getattr(self, name, None)
+        if isinstance(target_attr, BaseParam) and not isinstance(value, BaseParam):
+            target_attr.set_value(value)
+        else:
+            super().__setattr__(name, value)
 
     def __iter__(self):
         return self.params.__iter__()

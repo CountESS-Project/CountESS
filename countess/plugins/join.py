@@ -24,22 +24,13 @@ class JoinPlugin(PandasProductPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#join"
 
-    parameters = {
-        "inputs": ArrayParam(
-            "Inputs",
-            MultiParam(
-                "Input",
-                {
-                    "join_on": ColumnOrIndexChoiceParam("Join On"),
-                    "required": BooleanParam("Required", True),
-                    "drop": BooleanParam("Drop Column", False),
-                },
-            ),
-            read_only=True,
-            min_size=2,
-            max_size=2,
-        ),
-    }
+    class InputMultiParam(MultiParam):
+        join_on = ColumnOrIndexChoiceParam("Join On")
+        required = BooleanParam("Required", True)
+        drop = BooleanParam("Drop Column", False)
+
+    inputs = ArrayParam("Inputs", InputMultiParam("Input"), min_size=2, max_size=2)
+
     join_params = None
     input_columns_1: Optional[Dict] = None
     input_columns_2: Optional[Dict] = None
@@ -47,14 +38,14 @@ class JoinPlugin(PandasProductPlugin):
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         super().prepare(sources, row_limit)
 
-        assert isinstance(self.parameters["inputs"], ArrayParam)
-        assert len(self.parameters["inputs"]) == 2
-        ip1, ip2 = self.parameters["inputs"]
+        ip1, ip2 = self.inputs.params
+        assert isinstance(ip1, self.InputMultiParam)
+        assert isinstance(ip2, self.InputMultiParam)
         ip1.label = f"Input 1: {sources[0]}"
         ip2.label = f"Input 2: {sources[1]}"
 
         self.join_params = {
-            "how": _join_how(ip1.required.value, ip2.required.value),
+            "how": _join_how(bool(ip1.required), bool(ip2.required)),
             "left_index": ip1.join_on.is_index(),
             "right_index": ip2.join_on.is_index(),
             "left_on": None if ip1.join_on.is_index() else ip1.join_on.value,
@@ -70,7 +61,6 @@ class JoinPlugin(PandasProductPlugin):
         assert self.input_columns_1 is not None
         assert self.input_columns_2 is not None
         assert self.join_params is not None
-        assert isinstance(self.parameters["inputs"], ArrayParam)
 
         self.input_columns_1.update(get_all_columns(dataframe1))
         self.input_columns_2.update(get_all_columns(dataframe2))
@@ -94,19 +84,18 @@ class JoinPlugin(PandasProductPlugin):
             logger.exception(exc)
             return pd.DataFrame()
 
-        if self.parameters["inputs"][0]["drop"].value and join1 in dataframe.columns:
+        if self.inputs[0].drop and join1 in dataframe.columns:
             dataframe.drop(columns=join1, inplace=True)
-        if self.parameters["inputs"][1]["drop"].value and join2 in dataframe.columns:
+        if self.inputs[1].drop and join2 in dataframe.columns:
             dataframe.drop(columns=join2, inplace=True)
 
         return dataframe
 
     def finalize(self, logger: Logger) -> Iterable:
-        assert isinstance(self.parameters["inputs"], ArrayParam)
-        assert len(self.parameters["inputs"]) == 2
+        assert len(self.inputs.params) == 2
         assert self.input_columns_1 is not None
         assert self.input_columns_2 is not None
-        ip1, ip2 = self.parameters["inputs"]
+        ip1, ip2 = self.inputs.params
 
         ip1.set_column_choices(self.input_columns_1.keys())
         ip2.set_column_choices(self.input_columns_2.keys())

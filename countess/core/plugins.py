@@ -101,17 +101,30 @@ class BasePlugin:
 
         self.parameters = dict((k, v.copy()) for k, v in self.parameters.items())
 
-        # XXX should we allow django-esque declarations like this?
-        # Code gets cleaner, Namespace gets cluttered, though.
+        # Allow new django-esque declarations ...
 
-        for key in dir(self):
-            if isinstance(getattr(self, key), BaseParam):
-                self.parameters[key] = getattr(self, key).copy()
-                setattr(self, key, self.parameters[key])
+        for k, p in self.__class__.__dict__.items():
+            if isinstance(p, BaseParam):
+                self.__dict__[k] = self.parameters[k] = p.copy()
 
-    def add_parameter(self, name: str, param: BaseParam):
-        self.parameters[name] = param.copy()
-        return self.parameters[name]
+    def __setattr__(self, name, value):
+        """Intercepts attempts to set parameters to a value and turns them into parameter.set_value.
+        Any other kind of attribute assignment is passed through."""
+
+        target_attr = getattr(self, name, None)
+        if isinstance(target_attr, BaseParam) and not isinstance(value, BaseParam):
+            target_attr.set_value(value)
+        else:
+            super().__setattr__(name, value)
+
+    def __getitem__(self, key):
+        return self.parameters[key]
+
+    def __contains__(self, item):
+        return item in self.parameters
+
+    def __setitem__(self, key, value):
+        self.parameters[key].value = value
 
     def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
         param = self.parameters

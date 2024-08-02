@@ -17,7 +17,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#variant-caller"
 
-    parameters = {
+    """parameters = {
         "column": ColumnChoiceParam("Input Column", "sequence"),
         "reference": ColumnOrStringParam("Reference Sequence"),
         "offset": IntegerParam("Reference Offset", 0),
@@ -27,35 +27,44 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         "max_protein": IntegerParam("Max Protein Variations", 10),
         "drop": BooleanParam("Drop unidentified variants", False),
         "drop_columns": BooleanParam("Drop Input Column(s)", False),
-    }
+    }"""
+
+    
+    column = ColumnChoiceParam("Input Column", "sequence")
+    reference = ColumnOrStringParam("Reference Sequence")
+    offset = IntegerParam("Reference Offset", 0)
+    output = StringParam("Output Column", "variant")
+    max_mutations = IntegerParam("Max Mutations", 10)
+    protein = StringParam("Protein Column", "protein")
+    max_protein = IntegerParam("Max Protein Variations", 10)
+    drop = BooleanParam("Drop unidentified variants", False)
+    drop_columns = BooleanParam("Drop Input Column(s)", False)
+
 
     def process_dict(self, data, logger: Logger) -> dict:
         assert isinstance(self.parameters["reference"], ColumnOrStringParam)
-        sequence = data[self.parameters["column"].value]
+        sequence = data[self.column]
         if not sequence:
             return {}
 
-        reference = self.parameters["reference"].get_value(data)
-        offset = self.parameters["offset"].value
+        reference = self.reference.get_value_from_dict(data)
 
         r = {}
 
-        if self.parameters["output"].value:
+        if self.output:
             try:
-                max_mutations = self.parameters["max_mutations"].value
-                r[self.parameters["output"].value] = find_variant_string(
-                    "g.", reference, sequence, max_mutations, offset=offset
+                r[self.output] = find_variant_string(
+                    "g.", reference, sequence, int(self.max_mutations), offset=int(self.offset)
                 )
             except ValueError:
                 pass
             except (TypeError, KeyError, IndexError) as exc:
                 logger.exception(exc)
 
-        if self.parameters["protein"].value:
+        if self.protein:
             try:
-                max_protein = self.parameters["max_protein"].value
-                r[self.parameters["protein"].value] = find_variant_string(
-                    "p.", reference, sequence, max_protein, offset=offset
+                r[self.protein] = find_variant_string(
+                    "p.", reference, sequence, int(self.max_protein), offset=int(self.offset)
                 )
             except ValueError:
                 pass
@@ -69,16 +78,16 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         df_out = super().process_dataframe(dataframe, logger)
 
         if df_out is not None:
-            if self.parameters["drop"].value:
-                if self.parameters["output"].value:
-                    df_out.dropna(subset=self.parameters["output"].value, inplace=True)
-                if self.parameters["protein"].value:
-                    df_out.dropna(subset=self.parameters["protein"].value, inplace=True)
-            if self.parameters["drop_columns"].value:
+            if self.drop:
+                if self.output:
+                    df_out.dropna(subset=str(self.output), inplace=True)
+                if self.protein:
+                    df_out.dropna(subset=str(self.protein), inplace=True)
+            if self.drop_columns:
                 try:
-                    df_out.drop(columns=self.parameters["column"].value, inplace=True)
-                    if self.parameters["reference"].get_column_name():
-                        df_out.drop(columns=self.parameters["reference"].get_column_name(), inplace=True)
+                    df_out.drop(columns=str(self.column), inplace=True)
+                    if self.reference.get_column_name():
+                        df_out.drop(columns=self.reference.get_column_name(), inplace=True)
                 except KeyError:
                     pass
 
