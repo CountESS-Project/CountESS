@@ -1,11 +1,13 @@
+from time import sleep
+import sys
+
 import pandas as pd
 import pytest
 
-from countess.core.logger import MultiprocessLogger
+from countess.core.logger import ConsoleLogger
 from countess.plugins.variant import VariantPlugin
 
-logger = MultiprocessLogger()
-
+logger = ConsoleLogger()
 
 def test_variant_ref_value():
     input_df = pd.DataFrame([{"seq": "TGAAGTAGAGG"}, {"seq": "AGAAGTTGTGG"}, {"seq": "ATAAGAAGAGG"}])

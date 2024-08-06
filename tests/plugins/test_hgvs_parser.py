@@ -1,14 +1,17 @@
-import pandas as pd
+import sys
+from time import sleep
 
-from countess.core.logger import MultiprocessLogger
+import pandas as pd
+import pytest
+
+from countess.core.logger import ConsoleLogger
 from countess.plugins.hgvs_parser import HgvsParserPlugin
 
-logger = MultiprocessLogger()
+logger = ConsoleLogger()
 
 df1 = pd.DataFrame(
     [{"hgvs": "NC_000017.11:g.[43124022G>C;43124175C>T;43124111A>G]", "guides": "43124022G>C;43124111A>G"}]
 )
-
 
 def test_hgvs_parser():
     plugin = HgvsParserPlugin()

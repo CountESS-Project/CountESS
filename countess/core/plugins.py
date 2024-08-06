@@ -18,7 +18,6 @@ import hashlib
 import importlib
 import importlib.metadata
 import logging
-import os.path
 from collections.abc import MutableMapping
 from typing import Dict, Iterable, List, Optional, Sequence, Union
 
@@ -31,7 +30,7 @@ from countess.core.parameters import (
     BaseParam,
     FileArrayParam,
     FileParam,
-    FileSaveParam,
+    HasSubParametersMixin,
     MultiParam,
     StringParam,
 )
@@ -72,7 +71,7 @@ def load_plugin(module_name, class_name):
     return plugin_class()
 
 
-class BasePlugin:
+class BasePlugin(HasSubParametersMixin):
     """Base class for all plugins.  Plugins exist as entrypoints, but also
     PluginManager checks that plugins subclass this class before accepting them
     as plugins."""
@@ -84,7 +83,6 @@ class BasePlugin:
     num_inputs: int = 1
     num_outputs: int = 1
 
-    parameters: MutableMapping[str, BaseParam] = {}
     show_preview: bool = True
 
     @property
@@ -92,69 +90,16 @@ class BasePlugin:
         raise NotImplementedError(f"{self.__class__}.version")
 
     def __init__(self, plugin_name=None):
-        # Parameters store the actual values they are set to, so we copy them
-        # so that if the same plugin is used twice in a pipeline it will have
-        # its own parameters.
+
+        super().__init__()
 
         if plugin_name is not None:
             self.name = plugin_name
 
-        self.parameters = dict((k, v.copy()) for k, v in self.parameters.items())
-
-        # Allow new django-esque declarations ...
-
-        for k, p in self.__class__.__dict__.items():
-            if isinstance(p, BaseParam):
-                self.__dict__[k] = self.parameters[k] = p.copy()
-
-    def __setattr__(self, name, value):
-        """Intercepts attempts to set parameters to a value and turns them into parameter.set_value.
-        Any other kind of attribute assignment is passed through."""
-
-        target_attr = getattr(self, name, None)
-        if isinstance(target_attr, BaseParam) and not isinstance(value, BaseParam):
-            target_attr.set_value(value)
-        else:
-            super().__setattr__(name, value)
-
-    def __getitem__(self, key):
-        return self.parameters[key]
-
-    def __contains__(self, item):
-        return item in self.parameters
-
-    def __setitem__(self, key, value):
-        self.parameters[key].value = value
-
-    def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
-        param = self.parameters
-        for k in key.split("."):
-            if k == "_label" and hasattr(param, "label"):
-                # XXX backwards compatibility with pre 0.0.63 versions
-                # which accidentally saved labels with quotes around them.
-                # TODO remove this when 0.1.0 is ready.
-                if type(value) is str and value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-
-                param.label = value
-                return
-
-            # XXX types are a mess here
-            param = param[k]  # type: ignore
-        if isinstance(param, (FileParam, FileSaveParam)) and value is not None:
-            assert isinstance(value, str)
-            param.value = os.path.join(base_dir, value)
-        else:
-            param.value = value  # type: ignore
-
-    def get_parameters(self, base_dir="."):
-        for key, parameter in self.parameters.items():
-            yield from parameter.get_parameters(key, base_dir)
-
     def get_parameter_hash(self):
         """Build a hash of all configuration parameters"""
         h = hashlib.sha256()
-        for k, v in self.parameters.items():
+        for k, v in self.params.items():
             h.update((k + "\0" + v.get_hash_value()).encode("utf-8"))
         return h
 
@@ -252,7 +197,7 @@ class PandasProcessPlugin(ProcessPlugin):
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
         yield from super().finalize(logger)
-        for p in self.parameters.values():
+        for p in self.params.values():
             p.set_column_choices(self.input_columns.keys())
 
 
@@ -459,6 +404,7 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
                 dataframe_merged.reset_index("__tmpidx", drop=True, inplace=True)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
+            print(repr(exc))
             logger.exception(exc)
             return None
 
@@ -477,7 +423,7 @@ class PandasTransformSingleToXMixin:  # type: ignore [attr-defined]
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
     def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        column_name = self.parameters["column"].value  # type: ignore [attr-defined]
+        column_name = self.params["column"].value  # type: ignore [attr-defined]
         if column_name in dataframe:
             return dataframe[column_name].apply(self.process_value, logger=logger)
         elif column_name == dataframe.index.name:
@@ -548,10 +494,10 @@ class PandasTransformXToSingleMixin:
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        assert isinstance(self.parameters["output"], StringParam)
+        assert isinstance(self.params["output"], StringParam)
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        return series.to_frame(name=self.parameters["output"].value)  # type: ignore [attr-defined]
+        return series.to_frame(name=self.params["output"].value)  # type: ignore [attr-defined]
 
 
 class PandasTransformXToTupleMixin:
@@ -560,16 +506,16 @@ class PandasTransformXToTupleMixin:
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        assert hasattr(self, "parameters")
-        assert isinstance(self.parameters["output"], ArrayParam)
-        assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
+        assert hasattr(self, "params")
+        assert isinstance(self.params["output"], ArrayParam)
+        assert all(isinstance(pp["name"], StringParam) for pp in self.params["output"])
 
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        assert hasattr(self, "parameters")
-        assert isinstance(self.parameters["output"], ArrayParam)
-        assert all(isinstance(pp["name"], StringParam) for pp in self.parameters["output"])
+        assert hasattr(self, "params")
+        assert isinstance(self.params["output"], ArrayParam)
+        assert all(isinstance(pp["name"], StringParam) for pp in self.params["output"])
         column_names = [
-            pp.name.value or "Column %d" % n for n, pp in enumerate(self.parameters["output"], 1)
+            pp.name.value or "Column %d" % n for n, pp in enumerate(self.params["output"], 1)
         ]  # type: ignore [attr-defined]
 
         series.dropna(inplace=True)
@@ -687,23 +633,25 @@ class PandasInputPlugin(FileInputPlugin):
         raise NotImplementedError(f"{self.__class__}.load_file()")
 
 
+class PandasInputFilesPluginFilesMultiParam(MultiParam):
+
+    filename = FileParam("Filename")
+
+
 class PandasInputFilesPlugin(PandasInputPlugin):
+
+    files = FileArrayParam("Files", PandasInputFilesPluginFilesMultiParam("File"))
+
     def __init__(self, *a, **k):
         # Add in filenames
         super().__init__(*a, **k)
-        file_params = {"filename": FileParam("Filename", file_types=self.file_types)}
-        file_params.update(self.file_params)
-
-        self.parameters = dict(
-            [("files", FileArrayParam("Files", MultiParam("File", file_params)))] + list(self.parameters.items())
-        )
+        self.files.file_types = self.file_types
 
     def num_files(self):
-        return len(self.parameters["files"].params)
+        return len(self.files)
 
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
-        assert isinstance(self.parameters["files"], ArrayParam)
-        file_params = self.parameters["files"][file_number]
+        file_params = self.files[file_number]
         yield self.read_file_to_dataframe(file_params, logger, row_limit)
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None) -> pd.DataFrame:

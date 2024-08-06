@@ -27,6 +27,11 @@ CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
 ]
 
 
+class ColumnsMultiParam(MultiParam):
+    name = StringParam("Column Name", "")
+    type = DataTypeOrNoneChoiceParam("Column Type")
+    index = BooleanParam("Index?", False)
+
 class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
 
@@ -36,88 +41,72 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     version = VERSION
     file_types = CSV_FILE_TYPES
 
-    parameters = {
-        "delimiter": ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"]),
-        "quoting": ChoiceParam("Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"]),
-        "comment": ChoiceParam("Comment", "None", choices=["None", "#", ";"]),
-        "header": BooleanParam("CSV file has header row?", True),
-        "filename_column": StringParam("Filename Column", ""),
-        "columns": ArrayParam(
-            "Columns",
-            MultiParam(
-                "Column",
-                {
-                    "name": StringParam("Column Name", ""),
-                    "type": DataTypeOrNoneChoiceParam("Column Type"),
-                    "index": BooleanParam("Index?", False),
-                },
-            ),
-        ),
-    }
+    delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "WHITESPACE"])
+    quoting = ChoiceParam("Quoting", "None", choices=["None", "Double-Quote", "Quote with Escape"])
+    comment = ChoiceParam("Comment", "None", choices=["None", "#", ";"])
+    header = BooleanParam("CSV file has header row?", True)
+    filename_column = StringParam("Filename Column", "")
+    columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         filename = file_params["filename"].value
 
         options = {
-            "header": 0 if self.parameters["header"].value else None,
+            "header": 0 if self.header else None,
         }
         if row_limit is not None:
             options["nrows"] = row_limit
 
         index_col_numbers = []
 
-        if len(self.parameters["columns"]):
+        if len(self.columns):
             options["names"] = []
             options["usecols"] = []
             options["converters"] = {}
 
-            for n, pp in enumerate(self.parameters["columns"]):
-                options["names"].append(pp["name"].value or f"column_{n}")
-                if pp["type"].is_not_none():
-                    if pp["index"].value:
+            for n, pp in enumerate(self.columns):
+                options["names"].append(str(pp.name) or f"column_{n}")
+                if pp.type.is_not_none():
+                    if pp.index:
                         index_col_numbers.append(len(options["usecols"]))
                     options["usecols"].append(n)
                     options["converters"][n] = pp["type"].cast_value
 
-        delimiter = self.parameters["delimiter"].value
-        if delimiter == "TAB":
+        if self.delimiter == "TAB":
             options["delimiter"] = "\t"
-        elif delimiter == "WHITESPACE":
+        elif self.delimiter == "WHITESPACE":
             options["delim_whitespace"] = True
         else:
-            options["delimiter"] = delimiter
+            options["delimiter"] = str(self.delimiter)
 
-        quoting = self.parameters["quoting"].value
-        if quoting == "None":
+        if self.quoting == "None":
             options["quoting"] = csv.QUOTE_NONE
-        elif quoting == "Double-Quote":
+        elif self.quoting == "Double-Quote":
             options["quotechar"] = '"'
             options["doublequote"] = True
-        elif quoting == "Quote with Escape":
+        elif self.quoting == "Quote with Escape":
             options["quotechar"] = '"'
             options["doublequote"] = False
             options["escapechar"] = "\\"
 
-        comment = self.parameters["comment"].value
-        if comment != "None":
-            options["comment"] = comment
+        if self.comment.value != "None":
+            options["comment"] = str(self.comment)
 
         # XXX pd.read_csv(index_col=) is half the speed of pd.read_csv().set_index()
 
         df = pd.read_csv(filename, **options)
 
-        while len(df.columns) > len(self.parameters["columns"]):
-            self.parameters["columns"].add_row()
+        while len(df.columns) > len(self.columns):
+            self.columns.add_row()
 
         if self.header:
             for n, col in enumerate(df.columns):
-                if not self.parameters["columns"][n]["name"].value:
-                    self.parameters["columns"][n]["name"].value = str(col)
-                    self.parameters["columns"][n]["type"].value = "string"
+                if not self.columns[n].name:
+                    self.columns[n].name = str(col)
+                    self.columns[n].type = "string"
 
-        filename_column = self.parameters["filename_column"].value
-        if filename_column:
-            df[filename_column] = clean_filename(filename)
+        if self.filename_column:
+            df[str(self.filename_column)] = clean_filename(filename)
 
         if index_col_numbers:
             df = df.set_index([df.columns[n] for n in index_col_numbers])
@@ -137,7 +126,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
     quoting = BooleanParam("Quote all Strings", False)
 
-    filehandle: Optional[Union[BufferedWriter, BytesIO]] = None
+    filehandle: Optional[Union[BufferedWriter, BytesIO, gzip.GzipFile]] = None
     csv_columns = None
 
     SEPARATORS = {",": ",", ";": ";", "SPACE": " ", "TAB": "\t"}
@@ -182,8 +171,8 @@ class SaveCsvPlugin(PandasOutputPlugin):
             header=emit_header,
             columns=self.csv_columns,
             index=False,
-            sep=self.SEPARATORS[self.delimiter],
-            quoting=self.QUOTING[self.quoting],
+            sep=self.SEPARATORS[str(self.delimiter)],
+            quoting=self.QUOTING[bool(self.quoting)],
         )  # type: ignore [call-overload]
         return []
 

@@ -257,16 +257,16 @@ class ParameterWrapper:
             subparams = p.params.values()
             for m, pp in enumerate(subparams):
                 if pp in self.subwrappers:
-                    self.subwrappers[pp].update()
+                    self.subwrappers[str(pp)].update()
                 else:
-                    self.subwrappers[pp] = ParameterWrapper(
+                    self.subwrappers[str(pp)] = ParameterWrapper(
                         self.entry,
                         pp,
                         self.callback,
                         delete_row_callback,
                         level=self.level + 1,
                     )
-                self.subwrappers[pp].entry.grid(row=n + 1, column=m + 1, padx=10)
+                self.subwrappers[str(pp)].entry.grid(row=n + 1, column=m + 1, padx=10)
             if not self.parameter.read_only and delete_row_callback:
                 button = delete_button(self.entry, command=partial(delete_row_callback, self, n))
                 button.grid(row=n + 1, column=len(subparams) + 1, padx=10)
@@ -444,10 +444,10 @@ class PluginConfigurator:
 
     def update(self) -> None:
         # If there's only a single parameter it is presented a little differently.
-        top_level = 0 if len(self.plugin.parameters) == 1 else 1
+        top_level = 0 if len(self.plugin.params) == 1 else 1
 
         # Create any new parameter wrappers needed & update existing ones
-        for n, (key, parameter) in enumerate(self.plugin.parameters.items()):
+        for n, (key, parameter) in enumerate(self.plugin.params.items()):
             if key in self.wrapper_cache:
                 self.wrapper_cache[key].update()
             else:
@@ -458,6 +458,6 @@ class PluginConfigurator:
 
         # Remove any parameter wrappers no longer needed
         for key, wrapper in list(self.wrapper_cache.items()):
-            if key not in self.plugin.parameters:
+            if key not in self.plugin.params:
                 wrapper.destroy()
                 del self.wrapper_cache[key]

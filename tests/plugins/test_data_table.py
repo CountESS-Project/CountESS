@@ -15,15 +15,15 @@ def test_data_table():
     plugin.set_parameter("columns.1.type", "integer")
     plugin.set_parameter("columns.2.name", "baz")
     plugin.set_parameter("columns.2.type", "number")
-    plugin.set_parameter("rows.0.0", "a")
-    plugin.set_parameter("rows.0.1", "1")
-    plugin.set_parameter("rows.0.2", "4.5")
-    plugin.set_parameter("rows.1.0", "b")
-    plugin.set_parameter("rows.1.1", "2")
-    plugin.set_parameter("rows.1.2", "5.6")
-    plugin.set_parameter("rows.2.0", "c")
-    plugin.set_parameter("rows.2.1", "3")
-    plugin.set_parameter("rows.2.2", "6.7")
+    plugin.set_parameter("rows.0.foo", "a")
+    plugin.set_parameter("rows.0.bar", "1")
+    plugin.set_parameter("rows.0.baz", "4.5")
+    plugin.set_parameter("rows.1.foo", "b")
+    plugin.set_parameter("rows.1.bar", "2")
+    plugin.set_parameter("rows.1.baz", "5.6")
+    plugin.set_parameter("rows.2.foo", "c")
+    plugin.set_parameter("rows.2.bar", "3")
+    plugin.set_parameter("rows.2.baz", "6.7")
 
     df = next(plugin.load_file(0, logger, None))
 
@@ -37,7 +37,7 @@ def test_data_table():
     plugin.set_parameter("columns.3.name", "hello")
     plugin.set_parameter("columns.3.type", "string")
     plugin.fix_columns()
-    plugin.set_parameter("rows.2.3", "world")
+    plugin.set_parameter("rows.2.hello", "world")
     df = next(plugin.load_file(0, logger, None))
 
     assert df["bar"].iloc[0] == 1.0
@@ -50,7 +50,7 @@ def test_data_table():
 
     assert df["hello"].iloc[2] is None
 
-    plugin.parameters["columns"].del_row(1)
+    plugin.columns.del_row(1)
     plugin.fix_columns()
 
     df = next(plugin.load_file(0, logger, None))

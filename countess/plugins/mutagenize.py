@@ -51,15 +51,13 @@ class MutagenizePlugin(PandasInputPlugin):
 
     character_set = set(("A", "C", "G", "T", "N"))
 
-    parameters = {
-        "sequence": StringCharacterSetParam("Sequence", "", character_set=character_set),
-        "mutate": BooleanParam("All Single Mutations?", True),
-        "delete": BooleanParam("All Single Deletes?", False),
-        "del3": BooleanParam("All Triple Deletes?", False),
-        "insert": BooleanParam("All Single Inserts?", False),
-        "ins3": BooleanParam("All Triple Inserts?", False),
-        "remove": BooleanParam("Remove Duplicates?", False),
-    }
+    sequence = StringCharacterSetParam("Sequence", "", character_set=character_set)
+    mutate = BooleanParam("All Single Mutations?", True)
+    delete = BooleanParam("All Single Deletes?", False)
+    del3 = BooleanParam("All Triple Deletes?", False)
+    insert = BooleanParam("All Single Inserts?", False)
+    ins3 = BooleanParam("All Triple Inserts?", False)
+    remove = BooleanParam("Remove Duplicates?", False)
 
     def num_files(self):
         return 1
@@ -70,18 +68,18 @@ class MutagenizePlugin(PandasInputPlugin):
         df = pd.DataFrame(
             islice(
                 mutagenize(
-                    self.parameters["sequence"].value,
-                    self.parameters["mutate"].value,
-                    self.parameters["delete"].value,
-                    self.parameters["del3"].value,
-                    self.parameters["insert"].value,
-                    self.parameters["ins3"].value,
+                    str(self.sequence),
+                    bool(self.mutate),
+                    bool(self.delete),
+                    bool(self.del3),
+                    bool(self.insert),
+                    bool(self.ins3),
                 ),
                 0,
                 row_limit,
             ),
             columns=["sequence", "position", "reference", "variation"],
         )
-        if self.parameters["remove"].value:
+        if self.remove.value:
             df = df.groupby(["sequence"]).agg({"sequence": "count"}).rename(columns={"sequence": "count"})
         yield df

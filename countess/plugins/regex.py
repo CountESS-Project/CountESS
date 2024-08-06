@@ -16,6 +16,10 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import PandasInputFilesPlugin, PandasTransformSingleToTuplePlugin
 
+class OutputColumnsMultiParam(MultiParam):
+    name = StringParam("Column Name")
+    datatype = DataTypeChoiceParam("Column Type", "string")
+
 
 class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     name = "Regex Tool"
@@ -23,41 +27,26 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#regex-tool"
     version = VERSION
 
-    parameters = {
-        "column": ColumnChoiceParam("Input Column"),
-        "regex": StringParam("Regular Expression", ".*"),
-        "output": ArrayParam(
-            "Output Columns",
-            MultiParam(
-                "Col",
-                {
-                    "name": StringParam("Column Name"),
-                    "datatype": DataTypeChoiceParam(
-                        "Column Type",
-                        "string",
-                    ),
-                },
-            ),
-        ),
-        "drop_column": BooleanParam("Drop Column", False),
-        "drop_unmatch": BooleanParam("Drop Unmatched Rows", False),
-        "multi": BooleanParam("Multi Match", False),
-    }
+    column = ColumnChoiceParam("Input Column")
+    regex = StringParam("Regular Expression", ".*")
+    output = ArrayParam("Output Columns", OutputColumnsMultiParam("Col"))
+    drop_column = BooleanParam("Drop Column", False)
+    drop_unmatch = BooleanParam("Drop Unmatched Rows", False)
+    multi = BooleanParam("Multi Match", False)
 
     compiled_re = None
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         super().prepare(sources, row_limit)
-        self.compiled_re = re.compile(self.parameters["regex"].value)
+        self.compiled_re = re.compile(self.regex.value)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-        assert isinstance(self.parameters["output"], ArrayParam)
         df = super().process_dataframe(dataframe, logger)
         if df is None:
             return None
 
-        if self.parameters["drop_column"].value:
-            column_name = self.parameters["column"].value
+        if self.drop_column:
+            column_name = self.column.value
             if column_name in df.columns:
                 df = df.drop(columns=column_name)
             else:
@@ -71,15 +60,14 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
 
     def process_value(self, value: str, logger: Logger) -> Optional[Iterable]:
         assert self.compiled_re is not None
-        assert isinstance(self.parameters["output"], ArrayParam)
         if value is not None:
             try:
-                if self.parameters["multi"].value:
+                if self.multi:
                     return self.compiled_re.findall(str(value))
                 else:
                     if match := self.compiled_re.match(str(value)):
                         return [
-                            op.datatype.cast_value(val) for op, val in zip(self.parameters["output"], match.groups())
+                            op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())
                         ]
                     else:
                         pass
@@ -91,7 +79,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         # be filtered out in series_to_dataframe below, otherwise return
         # a tuple of Nones which will fill in the unmatched row.
 
-        if self.parameters["drop_unmatch"].value:
+        if self.drop_unmatch:
             return None
         else:
             return [None] * self.compiled_re.groups
@@ -99,10 +87,10 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
         # Unmatched rows return a single None, so we can easily drop
         # them out before doing further processing
-        if self.parameters["drop_unmatch"].value:
+        if self.drop_unmatch:
             series.dropna(inplace=True)
 
-        if self.parameters["multi"].value:
+        if self.multi:
             series = series.explode()
 
         return super().series_to_dataframe(series)
@@ -119,39 +107,25 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
 
     file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]
 
-    parameters = {
-        "regex": StringParam("Regular Expression", "(.*)"),
-        "skip": IntegerParam("Skip Lines", 0),
-        "output": ArrayParam(
-            "Output Columns",
-            MultiParam(
-                "Col",
-                {
-                    "name": StringParam("Column Name"),
-                    "datatype": DataTypeChoiceParam(
-                        "Column Type",
-                        "string",
-                    ),
-                },
-            ),
-        ),
-    }
+    regex = StringParam("Regular Expression", "(.*)")
+    skip = IntegerParam("Skip Lines", 0)
+    output = ArrayParam("Output Columns", OutputColumnsMultiParam("Col"))
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
         pdfs = []
 
-        compiled_re = re.compile(self.parameters["regex"].value)
+        compiled_re = re.compile(self.regex.value)
 
-        while compiled_re.groups > len(self.parameters["output"].params):
-            self.parameters["output"].add_row()
+        while compiled_re.groups > len(self.output.params):
+            self.output.add_row()
 
-        output_parameters = list(self.parameters["output"])[: compiled_re.groups]
+        output_parameters = list(self.output)[: compiled_re.groups]
         columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
 
         records = []
         with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
             for num, line in enumerate(fh):
-                if num < self.parameters["skip"].value:
+                if num < self.skip:
                     continue
                 match = compiled_re.match(line)
                 if match:
@@ -175,6 +149,5 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
         return df
 
     def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
-        assert isinstance(self.parameters["files"], ArrayParam)
-        file_params = self.parameters["files"][file_number]
+        file_params = self.files[file_number]
         yield self.read_file_to_dataframe(file_params, logger, row_limit)

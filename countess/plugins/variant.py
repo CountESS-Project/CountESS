@@ -17,19 +17,6 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#variant-caller"
 
-    """parameters = {
-        "column": ColumnChoiceParam("Input Column", "sequence"),
-        "reference": ColumnOrStringParam("Reference Sequence"),
-        "offset": IntegerParam("Reference Offset", 0),
-        "output": StringParam("Output Column", "variant"),
-        "max_mutations": IntegerParam("Max Mutations", 10),
-        "protein": StringParam("Protein Column", "protein"),
-        "max_protein": IntegerParam("Max Protein Variations", 10),
-        "drop": BooleanParam("Drop unidentified variants", False),
-        "drop_columns": BooleanParam("Drop Input Column(s)", False),
-    }"""
-
-    
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
     offset = IntegerParam("Reference Offset", 0)
@@ -40,10 +27,8 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     drop = BooleanParam("Drop unidentified variants", False)
     drop_columns = BooleanParam("Drop Input Column(s)", False)
 
-
     def process_dict(self, data, logger: Logger) -> dict:
-        assert isinstance(self.parameters["reference"], ColumnOrStringParam)
-        sequence = data[self.column]
+        sequence = data[str(self.column)]
         if not sequence:
             return {}
 
@@ -74,7 +59,6 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         return r
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-        assert isinstance(self.parameters["reference"], ColumnOrStringParam)
         df_out = super().process_dataframe(dataframe, logger)
 
         if df_out is not None:

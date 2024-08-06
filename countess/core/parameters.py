@@ -3,7 +3,7 @@ import hashlib
 import math
 import os.path
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Type
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import pandas as pd
 
@@ -25,7 +25,11 @@ class BaseParam:
 
     label: str = ""
     hide: bool = False
-    read_only: bool = False
+    read_only: bool = False # XXX deprecated
+    value: Any = None # XXX deprecated
+
+    def __init__(self, label):
+        self.label = label
 
     def copy(self):
         """Plugins declare their parameters with instances of BaseParam, these
@@ -67,7 +71,11 @@ class ScalarParam(BaseParam):
     def reset_value(self):
         self._value = self.default
 
-    value = property(get_value, set_value, reset_value)
+    value = property(
+        lambda self: self.get_value(),
+        lambda self, value: self.set_value(value),
+        lambda self: self.reset_value()
+    )
 
     def copy(self):
         return self.__class__(self.label, self._value)
@@ -128,7 +136,7 @@ class StringParam(ScalarWithOperatorsParam):
     # Operator methods which apply only to strings
 
     def __len__(self):
-        return len(self._value)
+        return len(self._value) if self._value is not None else 0
 
     def __contains__(self, other):
         return other in self._value
@@ -157,7 +165,7 @@ class NumericParam(ScalarWithOperatorsParam):
     def set_value(self, value):
         try:
             self._value = self.var_type(value)
-        except ValueError:
+        except (TypeError, ValueError):
             self.reset_value()
 
     # Operator methods which apply only to numerics
@@ -211,14 +219,14 @@ class BooleanParam(ScalarParam):
     def set_value(self, value):
         if isinstance(value, str):
             if value in ("t", "T", "true", "True", "1"):
-                return True
+                self._value = True
             if value in ("f", "F", "false", "False", "0"):
-                return False
+                self._value = False
             raise ValueError(f"Can't convert {value} to boolean")
-        return bool(value)
+        self._value = bool(value)
 
     def __bool__(self):
-        return self._value
+        return self._value or False
 
     def __str__(self):
         return str(self._value)
@@ -321,7 +329,7 @@ class FileSaveParam(StringParam):
             self.file_types = file_types
 
 
-class ChoiceParam(ScalarParam):
+class ChoiceParam(ScalarWithOperatorsParam):
     """A drop-down menu parameter choosing between options.
     Defaults to 'None'"""
 
@@ -338,7 +346,7 @@ class ChoiceParam(ScalarParam):
         choices: Optional[Iterable[str]] = None,
     ):
         super().__init__(self, label)
-        self.value = value
+        self.value = value if value is not None else self.DEFAULT_VALUE
         self.choices = list(choices or [])
 
     def set_value(self, value):
@@ -556,6 +564,81 @@ class ColumnOrStringParam(ColumnChoiceParam):
             self._choice = None
 
 
+class HasSubParametersMixin:
+    """Mixin class which handles access to the parameters inside Plugins
+    and MultiParams."""
+
+    params: Mapping[str, BaseParam] = {}
+    label: str
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+
+        # Allow new django-esque declarations via subclasses.
+        # parameters hold values so they are always copied to preven
+        # multiple parameters of the same type interfering.
+
+        for name in dir(self.__class__):
+            if isinstance(getattr(self, name), BaseParam):
+                self.__dict__[name] = self.params[name] = getattr(self, name).copy()
+
+    def __setattr__(self, name, value):
+        """Intercepts attempts to set parameters to a value and turns them into parameter.set_value.
+        Any other kind of attribute assignment is passed through."""
+
+        if name in self.params and not isinstance(value, BaseParam):
+            self.params[name].set_value(value)
+        else:
+            super().__setattr__(name, value)
+
+    def get_parameters(self, key, base_dir="."):
+        for subkey, param in self.params.items():
+            yield from param.get_parameters(f"{key}.{subkey}", base_dir)
+
+    def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
+        #if key == '_label' and isinstance(self, BaseParam):
+        #    self.label = str(value)
+        #    return
+
+        if '.' in key:
+            key, subkey = key.split('.', 1)
+        else:
+            subkey = None
+
+        try:
+            param = self.params[key]
+        except KeyError as e:
+            print(f">> KEY ERROR {repr(self)} {key} {self.params}")
+            raise e
+
+        if subkey == '_label':
+            param.label = str(value)
+            return
+
+        if isinstance(param, (HasSubParametersMixin, ArrayParam)):
+            param.set_parameter(subkey, value, base_dir)
+        elif isinstance(param, (FileParam, FileSaveParam)) and value is not None:
+            # XXX this is a clumsy approach?
+            param.set_value(os.path.join(base_dir, str(value)))
+        elif isinstance(param, ScalarParam):
+            param.set_value(value)
+
+    def set_column_choices(self, choices):
+        for p in self.params.values():
+            p.set_column_choices(choices)
+
+    # XXX allows dict-like access to params but not sure if this is a bad idea.
+
+    def __getitem__(self, key):
+        return self.params[key]
+
+    def __setitem__(self, key, value):
+        self.params[key].set_value(value)
+
+    def __contains__(self, key):
+        return key in self.params
+
+
 class ArrayParam(BaseParam):
     """An ArrayParam contains zero or more copies of `param`, which can be a
     SimpleParam or a MultiParam."""
@@ -563,6 +646,10 @@ class ArrayParam(BaseParam):
     # XXX the only real use for this is as an array of MultiParams so I think
     # maybe we should have a TabularParam which combines ArrayParam and
     # MultiParam more directly."""
+
+    # XXX it's a bit suss that this isn't a HasSubParametersMixin
+    # because that does most stuff already: perhaps the 'array' should
+    # actually be a dict, which would also deal with sparse keys elegantly.
 
     params: list[BaseParam]
 
@@ -573,7 +660,7 @@ class ArrayParam(BaseParam):
         min_size: int = 0,
         max_size: Optional[int] = None,
     ):
-        self.label = label
+        super().__init__(label)
         self.param = param
 
         self.min_size = min_size
@@ -626,27 +713,6 @@ class ArrayParam(BaseParam):
     def __iter__(self):
         return self.params.__iter__()
 
-    def get_value(self):
-        return [p.value for p in self.params]
-
-    def set_value(self, value):
-
-        # if setting to a dictionary, keep only the values in (hopefully
-        # numeric) order of the keys and forget about the numbering.
-        if isinstance(value, dict):
-            try:
-                value_pairs = sorted([(int(k), v) for k, v in value.items()])
-            except ValueError:
-                value_pairs = sorted(value.items())
-
-            value = [v for _, v in value_pairs]
-
-        # make new parameters for each value.
-        self.params = [self.param.copy_and_set_value(v) for v in value]
-
-    def reset_value(self):
-        self.params = []
-
     def get_parameters(self, key, base_dir="."):
         for n, p in enumerate(self.params):
             yield from p.get_parameters(f"{key}.{n}", base_dir)
@@ -661,6 +727,29 @@ class ArrayParam(BaseParam):
         self.param.set_column_choices(choices)
         for p in self.params:
             p.set_column_choices(choices)
+
+    def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
+        if '.' in key:
+            key, subkey = key.split('.', 1)
+        else:
+            subkey = None
+
+        while int(key) >= len(self.params):
+            self.params.append(self.param.copy())
+        param = self.params[int(key)]
+
+        if subkey == '_label':
+            param.label = str(value)
+            return
+
+        if isinstance(param, (HasSubParametersMixin, ArrayParam)):
+            param.set_parameter(subkey, value, base_dir)
+        elif isinstance(param, (FileParam, FileSaveParam)) and value is not None:
+            # XXX this is a clumsy approach?
+            param.set_value(os.path.join(base_dir, str(value)))
+        elif isinstance(param, ScalarParam):
+            param.set_value(value)
+
 
 
 class PerColumnArrayParam(ArrayParam):
@@ -706,6 +795,10 @@ class FileArrayParam(ArrayParam):
     def file_types(self):
         return self.find_fileparam().file_types
 
+    @file_types.setter
+    def file_types(self, file_types: Sequence[Tuple[str, Union[str, List[str]]]]):
+        self.find_fileparam().file_types = file_types
+
     def add_files(self, filenames):
         # XXX slightly daft way of doing it.  It is setting the filename
         # of the 'template' self.param, and then copying that template to
@@ -715,11 +808,11 @@ class FileArrayParam(ArrayParam):
             self.add_row()
 
 
-class MultiParam(BaseParam):
+class MultiParam(BaseParam, HasSubParametersMixin):
     params: Mapping[str, BaseParam] = {}
 
     def __init__(self, label: str, params: Optional[Mapping[str, BaseParam]] = None):
-        self.label = label
+        super().__init__(label)
         self.params = dict((k, v.copy()) for k, v in params.items()) if params else {}
 
         # Allow new django-esque declarations via subclasses
@@ -733,7 +826,7 @@ class MultiParam(BaseParam):
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
         return self.__class__(self.label, pp)
 
-    # XXX decide if the "dict-like" accessors are worth keeping
+    # XXX decide if these "dict-like" accessors are worth keeping
 
     def __getitem__(self, key):
         return self.params[key]
@@ -743,6 +836,9 @@ class MultiParam(BaseParam):
 
     def __setitem__(self, key, value):
         self.params[key].value = value
+
+    def __iter__(self):
+        return self.params.__iter__()
 
     def keys(self):
         return self.params.keys()
@@ -770,23 +866,6 @@ class MultiParam(BaseParam):
         else:
             super().__setattr__(name, value)
 
-    def __iter__(self):
-        return self.params.__iter__()
-
-    @property
-    def value(self):
-        return dict((k, p.value) for k, p in self.params.items())
-
-    @value.setter
-    def value(self, value):
-        for k, v in value.items():
-            self.params[k].value = v
-
-    @value.deleter
-    def value(self):
-        for p in self.params.values():
-            del p.value
-
     def get_parameters(self, key, base_dir="."):
         for k, p in self.params.items():
             yield from p.get_parameters(f"{key}.{k}", base_dir)
@@ -796,10 +875,6 @@ class MultiParam(BaseParam):
         for k, p in self.params.items():
             digest.update((str(k) + "\0" + p.get_hash_value()).encode("utf-8"))
         return digest.hexdigest()
-
-    def set_column_choices(self, choices):
-        for p in self.params.values():
-            p.set_column_choices(choices)
 
 
 class TabularMultiParam(MultiParam):
