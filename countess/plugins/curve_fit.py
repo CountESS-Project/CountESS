@@ -33,19 +33,15 @@ class CurveFitPlugin(PandasTransformDictToDictPlugin):
 
     version = VERSION
 
-    parameters = {
-        "xaxis": ColumnGroupOrNoneChoiceParam("X Axis", None, []),
-        "yaxis": ColumnGroupChoiceParam("Y Axis", None, []),
-        "function": ChoiceParam("Function", list(FUNCTIONS.keys())[0], list(FUNCTIONS.keys())),
-    }
+    xaxis = ColumnGroupOrNoneChoiceParam("X Axis", None, [])
+    yaxis = ColumnGroupChoiceParam("Y Axis", None, [])
+    function = ChoiceParam("Function", list(FUNCTIONS.keys())[0], list(FUNCTIONS.keys()))
 
     def process_dict(self, data: dict, logger: Logger) -> dict:
-        assert isinstance(self.parameters["xaxis"], ColumnGroupOrNoneChoiceParam)
-        assert isinstance(self.parameters["yaxis"], ColumnGroupChoiceParam)
         xprefix = None
-        if not self.parameters["xaxis"].is_none():
-            xprefix = self.parameters["xaxis"].value
-        yprefix = self.parameters["yaxis"].value
+        if not self.xaxis.is_none():
+            xprefix = self.xaxis.value
+        yprefix = self.yaxis.value
 
         tvals = {k.removeprefix(yprefix) for k in data.keys() if k.startswith(yprefix)}
         if xprefix:
@@ -62,7 +58,7 @@ class CurveFitPlugin(PandasTransformDictToDictPlugin):
                 yvals.append(yval)
 
         try:
-            function = FUNCTIONS[self.parameters["function"].value]
+            function = FUNCTIONS[self.function.value]
             popt, pcov, *_ = curve_fit(function, xvals, yvals)
 
             r = {f"popt_{n}": v for n, v in enumerate(popt)}

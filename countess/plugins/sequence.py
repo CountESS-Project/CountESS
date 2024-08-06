@@ -9,42 +9,39 @@ from countess.core.plugins import PandasTransformSingleToSinglePlugin
 
 
 class SequencePlugin(PandasTransformSingleToSinglePlugin):
-    """Manipulate DNA valueuences"""
+    """Manipulate DNA sequences"""
 
     name = "Sequence Tool"
     description = "Manipulate DNA Sequences"
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#valueuence"
 
-    parameters = {
-        "column": ColumnChoiceParam("Input Column"),
-        "invert": BooleanParam("Invert", False),
-        "offset": IntegerParam("Offset", 0),
-        "start": StringParam("Start at ...", ""),
-        "stop": StringParam("Stop at ...", ""),
-        "length": IntegerParam("Max Length", 150),
-        "output": StringParam("Output Column", "sequence"),
-    }
+    column = ColumnChoiceParam("Input Column")
+    invert = BooleanParam("Invert", False)
+    offset = IntegerParam("Offset", 0)
+    start = StringParam("Start at ...", "")
+    stop = StringParam("Stop at ...", "")
+    length = IntegerParam("Max Length", 150)
+    output = StringParam("Output Column", "sequence")
 
     def process_value(self, value: str, logger: Logger) -> Optional[str]:
         if value is None:
             return None
 
-        if self.parameters["invert"].value:
+        if self.invert:
             value = reverse_complement(value)
-        if self.parameters["offset"].value:
-            offset = self.parameters["offset"].value
-            value = value[offset:]
-        if self.parameters["start"].value:
-            offset = value.find(self.parameters["start"].value)
+        if self.offset > 0:
+            value = value[int(self.offset) :]
+        if self.start:
+            offset = value.find(self.start.value)
             if offset >= 0:
                 value = value[offset:]
             else:
                 return None
-        if self.parameters["stop"].value:
-            offset = value.find(self.parameters["stop"].value)
+        if self.stop:
+            offset = value.find(self.stop.value)
             if offset >= 0:
-                value = value[0 : offset + len(self.parameters["stop"].value)]
-        if self.parameters["length"].value:
-            value = value[0 : self.parameters["length"].value]
+                value = value[0 : offset + len(self.stop.value)]
+        if self.length > 0:
+            value = value[0 : int(self.length)]
         return value

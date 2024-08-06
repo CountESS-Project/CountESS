@@ -17,12 +17,8 @@ class CollatePlugin(PandasProcessPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-p  lugins/#collate"
 
-    parameters = {
-        "columns": PerColumnArrayParam(
-            "Columns", ChoiceParam("Role", choices=["—", "Group", "Sort (Asc)", "Sort (Desc)"])
-        ),
-        "limit": IntegerParam("First N records", 0),
-    }
+    columns = PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["—", "Group", "Sort (Asc)", "Sort (Desc)"]))
+    limit = IntegerParam("First N records", 0)
 
     dataframes: List[pd.DataFrame]
 
@@ -37,13 +33,12 @@ class CollatePlugin(PandasProcessPlugin):
         return []
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
-        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         assert self.dataframes
 
         df = pd.concat(self.dataframes)
         input_columns = get_all_columns(df).keys()
-        self.parameters["columns"].set_column_choices(input_columns)
-        column_parameters = list(zip(input_columns, self.parameters["columns"]))
+        self.columns.set_column_choices(input_columns)
+        column_parameters = list(zip(input_columns, self.columns))
         group_cols = [col for col, param in column_parameters if param.value == "Group"]
         sort_cols = {
             col: param.value.endswith("(Asc)") for col, param in column_parameters if param.value.startswith("Sort")
@@ -51,8 +46,8 @@ class CollatePlugin(PandasProcessPlugin):
 
         def sort_and_limit(df: pd.DataFrame) -> pd.DataFrame:
             df = df.sort_values(by=list(sort_cols.keys()), ascending=list(sort_cols.values()))
-            if self.parameters["limit"].value > 0:
-                df = df.head(self.parameters["limit"].value)
+            if self.limit > 0:
+                df = df.head(self.limit.value)
             return df
 
         try:

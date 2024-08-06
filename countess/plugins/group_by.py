@@ -18,6 +18,7 @@ class ColumnMultiParam(TabularMultiParam):
     sum = BooleanParam("Sum")
     mean = BooleanParam("Mean")
 
+
 class GroupByPlugin(PandasConcatProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
@@ -40,8 +41,7 @@ class GroupByPlugin(PandasConcatProcessPlugin):
             keep_columns = [
                 col_param.label
                 for col_param in self.columns
-                if any(cp.value for cp in col_param.values())
-                and col_param.label in data.columns
+                if any(cp.value for cp in col_param.values()) and col_param.label in data.columns
             ]
             data = data[keep_columns]
 

@@ -16,34 +16,31 @@ class CorrelationPlugin(PandasSimplePlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#correlation-tool"
 
-    parameters = {
-        "method": ChoiceParam("Method", choices=["pearson", "kendall", "spearman"]),
-        "group": ColumnOrNoneChoiceParam("Group"),
-        "column1": ColumnChoiceParam("Column 1"),
-        "column2": ColumnChoiceParam("Column 2"),
-    }
+    method = ChoiceParam("Method", choices=["pearson", "kendall", "spearman"])
+    group = ColumnOrNoneChoiceParam("Group")
+    column1 = ColumnChoiceParam("Column 1")
+    column2 = ColumnChoiceParam("Column 2")
+
     columns: list[str] = []
     dataframes: list[pd.DataFrame] = []
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
-        assert isinstance(self.parameters["group"], ColumnOrNoneChoiceParam)
-        column1 = self.parameters["column1"].value
-        column2 = self.parameters["column2"].value
+        column1 = self.column1.value
+        column2 = self.column2.value
         self.columns = [column1, column2]
-        if self.parameters["group"].is_not_none():
-            self.columns.append(self.parameters["group"].value)
+        if self.group.is_not_none():
+            self.columns.append(self.group.value)
         self.dataframes = []
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> None:
         self.dataframes.append(dataframe[self.columns])
 
     def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
-        assert isinstance(self.parameters["group"], ColumnOrNoneChoiceParam)
-        column1 = self.parameters["column1"].value
-        column2 = self.parameters["column2"].value
-        groupby = None if self.parameters["group"].is_none() else self.parameters["group"].value
+        column1 = self.column1.value
+        column2 = self.column2.value
+        groupby = None if self.group.is_none() else self.group.value
 
-        method = self.parameters["method"].value
+        method = self.method.value
 
         dataframe = pd.concat(self.dataframes)
         if groupby:

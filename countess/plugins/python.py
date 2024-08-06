@@ -1,7 +1,7 @@
 import builtins
 import math
 import re
-from types import CodeType, FunctionType, ModuleType, NoneType
+from types import FunctionType, ModuleType, NoneType
 from typing import Any
 
 import numpy as np
@@ -50,18 +50,14 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
 
     version = VERSION
 
-    parameters = {
-        "code": TextParam("Python Code"),
-        "dropna": BooleanParam("Drop Null Columns?"),
-    }
+    code = TextParam("Python Code")
+    dropna = BooleanParam("Drop Null Columns?")
 
     code_object = None
     code_globals: dict[str, Any] = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
 
     def process_dict(self, data: dict, logger: Logger):
-        assert isinstance(self.parameters["code"], TextParam)
-        assert isinstance(self.code_object, CodeType)
-
+        assert self.code_object is not None
         try:
             exec(self.code_object, self.code_globals, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -75,7 +71,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         b) we don't need to merge afterwards"""
 
         # XXX cache this?
-        self.code_object = compile(self.parameters["code"].value, "<PythonPlugin>", mode="exec")
+        self.code_object = compile(self.code.value, "<PythonPlugin>", mode="exec")
 
         dataframe = dataframe.reset_index(drop=dataframe.index.names == [None])
         series = self.dataframe_to_series(dataframe, logger)
@@ -86,7 +82,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
                 columns="__filter"
             )
 
-        if self.parameters["dropna"].value:
+        if self.dropna:
             dataframe.dropna(axis=1, how="all", inplace=True)
 
         return dataframe

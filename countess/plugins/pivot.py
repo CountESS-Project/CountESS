@@ -26,8 +26,7 @@ class PivotPlugin(PandasProcessPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
-    columns = PerColumnArrayParam("Columns",
-         ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
+    columns = PerColumnArrayParam("Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
     aggfunc = ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "min", "max"])
 
     input_columns: Dict[str, np.dtype] = {}

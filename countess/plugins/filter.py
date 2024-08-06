@@ -20,21 +20,25 @@ from countess.utils.pandas import get_all_columns
 
 OPERATORS = ["equals", "greater than", "less than", "contains", "starts with", "ends with", "matches regex"]
 
-class _FilterColumnMultiParam(MultiParam):
+
+class _FilterColumnMultiParam(TabularMultiParam):
     column = ColumnChoiceParam("Column")
     negate = BooleanParam("Negate?")
     operator = ChoiceParam("Operator", OPERATORS[0], OPERATORS)
     value = StringParam("Value")
 
-class _FilterOutputMultiParam(MultiParam):
+
+class _FilterOutputMultiParam(TabularMultiParam):
     output = StringParam("Output Column")
     value = StringParam("Output Value")
     type = DataTypeChoiceParam("Output Type")
+
 
 class FilterMultiParam(MultiParam):
     columns = ArrayParam("Columns", _FilterColumnMultiParam("Column"))
     combine = ChoiceParam("Combine", "All", ["All", "Any"])
     outputs = ArrayParam("Outputs", _FilterOutputMultiParam("Output"))
+
 
 class FilterPlugin(PandasSimplePlugin):
     name = "Filter Plugin"

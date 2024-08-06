@@ -83,7 +83,6 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             return s[0] if s else None
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-
         variant_col = self.variant.value
         replicate_col = self.replicate.value
         count_cols = self.columns.get_column_names(dataframe)

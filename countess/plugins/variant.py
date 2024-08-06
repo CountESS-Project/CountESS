@@ -34,11 +34,11 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
         reference = self.reference.get_value_from_dict(data)
 
-        r = {}
+        r : dict[str,str] = {}
 
         if self.output:
             try:
-                r[self.output] = find_variant_string(
+                r[self.output.value] = find_variant_string(
                     "g.", reference, sequence, int(self.max_mutations), offset=int(self.offset)
                 )
             except ValueError:
