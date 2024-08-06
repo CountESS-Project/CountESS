@@ -1,5 +1,5 @@
-from time import sleep
 import sys
+from time import sleep
 
 import pandas as pd
 import pytest
@@ -8,6 +8,7 @@ from countess.core.logger import ConsoleLogger
 from countess.plugins.variant import VariantPlugin
 
 logger = ConsoleLogger()
+
 
 def test_variant_ref_value():
     input_df = pd.DataFrame([{"seq": "TGAAGTAGAGG"}, {"seq": "AGAAGTTGTGG"}, {"seq": "ATAAGAAGAGG"}])

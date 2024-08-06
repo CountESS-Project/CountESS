@@ -32,6 +32,7 @@ class ColumnsMultiParam(MultiParam):
     type = DataTypeOrNoneChoiceParam("Column Type")
     index = BooleanParam("Index?", False)
 
+
 class LoadCsvPlugin(PandasInputFilesPlugin):
     """Load CSV files"""
 

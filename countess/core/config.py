@@ -131,7 +131,7 @@ def write_config_node(node: PipelineNode, cp: ConfigParser, base_dir: str):
         for k, v, _ in node.config:
             cp[node.name][k] = repr(v)
     elif node.plugin:
-        for k, v in node.plugin.get_parameters(base_dir):
+        for k, v in node.plugin.get_parameters("", base_dir):
             cp[node.name][k] = repr(v)
 
 

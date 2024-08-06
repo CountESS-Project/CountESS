@@ -5,10 +5,18 @@ from pandas.api.typing import DataFrameGroupBy  # type: ignore
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import ArrayParam, BooleanParam, PerColumnArrayParam, TabularMultiParam
+from countess.core.parameters import BooleanParam, PerColumnArrayParam, TabularMultiParam
 from countess.core.plugins import PandasConcatProcessPlugin
 from countess.utils.pandas import flatten_columns, get_all_columns
 
+
+class ColumnMultiParam(TabularMultiParam):
+    index = BooleanParam("Index")
+    count = BooleanParam("Count")
+    min = BooleanParam("Min")
+    max = BooleanParam("Max")
+    sum = BooleanParam("Sum")
+    mean = BooleanParam("Mean")
 
 class GroupByPlugin(PandasConcatProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
@@ -18,39 +26,21 @@ class GroupByPlugin(PandasConcatProcessPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#group-by"
 
-    parameters = {
-        "columns": PerColumnArrayParam(
-            "Columns",
-            TabularMultiParam(
-                "Column",
-                {
-                    "index": BooleanParam("Index"),
-                    "count": BooleanParam("Count"),
-                    "min": BooleanParam("Min"),
-                    "max": BooleanParam("Max"),
-                    "sum": BooleanParam("Sum"),
-                    "mean": BooleanParam("Mean"),
-                },
-            ),
-        ),
-        "join": BooleanParam("Join Back?"),
-    }
+    columns = PerColumnArrayParam("Columns", ColumnMultiParam("Column"))
+    join = BooleanParam("Join Back?")
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
         # XXX should do this in two stages: group each dataframe and then combine.
         # that can wait for a more general MapReduceFinalizePlugin class though.
         self.input_columns.update(get_all_columns(data))
 
-        assert isinstance(self.parameters["columns"], ArrayParam)
-
-        if not self.parameters["join"].value:
+        if not self.join:
             # Dispose of any columns we don't use in the aggregations.
             # TODO: Reindex as well?
             keep_columns = [
                 col_param.label
-                for col_param in self.parameters["columns"].params
-                if isinstance(col_param, TabularMultiParam)
-                and any(cp.value for cp in col_param.values())
+                for col_param in self.columns
+                if any(cp.value for cp in col_param.values())
                 and col_param.label in data.columns
             ]
             data = data[keep_columns]
@@ -58,10 +48,9 @@ class GroupByPlugin(PandasConcatProcessPlugin):
         yield from super().process(data, source, logger)
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-        assert isinstance(self.parameters["columns"], ArrayParam)
-        self.parameters["columns"].set_column_choices(self.input_columns.keys())
+        self.columns.set_column_choices(self.input_columns.keys())
 
-        column_parameters = list(zip(self.input_columns.keys(), self.parameters["columns"]))
+        column_parameters = list(zip(self.input_columns.keys(), self.columns))
         index_cols = [col for col, col_param in column_parameters if col_param["index"].value]
         agg_ops = dict(
             (
@@ -95,7 +84,7 @@ class GroupByPlugin(PandasConcatProcessPlugin):
 
             flatten_columns(data_out, inplace=True)
 
-            if self.parameters["join"].value:
+            if self.join:
                 if index_cols:
                     return data_in.merge(data_out, how="left", left_on=index_cols, right_on=index_cols)
                 else:

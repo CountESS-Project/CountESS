@@ -59,7 +59,7 @@ class ParameterWrapper:
         self.subwrapper_buttons: list[tk.Button] = []
         self.column_labels: list[tk.Label] = []
 
-        self.subwrappers: Mapping[BaseParam, ParameterWrapper] = {}
+        self.subwrappers: Mapping[int, ParameterWrapper] = {}
 
         self.var: Optional[tk.Variable] = None
         self.entry: Optional[tk.Widget] = None
@@ -91,7 +91,7 @@ class ParameterWrapper:
             # so we use a different method!
             # XXX is this a simpler way to handle other kinds of fields too?
             self.entry = tk.Text(tk_parent, height=10)
-            self.entry.insert("1.0", parameter.value)
+            self.entry.insert("1.0", parameter.value or "")
             if parameter.read_only:
                 self.entry["state"] = tk.DISABLED
             else:
@@ -202,7 +202,7 @@ class ParameterWrapper:
         elif isinstance(self.parameter, TextParam):
             if self.parameter.read_only:
                 self.entry["state"] = "normal"
-            self.entry.replace("1.0", tk.END, self.parameter.value)
+            self.entry.replace("1.0", tk.END, self.parameter.value or "")
             if self.parameter.read_only:
                 self.entry["state"] = "disabled"
         elif isinstance(self.parameter, FileParam):
@@ -214,24 +214,24 @@ class ParameterWrapper:
             self.label["text"] = self.parameter.label
 
     def cull_subwrappers(self, params):
-        params_set = set(params)
-        for p, pw in self.subwrappers.items():
-            if p not in params_set:
+        params_set = set(id(p) for p in params)
+        for pid, pw in self.subwrappers.items():
+            if pid not in params_set:
                 pw.destroy()
 
     def update_subwrappers(self, params, delete_row_callback):
         for n, p in enumerate(params):
-            if p in self.subwrappers:
-                self.subwrappers[p].update()
+            if id(p) in self.subwrappers:
+                self.subwrappers[id(p)].update()
             else:
-                self.subwrappers[p] = ParameterWrapper(
+                self.subwrappers[id(p)] = ParameterWrapper(
                     self.entry,
                     p,
                     self.callback,
                     delete_row_callback,
                     level=self.level + 1,
                 )
-            self.subwrappers[p].set_row(n)
+            self.subwrappers[id(p)].set_row(n)
 
         self.cull_subwrappers(params)
 
@@ -243,6 +243,9 @@ class ParameterWrapper:
         while self.column_labels:
             self.column_labels.pop().destroy()
 
+        # `MultiParam.param` is the 'template' each row in `MultiParam.params`
+        # is copied from ... step through its subparameters and make them
+        # each a column heading.
         for n, pp in enumerate(self.parameter.param.values()):
             column_label = tk.Label(self.entry, text=pp.label)
             self.column_labels.append(column_label)
@@ -256,17 +259,17 @@ class ParameterWrapper:
 
             subparams = p.params.values()
             for m, pp in enumerate(subparams):
-                if pp in self.subwrappers:
-                    self.subwrappers[str(pp)].update()
+                if id(pp) in self.subwrappers:
+                    self.subwrappers[id(pp)].update()
                 else:
-                    self.subwrappers[str(pp)] = ParameterWrapper(
+                    self.subwrappers[id(pp)] = ParameterWrapper(
                         self.entry,
                         pp,
                         self.callback,
                         delete_row_callback,
                         level=self.level + 1,
                     )
-                self.subwrappers[str(pp)].entry.grid(row=n + 1, column=m + 1, padx=10)
+                self.subwrappers[id(pp)].entry.grid(row=n + 1, column=m + 1, padx=10)
             if not self.parameter.read_only and delete_row_callback:
                 button = delete_button(self.entry, command=partial(delete_row_callback, self, n))
                 button.grid(row=n + 1, column=len(subparams) + 1, padx=10)
@@ -276,9 +279,9 @@ class ParameterWrapper:
 
     def update_subwrappers_framed(self, params, delete_row_callback):
         for n, p in enumerate(params):
-            if p in self.subwrappers:
-                self.subwrappers[p].update()
-                self.subwrappers[p].entry.master.grid(row=n)
+            if id(p) in self.subwrappers:
+                self.subwrappers[id(p)].update()
+                self.subwrappers[id(p)].entry.master.grid(row=n)
             else:
                 label_frame_label = tk.Frame(self.entry)
                 tk.Label(label_frame_label, text=p.label).grid(row=0, column=0, padx=10)
@@ -287,10 +290,10 @@ class ParameterWrapper:
                 label_frame.columnconfigure(0, weight=1)
 
                 def _command_drc(param, label_frame):
-                    delete_row_callback(self.subwrappers[param])
+                    delete_row_callback(self.subwrappers[id(param)])
                     label_frame.destroy()
 
-                self.subwrappers[p] = ParameterWrapper(
+                self.subwrappers[id(p)] = ParameterWrapper(
                     label_frame,
                     p,
                     self.callback,
@@ -425,7 +428,7 @@ class PluginConfigurator:
         self.plugin = plugin
         self.change_callback = change_callback
 
-        self.frame = tk.Frame(tk_parent, highlightcolor="purple", highlightthickness=3)
+        self.frame = tk.Frame(tk_parent)
         self.frame.columnconfigure(0, weight=0)
         self.frame.columnconfigure(1, weight=0)
         self.frame.columnconfigure(2, weight=1)

@@ -1,6 +1,7 @@
 import bz2
 import gzip
 from itertools import islice
+from typing import Iterable, Optional
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
@@ -11,7 +12,9 @@ from countess.core.plugins import PandasInputFilesPlugin
 from countess.utils.files import clean_filename
 
 
-def _file_reader(file_handle, min_avg_quality, row_limit=None, filename=""):
+def _file_reader(
+    file_handle, min_avg_quality: float, row_limit: Optional[int] = None, filename: str = ""
+) -> Iterable[dict[str, str]]:
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
             yield {
@@ -33,16 +36,14 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
     file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2"])]
 
-    parameters = {
-        "min_avg_quality": FloatParam("Minimum Average Quality", 10),
-        "header_column": BooleanParam("Header Column?", False),
-        "filename_column": BooleanParam("Filename Column?", False),
-        "group": BooleanParam("Group by Sequence?", True),
-    }
+    min_avg_quality = FloatParam("Minimum Average Quality", 10)
+    header_column = BooleanParam("Header Column?", False)
+    filename_column = BooleanParam("Filename Column?", False)
+    group = BooleanParam("Group by Sequence?", True)
 
     def read_file_to_dataframe(self, file_params, logger, row_limit=None):
-        filename = file_params["filename"].value
-        min_avg_quality = self.parameters["min_avg_quality"].value
+        filename = file_params.filename.value
+        min_avg_quality = float(self.min_avg_quality)
 
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
@@ -56,9 +57,9 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
         group_columns = ["sequence"]
 
-        if not self.parameters["header_column"].value:
+        if not self.header_column:
             dataframe.drop(columns="header", inplace=True)
-        elif self.parameters["group"].value:
+        elif self.group:
             # if we've got a header column and we're grouping by sequence,
             # find maximum common length of the 'header' field in this file
             for common_length in range(0, dataframe["header"].str.len().min() - 1):
@@ -68,12 +69,12 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
                 dataframe["header"] = dataframe["header"].str.slice(0, common_length)
                 group_columns.append("header")
 
-        if self.parameters["filename_column"].value:
+        if self.filename_column:
             group_columns.append("filename")
         else:
             dataframe.drop(columns="filename", inplace=True)
 
-        if self.parameters["group"].value:
+        if self.group:
             return dataframe.assign(count=1).groupby(group_columns).count()
         else:
             return dataframe

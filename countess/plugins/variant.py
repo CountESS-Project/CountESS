@@ -48,7 +48,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
         if self.protein:
             try:
-                r[self.protein] = find_variant_string(
+                r[str(self.protein)] = find_variant_string(
                     "p.", reference, sequence, int(self.max_protein), offset=int(self.offset)
                 )
             except ValueError:

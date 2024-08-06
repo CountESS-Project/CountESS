@@ -20,6 +20,21 @@ from countess.utils.pandas import get_all_columns
 
 OPERATORS = ["equals", "greater than", "less than", "contains", "starts with", "ends with", "matches regex"]
 
+class _FilterColumnMultiParam(MultiParam):
+    column = ColumnChoiceParam("Column")
+    negate = BooleanParam("Negate?")
+    operator = ChoiceParam("Operator", OPERATORS[0], OPERATORS)
+    value = StringParam("Value")
+
+class _FilterOutputMultiParam(MultiParam):
+    output = StringParam("Output Column")
+    value = StringParam("Output Value")
+    type = DataTypeChoiceParam("Output Type")
+
+class FilterMultiParam(MultiParam):
+    columns = ArrayParam("Columns", _FilterColumnMultiParam("Column"))
+    combine = ChoiceParam("Combine", "All", ["All", "Any"])
+    outputs = ArrayParam("Outputs", _FilterOutputMultiParam("Output"))
 
 class FilterPlugin(PandasSimplePlugin):
     name = "Filter Plugin"
@@ -33,52 +48,18 @@ class FilterPlugin(PandasSimplePlugin):
 
     version = VERSION
 
-    parameters = {
-        "filters": ArrayParam(
-            "Filters",
-            MultiParam(
-                "Filter",
-                {
-                    "columns": ArrayParam(
-                        "Columns",
-                        TabularMultiParam(
-                            "Column",
-                            {
-                                "column": ColumnChoiceParam("Column"),
-                                "negate": BooleanParam("Negate?"),
-                                "operator": ChoiceParam("Operator", OPERATORS[0], OPERATORS),
-                                "value": StringParam("Value"),
-                            },
-                        ),
-                    ),
-                    "combine": ChoiceParam("Combine", "All", ["All", "Any"]),
-                    "outputs": ArrayParam(
-                        "Outputs",
-                        TabularMultiParam(
-                            "Output",
-                            {
-                                "output": StringParam("Output Column"),
-                                "value": StringParam("Output Value"),
-                                "type": DataTypeChoiceParam("Output Type", "string"),
-                            },
-                        ),
-                    ),
-                },
-            ),
-        )
-    }
+    filters = ArrayParam("Filters", FilterMultiParam("Filter"))
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
-        assert isinstance(self.parameters["filters"], ArrayParam)
         data = data.reset_index(drop=data.index.names == [None])
 
         self.input_columns.update(get_all_columns(data))
 
-        for filt in self.parameters["filters"]:
+        for filt in self.filters:
             # build a dictionary of columns to assign to matched rows.
-            assign_dict = {p["output"].value: p["type"].cast_value(p["value"].value) for p in filt["outputs"]}
+            assign_dict = {p.output.value: p.type.cast_value(p.value.value) for p in filt.outputs}
 
-            if not filt.columns.params:
+            if len(filt.columns) == 0:
                 # If there are no filter columns at all, then we match
                 # every row, and there's no rows left unmatched so we're
                 # finished.
@@ -92,35 +73,33 @@ class FilterPlugin(PandasSimplePlugin):
             # a boolean series.
             series_acc = filt["combine"].value == "All"
 
-            for param in filt.columns.params:
-                assert isinstance(param, TabularMultiParam)
-                column = param["column"].value
-                operator = param["operator"].value
-                value = param["value"].value
+            for param in filt.columns:
+                column = param.column.value
+                value = param.value.value
                 if is_numeric_dtype(data[column]):
                     value = float(value)
 
-                if operator == "equals":
+                if param.operator == "equals":
                     series = data[column].eq(value)
-                elif operator == "greater than":
+                elif param.operator == "greater than":
                     series = data[column].gt(value)
-                elif operator == "less than":
+                elif param.operator == "less than":
                     series = data[column].lt(value)
-                elif operator == "contains":
+                elif param.operator == "contains":
                     series = data[column].str.contains(value, regex=False)
-                elif operator == "starts with":
+                elif param.operator == "starts with":
                     series = data[column].str.startswith(value)
-                elif operator == "ends with":
+                elif param.operator == "ends with":
                     series = data[column].str.endswith(value)
-                elif operator == "matches regex":
+                elif param.operator == "matches regex":
                     series = data[column].str.contains(value, regex=True)
                 else:
                     continue
 
-                if param["negate"].value:
+                if param.negate:
                     series = ~series
 
-                if filt["combine"].value == "All":
+                if filt.combine == "All":
                     series_acc = series_acc & series
                 else:
                     series_acc = series_acc | series

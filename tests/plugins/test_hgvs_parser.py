@@ -13,6 +13,7 @@ df1 = pd.DataFrame(
     [{"hgvs": "NC_000017.11:g.[43124022G>C;43124175C>T;43124111A>G]", "guides": "43124022G>C;43124111A>G"}]
 )
 
+
 def test_hgvs_parser():
     plugin = HgvsParserPlugin()
     plugin.set_parameter("column", "hgvs")

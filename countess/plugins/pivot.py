@@ -26,12 +26,9 @@ class PivotPlugin(PandasProcessPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
-    parameters = {
-        "columns": PerColumnArrayParam(
-            "Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"])
-        ),
-        "aggfunc": ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "min", "max"]),
-    }
+    columns = PerColumnArrayParam("Columns",
+         ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
+    aggfunc = ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "min", "max"])
 
     input_columns: Dict[str, np.dtype] = {}
 
@@ -42,13 +39,14 @@ class PivotPlugin(PandasProcessPlugin):
         self.dataframes = []
 
     def process(self, data: pd.DataFrame, source: str, logger: Logger):
-        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
         assert self.dataframes is not None
+        print(f"<<<< {get_all_columns(data)}")
         self.input_columns.update(get_all_columns(data))
+        print(f"<<X {self.input_columns}")
 
         data.reset_index(drop=data.index.names == [None], inplace=True)
 
-        column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
+        column_parameters = list(zip(self.input_columns, self.columns))
         index_cols = [col for col, param in column_parameters if param.value == "Index"]
         pivot_cols = [col for col, param in column_parameters if param.value == "Pivot"]
         expand_cols = [col for col, param in column_parameters if param.value == "Expand"]
@@ -78,7 +76,7 @@ class PivotPlugin(PandasProcessPlugin):
             values=expand_cols,
             index=index_cols,
             columns=pivot_cols,
-            aggfunc=self.parameters["aggfunc"].value,
+            aggfunc=self.aggfunc.value,
             fill_value=0,
         )
 
@@ -92,15 +90,15 @@ class PivotPlugin(PandasProcessPlugin):
         return []
 
     def finalize(self, logger: Logger):
-        assert isinstance(self.parameters["columns"], PerColumnArrayParam)
-        column_parameters = list(zip(self.input_columns, self.parameters["columns"]))
+        column_parameters = list(zip(self.input_columns, self.columns))
         index_cols = [col for col, param in column_parameters if param.value == "Index"]
         if self.dataframes:
             df = pd.concat(self.dataframes)
             self.dataframes = []
             if index_cols:
+                print(f">>>>> {index_cols}")
                 df = df.groupby(by=index_cols, group_keys=True).sum()
             yield df
 
-        for p in self.parameters.values():
+        for p in self.params.values():
             p.set_column_choices(self.input_columns.keys())

@@ -14,8 +14,8 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import PandasInputPlugin
 
-class _ColumnsMultiParam(MultiParam):
 
+class _ColumnsMultiParam(MultiParam):
     name = StringParam("Name")
     type = DataTypeChoiceParam("Type", "string")
     index = BooleanParam("Index?")
@@ -35,13 +35,12 @@ class DataTablePlugin(PandasInputPlugin):
     show_preview = False
 
     def fix_columns(self):
-
         old_rows = self.rows.params
 
-        self.params['rows'] = self.rows = ArrayParam("Rows", TabularMultiParam("Row", {
-            str(col.name): col.type.get_parameter(str(col.name))
-            for col in self.columns
-        }))
+        self.params["rows"] = self.rows = ArrayParam(
+            "Rows",
+            TabularMultiParam("Row", {str(col.name): col.type.get_parameter(str(col.name)) for col in self.columns}),
+        )
 
         # fix rows to use the latest columns
         for old_row in old_rows:
@@ -65,14 +64,11 @@ class DataTablePlugin(PandasInputPlugin):
         self.fix_columns()
         values = []
         for row in self.rows:
-            values.append({
-                str(col.name): row[str(col.name)].value
-                for col in self.columns
-            })
+            values.append({str(col.name): row[str(col.name)].value for col in self.columns})
 
         df = pd.DataFrame(values)
 
-        index_cols = [ str(col.name) for col in self.columns if col.index ]
+        index_cols = [str(col.name) for col in self.columns if col.index]
 
         if index_cols:
             df = df.set_index(index_cols)

@@ -16,6 +16,7 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import PandasInputFilesPlugin, PandasTransformSingleToTuplePlugin
 
+
 class OutputColumnsMultiParam(MultiParam):
     name = StringParam("Column Name")
     datatype = DataTypeChoiceParam("Column Type", "string")
@@ -66,9 +67,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
                     return self.compiled_re.findall(str(value))
                 else:
                     if match := self.compiled_re.match(str(value)):
-                        return [
-                            op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())
-                        ]
+                        return [op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())]
                     else:
                         pass
                         # logger.info(f"{repr(value)} didn't match")

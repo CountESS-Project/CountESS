@@ -90,7 +90,6 @@ class BasePlugin(HasSubParametersMixin):
         raise NotImplementedError(f"{self.__class__}.version")
 
     def __init__(self, plugin_name=None):
-
         super().__init__()
 
         if plugin_name is not None:
@@ -634,12 +633,10 @@ class PandasInputPlugin(FileInputPlugin):
 
 
 class PandasInputFilesPluginFilesMultiParam(MultiParam):
-
     filename = FileParam("Filename")
 
 
 class PandasInputFilesPlugin(PandasInputPlugin):
-
     files = FileArrayParam("Files", PandasInputFilesPluginFilesMultiParam("File"))
 
     def __init__(self, *a, **k):

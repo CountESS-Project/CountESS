@@ -29,7 +29,7 @@ class JoinPlugin(PandasProductPlugin):
         required = BooleanParam("Required", True)
         drop = BooleanParam("Drop Column", False)
 
-    inputs = ArrayParam("Inputs", InputMultiParam("Input"), min_size=2, max_size=2)
+    inputs = ArrayParam("Inputs", InputMultiParam("Input"), min_size=2, max_size=2, read_only=True)
 
     join_params = None
     input_columns_1: Optional[Dict] = None
@@ -80,7 +80,7 @@ class JoinPlugin(PandasProductPlugin):
 
         try:
             dataframe = dataframe1.merge(dataframe2, **self.join_params)
-        except ValueError as exc:
+        except (KeyError, ValueError) as exc:
             logger.exception(exc)
             return pd.DataFrame()
 

@@ -38,7 +38,6 @@ class ExpressionPlugin(PandasSimplePlugin):
     drop = PerColumnArrayParam("Drop Columns", BooleanParam("Drop"))
 
     def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
-
         codes = [c.replace("\n", " ").strip() for c in str(self.code).split("\n\n")]
         df = process(dataframe, codes, logger)
 
