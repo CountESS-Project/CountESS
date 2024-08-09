@@ -3,7 +3,6 @@ from typing import Iterable, Optional
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import ChoiceParam, ColumnChoiceParam, ColumnOrNoneChoiceParam
 from countess.core.plugins import PandasSimplePlugin
 
@@ -32,10 +31,10 @@ class CorrelationPlugin(PandasSimplePlugin):
             self.columns.append(self.group.value)
         self.dataframes = []
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> None:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> None:
         self.dataframes.append(dataframe[self.columns])
 
-    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+    def finalize(self) -> Iterable[pd.DataFrame]:
         column1 = self.column1.value
         column2 = self.column2.value
         groupby = None if self.group.is_none() else self.group.value

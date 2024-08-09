@@ -4,7 +4,6 @@ from typing import Optional
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 
@@ -22,7 +21,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
     split = BooleanParam("Split Output", False)
     multi = BooleanParam("Multiple rows", False)
 
-    def process_dict(self, data: dict, logger: Logger):
+    def process_dict(self, data: dict):
         try:
             value = data[str(self.column)]
         except KeyError:

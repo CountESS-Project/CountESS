@@ -4,7 +4,6 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -54,7 +53,7 @@ class FilterPlugin(PandasSimplePlugin):
 
     filters = ArrayParam("Filters", FilterMultiParam("Filter"))
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         data = data.reset_index(drop=data.index.names == [None])
 
         self.input_columns.update(get_all_columns(data))
@@ -128,6 +127,6 @@ class FilterPlugin(PandasSimplePlugin):
         # anything which has matched nothing at all is left behind
         # in `data` and is just thrown away.
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         # not used
         return dataframe

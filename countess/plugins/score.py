@@ -6,7 +6,6 @@ import pandas as pd
 from scipy.optimize import curve_fit
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import (
     BooleanParam,
     ChoiceParam,
@@ -82,7 +81,7 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             s = score(x_values, y_values)
             return s[0] if s else None
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
         variant_col = self.variant.value
         replicate_col = self.replicate.value
         count_cols = self.columns.get_column_names(dataframe)

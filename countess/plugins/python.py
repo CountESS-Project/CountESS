@@ -1,4 +1,5 @@
 import builtins
+import logging
 import math
 import re
 from types import FunctionType, ModuleType, NoneType
@@ -8,9 +9,10 @@ import numpy as np
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, TextParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
+
+logger = logging.getLogger(__name__)
 
 # XXX pretty sure this is a job for ast.parse rather than just
 # running compile() and exec() but that can wait.
@@ -56,16 +58,16 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     code_object = None
     code_globals: dict[str, Any] = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
 
-    def process_dict(self, data: dict, logger: Logger):
+    def process_dict(self, data: dict):
         assert self.code_object is not None
         try:
             exec(self.code_object, self.code_globals, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.exception(exc)
+            logger.warning("Exception", exc_info=exc)
 
         return dict((k, v) for k, v in data.items() if type(v) in SIMPLE_TYPES or isinstance(v, np.generic))
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         """Override parent class because we a) want to reset
         the indexes so we can use their values easily and
         b) we don't need to merge afterwards"""
@@ -74,7 +76,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         self.code_object = compile(self.code.value, "<PythonPlugin>", mode="exec")
 
         dataframe = dataframe.reset_index(drop=dataframe.index.names == [None])
-        series = self.dataframe_to_series(dataframe, logger)
+        series = self.dataframe_to_series(dataframe)
         dataframe = self.series_to_dataframe(series)
 
         if "__filter" in dataframe.columns:

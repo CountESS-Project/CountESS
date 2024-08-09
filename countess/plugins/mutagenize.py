@@ -4,7 +4,6 @@ from typing import Iterable, Optional
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, StringCharacterSetParam
 from countess.core.plugins import PandasInputPlugin
 
@@ -62,7 +61,7 @@ class MutagenizePlugin(PandasInputPlugin):
     def num_files(self):
         return 1
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         assert file_number == 0
 
         df = pd.DataFrame(

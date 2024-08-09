@@ -1,20 +1,23 @@
+import logging
+import logging.handlers
+import multiprocessing
 import sys
 import time
 
 from .config import read_config
-from .logger import ConsoleLogger
+
+logging_queue: multiprocessing.Queue = multiprocessing.Queue()
+logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
+logging.getLogger().setLevel(logging.INFO)
+
+logging.handlers.QueueListener(logging_queue, logging.StreamHandler())
 
 start_time = time.time()
 
 
 def process_ini(config_filename):
-    logger = ConsoleLogger()
-
-    graph = read_config(
-        config_filename,
-        logger=logger,
-    )
-    graph.run(logger)
+    graph = read_config(config_filename)
+    graph.run()
 
 
 def run(argv):

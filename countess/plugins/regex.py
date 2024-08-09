@@ -1,10 +1,10 @@
+import logging
 import re
 from typing import Iterable, Optional
 
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -15,6 +15,8 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import PandasInputFilesPlugin, PandasTransformSingleToTuplePlugin
+
+logger = logging.getLogger(__name__)
 
 
 class OutputColumnsMultiParam(MultiParam):
@@ -41,8 +43,8 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         super().prepare(sources, row_limit)
         self.compiled_re = re.compile(self.regex.value)
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-        df = super().process_dataframe(dataframe, logger)
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
+        df = super().process_dataframe(dataframe)
         if df is None:
             return None
 
@@ -59,7 +61,7 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
 
         return df
 
-    def process_value(self, value: str, logger: Logger) -> Optional[Iterable]:
+    def process_value(self, value: str) -> Optional[Iterable]:
         assert self.compiled_re is not None
         if value is not None:
             try:
@@ -69,10 +71,9 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
                     if match := self.compiled_re.match(str(value)):
                         return [op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())]
                     else:
-                        pass
-                        # logger.info(f"{repr(value)} didn't match")
+                        logger.info("%s didn't match", repr(value))
             except (TypeError, ValueError) as exc:
-                logger.exception(exc)
+                logger.warning("Exception", exc_info=exc)
 
         # If dropping unmatched values, return a simple None which will
         # be filtered out in series_to_dataframe below, otherwise return
@@ -110,7 +111,7 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
     skip = IntegerParam("Skip Lines", 0)
     output = ArrayParam("Output Columns", OutputColumnsMultiParam("Col"))
 
-    def read_file_to_dataframe(self, file_params, logger, row_limit=None):
+    def read_file_to_dataframe(self, file_params, row_limit=None):
         pdfs = []
 
         compiled_re = re.compile(self.regex.value)
@@ -130,7 +131,7 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
                 if match:
                     records.append((output_parameters[n].datatype.cast_value(g) for n, g in enumerate(match.groups())))
                 else:
-                    logger.warning(f"Row {num+1} did not match", detail=line)
+                    logger.warning("Row %d did not match", num)
                 if row_limit is not None:
                     if len(records) >= row_limit or num > 100 * row_limit:
                         break
@@ -147,6 +148,6 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
         df = pd.concat(pdfs)
         return df
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable:
         file_params = self.files[file_number]
-        yield self.read_file_to_dataframe(file_params, logger, row_limit)
+        yield self.read_file_to_dataframe(file_params, row_limit)

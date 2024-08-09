@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from countess.core.logger import MultiprocessLogger
 from countess.plugins.join import JoinPlugin
 
 df1 = pd.DataFrame(
@@ -21,8 +20,6 @@ df2 = pd.DataFrame(
     ]
 )
 
-logger = MultiprocessLogger()
-
 
 def test_join_inner():
     plugin = JoinPlugin()
@@ -34,7 +31,7 @@ def test_join_inner():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -56,7 +53,7 @@ def test_join_left():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -79,7 +76,7 @@ def test_join_right():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -102,7 +99,7 @@ def test_join_full():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -125,7 +122,7 @@ def test_join_drop1():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -146,7 +143,7 @@ def test_join_drop2():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -168,7 +165,7 @@ def test_join_drop3():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     df4 = pd.DataFrame(
         [
@@ -190,6 +187,6 @@ def test_join_broken():
 
     plugin.prepare(["df1", "df2"])
 
-    df3 = plugin.process_dataframes(df1, df2, logger)
+    df3 = plugin.process_dataframes(df1, df2)
 
     assert len(df3) == 0

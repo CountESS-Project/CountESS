@@ -1,12 +1,12 @@
 import csv
 import gzip
+import logging
 from io import BufferedWriter, BytesIO
 from typing import List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -25,6 +25,8 @@ CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("TSV", [".tsv", ".tsv.gz"]),
     ("TXT", [".txt", ".txt.gz"]),
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class ColumnsMultiParam(MultiParam):
@@ -49,7 +51,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     filename_column = StringParam("Filename Column", "")
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
-    def read_file_to_dataframe(self, file_params, logger, row_limit=None):
+    def read_file_to_dataframe(self, file_params, row_limit=None):
         filename = file_params["filename"].value
 
         options = {
@@ -145,7 +147,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
 
         self.csv_columns = None
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger):
+    def process(self, data: pd.DataFrame, source: str):
         # reset indexes so we can treat all columns equally.
         # if there's just a nameless index then we don't care about it, drop it.
         drop_index = data.index.name is None and data.index.names[0] is None
@@ -161,7 +163,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
             for c in dataframe.columns:
                 if c not in self.csv_columns:
                     self.csv_columns.append(c)
-                    logger.warning(f"Added CSV Column {repr(c)} with no header")
+                    logger.warning("Added CSV Column %s with no header", repr(c))
             # fill in blanks for any columns which are in previous dataframes but not
             # in this one.
             dataframe = dataframe.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
@@ -177,6 +179,6 @@ class SaveCsvPlugin(PandasOutputPlugin):
         )  # type: ignore [call-overload]
         return []
 
-    def finalize(self, logger: Logger):
+    def finalize(self):
         if isinstance(self.filehandle, BytesIO):
             yield self.filehandle.getvalue().decode("utf-8")

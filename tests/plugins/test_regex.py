@@ -1,9 +1,6 @@
 import pandas as pd
 
-from countess.core.logger import ConsoleLogger
 from countess.plugins.regex import RegexReaderPlugin, RegexToolPlugin
-
-logger = ConsoleLogger()
 
 
 def test_tool():
@@ -14,7 +11,7 @@ def test_tool():
     plugin.prepare(["fake"])
 
     input_df = pd.DataFrame([["hello"], ["backwards"], ["noaardvark"]], columns=["stuff"])
-    output_df = plugin.process_dataframe(input_df, logger)
+    output_df = plugin.process_dataframe(input_df)
 
     assert output_df is not None
     assert "foo" in output_df.columns
@@ -38,7 +35,7 @@ def test_reader():
     plugin.set_parameter("output.4.datatype", "integer")
     plugin.prepare([])
 
-    output_df = next(plugin.load_file(0, logger))
+    output_df = next(plugin.load_file(0))
 
     assert list(output_df.columns) == ["thing", "foo", "bar", "baz", "qux"]
     assert list(output_df["thing"]) == ["foo", "bar", "baz", "qux"]

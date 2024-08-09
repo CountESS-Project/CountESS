@@ -19,12 +19,11 @@ import importlib
 import importlib.metadata
 import logging
 from collections.abc import MutableMapping
-from typing import Dict, Iterable, List, Optional, Sequence, Union
+from typing import Dict, Iterable, List, Optional, Sequence, Type, Union
 
 import numpy as np
 import pandas as pd
 
-from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BaseParam,
@@ -37,10 +36,12 @@ from countess.core.parameters import (
 from countess.utils.pandas import get_all_columns
 from countess.utils.parallel import multiprocess_map
 
-PRERUN_ROW_LIMIT = 100000
+PRERUN_ROW_LIMIT: int = 100000
+
+logger = logging.getLogger(__name__)
 
 
-def get_plugin_classes():
+def get_plugin_classes() -> Iterable[Type["BasePlugin"]]:
     plugin_classes = set()
     try:
         # Python >= 3.10
@@ -64,11 +65,11 @@ def get_plugin_classes():
     return plugin_classes
 
 
-def load_plugin(module_name, class_name):
+def load_plugin(module_name: str, class_name: str, plugin_name: Optional[str] = None) -> "BasePlugin":
     module = importlib.import_module(module_name)
     plugin_class = getattr(module, class_name)
     assert issubclass(plugin_class, BasePlugin)
-    return plugin_class()
+    return plugin_class(plugin_name)
 
 
 class BasePlugin(HasSubParametersMixin):
@@ -89,7 +90,7 @@ class BasePlugin(HasSubParametersMixin):
     def version(self) -> str:
         raise NotImplementedError(f"{self.__class__}.version")
 
-    def __init__(self, plugin_name=None):
+    def __init__(self, plugin_name: Optional[str] = None):
         super().__init__()
 
         if plugin_name is not None:
@@ -115,21 +116,21 @@ class ProcessPlugin(BasePlugin):
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         pass
 
-    def preprocess(self, data, source: str, logger: Logger) -> None:
+    def preprocess(self, data, source: str) -> None:
         """Called with each `data` input from `source` before `process` is called
         for that data, to set up config etc.  Can't return anything."""
 
-    def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data, source: str) -> Iterable[pd.DataFrame]:
         """Called with each `data` input from `source`, yields results"""
         raise NotImplementedError(f"{self.__class__}.process")
 
-    def finished(self, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def finished(self, source: str) -> Iterable[pd.DataFrame]:
         """Called when a `source` is finished and not able to
         send any more messages.  Can be ignored by most things."""
         # override this if you need to do anything
         return []
 
-    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+    def finalize(self) -> Iterable[pd.DataFrame]:
         """Called when all sources are finished.  Can be
         ignored by most things.  This should reset the
         plugin to be ready for another use."""
@@ -138,7 +139,7 @@ class ProcessPlugin(BasePlugin):
 
 
 class SimplePlugin(ProcessPlugin):
-    def process(self, data, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data, source: str) -> Iterable[pd.DataFrame]:
         """Called with each `data` input from `source`, calls
         `callback` to send messages to the next plugin"""
         raise NotImplementedError(f"{self.__class__}.process")
@@ -160,24 +161,24 @@ class FileInputPlugin(BasePlugin):
     def num_files(self) -> int:
         """return the number of 'files' which are to be loaded.  The pipeline
         will call code equivalent to
-        `[ p.load_file(n, logger, row_limit) for n in range(0, p.num_files() ]`
+        `[ p.load_file(n, row_limit) for n in range(0, p.num_files() ]`
         although potentially using threads, multiprocessing, etc."""
         raise NotImplementedError("FileInputMixin.num_files")
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable:
+    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable:
         """Called potentially from multiple processes, see FileInputMixin.num_files()"""
         raise NotImplementedError("FileInputMixin.load_file")
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         self.row_limit = row_limit
 
-    def finalize(self, logger: Logger) -> Iterable:
+    def finalize(self) -> Iterable:
         num_files = self.num_files()
         if num_files > 1:
             row_limit_per_file = self.row_limit // num_files if self.row_limit else None
-            yield from multiprocess_map(self.load_file, range(0, num_files), logger, row_limit_per_file)
+            yield from multiprocess_map(self.load_file, range(0, num_files), row_limit_per_file)
         elif num_files == 1:
-            yield from self.load_file(0, logger, self.row_limit)
+            yield from self.load_file(0, self.row_limit)
 
 
 class PandasProcessPlugin(ProcessPlugin):
@@ -188,14 +189,14 @@ class PandasProcessPlugin(ProcessPlugin):
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         self.input_columns = {}
 
-    def preprocess(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
+    def preprocess(self, data: pd.DataFrame, source: str) -> None:
         self.input_columns.update(get_all_columns(data))
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")
 
-    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
-        yield from super().finalize(logger)
+    def finalize(self) -> Iterable[pd.DataFrame]:
+        yield from super().finalize()
         for p in self.params.values():
             p.set_column_choices(self.input_columns.keys())
 
@@ -212,18 +213,18 @@ class PandasConcatProcessPlugin(PandasProcessPlugin):
         super().prepare(sources, row_limit)
         self.dataframes = []
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable:
         self.dataframes.append(data)
         return []
 
-    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+    def finalize(self) -> Iterable[pd.DataFrame]:
         data_in = pd.concat(self.dataframes)
-        data_out = self.process_dataframe(data_in, logger)
+        data_out = self.process_dataframe(data_in)
         if data_out is not None:
             yield data_out
-        yield from super().finalize(logger)
+        yield from super().finalize()
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
@@ -233,27 +234,27 @@ class PandasSimplePlugin(PandasProcessPlugin):
     Subclassing this hides all the distracting aspects of the pipeline
     from the plugin implementor, who only needs to override process_dataframe"""
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         """Just deal with each dataframe as it comes.  PandasSimplePlugins don't care about `source`."""
         assert isinstance(data, pd.DataFrame)
 
         try:
-            result = self.process_dataframe(data, logger)
+            result = self.process_dataframe(data)
             if result is not None:
                 assert isinstance(result, pd.DataFrame)
                 if len(result) > 0:
                     yield result
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.exception(exc)
+            logger.warning("Exception", exc_info=exc)
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
         raise NotImplementedError(f"{self.__class__}.process_dataframe()")
 
 
 # class MapReduceFinalizePlugin(BasePlugin):
-#    def map(self, data, logger: Logger) -> Iterable:
+#    def map(self, data) -> Iterable:
 #        return []
 #
 #    def reduce(self, data: Iterable):
@@ -264,7 +265,7 @@ class PandasSimplePlugin(PandasProcessPlugin):
 #
 #
 # class PandasMapReduceFinalizePlugin(MapReduceFinalizePlugin):
-#    def map(self, data, logger: Logger) -> Iterable[pd.DataFrame]:
+#    def map(self, data) -> Iterable[pd.DataFrame]:
 #        return []
 #
 #    def reduce(self, data: Iterable[pd.DataFrame]) -> pd.DataFrame:
@@ -299,13 +300,13 @@ class PandasProductPlugin(PandasProcessPlugin):
         self.mem1 = []
         self.mem2 = []
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         if source == self.source1:
             if self.mem1 is not None:
                 self.mem1.append(data)
             assert self.mem2 is not None
             for val2 in self.mem2:
-                df = self.process_dataframes(data, val2, logger)
+                df = self.process_dataframes(data, val2)
                 if len(df):
                     yield df
 
@@ -314,14 +315,14 @@ class PandasProductPlugin(PandasProcessPlugin):
                 self.mem2.append(data)
             assert self.mem1 is not None
             for val1 in self.mem1:
-                df = self.process_dataframes(val1, data, logger)
+                df = self.process_dataframes(val1, data)
                 if len(df):
                     yield df
 
         else:
             raise ValueError(f"Unknown source {source}")
 
-    def finished(self, source: str, logger: Logger) -> Iterable:
+    def finished(self, source: str) -> Iterable:
         if source == self.source1:
             # source1 is finished, mem2 is no longer needed
             self.source1 = None
@@ -334,13 +335,13 @@ class PandasProductPlugin(PandasProcessPlugin):
             raise ValueError(f"Unknown source {source}")
         return []
 
-    def finalize(self, logger: Logger) -> Iterable:
+    def finalize(self) -> Iterable:
         # free up any memory taken up by memoization
         self.mem1 = None
         self.mem2 = None
         return []
 
-    def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError(f"{self.__class__}.process_dataframes")
 
 
@@ -374,10 +375,10 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
     def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
         raise NotImplementedError(f"{self.__class__}.series_to_dataframe()")
 
-    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+    def dataframe_to_series(self, dataframe: pd.DataFrame) -> pd.Series:
         raise NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
         try:
             # 1. A dataframe with duplicates in its index can't be merged back correctly
             # in Step 4, so we add in an extra RangeIndex to guarantee uniqueness,
@@ -389,7 +390,7 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
             # a series of results by PandasTransform...ToXMixin.dataframe_to_series,
             # which is expected to take each row of the dataframe, do something with
             # it and return a series of objects (values, tuples or dicts).
-            series = self.dataframe_to_series(dataframe, logger)
+            series = self.dataframe_to_series(dataframe)
 
             # 3. the series is expanded back out into rows by
             # PandasTransformXTo...Mixin.series_to_dataframe()
@@ -404,7 +405,7 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
             print(repr(exc))
-            logger.exception(exc)
+            logger.warning("Exception", exc_info=exc)
             return None
 
         return dataframe_merged
@@ -418,19 +419,19 @@ class PandasTransformSingleToXMixin:  # type: ignore [attr-defined]
     """Transformer which takes a single column, the name of which is specified
     in a ColumnChoiceParam called "column" """
 
-    def process_value(self, value, logger: Logger):
+    def process_value(self, value):
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
-    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+    def dataframe_to_series(self, dataframe: pd.DataFrame) -> pd.Series:
         column_name = self.params["column"].value  # type: ignore [attr-defined]
         if column_name in dataframe:
-            return dataframe[column_name].apply(self.process_value, logger=logger)
+            return dataframe[column_name].apply(self.process_value)
         elif column_name == dataframe.index.name:
-            return dataframe.index.to_series().apply(self.process_value, logger=logger)
+            return dataframe.index.to_series().apply(self.process_value)
         elif column_name in dataframe.index.names:
-            return dataframe.index.to_frame()[column_name].apply(self.process_value, logger=logger)
+            return dataframe.index.to_frame()[column_name].apply(self.process_value)
         else:
-            null_values = [self.process_value(None, logger)] * len(dataframe)
+            null_values = [self.process_value(None)] * len(dataframe)
             s = pd.Series(null_values, index=dataframe.index)
             return s
 
@@ -439,17 +440,17 @@ class PandasTransformRowToXMixin:
     """Transformer which takes an entire row. Less efficient than processing
     just a single value, but a bit more flexible."""
 
-    def process_row(self, row: pd.Series, logger: Logger):
+    def process_row(self, row: pd.Series):
         raise NotImplementedError(f"{self.__class__}.process_row()")
 
-    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
-        return dataframe.apply(self.process_row, axis=1, args=(logger,))
+    def dataframe_to_series(self, dataframe: pd.DataFrame) -> pd.Series:
+        return dataframe.apply(self.process_row, axis=1)
 
 
 class PandasTransformDictToXMixin:
     """Transformer which takes a row as a dictionary"""
 
-    def dataframe_to_series(self, dataframe: pd.DataFrame, logger: Logger) -> pd.Series:
+    def dataframe_to_series(self, dataframe: pd.DataFrame) -> pd.Series:
         if dataframe.index.names == [None]:
             # unnamed index,
             # XXX there is a bug in Pandas 2.1.x which prevents
@@ -458,7 +459,7 @@ class PandasTransformDictToXMixin:
             # hopefully this lambda can be removed some day.
             # https://github.com/pandas-dev/pandas/issues/55009
             return dataframe.apply(
-                lambda x: self.process_raw(x, list(dataframe.columns), logger),
+                lambda x: self.process_raw(x, list(dataframe.columns)),
                 axis=1,
                 raw=True,
             )
@@ -468,23 +469,23 @@ class PandasTransformDictToXMixin:
         if len(dataframe.index.names) == 1:
             # single index
             values = (
-                self.process_raw(list(index_and_data_tuple), columns, logger)
+                self.process_raw(list(index_and_data_tuple), columns)
                 for index_and_data_tuple in dataframe.itertuples(name=None)
             )
         else:
             # multiindex
             values = (
-                self.process_raw(list(index_tuple) + list(data_tuple), columns, logger)
+                self.process_raw(list(index_tuple) + list(data_tuple), columns)
                 for index_tuple, *data_tuple in dataframe.itertuples(name=None)
             )
 
         return pd.Series(values, index=dataframe.index)
 
-    def process_dict(self, data, logger: Logger):
+    def process_dict(self, data):
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
-    def process_raw(self, data, columns, logger: Logger) -> pd.Series:
-        return self.process_dict(dict(zip(columns, data)), logger=logger)
+    def process_raw(self, data, columns) -> pd.Series:
+        return self.process_dict(dict(zip(columns, data)))
 
 
 class PandasTransformXToSingleMixin:
@@ -545,7 +546,7 @@ class PandasTransformSingleToSinglePlugin(
 ):
     """Transformer which takes a single column and returns a single value"""
 
-    def process_value(self, value, logger: Logger):
+    def process_value(self, value):
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
@@ -554,7 +555,7 @@ class PandasTransformSingleToTuplePlugin(
 ):
     """Transformer which takes a single column and returns a tuple of values"""
 
-    def process_value(self, value, logger: Logger) -> Optional[Iterable]:
+    def process_value(self, value) -> Optional[Iterable]:
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
@@ -563,7 +564,7 @@ class PandasTransformSingleToDictPlugin(
 ):
     """Transformer which takes a single column and returns a dictionary of values"""
 
-    def process_value(self, value, logger: Logger) -> Optional[Dict]:
+    def process_value(self, value) -> Optional[Dict]:
         raise NotImplementedError(f"{self.__class__}.process_value()")
 
 
@@ -572,7 +573,7 @@ class PandasTransformRowToSinglePlugin(
 ):
     """Transformer which takes a whole row and returns a single value"""
 
-    def process_row(self, row: pd.Series, logger: Logger):
+    def process_row(self, row: pd.Series):
         raise NotImplementedError(f"{self.__class__}.process_row()")
 
 
@@ -581,7 +582,7 @@ class PandasTransformRowToTuplePlugin(
 ):
     """Transformer which takes a whole row and returns a tuple of values"""
 
-    def process_row(self, row: pd.Series, logger: Logger):
+    def process_row(self, row: pd.Series):
         raise NotImplementedError(f"{self.__class__}.process_row()")
 
 
@@ -590,7 +591,7 @@ class PandasTransformRowToDictPlugin(
 ):
     """Transformer which takes a whole row and returns a dictionary of values"""
 
-    def process_row(self, row: pd.Series, logger: Logger):
+    def process_row(self, row: pd.Series):
         raise NotImplementedError(f"{self.__class__}.process_row()")
 
 
@@ -599,7 +600,7 @@ class PandasTransformDictToSinglePlugin(
 ):
     """Transformer which takes a whole row and returns a single value"""
 
-    def process_dict(self, data, logger: Logger):
+    def process_dict(self, data):
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
@@ -608,7 +609,7 @@ class PandasTransformDictToTuplePlugin(
 ):
     """Transformer which takes a whole row and returns a tuple of values"""
 
-    def process_dict(self, data, logger: Logger):
+    def process_dict(self, data):
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
@@ -617,7 +618,7 @@ class PandasTransformDictToDictPlugin(
 ):
     """Transformer which takes a whole row and returns a dictionary of values"""
 
-    def process_dict(self, data, logger: Logger):
+    def process_dict(self, data):
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
@@ -628,7 +629,7 @@ class PandasInputPlugin(FileInputPlugin):
     def num_files(self):
         raise NotImplementedError(f"{self.__class__}.num_files()")
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.load_file()")
 
 
@@ -647,16 +648,16 @@ class PandasInputFilesPlugin(PandasInputPlugin):
     def num_files(self):
         return len(self.files)
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         file_params = self.files[file_number]
-        yield self.read_file_to_dataframe(file_params, logger, row_limit)
+        yield self.read_file_to_dataframe(file_params, row_limit)
 
-    def read_file_to_dataframe(self, file_params, logger, row_limit=None) -> pd.DataFrame:
+    def read_file_to_dataframe(self, file_params, row_limit=None) -> pd.DataFrame:
         raise NotImplementedError(f"{self.__class__}.read_file_to_dataframe")
 
 
 class PandasOutputPlugin(PandasProcessPlugin):
     num_outputs = 0
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable[pd.DataFrame]:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")

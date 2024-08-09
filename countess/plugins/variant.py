@@ -1,12 +1,14 @@
+import logging
 from typing import Optional
 
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrStringParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
+
+logger = logging.getLogger(__name__)
 
 
 class VariantPlugin(PandasTransformDictToDictPlugin):
@@ -27,14 +29,14 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     drop = BooleanParam("Drop unidentified variants", False)
     drop_columns = BooleanParam("Drop Input Column(s)", False)
 
-    def process_dict(self, data, logger: Logger) -> dict:
+    def process_dict(self, data) -> dict:
         sequence = data[str(self.column)]
         if not sequence:
             return {}
 
         reference = self.reference.get_value_from_dict(data)
 
-        r : dict[str,str] = {}
+        r: dict[str, str] = {}
 
         if self.output:
             try:
@@ -44,7 +46,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             except ValueError:
                 pass
             except (TypeError, KeyError, IndexError) as exc:
-                logger.exception(exc)
+                logger.warning("Exception", exc_info=exc)
 
         if self.protein:
             try:
@@ -54,12 +56,12 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             except ValueError:
                 pass
             except (TypeError, KeyError, IndexError) as exc:
-                logger.exception(exc)
+                logger.warning("Exception", exc_info=exc)
 
         return r
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
-        df_out = super().process_dataframe(dataframe, logger)
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
+        df_out = super().process_dataframe(dataframe)
 
         if df_out is not None:
             if self.drop:

@@ -4,10 +4,7 @@ from time import sleep
 import pandas as pd
 import pytest
 
-from countess.core.logger import ConsoleLogger
 from countess.plugins.variant import VariantPlugin
-
-logger = ConsoleLogger()
 
 
 def test_variant_ref_value():
@@ -19,7 +16,7 @@ def test_variant_ref_value():
 
     plugin.prepare(["test"], None)
 
-    output_df = plugin.process_dataframe(input_df, logger)
+    output_df = plugin.process_dataframe(input_df)
 
     output = output_df.to_records()
 
@@ -40,7 +37,7 @@ def test_variant_ref_column():
 
     plugin.prepare(["test"], None)
 
-    output_df = plugin.process_dataframe(input_df, logger)
+    output_df = plugin.process_dataframe(input_df)
 
     output = output_df.to_records()
 

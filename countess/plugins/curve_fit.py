@@ -5,7 +5,6 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import ChoiceParam, ColumnGroupChoiceParam, ColumnGroupOrNoneChoiceParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 
@@ -37,7 +36,7 @@ class CurveFitPlugin(PandasTransformDictToDictPlugin):
     yaxis = ColumnGroupChoiceParam("Y Axis", None, [])
     function = ChoiceParam("Function", list(FUNCTIONS.keys())[0], list(FUNCTIONS.keys()))
 
-    def process_dict(self, data: dict, logger: Logger) -> dict:
+    def process_dict(self, data: dict) -> dict:
         xprefix = None
         if not self.xaxis.is_none():
             xprefix = self.xaxis.value

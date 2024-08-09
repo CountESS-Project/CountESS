@@ -1,8 +1,11 @@
+import logging
+import logging.handlers
 import multiprocessing
 import re
 import sys
 import threading
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import messagebox, ttk
 from typing import Optional
 
@@ -13,7 +16,6 @@ from countess.core.config import export_config_graphviz, read_config, write_conf
 from countess.core.pipeline import PipelineGraph
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
-from countess.gui.logger import LoggerFrame
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
@@ -23,6 +25,9 @@ from countess.utils.pandas import concat_dataframes
 # import faulthandler
 # faulthandler.enable(all_threads=True)
 
+logger = logging.getLogger(__name__)
+
+logging_queue: multiprocessing.Queue = multiprocessing.Queue()
 
 plugin_classes = sorted(get_plugin_classes(), key=lambda x: x.name)
 
@@ -67,9 +72,8 @@ class ConfiguratorWrapper:
     info_toplevel = None
     info_frame = None
 
-    def __init__(self, tk_parent, node, logger, change_callback):
+    def __init__(self, tk_parent, node, change_callback):
         self.node = node
-        self.logger = logger
         self.change_callback = change_callback
 
         self.frame = ResizingFrame(tk_parent, orientation=ResizingFrame.Orientation.VERTICAL, bg="darkgrey")
@@ -107,7 +111,7 @@ class ConfiguratorWrapper:
         self.config_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
         if self.node.plugin:
-            self.node.load_config(self.logger)
+            self.node.load_config()
             if self.node.notes:
                 self.show_notes_widget(self.node.notes)
             else:
@@ -228,14 +232,12 @@ class ConfiguratorWrapper:
     def config_change_task_callback(self):
         self.config_change_task = None
 
-        self.node_update_thread = threading.Thread(target=self.node.prerun, args=(self.logger,))
+        self.node_update_thread = threading.Thread(target=self.node.prerun)
         self.node_update_thread.start()
 
         self.config_change_task_callback_2()
 
     def config_change_task_callback_2(self):
-        self.logger.poll()
-
         if self.node_update_thread.is_alive():
             self.frame.after(100, self.config_change_task_callback_2)
             return
@@ -253,7 +255,7 @@ class ConfiguratorWrapper:
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
-        self.node.prerun(self.logger)
+        self.node.prerun()
         self.node.is_dirty = True
         self.show_config_subframe()
         self.change_callback(self.node)
@@ -289,8 +291,6 @@ class RunWindow:
 
         self.logger_frame = LoggerFrame(self.toplevel)
         self.logger_frame.grid(row=1, column=0, stick=tk.NSEW)
-        self.logger = self.logger_frame.get_logger("")
-        self.logger.info("Started")
 
         self.button = tk.Button(self.toplevel, text="Stop", command=self.on_button)
         self.button.grid(row=2, column=0, sticky=tk.EW)
@@ -301,17 +301,16 @@ class RunWindow:
         self.poll()
 
     def subproc(self):
-        self.graph.run(self.logger)
+        self.graph.run()
 
     def poll(self):
         if self.process:
             if self.process.is_alive():
                 self.logger_frame.after(1000, self.poll)
             else:
-                self.logger.info("Finished")
+                logger.info("Finished")
                 self.process = None
                 self.button["text"] = "Close"
-            self.logger_frame.poll()
 
     def on_button(self):
         if self.process:
@@ -321,12 +320,42 @@ class RunWindow:
             self.button["text"] = "Close"
             self.process = None
 
-            self.logger.info("Stopped")
-            self.logger_frame.poll()
+            logger.info("Stopped")
 
         elif self.toplevel:
             self.toplevel.destroy()
             self.toplevel = None
+
+
+class _CallbackLoggingHandler(logging.Handler):
+    """This is a tiny stub of a logging.Handler which just lets you
+    direct LogRecords to a callback instead of a handler, eg:
+    a method in some other class."""
+
+    def __init__(self, callback: Callable[[logging.LogRecord], None], *a, **k):
+        super().__init__(*a, **k)
+        self.__callback = callback
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.__callback(record)
+
+
+class LoggerFrame(tk.Frame):
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.count = 0
+        self.text = tk.Text(self)
+        self.text.grid(sticky=tk.NSEW)
+
+        # Start a QueueListener in its own thread,
+        # logging_callback gets called for each record
+        # received.
+        logging.handlers.QueueListener(logging_queue, _CallbackLoggingHandler(self.logging_callback)).start()
+
+    def logging_callback(self, record: logging.LogRecord) -> None:
+        message = record.getMessage()
+        self.count += 1
+        self.text.insert(tk.END, message + "\n")
 
 
 class MainWindow:
@@ -376,8 +405,9 @@ class MainWindow:
         self.frame.add_child(self.main_subframe, weight=4)
 
         self.logger_subframe = LoggerFrame(self.frame)
-        self.logger = self.logger_subframe.get_logger("")
-        self.logger_subframe_show_task()
+        # self.logger = self.logger_subframe.get_logger("")
+        # self.logger_subframe_show_task()
+        self.frame.add_child(self.logger_subframe)
 
         self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")
         self.main_subframe.add_child(self.tree_canvas)
@@ -464,7 +494,7 @@ class MainWindow:
 
     def node_select(self, node):
         if node:
-            new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.logger, self.node_changed)
+            new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.node_changed)
             if self.config_wrapper:
                 self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
                 self.config_wrapper.destroy()
@@ -528,6 +558,12 @@ def make_root():
 
 
 def main():
+    # set up a multiprocessing-compatible logging queue to bring all logging
+    # messages back to the main process.
+    logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
+    logging.getLogger().addHandler(logging.StreamHandler())
+    logging.getLogger().setLevel(logging.INFO)
+
     root = make_root()
     SplashScreen(root)
     MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)

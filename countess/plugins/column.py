@@ -1,7 +1,6 @@
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import (
     BooleanParam,
     DataTypeOrNoneChoiceParam,
@@ -25,7 +24,7 @@ class ColumnToolPlugin(PandasSimplePlugin):
 
     columns = PerColumnArrayParam("Columns", _ColumnMultiParam("Column"))
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         column_parameters = list(zip(self.input_columns, self.columns))
 
         drop_columns = [column_name for column_name, parameter in column_parameters if parameter.datatype.is_none()]

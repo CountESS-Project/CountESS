@@ -41,7 +41,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
     filename_column = BooleanParam("Filename Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def read_file_to_dataframe(self, file_params, logger, row_limit=None):
+    def read_file_to_dataframe(self, file_params, row_limit=None):
         filename = file_params.filename.value
         min_avg_quality = float(self.min_avg_quality)
 

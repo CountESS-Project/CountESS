@@ -1,12 +1,14 @@
+import logging
 from typing import Dict, Iterable, Optional
 
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import ArrayParam, BooleanParam, ColumnOrIndexChoiceParam, MultiParam
 from countess.core.plugins import PandasProductPlugin
 from countess.utils.pandas import get_all_columns
+
+logger = logging.getLogger(__name__)
 
 
 def _join_how(left_required: bool, right_required: bool) -> str:
@@ -54,7 +56,7 @@ class JoinPlugin(PandasProductPlugin):
         self.input_columns_1 = {}
         self.input_columns_2 = {}
 
-    def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframes(self, dataframe1: pd.DataFrame, dataframe2: pd.DataFrame) -> pd.DataFrame:
         # update columns on inputs, these won't propagate back in the case of multiprocess runs but
         # they will work in preview mode where we only run this in a single thread.
 
@@ -81,7 +83,7 @@ class JoinPlugin(PandasProductPlugin):
         try:
             dataframe = dataframe1.merge(dataframe2, **self.join_params)
         except (KeyError, ValueError) as exc:
-            logger.exception(exc)
+            logger.warning("Exception", exc_info=exc)
             return pd.DataFrame()
 
         if self.inputs[0].drop and join1 in dataframe.columns:
@@ -91,7 +93,7 @@ class JoinPlugin(PandasProductPlugin):
 
         return dataframe
 
-    def finalize(self, logger: Logger) -> Iterable:
+    def finalize(self) -> Iterable:
         assert len(self.inputs.params) == 2
         assert self.input_columns_1 is not None
         assert self.input_columns_2 is not None
@@ -99,4 +101,4 @@ class JoinPlugin(PandasProductPlugin):
 
         ip1.set_column_choices(self.input_columns_1.keys())
         ip2.set_column_choices(self.input_columns_2.keys())
-        yield from super().finalize(logger)
+        yield from super().finalize()

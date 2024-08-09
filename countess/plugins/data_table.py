@@ -3,7 +3,6 @@ from typing import Iterable, Optional
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import (
     ArrayParam,
     BooleanParam,
@@ -59,7 +58,7 @@ class DataTablePlugin(PandasInputPlugin):
     def num_files(self):
         return 1
 
-    def load_file(self, file_number: int, logger: Logger, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
+    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
         assert file_number == 0
         self.fix_columns()
         values = []

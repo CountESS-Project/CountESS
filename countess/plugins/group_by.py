@@ -1,13 +1,15 @@
+import logging
 from typing import Iterable, Optional
 
 import pandas as pd
 from pandas.api.typing import DataFrameGroupBy  # type: ignore
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, TabularMultiParam
 from countess.core.plugins import PandasConcatProcessPlugin
 from countess.utils.pandas import flatten_columns, get_all_columns
+
+logger = logging.getLogger(__name__)
 
 
 class ColumnMultiParam(TabularMultiParam):
@@ -30,7 +32,7 @@ class GroupByPlugin(PandasConcatProcessPlugin):
     columns = PerColumnArrayParam("Columns", ColumnMultiParam("Column"))
     join = BooleanParam("Join Back?")
 
-    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> Iterable:
+    def process(self, data: pd.DataFrame, source: str) -> Iterable:
         # XXX should do this in two stages: group each dataframe and then combine.
         # that can wait for a more general MapReduceFinalizePlugin class though.
         self.input_columns.update(get_all_columns(data))
@@ -45,9 +47,9 @@ class GroupByPlugin(PandasConcatProcessPlugin):
             ]
             data = data[keep_columns]
 
-        yield from super().process(data, source, logger)
+        yield from super().process(data, source)
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> Optional[pd.DataFrame]:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
         self.columns.set_column_choices(self.input_columns.keys())
 
         column_parameters = list(zip(self.input_columns.keys(), self.columns))
@@ -92,5 +94,5 @@ class GroupByPlugin(PandasConcatProcessPlugin):
             else:
                 return data_out
         except (KeyError, ValueError) as exc:
-            logger.exception(exc)
+            logger.warning("Exception", exc_info=exc)
             return None

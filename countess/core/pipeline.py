@@ -1,13 +1,15 @@
+import logging
 import re
 import time
 from queue import Empty, Queue
 from threading import Thread
 from typing import Any, Optional
 
-from countess.core.logger import Logger
 from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
+
+logger = logging.getLogger(__name__)
 
 
 class SentinelQueue(Queue):
@@ -117,23 +119,23 @@ class PipelineNode:
         for queue in self.output_queues:
             queue.finish()
 
-    def run_multithread(self, queue: SentinelQueue, name: str, logger: Logger, row_limit: Optional[int] = None):
+    def run_multithread(self, queue: SentinelQueue, name: str, row_limit: Optional[int] = None):
         assert isinstance(self.plugin, ProcessPlugin)
         for data_in in queue:
             self.counter_in += 1
-            self.plugin.preprocess(data_in, name, logger)
-            self.queue_output(self.plugin.process(data_in, name, logger))
+            self.plugin.preprocess(data_in, name)
+            self.queue_output(self.plugin.process(data_in, name))
 
-    def run_subthread(self, queue: SentinelQueue, name: str, logger: Logger, row_limit: Optional[int] = None):
+    def run_subthread(self, queue: SentinelQueue, name: str, row_limit: Optional[int] = None):
         assert isinstance(self.plugin, ProcessPlugin)
 
         for data_in in queue:
             self.counter_in += 1
-            self.plugin.preprocess(data_in, name, logger)
-            self.queue_output(self.plugin.process(data_in, name, logger))
-        self.queue_output(self.plugin.finished(name, logger))
+            self.plugin.preprocess(data_in, name)
+            self.queue_output(self.plugin.process(data_in, name))
+        self.queue_output(self.plugin.finished(name))
 
-    def run_thread(self, logger: Logger, row_limit: Optional[int] = None):
+    def run_thread(self, row_limit: Optional[int] = None):
         """For each PipelineNode, this is run in its own thread."""
         assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
 
@@ -146,7 +148,7 @@ class PipelineNode:
             only_parent_node = list(self.parent_nodes)[0]
             only_parent_queue = only_parent_node.add_output_queue()
             subthreads = [
-                Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, logger, row_limit))
+                Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, row_limit))
                 for _ in range(0, 4)
             ]
             for subthread in subthreads:
@@ -154,7 +156,7 @@ class PipelineNode:
             for subthread in subthreads:
                 subthread.join()
 
-            self.queue_output(self.plugin.finished(only_parent_node.name, logger))
+            self.queue_output(self.plugin.finished(only_parent_node.name))
 
         elif len(self.parent_nodes) > 1:
             assert isinstance(self.plugin, ProcessPlugin)
@@ -163,7 +165,7 @@ class PipelineNode:
             subthreads = [
                 Thread(
                     target=self.run_subthread,
-                    args=(parent_node.add_output_queue(), parent_node.name, logger, row_limit),
+                    args=(parent_node.add_output_queue(), parent_node.name, row_limit),
                 )
                 for parent_node in self.parent_nodes
             ]
@@ -172,23 +174,23 @@ class PipelineNode:
             for subthread in subthreads:
                 subthread.join()
 
-        self.queue_output(self.plugin.finalize(logger))
+        self.queue_output(self.plugin.finalize())
         self.finish_output()
 
-    def load_config(self, logger: Logger):
+    def load_config(self):
         assert isinstance(self.plugin, BasePlugin)
         if self.config:
             for key, val, base_dir in self.config:
                 try:
                     self.plugin.set_parameter(key, val, base_dir)
                 except (KeyError, ValueError):
-                    logger.warning(f"Parameter {key}={val} Not Found")
+                    logger.warning("Parameter %s=%s Not Found", key, val)
             self.config = None
 
-    def prerun(self, logger: Logger, row_limit=PRERUN_ROW_LIMIT):
+    def prerun(self, row_limit=PRERUN_ROW_LIMIT):
         if not self.plugin:
             return
-        self.load_config(logger)
+        self.load_config()
         if self.is_dirty:
             assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
             self.result = []
@@ -196,14 +198,14 @@ class PipelineNode:
 
             for parent_node in self.parent_nodes:
                 assert isinstance(self.plugin, ProcessPlugin)
-                parent_node.prerun(logger, row_limit)
+                parent_node.prerun(row_limit)
                 if parent_node.result:
                     for data_in in parent_node.result:
-                        self.plugin.preprocess(data_in, parent_node.name, logger)
+                        self.plugin.preprocess(data_in, parent_node.name)
                     for data_in in parent_node.result:
-                        self.result += list(self.plugin.process(data_in, parent_node.name, logger))
-                self.result += list(self.plugin.finished(parent_node.name, logger))
-            self.result += list(self.plugin.finalize(logger))
+                        self.result += list(self.plugin.process(data_in, parent_node.name))
+                self.result += list(self.plugin.finished(parent_node.name))
+            self.result += list(self.plugin.finalize())
             self.is_dirty = False
 
     def mark_dirty(self):
@@ -294,11 +296,11 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-    def run(self, logger):
+    def run(self):
         threads_and_nodes = []
         for node in self.traverse_nodes_backwards():
-            node.load_config(logger)
-            threads_and_nodes.append((Thread(target=node.run_thread, args=(logger,)), node))
+            node.load_config()
+            threads_and_nodes.append((Thread(target=node.run_thread), node))
 
         for thread, _ in threads_and_nodes:
             thread.start()

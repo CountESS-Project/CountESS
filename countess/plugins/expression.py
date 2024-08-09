@@ -1,12 +1,15 @@
+import logging
+
 import pandas as pd
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
 from countess.core.plugins import PandasSimplePlugin
 
+logger = logging.getLogger(__name__)
 
-def process(df: pd.DataFrame, codes, logger: Logger):
+
+def process(df: pd.DataFrame, codes):
     for code in codes:
         if not code:
             continue
@@ -14,7 +17,7 @@ def process(df: pd.DataFrame, codes, logger: Logger):
         try:
             result = df.eval(code)
         except Exception as exc:  # pylint: disable=W0718
-            logger.exception(exc)
+            logger.warning("Exception", exc_info=exc)
             continue
 
         if isinstance(result, pd.Series):
@@ -37,9 +40,9 @@ class ExpressionPlugin(PandasSimplePlugin):
     code = TextParam("Expressions")
     drop = PerColumnArrayParam("Drop Columns", BooleanParam("Drop"))
 
-    def process_dataframe(self, dataframe: pd.DataFrame, logger: Logger) -> pd.DataFrame:
+    def process_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         codes = [c.replace("\n", " ").strip() for c in str(self.code).split("\n\n")]
-        df = process(dataframe, codes, logger)
+        df = process(dataframe, codes)
 
         drop_names = [label for label, param in self.drop.get_column_params() if param.value]
 

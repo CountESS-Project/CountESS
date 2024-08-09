@@ -3,7 +3,6 @@ from typing import Optional
 from fqfa.util.nucleotide import reverse_complement  # type: ignore
 
 from countess import VERSION
-from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformSingleToSinglePlugin
 
@@ -24,7 +23,7 @@ class SequencePlugin(PandasTransformSingleToSinglePlugin):
     length = IntegerParam("Max Length", 150)
     output = StringParam("Output Column", "sequence")
 
-    def process_value(self, value: str, logger: Logger) -> Optional[str]:
+    def process_value(self, value: str) -> Optional[str]:
         if value is None:
             return None
 

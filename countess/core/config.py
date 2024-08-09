@@ -5,7 +5,6 @@ import re
 import sys
 from configparser import ConfigParser
 
-from countess.core.logger import ConsoleLogger, Logger
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import load_plugin
 
@@ -59,7 +58,6 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
 
 def read_config(
     filename: str,
-    logger: Logger = ConsoleLogger(),
 ) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
