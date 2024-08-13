@@ -297,7 +297,14 @@ class LabeledProgressbar(ttk.Progressbar):
         self.style.configure(self.style_name, background="green")
 
         kwargs["style"] = self.style_name
+        self.done = False
         super().__init__(master, *args, **kwargs)
 
-    def update_label(self, s):
-        self.style.configure(self.style_name, text=s)
+    def progress_update(self, text: str, percentage: Optional[int] = None):
+        if percentage is None:
+            self.config(mode="indeterminate")
+            self.step(5)
+        else:
+            self.done = percentage == 100
+            self.config(mode="determinate", value=percentage)
+        self.style.configure(self.style_name, text=text)

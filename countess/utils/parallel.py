@@ -1,4 +1,5 @@
 import gc
+import logging
 import threading
 import time
 from multiprocessing import Process, Queue, Value
@@ -17,6 +18,8 @@ import psutil
 D = TypeVar("D")
 V = TypeVar("V")
 P = ParamSpec("P")
+
+logger = logging.getLogger(__name__)
 
 
 def multiprocess_map(
@@ -61,8 +64,8 @@ def multiprocess_map(
                     # Prevent processes from using up all
                     # available memory while waiting
                     # XXX this is probably a bad idea
-                    while psutil.virtual_memory().percent > 75:
-                        print(f"{getpid()} LOW MEMORY {psutil.virtual_memory().percent}")
+                    while psutil.virtual_memory().percent > 90:
+                        logger.warning("PID %d LOW MEMORY alert %f%%", getpid(), psutil.virtual_memory().percent)
                         time.sleep(1)
 
                     data_in = input_queue.get(timeout=1)

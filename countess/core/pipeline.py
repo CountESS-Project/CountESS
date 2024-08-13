@@ -114,6 +114,7 @@ class PipelineNode:
             # XXX can we do this out-of-order if any queues are full?
             for queue in self.output_queues:
                 queue.put(data)
+            logger.info("%s: %d/%d", self.name, self.counter_out, self.counter_in)
 
     def finish_output(self):
         for queue in self.output_queues:
@@ -138,6 +139,8 @@ class PipelineNode:
     def run_thread(self, row_limit: Optional[int] = None):
         """For each PipelineNode, this is run in its own thread."""
         assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
+
+        logger.info("%s: 0%%", self.name)
 
         self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
@@ -177,6 +180,8 @@ class PipelineNode:
         self.queue_output(self.plugin.finalize())
         self.finish_output()
 
+        logger.info("%s: 100%%", self.name)
+
     def load_config(self):
         assert isinstance(self.plugin, BasePlugin)
         if self.config:
@@ -203,10 +208,17 @@ class PipelineNode:
                     for data_in in parent_node.result:
                         self.plugin.preprocess(data_in, parent_node.name)
                     for data_in in parent_node.result:
-                        self.result += list(self.plugin.process(data_in, parent_node.name))
-                self.result += list(self.plugin.finished(parent_node.name))
-            self.result += list(self.plugin.finalize())
+                        for data_out in self.plugin.process(data_in, parent_node.name):
+                            self.result.append(data_out)
+                            logger.info("%s: %s/0", self.name, len(self.result))
+                for data_out in self.plugin.finished(parent_node.name):
+                    self.result.append(data_out)
+                    logger.info("%s: %s/0", self.name, len(self.result))
+            for data_out in self.plugin.finalize():
+                self.result.append(data_out)
+                logger.info("%s: %s/0", self.name, len(self.result))
             self.is_dirty = False
+            logger.info("%s: 100%%", self.name)
 
     def mark_dirty(self):
         self.is_dirty = True
@@ -298,6 +310,8 @@ class PipelineGraph:
 
     def run(self):
         threads_and_nodes = []
+        logger.info("Starting")
+        start_time = time.time()
         for node in self.traverse_nodes_backwards():
             node.load_config()
             threads_and_nodes.append((Thread(target=node.run_thread), node))
@@ -305,14 +319,11 @@ class PipelineGraph:
         for thread, _ in threads_and_nodes:
             thread.start()
 
-        while True:
-            print("------------------")
-            for thread, node in threads_and_nodes[::-1]:
-                if thread.is_alive():
-                    print("%-40s %d %d" % (node.name, node.counter_in, node.counter_out))
-            if not any(t.is_alive() for t, _ in threads_and_nodes):
-                break
+        while any(t.is_alive() for t, _ in threads_and_nodes):
+            logger.info("Elapsed time: %d", time.time() - start_time)
             time.sleep(10)
+
+        logger.info("Finished, elapsed time: %d", time.time() - start_time)
 
     def reset(self):
         for node in self.nodes:

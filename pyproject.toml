@@ -89,6 +89,8 @@ version = { attr = "countess.VERSION" }
 readme = { file = "README.md", content-type="text/markdown" }
 
 [tool.pylint]
+load-plugins = "pylint.extensions.bad_builtin"
+bad-functions = ['print']
 disable = [
     "consider-using-f-string",
     "consider-using-with",

@@ -2,31 +2,30 @@ import logging
 import logging.handlers
 import multiprocessing
 import sys
-import time
 
 from .config import read_config
 
-logging_queue: multiprocessing.Queue = multiprocessing.Queue()
-logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
-logging.getLogger().setLevel(logging.INFO)
 
-logging.handlers.QueueListener(logging_queue, logging.StreamHandler())
-
-start_time = time.time()
-
-
-def process_ini(config_filename):
+def process_ini(config_filename) -> None:
     graph = read_config(config_filename)
     graph.run()
 
 
-def run(argv):
+def run(argv) -> None:
     for config_filename in argv:
         process_ini(config_filename)
 
 
-def main():
+def main() -> None:
+    logging_queue: multiprocessing.Queue = multiprocessing.Queue()
+    logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
+    logging.getLogger().setLevel(logging.INFO)
+    logging_handler = logging.handlers.QueueListener(logging_queue, logging.StreamHandler())
+    logging_handler.start()
+
     run(sys.argv[1:])
+
+    logging_handler.stop()
 
 
 if __name__ == "__main__":

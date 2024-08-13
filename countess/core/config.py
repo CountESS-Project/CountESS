@@ -2,19 +2,10 @@ import ast
 import io
 import os.path
 import re
-import sys
 from configparser import ConfigParser
 
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import load_plugin
-
-
-def default_progress_callback(n, a, b, s=""):
-    print(f"{n:40s} {a:4d}/{b:4d} {s}")
-
-
-def default_output_callback(output):
-    sys.stderr.write(repr(output))
 
 
 def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNode:

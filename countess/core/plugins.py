@@ -174,11 +174,15 @@ class FileInputPlugin(BasePlugin):
 
     def finalize(self) -> Iterable:
         num_files = self.num_files()
+        logger.info("%s: 0%%", self.name)
         if num_files > 1:
             row_limit_per_file = self.row_limit // num_files if self.row_limit else None
-            yield from multiprocess_map(self.load_file, range(0, num_files), row_limit_per_file)
+            for n, r in enumerate(multiprocess_map(self.load_file, range(0, num_files), row_limit_per_file)):
+                logger.info("%s: %d%%", self.name, int(100 * n / num_files))
+                yield r
         elif num_files == 1:
             yield from self.load_file(0, self.row_limit)
+        logger.info("%s: 100%%", self.name)
 
 
 class PandasProcessPlugin(ProcessPlugin):
@@ -404,7 +408,6 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
                 dataframe_merged.reset_index("__tmpidx", drop=True, inplace=True)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            print(repr(exc))
             logger.warning("Exception", exc_info=exc)
             return None
 

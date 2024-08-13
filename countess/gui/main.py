@@ -19,7 +19,14 @@ from countess.gui.config import PluginConfigurator
 from countess.gui.mini_browser import MiniBrowserFrame
 from countess.gui.tabular import TabularDataFrame
 from countess.gui.tree import FlippyCanvas, GraphWrapper
-from countess.gui.widgets import ResizingFrame, ask_open_filename, ask_saveas_filename, get_icon, info_button
+from countess.gui.widgets import (
+    LabeledProgressbar,
+    ResizingFrame,
+    ask_open_filename,
+    ask_saveas_filename,
+    get_icon,
+    info_button,
+)
 from countess.utils.pandas import concat_dataframes
 
 # import faulthandler
@@ -341,21 +348,51 @@ class _CallbackLoggingHandler(logging.Handler):
 
 
 class LoggerFrame(tk.Frame):
-    def __init__(self, *a, **k):
+    def __init__(self, *a, **k) -> None:
         super().__init__(*a, **k)
         self.count = 0
         self.text = tk.Text(self)
         self.text.grid(sticky=tk.NSEW)
+        self.progress_bars: dict[str, LabeledProgressbar] = {}
 
         # Start a QueueListener in its own thread,
         # logging_callback gets called for each record
         # received.
         logging.handlers.QueueListener(logging_queue, _CallbackLoggingHandler(self.logging_callback)).start()
 
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        # self.rowconfigure(1, weight=0)
+
+        self.pbars_done : list[LabeledProgressbar] = []
+        self.hide_event()
+
     def logging_callback(self, record: logging.LogRecord) -> None:
         message = record.getMessage()
-        self.count += 1
-        self.text.insert(tk.END, message + "\n")
+        if m := re.match(r"(.*): (\d+)(%|/\d+)", message):
+            name, n1, n2 = m.groups()
+            try:
+                pbar = self.progress_bars[name]
+            except KeyError:
+                pbar = LabeledProgressbar(self, value=0)
+                self.progress_bars[name] = pbar
+                pbar.grid(sticky=tk.EW, row=len(self.progress_bars), column=0)
+            if n2 == "%":
+                pbar.progress_update(message, int(n1))
+            else:
+                pbar.progress_update(message)
+        else:
+            self.text.insert(tk.END, message + "\n")
+            self.count += 1
+
+    def hide_event(self):
+        for pbar in self.pbars_done:
+            pbar.grid_forget()
+        self.pbars_done = []
+        for pbar in self.progress_bars.values():
+            if pbar.done:
+                self.pbars_done.append(pbar)
+        self.after(5000, self.hide_event)
 
 
 class MainWindow:
