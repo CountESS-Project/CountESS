@@ -1,7 +1,7 @@
 import builtins
 import math
 import re
-from types import CodeType, FunctionType, ModuleType, NoneType
+from types import BuiltinFunctionType, CodeType, FunctionType, ModuleType, NoneType
 from typing import Any
 
 import numpy as np
@@ -25,18 +25,37 @@ SIMPLE_TYPES = set((bool, int, float, str, tuple, list, NoneType))
 
 def _module_functions(mod: ModuleType):
     """Extracts just the public functions from a module"""
-    return {k: v for k, v in mod.__dict__.items() if not k.startswith("_") and type(v) is FunctionType}
+    return {
+        k: v
+        for k, v in mod.__dict__.items()
+        if not k.startswith("_") and type(v) in (BuiltinFunctionType, FunctionType)
+    }
 
 
 SAFE_BUILTINS = {
     x: builtins.__dict__[x]
-    for x in "abs all any ascii bin bool bytearray bytes chr complex dict divmod "
-    "enumerate filter float format frozenset hash hex id int len list map max min "
-    "oct ord pow range reversed round set slice sorted str sum tuple type zip".split()
+    for x in "abs all any ascii bin bool chr "
+    "float format frozenset hash hex int len max min "
+    "ord range round sorted str sum type zip".split()
 }
 MATH_FUNCTIONS = _module_functions(math)
 RE_FUNCTIONS = _module_functions(re)
-NUMPY_IMPORTS = {"nan": np.nan, "inf": np.inf, "isnan": np.isnan, "isinf": np.isinf}
+NUMPY_IMPORTS = {
+    "nan": np.nan,
+    "inf": np.inf,
+    "isnan": np.isnan,
+    "isinf": np.isinf,
+    "mean": lambda *x: np.mean(x),
+    "std": lambda *x: np.std(x),
+    "var": lambda *x: np.var(x),
+    "median": lambda *x: np.median(x),
+}
+
+CODE_GLOBALS: dict[str, Any] = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
+
+AVAILABLE_FUNCTIONS: list[str] = sorted(
+    list(SAFE_BUILTINS.keys()) + list(MATH_FUNCTIONS.keys()) + list(RE_FUNCTIONS.keys()) + list(NUMPY_IMPORTS.keys())
+)
 
 
 class PythonPlugin(PandasTransformDictToDictPlugin):
@@ -46,7 +65,11 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         Columns are mapped to local variables and back.
         If you assign to a variable called "__filter",
         only rows where that value is true will be kept.
-    """
+
+        Available Functions:
+    """ + " ".join(
+        AVAILABLE_FUNCTIONS
+    )
 
     version = VERSION
 
@@ -63,7 +86,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         assert isinstance(self.code_object, CodeType)
 
         try:
-            exec(self.code_object, self.code_globals, data)  # pylint: disable=exec-used
+            exec(self.code_object, CODE_GLOBALS, data)  # pylint: disable=exec-used
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(exc)
 
