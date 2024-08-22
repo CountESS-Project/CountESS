@@ -1,7 +1,7 @@
 import builtins
 import math
 import re
-from types import BuiltinFunctionType, CodeType, FunctionType, ModuleType, NoneType
+from types import BuiltinFunctionType, CodeType, FunctionType, ModuleType
 from typing import Any
 
 import numpy as np
@@ -11,6 +11,9 @@ from countess import VERSION
 from countess.core.logger import Logger
 from countess.core.parameters import BooleanParam, TextParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
+
+# For 3.9 compatibility
+NoneType = type(None)
 
 # XXX pretty sure this is a job for ast.parse rather than just
 # running compile() and exec() but that can wait.
