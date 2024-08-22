@@ -70,6 +70,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     """ + " ".join(
         AVAILABLE_FUNCTIONS
     )
+    link = "https://countess-project.github.io/CountESS/included-plugins/#python-code"
 
     version = VERSION
 

@@ -201,6 +201,28 @@ when pivoted with index on Variant, pivot on Replicate and expanding Count becom
 | `2` | `3` | `9` |
 | `3` | `0` | `6` |
 
+### Python Code
+
+This lets you embed simple Python expressions into your data processing.
+
+Add one or more Python expressions to the "Python Code".
+Each row is processed separately, with column values appearing as local variables.
+
+Functions available:
+```
+abs acos acosh all any ascii asin asinh atan atan2 atanh
+bin bool cbrt ceil chr comb compile copysign cos cosh
+degrees dist erf erfc escape exp exp2 expm1
+fabs factorial findall finditer float floor fmod
+format frexp frozenset fsum fullmatch gamma gcd
+hash hex hypot inf int isclose isfinite isinf isinf
+isnan isnan isqrt lcm ldexp len lgamma log log10 log1p log2
+match max mean median min modf nan nextafter ord
+perm pow prod purge radians range remainder round
+search sin sinh sorted split sqrt std str sub subn
+sum sumprod tan tanh template trunc type ulp var zip
+```
+
 ## Bioinformatics
 
 ### FASTQ Load
