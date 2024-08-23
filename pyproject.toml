@@ -44,6 +44,8 @@ dev = [
     'twine==4.0.2',
     'pandas-stubs~=2.1.0',
     'pytest~=7.2',
+    'pytest-socket~=0.6.0',
+    'requests-mock~=1.11.0',
 ]
 
 [project.entry-points.countess_plugins]
@@ -120,7 +122,7 @@ max-line-length = 120
 line-length = 120
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers"
+addopts = "--strict-markers --disable-socket"
 markers = [ "slow", "gui" ]
 
 [tool.mypy]
