@@ -5,7 +5,6 @@ import sys
 
 from .config import read_config
 
-
 def process_ini(config_filename) -> None:
     graph = read_config(config_filename)
     graph.run()

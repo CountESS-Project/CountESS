@@ -1,3 +1,4 @@
+import bz2
 import csv
 import gzip
 import logging
@@ -140,6 +141,8 @@ class SaveCsvPlugin(PandasOutputPlugin):
             filename = str(self.filename)
             if filename.endswith(".gz"):
                 self.filehandle = gzip.open(filename, "wb")
+            elif filename.endswith(".bz2"):
+                self.filehandle = bz2.open(filename, "wb")
             else:
                 self.filehandle = open(filename, "wb")
         else:
@@ -182,3 +185,5 @@ class SaveCsvPlugin(PandasOutputPlugin):
     def finalize(self):
         if isinstance(self.filehandle, BytesIO):
             yield self.filehandle.getvalue().decode("utf-8")
+        else:
+            self.filehandle.close()

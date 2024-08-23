@@ -53,3 +53,35 @@ if d >= 10: d = None
 
     assert any(np.isnan(dfo["d"]))
     assert not any(np.isnan(dfo["b"]))
+
+
+def test_python_filter():
+    plugin = PythonPlugin()
+    plugin.set_parameter(
+        "code",
+        """
+__filter = d < 10 and a % 2
+    """,
+    )
+
+    plugin.prepare(["test"], None)
+    dfo = plugin.process_dataframe(dfi)
+
+    assert "__filter" not in dfo.columns
+    assert len(dfo) == 2
+
+
+def test_python_exception(caplog):
+    plugin = PythonPlugin()
+    plugin.set_parameter(
+        "code",
+        """
+e = 1/0
+    """,
+    )
+
+    plugin.prepare(["test"], None)
+    dfo = plugin.process_dataframe(dfi)
+    assert len(dfo) == 5
+
+    assert "Exception" in caplog.text
