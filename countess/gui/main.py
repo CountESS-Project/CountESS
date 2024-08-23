@@ -364,7 +364,7 @@ class LoggerFrame(tk.Frame):
         self.rowconfigure(0, weight=1)
         # self.rowconfigure(1, weight=0)
 
-        self.pbars_done : list[LabeledProgressbar] = []
+        self.pbars_done: list[LabeledProgressbar] = []
         self.hide_event()
 
     def logging_callback(self, record: logging.LogRecord) -> None:
