@@ -22,6 +22,11 @@ def translate_aa(aa_seq: str) -> str:
 
     >>> translate_aa("HYPERSENSITIVITIES")
     'HisTyrProGluArgSerGluAsnSerIleThrIleValIleThrIleGluSer'
+
+    >>> translate_aa("SYZYGY")
+    Traceback (most recent call last):
+        ...
+    ValueError: Invalid AA Sequence
     """
 
     try:
@@ -323,10 +328,20 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGGTTCA"))
     ['Val2del']
 
+    a double AA deletion:
+
+    >>> list(find_variant_protein("ATGGTTGGTTCAGGC", "ATGTCAGGC"))
+    ['Val2_Gly3del']
+
     a single AA duplication:
 
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTGGTTCA"))
     ['Gly3dup']
+
+    a double AA duplication:
+
+    >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTGTTGGTTCA"))
+    ['Val2_Gly3dup']
 
     a single AA insertion
     >>> list(find_variant_protein("ATGGTTGGTTCA", "ATGGTTGGTAAATCA"))
@@ -364,17 +379,16 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
 
     >>> list(find_variant_protein("ATGGCCCCCAAATAA", "ATGGCGCCAAATTAA"))
     ['Ala2_Pro3=', 'Lys4Asn']
-
     """
 
     ref_seq = ref_seq.strip().upper()
     var_seq = var_seq.strip().upper()
 
     if not re.match("[AGTCN]+$", ref_seq):
-        raise ValueError("Invalid reference sequence")
+        raise ValueError("Invalid reference sequence")  # pragma: no cover
 
     if not re.match("[AGTCN]+$", var_seq):
-        raise ValueError("Invalid variant sequence")
+        raise ValueError("Invalid variant sequence")  # pragma: no cover
 
     frame = (3 - offset) % 3
     ref_pro = translate_dna(ref_seq[frame:])[0]
@@ -415,7 +429,7 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
                 if len(dest_pro) == 1:
                     yield f"{_ref(start-1)}dup"
                 else:
-                    yield f"{_ref(start-len(dest_pro))}_{_ref(start)}dup"
+                    yield f"{_ref(start-len(dest_pro))}_{_ref(start-1)}dup"
             elif start == len(ref_pro):
                 # 'extension', not quite standards compliant
                 yield f"{_ref(start-1)}ext{translate_aa(dest_pro)}"
