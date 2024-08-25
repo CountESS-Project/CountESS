@@ -1,8 +1,5 @@
-import sys
-from time import sleep
-
+import numpy as np
 import pandas as pd
-import pytest
 
 from countess.plugins.hgvs_parser import HgvsParserPlugin
 
@@ -76,3 +73,21 @@ def test_hgvs_parser_split_and_multi():
     assert df["var"].iloc[1] == "A>G"
     assert df["loc"].iloc[0] == "43124175"
     assert df["loc"].iloc[1] == "43124111"
+
+
+df2 = pd.DataFrame(
+        [{"fnords": "whatever"}, {"hgvs": None }, {"hgvs": "g.="}, {"hgvs": "g.[1A>T;2G>C;3C>T;4A>T;5A>T]"}]
+)
+
+def test_hgvs_parser_bad():
+    plugin = HgvsParserPlugin()
+    plugin.set_parameter("column", "hgvs")
+
+    df = plugin.process_dataframe(df2)
+
+    print(df)
+    assert np.isnan(df["var_1"].iloc[0])
+    assert np.isnan(df["var_1"].iloc[1])
+    assert df["var_1"].iloc[2] == "g.="
+    assert np.isnan(df["var_1"].iloc[3])
+

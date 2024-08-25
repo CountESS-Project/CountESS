@@ -2,6 +2,7 @@ import re
 from typing import Optional
 
 import pandas as pd
+import numpy as np
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam
@@ -25,10 +26,10 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         try:
             value = data[str(self.column)]
         except KeyError:
-            return None
+            return {}
 
-        if value is None:
-            return None
+        if type(value) is not str:
+            return {}
 
         output = {}
 
@@ -56,7 +57,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         max_variations = int(self.max_var)
         variations = [v for v in variations if v not in guides]
         if len(variations) > max_variations:
-            return None
+            return {}
 
         output_vars: list[Optional[str]] = [None] * max_variations
         output_locs: list[Optional[str]] = [None] * max_variations
