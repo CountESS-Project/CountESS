@@ -148,3 +148,21 @@ navigation but for convenience they are generated on page load by
 
 For issues with these pages, especially accessibility issues, please
 [raise a github issue](https://github.com/CountESS-Project/CountESS/issues).
+
+## Deployment
+
+Github actions are set up to run code checks and tests on every push.
+
+Deployment is not yet automated.  There's a couple of small scripts
+to set a new version number in the code, documentation and git tags.
+The default just bumps the patch version, or provide a valid semver
+name on the command line:
+
+    script/set_version
+
+    script/set_version 1.2.3
+
+There's also a script to automate upload to PyPI using twine.
+
+    script/build_and_upload
+
