@@ -4,7 +4,14 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrIntegerParam, ColumnOrStringParam, IntegerParam, StringParam
+from countess.core.parameters import (
+    BooleanParam,
+    ColumnChoiceParam,
+    ColumnOrIntegerParam,
+    ColumnOrStringParam,
+    IntegerParam,
+    StringParam,
+)
 from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
 
@@ -31,6 +38,8 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     def process_dict(self, data, logger: Logger) -> dict:
         assert isinstance(self.parameters["reference"], ColumnOrStringParam)
+        assert isinstance(self.parameters["offset"], ColumnOrIntegerParam)
+
         sequence = data[self.parameters["column"].value]
         if not sequence:
             return {}

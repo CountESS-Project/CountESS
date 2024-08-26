@@ -47,7 +47,11 @@ def test_variant_ref_column():
 
 def test_variant_ref_offset():
     input_df = pd.DataFrame(
-        [{"seq": "TGAAGTAGAGG", "offs": "0"}, {"seq": "AGAAGTTGTGG", "offs": "10"}, {"seq": "ATAAGAAGAGG", "offs": "100"}]
+        [
+            {"seq": "TGAAGTAGAGG", "offs": "0"},
+            {"seq": "AGAAGTTGTGG", "offs": "10"},
+            {"seq": "ATAAGAAGAGG", "offs": "100"},
+        ]
     )
 
     plugin = VariantPlugin()

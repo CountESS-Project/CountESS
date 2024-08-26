@@ -455,7 +455,7 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
 
 
 class ColumnOrStringParam(ColumnChoiceParam):
-    DEFAULT_VALUE = ""
+    DEFAULT_VALUE : Any = ""
     PREFIX = "— "
 
     def set_column_choices(self, choices):
@@ -475,7 +475,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
     def get_column_or_value(self, df: pd.DataFrame, numeric: bool):
         if self.value.startswith(self.PREFIX):
             col = df[self.value[len(self.PREFIX) :]]
-            return col.astype('f' if numeric else 'string')
+            return col.astype("f" if numeric else "string")
         else:
             return float(self.value) if numeric else str(self.value)
 
@@ -493,7 +493,16 @@ class ColumnOrStringParam(ColumnChoiceParam):
 
 
 class ColumnOrIntegerParam(ColumnOrStringParam):
-    DEFAULT_VALUE = 0
+    DEFAULT_VALUE : int = 0
+
+    def __init__(
+        self,
+        label: str,
+        value: Optional[int] = 0,
+        choices: Optional[Iterable[str]] = None,
+    ):
+        super().__init__(label, choices=choices)
+        self.value = value
 
     def clean_value(self, value):
         if type(value) is str and value.startswith(self.PREFIX):
