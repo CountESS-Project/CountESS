@@ -43,3 +43,25 @@ def test_variant_ref_column():
 
     assert output[0]["out"] == "g.5C>G"
     assert output[1]["out"] == "g.[7_9dup;11_12insG]"
+
+
+def test_variant_ref_offset():
+    input_df = pd.DataFrame(
+        [{"seq": "TGAAGTAGAGG", "offs": "0"}, {"seq": "AGAAGTTGTGG", "offs": "10"}, {"seq": "ATAAGAAGAGG", "offs": "100"}]
+    )
+
+    plugin = VariantPlugin()
+    plugin.set_parameter("column", "seq")
+    plugin.set_parameter("reference", "AGAAGTAGAGG")
+    plugin.set_parameter("offset", "— offs")
+    plugin.set_parameter("output", "out")
+
+    plugin.prepare(["test"], None)
+
+    output_df = plugin.process_dataframe(input_df, logger)
+
+    output = output_df.to_records()
+
+    assert output[0]["out"] == "g.1A>T"
+    assert output[1]["out"] == "g.[17A>T;19A>T]"
+    assert output[2]["out"] == "g.[102G>T;106T>A]"

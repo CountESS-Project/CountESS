@@ -4,7 +4,7 @@ import pandas as pd
 
 from countess import VERSION
 from countess.core.logger import Logger
-from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrStringParam, IntegerParam, StringParam
+from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrIntegerParam, ColumnOrStringParam, IntegerParam, StringParam
 from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
 
@@ -20,7 +20,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     parameters = {
         "column": ColumnChoiceParam("Input Column", "sequence"),
         "reference": ColumnOrStringParam("Reference Sequence"),
-        "offset": IntegerParam("Reference Offset", 0),
+        "offset": ColumnOrIntegerParam("Reference Offset", 0),
         "output": StringParam("Output Column", "variant"),
         "max_mutations": IntegerParam("Max Mutations", 10),
         "protein": StringParam("Protein Column", "protein"),
@@ -36,7 +36,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             return {}
 
         reference = self.parameters["reference"].get_value(data)
-        offset = self.parameters["offset"].value
+        offset = int(self.parameters["offset"].get_value(data) or 0)
 
         r = {}
 

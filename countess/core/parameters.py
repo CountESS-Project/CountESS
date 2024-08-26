@@ -258,6 +258,9 @@ class ChoiceParam(BaseParam):
         self.value = value
         self.choices = list(choices or [])
 
+    def clean_value(self, value):
+        return value
+
     @property
     def value(self):
         return self._value
@@ -267,7 +270,7 @@ class ChoiceParam(BaseParam):
         if value is None:
             self._value = self.DEFAULT_VALUE
         else:
-            self._value = value
+            self._value = self.clean_value(value)
         try:
             self._choice = self.choices.index(value)
         except ValueError:
@@ -464,8 +467,21 @@ class ColumnOrStringParam(ColumnChoiceParam):
         return None
 
     def get_value(self, data: dict):
-        if self.value.startswith(self.PREFIX):
+        if str(self.value).startswith(self.PREFIX):
             return data[self.value[len(self.PREFIX) :]]
+        else:
+            return self.value
+
+    def get_column_or_value(self, df: pd.DataFrame, numeric: bool):
+        if self.value.startswith(self.PREFIX):
+            col = df[self.value[len(self.PREFIX) :]]
+            return col.astype('f' if numeric else 'string')
+        else:
+            return float(self.value) if numeric else str(self.value)
+
+    def get_column_or_value_numeric(self, df: pd.DataFrame):
+        if self.value.startswith(self.PREFIX):
+            return df[self.value[len(self.PREFIX) :]]
         else:
             return self.value
 
@@ -474,6 +490,18 @@ class ColumnOrStringParam(ColumnChoiceParam):
         if self._value is not None and self._value.startswith(self.PREFIX) and self._value not in self.choices:
             self._value = self.DEFAULT_VALUE
             self._choice = None
+
+
+class ColumnOrIntegerParam(ColumnOrStringParam):
+    DEFAULT_VALUE = 0
+
+    def clean_value(self, value):
+        if type(value) is str and value.startswith(self.PREFIX):
+            return value
+        try:
+            return int(value)
+        except ValueError:
+            return self.DEFAULT_VALUE
 
 
 class ArrayParam(BaseParam):
