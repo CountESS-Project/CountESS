@@ -455,7 +455,7 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
 
 
 class ColumnOrStringParam(ColumnChoiceParam):
-    DEFAULT_VALUE : Any = ""
+    DEFAULT_VALUE: Any = ""
     PREFIX = "— "
 
     def set_column_choices(self, choices):
@@ -493,7 +493,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
 
 
 class ColumnOrIntegerParam(ColumnOrStringParam):
-    DEFAULT_VALUE : int = 0
+    DEFAULT_VALUE: int = 0
 
     def __init__(
         self,
