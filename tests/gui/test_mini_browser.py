@@ -8,10 +8,10 @@ from countess.gui.mini_browser import MiniBrowserFrame
 
 example_url = "http://example.com/"
 
+
 @pytest.mark.gui
 def test_mini_browser():
-    with patch.object(tkinterweb.HtmlFrame, 'load_url') as p:
-
+    with patch.object(tkinterweb.HtmlFrame, "load_url") as p:
         root = make_root()
         MiniBrowserFrame(root, example_url)
 

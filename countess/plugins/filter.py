@@ -9,6 +9,7 @@ from countess.core.parameters import (
     BooleanParam,
     ChoiceParam,
     ColumnChoiceParam,
+    ColumnOrStringParam,
     DataTypeChoiceParam,
     MultiParam,
     StringParam,
@@ -24,7 +25,7 @@ class _FilterColumnMultiParam(TabularMultiParam):
     column = ColumnChoiceParam("Column")
     negate = BooleanParam("Negate?")
     operator = ChoiceParam("Operator", OPERATORS[0], OPERATORS)
-    value = StringParam("Value")
+    value = ColumnOrStringParam("Value")
 
 
 class _FilterOutputMultiParam(TabularMultiParam):
@@ -78,9 +79,7 @@ class FilterPlugin(PandasSimplePlugin):
 
             for param in filt.columns:
                 column = param.column.value
-                value = param.value.value
-                if is_numeric_dtype(data[column]):
-                    value = float(value)
+                value = param.value.get_column_or_value(data, is_numeric_dtype(data[column]))
 
                 if param.operator == "equals":
                     series = data[column].eq(value)

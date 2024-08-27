@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 import countess.core.cmd
-from countess.core.cmd import run, main
+from countess.core.cmd import main, run
 
 expected_output = """"thing","foo","bar","baz","qux","number","zz"
 "bar",10,2,1,4,232,0.08620689655172414
@@ -23,6 +23,6 @@ def test_command_invocation():
 
 
 def test_main():
-    with patch.object(countess.core.cmd, 'run') as p:
+    with patch.object(countess.core.cmd, "run") as p:
         main()
         p.assert_called_once()

@@ -4,7 +4,17 @@ set -eu
 git diff --quiet || { echo "There are unstaged changes!"; exit 1; }
 git diff --cached --quiet || { echo "There are staged changes!"; exit 2; }
 
-VERSION=$1
+PREVIOUS=`python -c 'import countess; print(countess.VERSION)'`
+echo "Old Version: $PREVIOUS"
+
+if [ -v 1 ]; then
+    VERSION=$1
+    pysemver check $VERSION
+else
+    VERSION=`pysemver bump patch $PREVIOUS`
+fi
+
+echo "New Version: $VERSION"
 
 sed -i "s/\# CountESS .*/# CountESS $VERSION/" README.md
 sed -i "s/VERSION = .*/VERSION = \"$VERSION\"/" countess/__init__.py

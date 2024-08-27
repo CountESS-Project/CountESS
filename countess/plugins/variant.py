@@ -4,7 +4,14 @@ from typing import Optional
 import pandas as pd
 
 from countess import VERSION
-from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrStringParam, IntegerParam, StringParam
+from countess.core.parameters import (
+    BooleanParam,
+    ColumnChoiceParam,
+    ColumnOrIntegerParam,
+    ColumnOrStringParam,
+    IntegerParam,
+    StringParam,
+)
 from countess.core.plugins import PandasTransformDictToDictPlugin
 from countess.utils.variant import find_variant_string
 
@@ -21,7 +28,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
-    offset = IntegerParam("Reference Offset", 0)
+    offset = ColumnOrIntegerParam("Reference Offset", 0)
     output = StringParam("Output Column", "variant")
     max_mutations = IntegerParam("Max Mutations", 10)
     protein = StringParam("Protein Column", "protein")
@@ -35,13 +42,14 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             return {}
 
         reference = self.reference.get_value_from_dict(data)
+        offset = int(self.offset.get_value_from_dict(data) or 0)
 
         r: dict[str, str] = {}
 
         if self.output:
             try:
                 r[self.output.value] = find_variant_string(
-                    "g.", reference, sequence, int(self.max_mutations), offset=int(self.offset)
+                    "g.", reference, sequence, int(self.max_mutations), offset=offset
                 )
             except ValueError:
                 pass
@@ -51,7 +59,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
         if self.protein:
             try:
                 r[str(self.protein)] = find_variant_string(
-                    "p.", reference, sequence, int(self.max_protein), offset=int(self.offset)
+                    "p.", reference, sequence, int(self.max_protein), offset=offset
                 )
             except ValueError:
                 pass

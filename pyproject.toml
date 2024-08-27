@@ -39,6 +39,7 @@ dev = [
     'coverage==7.3.2',
     'mypy~=1.0.1',
     'pylint~=3.2.3',
+    'semver~=3.0.2',
     'types-psutil~=5.9.5',
     'types-ttkthemes~=3.2',
     'twine==4.0.2',

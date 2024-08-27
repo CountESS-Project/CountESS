@@ -2,7 +2,6 @@ import re
 from typing import Optional
 
 import pandas as pd
-import numpy as np
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, IntegerParam, StringParam

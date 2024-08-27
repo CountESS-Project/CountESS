@@ -348,11 +348,14 @@ class ChoiceParam(ScalarWithOperatorsParam):
         self.value = value if value is not None else self.DEFAULT_VALUE
         self.choices = list(choices or [])
 
+    def clean_value(self, value):
+        return value
+
     def set_value(self, value):
         if value is None:
             self._value = self.DEFAULT_VALUE
         else:
-            self._value = value
+            self._value = self.clean_value(value)
         try:
             self._choice = self.choices.index(value)
         except ValueError:
@@ -539,7 +542,7 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
 
 
 class ColumnOrStringParam(ColumnChoiceParam):
-    DEFAULT_VALUE = ""
+    DEFAULT_VALUE: Any = ""
     PREFIX = "— "
 
     def set_column_choices(self, choices):
@@ -551,8 +554,21 @@ class ColumnOrStringParam(ColumnChoiceParam):
         return None
 
     def get_value_from_dict(self, data: dict):
-        if self.value.startswith(self.PREFIX):
+        if type(self.value) is str and self.value.startswith(self.PREFIX):
             return data[self.value[len(self.PREFIX) :]]
+        else:
+            return self.value
+
+    def get_column_or_value(self, df: pd.DataFrame, numeric: bool):
+        if self.value.startswith(self.PREFIX):
+            col = df[self.value[len(self.PREFIX) :]]
+            return col.astype("f" if numeric else "string")
+        else:
+            return float(self.value) if numeric else str(self.value)
+
+    def get_column_or_value_numeric(self, df: pd.DataFrame):
+        if self.value.startswith(self.PREFIX):
+            return df[self.value[len(self.PREFIX) :]]
         else:
             return self.value
 
@@ -561,6 +577,27 @@ class ColumnOrStringParam(ColumnChoiceParam):
         if self._value is not None and self._value.startswith(self.PREFIX) and self._value not in self.choices:
             self._value = self.DEFAULT_VALUE
             self._choice = None
+
+
+class ColumnOrIntegerParam(ColumnOrStringParam):
+    DEFAULT_VALUE: int = 0
+
+    def __init__(
+        self,
+        label: str,
+        value: Optional[int] = 0,
+        choices: Optional[Iterable[str]] = None,
+    ):
+        super().__init__(label, choices=choices)
+        self.value = value
+
+    def clean_value(self, value):
+        if type(value) is str and value.startswith(self.PREFIX):
+            return value
+        try:
+            return int(value)
+        except ValueError:
+            return self.DEFAULT_VALUE
 
 
 class HasSubParametersMixin:

@@ -130,7 +130,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
     quoting = BooleanParam("Quote all Strings", False)
 
-    filehandle: Optional[Union[BufferedWriter, BytesIO, gzip.GzipFile]] = None
+    filehandle: Optional[Union[BufferedWriter, BytesIO, gzip.GzipFile, bz2.BZ2File]] = None
     csv_columns = None
 
     SEPARATORS = {",": ",", ";": ";", "SPACE": " ", "TAB": "\t"}

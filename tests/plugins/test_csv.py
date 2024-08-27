@@ -5,6 +5,7 @@ import pandas as pd
 
 from countess.plugins.csv import LoadCsvPlugin, SaveCsvPlugin
 
+
 def test_load_csv():
     plugin = LoadCsvPlugin()
     plugin.set_parameter("files.0.filename", "tests/input1.csv")
@@ -96,15 +97,15 @@ def test_filename_column():
     assert output_df["filename"].iloc[1] == "input1"
 
 
-df = pd.DataFrame([[1,2,3],[4,5,6],[7,8,9]], columns=['a','b','c'])
+df = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]], columns=["a", "b", "c"])
+
 
 def test_save_csv():
-
     plugin = SaveCsvPlugin()
     plugin.set_parameter("header", True)
     plugin.set_parameter("filename", "tests/output1.csv")
     plugin.prepare(["test"], None)
-    plugin.process(df, 'test')
+    plugin.process(df, "test")
     plugin.finalize()
 
     with open("tests/output1.csv", "r", encoding="utf-8") as fh:
@@ -113,12 +114,11 @@ def test_save_csv():
 
 
 def test_save_csv_gz():
-
     plugin = SaveCsvPlugin()
     plugin.set_parameter("header", True)
     plugin.set_parameter("filename", "tests/output1.csv.gz")
     plugin.prepare(["test"], None)
-    plugin.process(df, 'test')
+    plugin.process(df, "test")
     list(plugin.finalize())
 
     with gzip.open("tests/output1.csv.gz", "rt") as fh:
@@ -127,12 +127,11 @@ def test_save_csv_gz():
 
 
 def test_save_csv_bz2():
-
     plugin = SaveCsvPlugin()
     plugin.set_parameter("header", True)
     plugin.set_parameter("filename", "tests/output1.csv.bz2")
     plugin.prepare(["test"], None)
-    plugin.process(df, 'test')
+    plugin.process(df, "test")
     list(plugin.finalize())
 
     with bz2.open("tests/output1.csv.bz2", "rt") as fh:
@@ -140,7 +139,7 @@ def test_save_csv_bz2():
         assert text == "a,b,c\n1,2,3\n4,5,6\n7,8,9\n"
 
 
-df2 = pd.DataFrame([[10,11,12]], columns=['a','b','d'])
+df2 = pd.DataFrame([[10, 11, 12]], columns=["a", "b", "d"])
 
 
 def test_save_csv_multi():
@@ -148,8 +147,8 @@ def test_save_csv_multi():
     plugin.set_parameter("header", True)
     plugin.set_parameter("filename", "tests/output2.csv")
     plugin.prepare(["test"], None)
-    plugin.process(df, 'test')
-    plugin.process(df2, 'test2')
+    plugin.process(df, "test")
+    plugin.process(df2, "test2")
     plugin.finalize()
 
     with open("tests/output2.csv", "r", encoding="utf-8") as fh:

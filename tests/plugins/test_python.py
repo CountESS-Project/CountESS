@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,6 +10,7 @@ dfi = pd.DataFrame(
     [[1, 1, 2, 7, 11], [2, 2, 3, 8, 1], [3, 3, 4, 9, 3], [4, 4, 5, 10, 4], [5, 5, 6, 12, 7]],
     columns=["a", "b", "c", "d", "e"],
 )
+
 
 def test_python_builtins():
     plugin = PythonPlugin()
