@@ -44,6 +44,7 @@ def test_main():
 
     root.update()
 
+    wrap.destroy()
     root.destroy()
 
 

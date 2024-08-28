@@ -142,7 +142,7 @@ def test_save_csv_bz2():
 df2 = pd.DataFrame([[10, 11, 12]], columns=["a", "b", "d"])
 
 
-def test_save_csv_multi():
+def test_save_csv_multi(caplog):
     plugin = SaveCsvPlugin()
     plugin.set_parameter("header", True)
     plugin.set_parameter("filename", "tests/output2.csv")
@@ -154,3 +154,4 @@ def test_save_csv_multi():
     with open("tests/output2.csv", "r", encoding="utf-8") as fh:
         text = fh.read()
         assert text == "a,b,c\n1,2,3\n4,5,6\n7,8,9\n10,11,,12\n"
+    assert "Added CSV Column" in caplog.text

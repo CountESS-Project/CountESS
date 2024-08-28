@@ -25,7 +25,10 @@ def main() -> None:
 
     run(sys.argv[1:])
 
+    # tidy up just in case we're not just about to exit
+    logging.getLogger().handlers.clear()
     logging_handler.stop()
+    logging_queue.close()
 
 
 if __name__ == "__main__":
