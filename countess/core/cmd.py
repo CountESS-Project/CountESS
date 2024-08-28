@@ -26,6 +26,7 @@ def main() -> None:
     run(sys.argv[1:])
 
     logging_handler.stop()
+    logging_queue.close()
 
 
 if __name__ == "__main__":

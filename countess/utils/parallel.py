@@ -1,10 +1,9 @@
 import gc
 import logging
-import threading
-import time
 from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
-from queue import Empty
+from queue import Empty, Full
+import time
 from typing import Callable, Iterable
 
 try:
@@ -22,6 +21,37 @@ P = ParamSpec("P")
 logger = logging.getLogger(__name__)
 
 
+class IterableMultiprocessQueue:
+    """This connects a multiprocessing.Queue with a multiprocessing.Value
+    and gives us a queue that multiple reader processes can iterate over and
+    they'll each get a StopIteration when the Queue is both finished *and*
+    empty."""
+
+    def __init__(self, maxsize=3):
+        self.queue = Queue(maxsize=maxsize)
+        self.finished = Value("b", False)
+
+    def put(self, value, timeout=None):
+        if self.finished.value:
+            raise ValueError("IterableMultiprocessQueue Stopped")
+        self.queue.put(value, timeout=timeout)
+
+    def close(self):
+        self.finished.value = True
+        self.queue.close()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while True:
+            try:
+                return self.queue.get(timeout=0.1)
+            except Empty as exc:
+                if self.finished.value:
+                    raise StopIteration from exc
+
+
 def multiprocess_map(
     function: Callable[Concatenate[V, P], Iterable[D]], values: Iterable[V], *args: P.args, **kwargs: P.kwargs
 ) -> Iterable[D]:
@@ -37,58 +67,60 @@ def multiprocess_map(
 
     # Start up several workers.
     nproc = ((cpu_count() or 1) + 1) // 2
-    input_queue: Queue = Queue()
+    input_queue = IterableMultiprocessQueue(maxsize=nproc)
     output_queue: Queue = Queue(maxsize=3)
 
-    # XXX is it actually necessary to have this in a separate thread or
-    # would it be sufficient to add items to input_queue alternately with
-    # removing items from output_queue?
-
-    enqueue_running = Value("b", True)
-
-    def __enqueue():
-        for v in values:
-            input_queue.put(v)
-        enqueue_running.value = False
-
-    thread = threading.Thread(target=__enqueue)
-    thread.start()
-
-    # XXX is this necessary?
-    time.sleep(1)
-
     def __process():
-        while True:
-            try:
-                while True:
-                    # Prevent processes from using up all
-                    # available memory while waiting
-                    # XXX this is probably a bad idea
-                    while psutil.virtual_memory().percent > 90:
-                        logger.warning("PID %d LOW MEMORY alert %f%%", getpid(), psutil.virtual_memory().percent)
-                        time.sleep(1)
+        for data_in in input_queue:
+            for data_out in function(data_in, *args, **(kwargs or {})):
+                output_queue.put(data_out)
 
-                    data_in = input_queue.get(timeout=1)
-                    for data_out in function(data_in, *args, **(kwargs or {})):
-                        output_queue.put(data_out)
+                # Make sure large data is disposed of before we
+                # go around for the next loop
+                del data_out
+            del data_in
+            gc.collect()
 
-                        # Make sure large data is disposed of before we
-                        # go around for the next loop
-                        del data_out
-                    del data_in
-                    gc.collect()
-
-            except Empty:
-                if not enqueue_running.value:
-                    break
+            # Prevent processes from using up all available memory while waiting
+            # XXX this is probably a bad idea
+            while psutil.virtual_memory().percent > 90:
+                logger.warning("PID %d LOW MEMORY %f%%", getpid(), psutil.virtual_memory().percent)
+                time.sleep(1)
 
     processes = [Process(target=__process, name=f"worker {n}") for n in range(0, nproc)]
     for p in processes:
         p.start()
 
-    while thread.is_alive() or any(p.is_alive() for p in processes):
+    # push each of the input values onto the input_queue, if it gets full
+    # then also try to drain the output_queue.
+    for v in values:
+        while True:
+            try:
+                input_queue.put(v, timeout=0.1)
+                break
+            except Full:
+                try:
+                    yield output_queue.get(timeout=0.1)
+                except Empty:
+                    # Waiting for the next output, might as well tidy up
+                    gc.collect()
+
+    # we're finished with input values, so close the input_queue to
+    # signal to all the processes that there will be no new entries
+    # and once the queue is empty they can finish.
+    input_queue.close()
+
+    # wait for all processes to finish and yield any data which appears
+    # on the output_queue
+    while any(p.is_alive() for p in processes):
         try:
-            yield output_queue.get(timeout=0.1)
+            while True:
+                yield output_queue.get(timeout=0.1)
         except Empty:
-            # Waiting for the next input, might as well tidy up
+            # Waiting for the next output, might as well tidy up
             gc.collect()
+
+    # once all processes have finished, we can clean up the queue.
+    for p in processes:
+        p.join()
+    output_queue.close()
