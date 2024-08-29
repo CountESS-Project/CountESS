@@ -1,8 +1,9 @@
 import pytest
 
+from countess.core.parameters import IntegerParam
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import ProcessPlugin
-from countess.core.parameters import IntegerParam
+
 
 @pytest.fixture(name="pg")
 def fixture_pg():
@@ -12,7 +13,7 @@ def fixture_pg():
     pn3 = PipelineNode("node")
     pn4 = PipelineNode("node")
 
-    pg = PipelineGraph([pn0,pn1,pn2,pn3,pn4])
+    pg = PipelineGraph([pn0, pn1, pn2, pn3, pn4])
 
     pn4.add_parent(pn2)
     pn4.add_parent(pn3)
@@ -78,9 +79,9 @@ def test_pipeline_graph_reset_node_names(pg):
     names = [pn.name for pn in pg.traverse_nodes()]
     assert sorted(set(names)) == names
 
-    pn = PipelineNode('node')
+    pn = PipelineNode("node")
     pg.add_node(pn)
-    assert pn.name == 'node 5'
+    assert pn.name == "node 5"
 
 
 def test_pg_reset(pg):
@@ -91,8 +92,8 @@ def test_pg_reset(pg):
 
 
 class DoesNothingPlugin(ProcessPlugin):
-    version = '0'
-    param = IntegerParam('param', 0)
+    version = "0"
+    param = IntegerParam("param", 0)
 
     def process(self, data, source):
         yield data
@@ -103,10 +104,14 @@ class DoesNothingPlugin(ProcessPlugin):
 
 def test_plugin_config(caplog):
     dnp = DoesNothingPlugin()
-    dnn = PipelineNode('node', plugin=dnp, config=[
-        ('param', 1, '.'),
-        ('noparam', 'whatever', '.'),
-    ])
+    dnn = PipelineNode(
+        "node",
+        plugin=dnp,
+        config=[
+            ("param", 1, "."),
+            ("noparam", "whatever", "."),
+        ],
+    )
     dnn.load_config()
 
     assert "noparam=whatever" in caplog.text
@@ -114,7 +119,7 @@ def test_plugin_config(caplog):
 
 
 def test_noplugin_prerun():
-    pn = PipelineNode('node')
+    pn = PipelineNode("node")
 
     with pytest.raises(AssertionError):
         pn.load_config()
@@ -123,8 +128,8 @@ def test_noplugin_prerun():
 
 
 def test_mark_dirty():
-    pn1 = PipelineNode('node1', plugin=DoesNothingPlugin())
-    pn2 = PipelineNode('node2', plugin=DoesNothingPlugin())
+    pn1 = PipelineNode("node1", plugin=DoesNothingPlugin())
+    pn2 = PipelineNode("node2", plugin=DoesNothingPlugin())
     pn2.add_parent(pn1)
 
     pn2.prerun()
@@ -132,7 +137,7 @@ def test_mark_dirty():
     assert not pn1.is_dirty
     assert not pn2.is_dirty
 
-    pn1.configure_plugin('param', 2)
+    pn1.configure_plugin("param", 2)
 
     assert pn1.is_dirty
     assert pn2.is_dirty

@@ -1,17 +1,17 @@
 import gc
 import logging
+import threading
+import time
 from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
 from queue import Empty
-import threading
-import time
 from typing import Callable, Iterable
 
 try:
     from typing import Concatenate, ParamSpec, TypeVar
 except ImportError:  # pragma: no cover
     # for Python 3.9 compatibility
-    from typing_extensions import Concatenate, ParamSpec, TypeVar  # type: ignore  pragma: no cover
+    from typing_extensions import Concatenate, ParamSpec, TypeVar  #  type: ignore
 
 import psutil
 

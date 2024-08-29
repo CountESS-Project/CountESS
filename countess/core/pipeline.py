@@ -246,7 +246,7 @@ class PipelineNode:
 
 
 class PipelineGraph:
-    def __init__(self, nodes : Optional[list[PipelineNode]] =None):
+    def __init__(self, nodes: Optional[list[PipelineNode]] = None):
         self.plugin_classes = get_plugin_classes()
         self.nodes = nodes or []
 

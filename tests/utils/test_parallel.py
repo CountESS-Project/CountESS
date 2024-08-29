@@ -1,6 +1,6 @@
 import pytest
 
-from countess.utils.parallel import multiprocess_map, IterableMultiprocessQueue
+from countess.utils.parallel import IterableMultiprocessQueue, multiprocess_map
 
 
 def test_multiprocess_map():
@@ -43,16 +43,16 @@ def test_multiprocess_map():
         49,
     ]
 
-def test_multiprocess_map_stopped():
 
+def test_multiprocess_map_stopped():
     impq = IterableMultiprocessQueue()
 
-    impq.put('1')
-    impq.put('2')
-    impq.put('3')
+    impq.put("1")
+    impq.put("2")
+    impq.put("3")
     impq.finish()
 
     with pytest.raises(ValueError):
-        impq.put('4')
+        impq.put("4")
 
-    assert sorted(list(impq)) == ['1', '2', '3']
+    assert sorted(list(impq)) == ["1", "2", "3"]

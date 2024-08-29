@@ -110,13 +110,13 @@ class ScalarWithOperatorsParam(ScalarParam):
     def __gt__(self, other):
         return self._value > other
 
-    def __gte__(self, other):
+    def __ge__(self, other):
         return self._value >= other
 
     def __lt__(self, other):
         return self._value < other
 
-    def __lte__(self, other):
+    def __le__(self, other):
         return self._value <= other
 
 
@@ -187,6 +187,15 @@ class NumericParam(ScalarWithOperatorsParam):
     def __float__(self):
         return float(self._value)
 
+    def __abs__(self):
+        return abs(self._value)
+
+    def __pos__(self):
+        return self._value
+
+    def __neg__(self):
+        return 0 - (self._value)
+
     # XXX should include many more numeric operator methods here, see
     # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
     #   matmul, truediv, floordiv, mod, divmod, pow, lshift, rshift, and, xor, or,
@@ -219,10 +228,12 @@ class BooleanParam(ScalarParam):
         if isinstance(value, str):
             if value in ("t", "T", "true", "True", "1"):
                 self._value = True
-            if value in ("f", "F", "false", "False", "0"):
+            elif value in ("f", "F", "false", "False", "0"):
                 self._value = False
-            raise ValueError(f"Can't convert {value} to boolean")
-        self._value = bool(value)
+            else:
+                raise ValueError(f"Can't convert {value} to boolean")
+        else:
+            self._value = bool(value)
 
     def __bool__(self):
         return self._value or False
