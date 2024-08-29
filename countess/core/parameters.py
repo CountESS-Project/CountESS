@@ -413,10 +413,10 @@ class DataTypeChoiceParam(ChoiceParam):
         super().__init__(label, value, choices)
 
     def get_selected_type(self):
-        if self.value is None:
-            return None
-        else:
+        try:
             return self.DATA_TYPES[self.value][0]
+        except KeyError:
+            return None
 
     def cast_value(self, value):
         if value is not None:
@@ -530,7 +530,7 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
     def get_column_prefix(self):
         if self.is_none():
             return None
-        return self.value.removesuffix("*")
+        return super().get_column_prefix()
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
@@ -560,7 +560,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
         self.set_choices([self.PREFIX + c for c in choices])
 
     def get_column_name(self):
-        if self.value.startswith(self.PREFIX):
+        if type(self.value) is str and self.value.startswith(self.PREFIX):
             return self.value[len(self.PREFIX) :]
         return None
 
@@ -571,21 +571,15 @@ class ColumnOrStringParam(ColumnChoiceParam):
             return self.value
 
     def get_column_or_value(self, df: pd.DataFrame, numeric: bool):
-        if self.value.startswith(self.PREFIX):
+        if type(self.value) is str and self.value.startswith(self.PREFIX):
             col = df[self.value[len(self.PREFIX) :]]
             return col.astype("f" if numeric else "string")
         else:
             return float(self.value) if numeric else str(self.value)
 
-    def get_column_or_value_numeric(self, df: pd.DataFrame):
-        if self.value.startswith(self.PREFIX):
-            return df[self.value[len(self.PREFIX) :]]
-        else:
-            return self.value
-
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if self._value is not None and self._value.startswith(self.PREFIX) and self._value not in self.choices:
+        if self._value is not None and type(self._value) is str and self._value.startswith(self.PREFIX) and self._value not in self.choices:
             self._value = self.DEFAULT_VALUE
             self._choice = None
 
@@ -872,17 +866,6 @@ class MultiParam(HasSubParametersMixin, BaseParam):
     def copy(self) -> "MultiParam":
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
         return self.__class__(self.label, pp)
-
-    # XXX decide if these "dict-like" accessors are worth keeping
-
-    def __getitem__(self, key):
-        return self.params[key]
-
-    def __contains__(self, item):
-        return item in self.params
-
-    def __setitem__(self, key, value):
-        self.params[key].value = value
 
     def __iter__(self):
         return self.params.__iter__()
