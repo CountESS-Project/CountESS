@@ -559,21 +559,21 @@ class ColumnOrStringParam(ColumnChoiceParam):
     def set_column_choices(self, choices):
         self.set_choices([self.PREFIX + c for c in choices])
 
-    def get_column_name(self):
+    def get_column_name(self) -> Optional[str]:
         if type(self.value) is str and self.value.startswith(self.PREFIX):
             return self.value[len(self.PREFIX) :]
         return None
 
-    def get_value_from_dict(self, data: dict):
+    def get_value_from_dict(self, data: dict) -> str:
         if type(self.value) is str and self.value.startswith(self.PREFIX):
             return data[self.value[len(self.PREFIX) :]]
         else:
             return self.value
 
-    def get_column_or_value(self, df: pd.DataFrame, numeric: bool):
+    def get_column_or_value(self, df: pd.DataFrame, numeric: bool) -> Union[float, str, pd.Series]:
         if type(self.value) is str and self.value.startswith(self.PREFIX):
             col = df[self.value[len(self.PREFIX) :]]
-            return col.astype("f" if numeric else "string")
+            return col.astype(float if numeric else str)
         else:
             return float(self.value) if numeric else str(self.value)
 
