@@ -105,9 +105,6 @@ class PipelineNode:
         self.output_queues.add(queue)
         return queue
 
-    def clear_output_queues(self):
-        self.output_queues = set()
-
     def queue_output(self, result):
         for data in result:
             self.counter_out += 1
@@ -249,9 +246,9 @@ class PipelineNode:
 
 
 class PipelineGraph:
-    def __init__(self):
+    def __init__(self, nodes : Optional[list[PipelineNode]] =None):
         self.plugin_classes = get_plugin_classes()
-        self.nodes = []
+        self.nodes = nodes or []
 
     def reset_node_name(self, node):
         node_names_seen = set(n.name for n in self.nodes if n != node)
