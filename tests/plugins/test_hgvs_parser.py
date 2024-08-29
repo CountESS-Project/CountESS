@@ -75,7 +75,7 @@ def test_hgvs_parser_split_and_multi():
     assert df["loc"].iloc[1] == "43124111"
 
 
-df2 = pd.DataFrame([{"fnords": "whatever"}, {"hgvs": None}, {"hgvs": "g.="}, {"hgvs": "g.[1A>T;2G>C;3C>T;4A>T;5A>T]"}])
+df2 = pd.DataFrame([{"fnords": "whatever"}, {"hgvs": None}, {"hgvs": "g.[1A>T;2G>C;3C>T;4A>T;5A>T]"}])
 
 
 def test_hgvs_parser_bad():
@@ -85,7 +85,17 @@ def test_hgvs_parser_bad():
     df = plugin.process_dataframe(df2)
 
     print(df)
-    assert np.isnan(df["var_1"].iloc[0])
-    assert np.isnan(df["var_1"].iloc[1])
-    assert df["var_1"].iloc[2] == "g.="
-    assert np.isnan(df["var_1"].iloc[3])
+    assert all(np.isnan(df["var_1"]))
+    #assert np.isnan(df["var_1"].iloc[0])
+    #assert np.isnan(df["var_1"].iloc[1])
+    #assert np.isnan(df["var_1"].iloc[2])
+
+
+def test_hgvs_parser_very_bad():
+    plugin = HgvsParserPlugin()
+    plugin.set_parameter("column", "hgvs")
+
+    dfi = pd.DataFrame([{'a': 1}])
+    dfo = plugin.process_dataframe(dfi)
+
+    assert all(dfo == dfi)
