@@ -579,7 +579,12 @@ class ColumnOrStringParam(ColumnChoiceParam):
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if self._value is not None and type(self._value) is str and self._value.startswith(self.PREFIX) and self._value not in self.choices:
+        if (
+            self._value is not None
+            and type(self._value) is str
+            and self._value.startswith(self.PREFIX)
+            and self._value not in self.choices
+        ):
             self._value = self.DEFAULT_VALUE
             self._choice = None
 
