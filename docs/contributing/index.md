@@ -152,6 +152,9 @@ For issues with these pages, especially accessibility issues, please
 ## Deployment
 
 Github actions are set up to run code checks and tests on every push.
+Tests are run across Python 3.9, 3.10, 3.11 and 3.12.  Even though
+3.9 is very old it is very widely deployed and there are a lot of
+small but breaking changes.
 
 Deployment is not yet automated.  There's a couple of small scripts
 to set a new version number in the code, documentation and git tags.
@@ -162,7 +165,8 @@ name on the command line:
 
     script/set_version 1.2.3
 
-There's also a script to automate upload to PyPI using twine.
+Releases are not yet automated.  Releases are on PyPI (not github),
+there's a script to automate upload to PyPI using twine:
 
     script/build_and_upload
 
