@@ -1,15 +1,15 @@
 import pytest
 
-from countess.core.pipeline import PipelineNode, PipelineGraph
+from countess.core.pipeline import PipelineGraph, PipelineNode
 
-@pytest.fixture(name='pg')
+
+@pytest.fixture(name="pg")
 def fixture_pg():
-
-    pn0 = PipelineNode('node')
-    pn1 = PipelineNode('node')
-    pn2 = PipelineNode('node')
-    pn3 = PipelineNode('node')
-    pn4 = PipelineNode('node')
+    pn0 = PipelineNode("node")
+    pn1 = PipelineNode("node")
+    pn2 = PipelineNode("node")
+    pn3 = PipelineNode("node")
+    pn4 = PipelineNode("node")
 
     pg = PipelineGraph()
     pg.add_node(pn0)
@@ -27,8 +27,8 @@ def fixture_pg():
 
     return pg
 
-def test_ancestor_descendant(pg):
 
+def test_ancestor_descendant(pg):
     pns = list(pg.traverse_nodes())
     for pn in pns[1:]:
         assert pns[0].is_ancestor_of(pn)
@@ -40,7 +40,6 @@ def test_ancestor_descendant(pg):
 
 
 def test_pipeline_graph_tidy(pg):
-
     pg.tidy()
 
     pns = list(pg.traverse_nodes())
@@ -52,39 +51,39 @@ def test_pipeline_graph_tidy(pg):
     xs = [pn.position[0] for pn in pns]
     assert sorted(xs) == xs
 
-def test_pipeline_del_node(pg):
 
+def test_pipeline_del_node(pg):
     pns = list(pg.traverse_nodes())
     pg.del_node(pns[2])
 
     assert not pns[2].is_descendant_of(pns[0])
     assert not pns[2].is_ancestor_of(pns[-1])
 
-def test_pipeline_del_parent(pg):
 
+def test_pipeline_del_parent(pg):
     pns = list(pg.traverse_nodes())
     pns[2].del_parent(pns[1])
 
     assert not pns[1].is_ancestor_of(pns[2])
     assert pns[2].is_ancestor_of(pns[-1])
 
-def test_pipeline_graph_reset_node_name(pg):
 
+def test_pipeline_graph_reset_node_name(pg):
     pns = list(pg.traverse_nodes())
     pg.reset_node_name(pns[1])
-    assert pns[1].name == 'node 2'
+    assert pns[1].name == "node 2"
 
     pg.reset_node_name(pns[3])
-    assert pns[3].name == 'node 4'
+    assert pns[3].name == "node 4"
+
 
 def test_pipeline_graph_reset_node_names(pg):
-
     pg.reset_node_names()
     names = [pn.name for pn in pg.traverse_nodes()]
     assert sorted(set(names)) == names
 
-def test_pg_reset(pg):
 
+def test_pg_reset(pg):
     pg.reset()
 
     assert all(pn.result is None for pn in pg.traverse_nodes())
