@@ -110,13 +110,13 @@ class ScalarWithOperatorsParam(ScalarParam):
     def __gt__(self, other):
         return self._value > other
 
-    def __gte__(self, other):
+    def __ge__(self, other):
         return self._value >= other
 
     def __lt__(self, other):
         return self._value < other
 
-    def __lte__(self, other):
+    def __le__(self, other):
         return self._value <= other
 
 
@@ -187,6 +187,15 @@ class NumericParam(ScalarWithOperatorsParam):
     def __float__(self):
         return float(self._value)
 
+    def __abs__(self):
+        return abs(self._value)
+
+    def __pos__(self):
+        return self._value
+
+    def __neg__(self):
+        return 0 - (self._value)
+
     # XXX should include many more numeric operator methods here, see
     # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
     #   matmul, truediv, floordiv, mod, divmod, pow, lshift, rshift, and, xor, or,
@@ -219,10 +228,12 @@ class BooleanParam(ScalarParam):
         if isinstance(value, str):
             if value in ("t", "T", "true", "True", "1"):
                 self._value = True
-            if value in ("f", "F", "false", "False", "0"):
+            elif value in ("f", "F", "false", "False", "0"):
                 self._value = False
-            raise ValueError(f"Can't convert {value} to boolean")
-        self._value = bool(value)
+            else:
+                raise ValueError(f"Can't convert {value} to boolean")
+        else:
+            self._value = bool(value)
 
     def __bool__(self):
         return self._value or False
@@ -402,10 +413,10 @@ class DataTypeChoiceParam(ChoiceParam):
         super().__init__(label, value, choices)
 
     def get_selected_type(self):
-        if self.value is None:
-            return None
-        else:
+        try:
             return self.DATA_TYPES[self.value][0]
+        except KeyError:
+            return None
 
     def cast_value(self, value):
         if value is not None:
@@ -519,7 +530,7 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
     def get_column_prefix(self):
         if self.is_none():
             return None
-        return self.value.removesuffix("*")
+        return super().get_column_prefix()
 
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
@@ -548,33 +559,32 @@ class ColumnOrStringParam(ColumnChoiceParam):
     def set_column_choices(self, choices):
         self.set_choices([self.PREFIX + c for c in choices])
 
-    def get_column_name(self):
-        if self.value.startswith(self.PREFIX):
+    def get_column_name(self) -> Optional[str]:
+        if type(self.value) is str and self.value.startswith(self.PREFIX):
             return self.value[len(self.PREFIX) :]
         return None
 
-    def get_value_from_dict(self, data: dict):
+    def get_value_from_dict(self, data: dict) -> str:
         if type(self.value) is str and self.value.startswith(self.PREFIX):
             return data[self.value[len(self.PREFIX) :]]
         else:
             return self.value
 
-    def get_column_or_value(self, df: pd.DataFrame, numeric: bool):
-        if self.value.startswith(self.PREFIX):
+    def get_column_or_value(self, df: pd.DataFrame, numeric: bool) -> Union[float, str, pd.Series]:
+        if type(self.value) is str and self.value.startswith(self.PREFIX):
             col = df[self.value[len(self.PREFIX) :]]
-            return col.astype("f" if numeric else "string")
+            return col.astype(float if numeric else str)
         else:
             return float(self.value) if numeric else str(self.value)
 
-    def get_column_or_value_numeric(self, df: pd.DataFrame):
-        if self.value.startswith(self.PREFIX):
-            return df[self.value[len(self.PREFIX) :]]
-        else:
-            return self.value
-
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)
-        if self._value is not None and self._value.startswith(self.PREFIX) and self._value not in self.choices:
+        if (
+            self._value is not None
+            and type(self._value) is str
+            and self._value.startswith(self.PREFIX)
+            and self._value not in self.choices
+        ):
             self._value = self.DEFAULT_VALUE
             self._choice = None
 
@@ -861,17 +871,6 @@ class MultiParam(HasSubParametersMixin, BaseParam):
     def copy(self) -> "MultiParam":
         pp = dict(((k, p.copy()) for k, p in self.params.items()))
         return self.__class__(self.label, pp)
-
-    # XXX decide if these "dict-like" accessors are worth keeping
-
-    def __getitem__(self, key):
-        return self.params[key]
-
-    def __contains__(self, item):
-        return item in self.params
-
-    def __setitem__(self, key, value):
-        self.params[key].value = value
 
     def __iter__(self):
         return self.params.__iter__()

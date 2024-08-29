@@ -8,9 +8,9 @@ from typing import Callable, Iterable
 
 try:
     from typing import Concatenate, ParamSpec, TypeVar
-except ImportError:
+except ImportError:  # pragma: no cover
     # for Python 3.9 compatibility
-    from typing_extensions import Concatenate, ParamSpec, TypeVar  # type: ignore
+    from typing_extensions import Concatenate, ParamSpec, TypeVar  #  type: ignore
 
 import psutil
 
@@ -36,8 +36,10 @@ class IterableMultiprocessQueue:
             raise ValueError("IterableMultiprocessQueue Stopped")
         self.queue.put(value, timeout=timeout)
 
-    def close(self):
+    def finish(self):
         self.finished.value = True
+
+    def close(self):
         self.queue.close()
 
     def __iter__(self):
@@ -70,7 +72,11 @@ def multiprocess_map(
     input_queue = IterableMultiprocessQueue(maxsize=nproc)
     output_queue: Queue = Queue(maxsize=3)
 
-    def __process():
+    def __process():  # pragma: no cover
+    # this is run in a pool of `nproc` processes to handle resource-intensive
+    # processes which don't play nicely with the GIL.
+    # XXX Coverage doesn't seem to understand this so we exclude it from coverage.
+
         for data_in in input_queue:
             for data_out in function(data_in, *args, **(kwargs or {})):
                 output_queue.put(data_out)
@@ -91,27 +97,17 @@ def multiprocess_map(
     for p in processes:
         p.start()
 
-    # push each of the input values onto the input_queue, if it gets full
-    # then also try to drain the output_queue.
-    for v in values:
-        while True:
-            try:
-                input_queue.put(v, timeout=0.1)
-                break
-            except Full:
-                try:
-                    yield output_queue.get(timeout=0.1)
-                except Empty:
-                    # Waiting for the next output, might as well tidy up
-                    gc.collect()
+    # separate thread is in charge of pushing items into the input_queue
+    def __enqueue():
+        for v in values:
+            input_queue.put(v)
+        input_queue.finish()
 
-    # we're finished with input values, so close the input_queue to
-    # signal to all the processes that there will be no new entries
-    # and once the queue is empty they can finish.
-    input_queue.close()
+    thread = threading.Thread(target=__enqueue)
+    thread.start()
 
     # wait for all processes to finish and yield any data which appears
-    # on the output_queue
+    # on the output_queue as soon as it is available.
     while any(p.is_alive() for p in processes):
         try:
             while True:
@@ -121,6 +117,8 @@ def multiprocess_map(
             gc.collect()
 
     # once all processes have finished, we can clean up the queue.
+    thread.join()
     for p in processes:
         p.join()
+    input_queue.close()
     output_queue.close()
