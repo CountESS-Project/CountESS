@@ -888,7 +888,11 @@ class MultiParam(HasSubParametersMixin, BaseParam):
         try:
             return self.params[name]
         except KeyError as exc:
-            raise AttributeError(name=name, obj=self) from exc
+            try:
+                raise AttributeError(name=name, obj=self) from exc
+            except TypeError:  # pragma: no cover
+                # 3.9 doesn't have name and obj attributes
+                raise AttributeError() from exc
 
     def __setattr__(self, name, value):
         """Intercepts attempts to set parameters to a value and turns them into parameter.set_value.
