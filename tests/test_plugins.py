@@ -4,13 +4,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-<<<<<<< HEAD
-import countess
-from countess.core.plugins import BasePlugin, FileInputPlugin, PandasProductPlugin, get_plugin_classes
-=======
 from countess.core.parameters import ColumnChoiceParam, StringParam
 from countess.core.plugins import (
-    BasePlugin,
     FileInputPlugin,
     PandasConcatProcessPlugin,
     PandasProductPlugin,
@@ -19,7 +14,6 @@ from countess.core.plugins import (
     PandasTransformSingleToSinglePlugin,
     get_plugin_classes,
 )
->>>>>>> bf58ca03bb7b84f59ec878258834878f375eb369
 
 empty_entry_points_dict = {"countess_plugins": []}
 
@@ -122,7 +116,7 @@ class FIP(FileInputPlugin):
     def num_files(self):
         return 3
 
-    def load_file(self, file_number, row_limit):
+    def load_file(self, file_number, row_limit=None):
         if row_limit is None:
             row_limit = 1000000
         return [f"hello{file_number}"] * row_limit

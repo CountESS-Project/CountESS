@@ -1,9 +1,10 @@
 import gc
 import logging
+import threading
+import time
 from multiprocessing import Process, Queue, Value
 from os import cpu_count, getpid
-from queue import Empty, Full
-import time
+from queue import Empty
 from typing import Callable, Iterable
 
 try:
@@ -73,9 +74,9 @@ def multiprocess_map(
     output_queue: Queue = Queue(maxsize=3)
 
     def __process():  # pragma: no cover
-    # this is run in a pool of `nproc` processes to handle resource-intensive
-    # processes which don't play nicely with the GIL.
-    # XXX Coverage doesn't seem to understand this so we exclude it from coverage.
+        # this is run in a pool of `nproc` processes to handle resource-intensive
+        # processes which don't play nicely with the GIL.
+        # XXX Coverage doesn't seem to understand this so we exclude it from coverage.
 
         for data_in in input_queue:
             for data_out in function(data_in, *args, **(kwargs or {})):

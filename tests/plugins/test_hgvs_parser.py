@@ -84,18 +84,16 @@ def test_hgvs_parser_bad():
 
     df = plugin.process_dataframe(df2)
 
-    print(df)
-    assert all(np.isnan(df["var_1"]))
-    #assert np.isnan(df["var_1"].iloc[0])
-    #assert np.isnan(df["var_1"].iloc[1])
-    #assert np.isnan(df["var_1"].iloc[2])
+    assert np.isnan(df["var_1"].iloc[0])
+    assert np.isnan(df["var_1"].iloc[1])
+    assert np.isnan(df["var_1"].iloc[2])
 
 
 def test_hgvs_parser_very_bad():
     plugin = HgvsParserPlugin()
     plugin.set_parameter("column", "hgvs")
 
-    dfi = pd.DataFrame([{'a': 1}])
+    dfi = pd.DataFrame([{"a": 1}])
     dfo = plugin.process_dataframe(dfi)
 
     assert all(dfo == dfi)

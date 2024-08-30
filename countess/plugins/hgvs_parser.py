@@ -22,11 +22,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
     multi = BooleanParam("Multiple rows", False)
 
     def process_dict(self, data: dict):
-        try:
-            value = data[str(self.column)]
-        except KeyError:
-            return {}
-
+        value = data.get(str(self.column))
         if type(value) is not str:
             return {}
 
@@ -39,7 +35,7 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
             guides += self.guides_str.value.split(";")
 
         if m := re.match(r"(?:([\w.]+):)?([ncg]\.)(.*)", value):
-            output["reference"] = m.group(1) or ''
+            output["reference"] = m.group(1) or ""
             output["prefix"] = m.group(2)
             value = m.group(3)
 
@@ -55,18 +51,18 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
 
         max_variations = int(self.max_var)
         variations = [v for v in variations if v not in guides]
-        if len(variations) > max_variations:
-            return {}
 
         output_vars: list[Optional[str]] = [None] * max_variations
         output_locs: list[Optional[str]] = [None] * max_variations
-        for n, v in enumerate(variations):
-            if self.split:
-                if m := re.match(r"([\d_]+)(.*)", v):
-                    output_locs[n] = m.group(1)
-                    output_vars[n] = m.group(2)
-                    continue
-            output_vars[n] = v
+
+        if len(variations) <= max_variations:
+            for n, v in enumerate(variations):
+                if self.split:
+                    if m := re.match(r"([\d_]+)(.*)", v):
+                        output_locs[n] = m.group(1)
+                        output_vars[n] = m.group(2)
+                        continue
+                output_vars[n] = v
 
         if self.multi:
             output["var"] = output_vars

@@ -296,5 +296,5 @@ def test_arrayparam_minmax():
     assert len(ap) == 2
 
     # FIX minimum and maximum constraints!
-    #ap.del_subparam(ap[1])
-    #assert len(ap) == 2
+    # ap.del_subparam(ap[1])
+    # assert len(ap) == 2
