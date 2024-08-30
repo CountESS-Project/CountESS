@@ -853,14 +853,14 @@ class MultiParam(HasSubParametersMixin, BaseParam):
         self.params = dict((k, v.copy()) for k, v in params.items()) if params else {}
 
         # Allow new django-esque declarations via subclasses
-
         for k, p in self.__class__.__dict__.items():
             if isinstance(p, BaseParam):
-                self.__dict__[k] = self.params[k] = p.copy()
+                if k not in self.params:
+                    self.params[k] = p.copy()
+                self.__dict__[k] = self.params[k]
 
     def copy(self) -> "MultiParam":
-        pp = dict(((k, p.copy()) for k, p in self.params.items()))
-        return self.__class__(self.label, pp)
+        return self.__class__(self.label, self.params)
 
     # XXX decide if these "dict-like" accessors are worth keeping
 
