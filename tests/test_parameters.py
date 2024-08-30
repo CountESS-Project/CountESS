@@ -1,5 +1,5 @@
 import io
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -15,10 +15,12 @@ from countess.core.parameters import (
     ColumnOrNoneChoiceParam,
     DataTypeChoiceParam,
     DataTypeOrNoneChoiceParam,
+    FileArrayParam,
     FileParam,
     FloatParam,
     IntegerParam,
     MultiParam,
+    PerColumnArrayParam,
     ScalarParam,
     StringCharacterSetParam,
     StringParam,
@@ -108,6 +110,7 @@ def test_multiparam():
     )
 
     assert "foo" in mp
+    assert sorted(mp.keys()) == ["bar", "foo"]
 
     mp["foo"] = "hello"
     assert mp.foo == "hello"
@@ -122,6 +125,9 @@ def test_multiparam():
 
     mp.set_parameter("foo._label", "fnord")
     assert mp["foo"].label == "fnord"
+
+    with pytest.raises(AttributeError):
+        assert mp.fnord
 
 
 def test_scsp():
@@ -277,6 +283,23 @@ def test_fileparam():
     fp.value = "/foo/bar/baz"
     assert fp.get_parameters("fnord", "/foo") == [("fnord", "bar/baz")]
 
+    assert fp.get_parameters("fnord", "") == [("fnord", "/foo/bar/baz")]
+
+    fp.value = ""
+    assert fp.get_parameters("fnord", "") == [("fnord", None)]
+
+
+def test_filearrayparam():
+    ap1 = FileArrayParam("x", param=FileParam("Y"))
+    assert ap1.find_fileparam().label == "Y"
+
+    ap2 = FileArrayParam("x", param=MultiParam("Y", params={"z": FileParam("Z")}))
+    assert ap2.find_fileparam().label == "Z"
+
+    with pytest.raises(TypeError):
+        ap0 = FileArrayParam("x", param=IntegerParam("Y"))
+        ap0.find_fileparam()
+
 
 def test_arrayparam_minmax():
     pp = IntegerParam("x")
@@ -295,6 +318,25 @@ def test_arrayparam_minmax():
     ap.del_row(1)
     assert len(ap) == 2
 
-    # FIX minimum and maximum constraints!
-    # ap.del_subparam(ap[1])
-    # assert len(ap) == 2
+    assert ap[1] in ap
+    ap.del_subparam(ap[1])
+    assert len(ap) == 2
+
+    ap[0] = 7
+    assert ap[0].value == 7
+
+
+def test_pcap():
+    pp = IntegerParam("x")
+    ap = PerColumnArrayParam("y", param=pp)
+
+    ap.set_column_choices(["a", "b", "c"])
+    assert len(ap) == 3
+    apa, apb, apc = list(ap)
+
+    ap.set_column_choices(["c", "d", "b", "a"])
+    assert len(ap) == 4
+    assert ap[0] is apc
+    assert ap[2] is apb
+    assert ap[3] is apa
+    assert ap[1] is not apb

@@ -297,7 +297,7 @@ class FileParam(StringParam):
                 try:
                     # Python 3.11
                     digest = hashlib.file_digest(file, PARAM_DIGEST_HASH)
-                except AttributeError:
+                except AttributeError:  # pragma: no cover
                     digest = hashlib.new(PARAM_DIGEST_HASH)
                     while True:
                         data = file.read()
@@ -725,8 +725,6 @@ class ArrayParam(BaseParam):
         assert 0 <= position < len(self.params)
 
         self.params.pop(position)
-        if len(self.params) < self.min_size:
-            self.params.append(self.param.copy())
         self.relabel()
 
     def del_subparam(self, param: BaseParam):
@@ -734,6 +732,8 @@ class ArrayParam(BaseParam):
         self.relabel()
 
     def relabel(self):
+        while len(self.params) < self.min_size:
+            self.params.append(self.param.copy())
         for n, param in enumerate(self.params):
             param.label = self.param.label + f" {n+1}"
 
@@ -744,8 +744,6 @@ class ArrayParam(BaseParam):
         return len(self.params)
 
     def __getitem__(self, key):
-        while len(self.params) <= int(key):
-            self.add_row()
         return self.params[int(key)]
 
     def __setitem__(self, key, value):
@@ -785,7 +783,7 @@ class ArrayParam(BaseParam):
                 assert isinstance(param, (HasSubParametersMixin, ArrayParam))
                 param.set_parameter(subkey, value, base_dir)
 
-        else:
+        elif self.max_size is None or int(key) < self.max_size:
             while int(key) >= len(self.params):
                 self.params.append(self.param.copy())
             param = self.params[int(key)]
@@ -810,14 +808,14 @@ class PerColumnArrayParam(ArrayParam):
 
     def set_column_choices(self, choices):
         params_by_label = {p.label: p for p in self.params}
-        self.params = [None] * len(choices)
-        for num, name in enumerate(choices):
-            if name in params_by_label:
-                self.params[num] = params_by_label[name]
+        self.params = []
+        for label in choices:
+            if label in params_by_label:
+                self.params.append(params_by_label[label])
             else:
-                self.params[num] = self.param.copy()
-                self.params[num].label = name
-            self.params[num].set_column_choices(choices)
+                self.params.append(self.param.copy())
+                self.params[-1].label = label
+        super().set_column_choices(choices)
 
     def get_column_params(self):
         for p in self.params:
