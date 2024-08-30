@@ -11,148 +11,60 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: "3.9"
+        cache: 'pip'
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-    - run: xvfb-run pytest tests/
+    - run: xvfb-run pytest -v -rP --doctest-modules countess/ tests/
 
-  run-tests-ubuntu-22_04-python-3_10-with-coverage:
+  run-tests-ubuntu-22_04-python-3_10:
     runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.10 (with coverage)
+    name: Ubuntu 22.04, Python 3.10
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
         python-version: "3.10"
+        cache: 'pip'
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-    - run: xvfb-run coverage run --source countess -m pytest tests/
-#    - run: coverage html
-#    - uses: actions/upload-artifact@v3
-#      with:
-#        name: test coverage report
-#        path: htmlcov/*
-    - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
-    - run: coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY
-
-#  run-tests-ubuntu-22_04-python-3_11_0rc2:
-#   runs-on: ubuntu-22.04
-#    name: Ubuntu 22.04, Python 3.11.0rc2
-#    steps:
-#    - uses: actions/checkout@v4
-#    - uses: actions/setup-python@v4
-#      with:
-#        python-version: "3.11.0-rc.2"
-#    - run: sudo apt install xvfb
-#    - run: pip install --upgrade pip
-#    - run: pip install .[dev]
-#    - run: xvfb-run pytest tests/
-#
-#  run-tests-ubuntu-22_04-python-3_11_0:
-#    runs-on: ubuntu-22.04
-#    name: Ubuntu 22.04, Python 3.11.1
-#    steps:
-#    - uses: actions/checkout@v4
-#    - uses: actions/setup-python@v4
-#      with:
-#        python-version: "3.11.0"
-#    - run: sudo apt install xvfb
-#    - run: pip install --upgrade pip
-#    - run: pip install .[dev]
-#    - run: xvfb-run pytest tests/
-#
-#  run-tests-ubuntu-22_04-python-3_11_1:
-#    runs-on: ubuntu-22.04
-#    name: Ubuntu 22.04, Python 3.11.1
-#    steps:
-#    - uses: actions/checkout@v4
-#    - uses: actions/setup-python@v4
-#      with:
-#        python-version: "3.11.1"
-#    - run: sudo apt install xvfb
-#    - run: pip install --upgrade pip
-#    - run: pip install .[dev]
-#    - run: xvfb-run pytest tests/
-
-  run-tests-ubuntu-22_04-python-3_11_2:
-    runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.11.2
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: "3.11.2"
-    - run: sudo apt install xvfb
-    - run: pip install --upgrade pip
-    - run: pip install .[dev]
-    - run: xvfb-run pytest tests/
-
-  run-tests-ubuntu-22_04-python-3_11:
-    runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.11
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-    - run: sudo apt install xvfb
-    - run: pip install --upgrade pip
-    - run: pip install .[dev]
-    - run: xvfb-run pytest tests/
-
-#  run-tests-ubuntu-22_04-python-3_12_0_alpha5:
-#    runs-on: ubuntu-22.04
-#    name: Ubuntu 22.04, Python 3.12.0alpha5
-#    steps:
-#    - uses: actions/checkout@v4
-#    - uses: actions/setup-python@v4
-#      with:
-#        python-version: "3.12.0-alpha.5"
-#    - run: sudo apt install xvfb
-#    - run: pip install --upgrade pip
-#    - run: pip install .[dev]
-#    - run: xvfb-run pytest tests/
+    - run: xvfb-run pytest -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-22_04-python-3_11_from_apt:
     runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python from Apt
+    name: Ubuntu 22.04, Python 3.11 from Apt
     steps:
     - uses: actions/checkout@v4
     - run: sudo apt install python3.11-full python3-pip xvfb
     - run: python3.11 -m pip install --upgrade pip
     - run: python3.11 -m pip install -e .[dev]
-    - run: xvfb-run python3.11 -mpytest tests/
+    - run: xvfb-run python3.11 -m pytest -v -rP --doctest-modules countess/ tests/
 
-      #  run-tests-ubuntu-22_10-python-3_11_from_apt:
-      #runs-on: ubuntu-22.10
-      #name: Ubuntu 22.10, Python from Apt
-      #steps:
-      #- uses: actions/checkout@v4
-      #- run: sudo apt install python3.11-full python3-pip xvfb
-      #- run: python3.11 -m pip install --upgrade pip
-      #- run: python3.11 -m pip install -e .[dev]
-      #- run: xvfb-run python3.11 -mpytest tests/
+  run-tests-ubuntu-24_04-python-3_12_from_apt:
+    runs-on: ubuntu-24.04
+    name: Ubuntu 24.04, Python 3.12 from Apt
+    steps:
+    - uses: actions/checkout@v4
+    - run: sudo apt install python3.12-full python3-pip xvfb
+    - run: python3.12 -m venv /tmp/venv
+    - run: /tmp/venv/bin/python -m pip install --upgrade pip
+    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: xvfb-run /tmp/venv/bin/python -m pytest -v -rP --doctest-modules countess/ tests/
 
-      #run-tests-ubuntu-23_04-python-3_11_from_apt:
-      #runs-on: ubuntu-23.04
-      #name: Ubuntu 23.04, Python from Apt
-      #steps:
-      #- uses: actions/checkout@v4
-      #- run: sudo apt install python3.11-full python3-pip xvfb
-      #- run: python3.11 -m pip install --upgrade pip
-      #- run: python3.11 -m pip install -e .[dev]
-      #- run: xvfb-run python3.11 -mpytest tests/
-
-#  run-tests-ubuntu-22_04-pypy3:
-#    runs-on: ubuntu-22.04
-#    name: Ubuntu 22.04, PyPy 3
-#    steps:
-#    - uses: actions/checkout@v4
-#    - uses: actions/setup-python@v4
-#      with:
-#        python-version: "pypy3.9"
-#    - run: sudo apt install pypy3 pypy3-tk pypy3-dev xvfb
-#    - run: pypy3 -mpip install -U pip wheel
-#    - run: pypy3 -mpip install .[dev]
-#    - run: xvfb-run pytest tests/
+  run-tests-ubuntu-24_04-python-3_x:
+    runs-on: ubuntu-24.04
+    name: Ubuntu 24.04, Python 3.x
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+        cache: 'pip'
+    - run: sudo apt install xvfb
+    - run: python3 -m venv /tmp/venv
+    - run: /tmp/venv/bin/python -m pip install --upgrade pip
+    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: xvfb-run /tmp/venv/bin/coverage run --source countess -m pytest -v -rP --doctest-modules countess/ tests/
+    - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
+    - run: /tmp/venv/bin/coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY

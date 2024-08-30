@@ -18,8 +18,12 @@ class SentinelQueue(Queue):
     The writer is expected to call `queue.finish()` when it is done and
     the reader can treat the queue like an iterable."""
 
-    # XXX this is an attempt to handle multiple threads reading from the
-    # queue in parallel: they should all get StopIterations.
+    # catch attempts to 'put' more data onto the queue after it has finished.
+    finished = False
+
+    # Handle multiple threads reading from the
+    # queue in parallel: once the sentinel has been received by any thread
+    # all further attempts to read get StopIterations.
     stopped = False
 
     class SENTINEL:
@@ -27,6 +31,7 @@ class SentinelQueue(Queue):
 
     def finish(self):
         self.put(self.SENTINEL)
+        self.finished = True
 
     def __iter__(self):
         return self
@@ -47,13 +52,8 @@ class SentinelQueue(Queue):
             raise StopIteration
         return val
 
-    def get(self, block=True, timeout=None):
-        if self.stopped:
-            raise ValueError("SentinelQueue stopped")
-        return super().get(block, timeout)
-
     def put(self, item, block=True, timeout=None):
-        if self.stopped:
+        if self.finished:
             raise ValueError("SentinelQueue stopped")
         super().put(item, block, timeout)
 
@@ -83,7 +83,7 @@ class PipelineNode:
         self.name = name
         self.plugin = plugin
         self.config = config or []
-        self.position = position
+        self.position = position or (0.5, 0.5)
         self.sort_column = sort_column
         self.sort_descending = sort_descending
         self.notes = notes
@@ -104,9 +104,6 @@ class PipelineNode:
         queue = SentinelQueue(maxsize=3)
         self.output_queues.add(queue)
         return queue
-
-    def clear_output_queues(self):
-        self.output_queues = set()
 
     def queue_output(self, result):
         for data in result:
@@ -237,39 +234,21 @@ class PipelineNode:
         parent.child_nodes.discard(self)
         self.mark_dirty()
 
-    def has_sibling(self):
-        return any(len(pn.child_nodes) > 1 for pn in self.parent_nodes)
-
     def configure_plugin(self, key, value, base_dir="."):
         self.plugin.set_parameter(key, value, base_dir)
         self.mark_dirty()
 
-    def final_descendants(self):
-        if self.child_nodes:
-            return set(n2 for n1 in self.child_nodes for n2 in n1.final_descendants())
-        else:
-            return set(self)
-
-    def detatch(self):
+    def detach(self):
         for parent_node in self.parent_nodes:
             parent_node.child_nodes.discard(self)
         for child_node in self.child_nodes:
             child_node.parent_nodes.discard(self)
 
-    @classmethod
-    def get_ancestor_list(cls, nodes):
-        """Given a bunch of nodes, find the list of all the ancestors in a
-        sensible order"""
-        parents = set((p for n in nodes for p in n.parent_nodes))
-        if not parents:
-            return list(nodes)
-        return cls.get_ancestor_list(parents) + list(nodes)
-
 
 class PipelineGraph:
-    def __init__(self):
+    def __init__(self, nodes: Optional[list[PipelineNode]] = None):
         self.plugin_classes = get_plugin_classes()
-        self.nodes = []
+        self.nodes = nodes or []
 
     def reset_node_name(self, node):
         node_names_seen = set(n.name for n in self.nodes if n != node)
@@ -285,7 +264,7 @@ class PipelineGraph:
         self.nodes.append(node)
 
     def del_node(self, node):
-        node.detatch()
+        node.detach()
         self.nodes.remove(node)
 
     def traverse_nodes(self):

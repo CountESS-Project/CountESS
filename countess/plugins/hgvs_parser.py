@@ -38,8 +38,8 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
         if self.guides_str:
             guides += self.guides_str.value.split(";")
 
-        if m := re.match(r"([\w.]+):([ncg].)(.*)", value):
-            output["reference"] = m.group(1)
+        if m := re.match(r"(?:([\w.]+):)?([ncg]\.)(.*)", value):
+            output["reference"] = m.group(1) or ''
             output["prefix"] = m.group(2)
             value = m.group(3)
 

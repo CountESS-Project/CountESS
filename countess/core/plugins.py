@@ -250,7 +250,7 @@ class PandasSimplePlugin(PandasProcessPlugin):
                     yield result
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning("Exception", exc_info=exc)
+            logger.warning("Exception", exc_info=exc)  # pragma: no cover
 
     def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
         """Override this to process a single dataframe"""
@@ -383,6 +383,7 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
         raise NotImplementedError(f"{self.__class__}.dataframe_to_series()")
 
     def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
+        dataframe_merged = None
         try:
             # 1. A dataframe with duplicates in its index can't be merged back correctly
             # in Step 4, so we add in an extra RangeIndex to guarantee uniqueness,
@@ -407,9 +408,8 @@ class PandasTransformBasePlugin(PandasSimplePlugin):
             if "__tmpidx" in dataframe_merged.index.names:
                 dataframe_merged.reset_index("__tmpidx", drop=True, inplace=True)
 
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning("Exception", exc_info=exc)
-            return None
+        except Exception as exc:  # pylint: disable=broad-exception-caught  # pragma: no cover
+            logger.warning("Exception", exc_info=exc)  # pragma: no cover
 
         return dataframe_merged
 
@@ -523,13 +523,9 @@ class PandasTransformXToTupleMixin:
 
         series.dropna(inplace=True)
         data = series.tolist()
-        if len(data):
-            max_cols = max(len(d) for d in data)
-            column_names = column_names[:max_cols]
-            df = pd.DataFrame(data, columns=column_names, index=series.index)
-            return df
-        else:
-            return pd.DataFrame()
+        max_cols = max(len(d) for d in data) if len(data) else 0
+        column_names = column_names[:max_cols]
+        return pd.DataFrame(data, columns=column_names, index=series.index)
 
 
 class PandasTransformXToDictMixin:
