@@ -1,4 +1,5 @@
 import csv
+import time
 from unittest.mock import patch
 
 import pytest
@@ -16,7 +17,7 @@ expected_output = """"thing","foo","bar","baz","qux","number","zz"
 @pytest.mark.slow
 def test_command_invocation():
     run(["countess_cmd", "tests/simple.ini"])
-
+    time.sleep(0.5)
     with open("tests/output.csv", "r", encoding="utf-8") as fh:
         output = fh.read()
         assert output == expected_output

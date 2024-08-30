@@ -39,18 +39,17 @@ class HgvsParserPlugin(PandasTransformDictToDictPlugin):
             output["prefix"] = m.group(2)
             value = m.group(3)
 
-        if value == "=":
-            variations = []
-        else:
+        variations: list[str] = []
+        if value != "=":
             if value.startswith("[") and value.endswith("]"):
                 value = value[1:-1]
             variations = value.split(";")
 
-        for n, g in enumerate(guides, 1):
-            output[f"guide_{n}"] = g in variations
+            for n, g in enumerate(guides, 1):
+                output[f"guide_{n}"] = g in variations
 
-        max_variations = int(self.max_var)
-        variations = [v for v in variations if v not in guides]
+            max_variations = int(self.max_var)
+            variations = [v for v in variations if v not in guides]
 
         output_vars: list[Optional[str]] = [None] * max_variations
         output_locs: list[Optional[str]] = [None] * max_variations
