@@ -3,7 +3,7 @@ import re
 import time
 from queue import Empty, Queue
 from threading import Thread
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
 
@@ -79,10 +79,9 @@ class PipelineNode:
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
 
-    def __init__(self, name, plugin=None, config=None, position=None, notes=None, sort_column=0, sort_descending=0):
+    def __init__(self, name, plugin=None, position=None, notes=None, sort_column=0, sort_descending=0):
         self.name = name
         self.plugin = plugin
-        self.config = config or []
         self.position = position or (0.5, 0.5)
         self.sort_column = sort_column
         self.sort_descending = sort_descending
@@ -90,17 +89,21 @@ class PipelineNode:
         self.parent_nodes = set()
         self.child_nodes = set()
         self.output_queues = set()
+        self.config : list[tuple[str,str,str]] = []
+
+    def set_config(self, key, value, base_dir):
+        self.config.append((key, value, base_dir))
 
     def __hash__(self):
         return id(self)
 
-    def is_ancestor_of(self, node):
+    def is_ancestor_of(self, node: "PipelineNode") -> bool:
         return (self in node.parent_nodes) or any((self.is_ancestor_of(n) for n in node.parent_nodes))
 
-    def is_descendant_of(self, node):
+    def is_descendant_of(self, node: "PipelineNode") -> bool:
         return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
-    def add_output_queue(self):
+    def add_output_queue(self) -> SentinelQueue:
         queue = SentinelQueue(maxsize=3)
         self.output_queues.add(queue)
         return queue
@@ -250,7 +253,7 @@ class PipelineGraph:
         self.plugin_classes = get_plugin_classes()
         self.nodes = nodes or []
 
-    def reset_node_name(self, node):
+    def reset_node_name(self, node: PipelineNode):
         node_names_seen = set(n.name for n in self.nodes if n != node)
         while node.name in node_names_seen:
             num = 1
@@ -259,15 +262,21 @@ class PipelineGraph:
                 num = int(match.group(2))
             node.name += f" {num + 1}"
 
-    def add_node(self, node):
+    def add_node(self, node: PipelineNode):
         self.reset_node_name(node)
         self.nodes.append(node)
 
-    def del_node(self, node):
+    def del_node(self, node: PipelineNode):
         node.detach()
         self.nodes.remove(node)
 
-    def traverse_nodes(self):
+    def find_node(self, label: str) -> Optional[PipelineNode]:
+        for node in self.nodes:
+            if node.label == label:
+                return node
+        return None
+
+    def traverse_nodes(self) -> Iterable[PipelineNode]:
         found_nodes = set(node for node in self.nodes if not node.parent_nodes)
         yield from found_nodes
 
@@ -277,7 +286,7 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-    def traverse_nodes_backwards(self):
+    def traverse_nodes_backwards(self) -> Iterable[PipelineNode]:
         found_nodes = set(node for node in self.nodes if not node.child_nodes)
         yield from found_nodes
 
@@ -319,6 +328,7 @@ class PipelineGraph:
                     num = int(match.group(2))
                 node.name += f" {num + 1}"
             node_names_seen.add(node.name)
+
 
     def tidy(self):
         """Tidies the graph (sets all the node positions)"""

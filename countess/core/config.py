@@ -34,17 +34,18 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
 
     # XXX check version and hash_digest and emit warnings.
 
-    config = [(key, ast.literal_eval(val), base_dir) for key, val in config_dict.items() if not key.startswith("_")]
-
-    return PipelineNode(
+    node = PipelineNode(
         name=name,
         plugin=plugin,
-        config=config,
         position=position,
         notes=notes,
         sort_column=int(sort[0]),
         sort_descending=bool(int(sort[1])),
     )
+    for key, val in config_dict.items():
+        if not key.startswith("_"):
+            node.set_config(key, ast.literal_eval(val), base_dir)
+    return node
 
 
 def read_config(
