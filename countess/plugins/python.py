@@ -100,7 +100,7 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
         b) we don't need to merge afterwards"""
 
         # XXX cache this?
-        self.code_object = compile(self.code.value, "<PythonPlugin>", mode="exec")
+        self.code_object = compile(self.code.value or "", "<PythonPlugin>", mode="exec")
 
         dataframe = dataframe.reset_index(drop=dataframe.index.names == [None])
         series = self.dataframe_to_series(dataframe)

@@ -26,7 +26,8 @@ def test_read_config_dict_no_plugin():
 
 
 def test_write_config():
-    pn = PipelineNode("node", plugin=NothingPlugin("node"), config=[("foo", "bar", "baz")])
+    pn = PipelineNode("node", plugin=NothingPlugin("node"))
+    pn.set_config("foo", "bar", "baz")
     pg = PipelineGraph([pn])
 
     buf = io.StringIO()

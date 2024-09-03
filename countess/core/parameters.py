@@ -130,7 +130,7 @@ class StringParam(ScalarWithOperatorsParam):
     _value: Optional[str] = None
 
     def set_value(self, value: Any):
-        self._value = str(value)
+        self._value = str(value or "")
 
     # Operator methods which apply only to strings
 
@@ -149,7 +149,7 @@ class TextParam(StringParam):
     long text field and also removes extra blank lines"""
 
     def set_value(self, value):
-        self._value = re.sub("\n\n\n+", "\n\n", value)
+        self._value = re.sub("\n\n\n+", "\n\n", value or "")
 
 
 class NumericParam(ScalarWithOperatorsParam):
@@ -270,7 +270,7 @@ class StringCharacterSetParam(StringParam):
             return ""
 
     def set_value(self, value: Any):
-        value_str = str(value)
+        value_str = str(value or "")
         self._value = "".join([self.clean_character(c) for c in value_str])
 
     def copy(self) -> "StringCharacterSetParam":

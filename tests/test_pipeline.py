@@ -106,12 +106,10 @@ def test_plugin_config(caplog):
     dnp = DoesNothingPlugin()
     dnn = PipelineNode(
         "node",
-        plugin=dnp,
-        config=[
-            ("param", 1, "."),
-            ("noparam", "whatever", "."),
-        ],
+        plugin=dnp
     )
+    dnn.set_config("param", "1", ".")
+    dnn.set_config("noparam", "whatever", ".")
     dnn.load_config()
 
     assert "noparam=whatever" in caplog.text

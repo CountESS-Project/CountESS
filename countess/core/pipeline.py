@@ -79,7 +79,15 @@ class PipelineNode:
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
 
-    def __init__(self, name, plugin=None, position=None, notes=None, sort_column=0, sort_descending=0):
+    def __init__(
+        self,
+        name: str,
+        plugin: Optional[BasePlugin] = None,
+        position: Optional[tuple[float, float]] = None,
+        notes: Optional[str] = None,
+        sort_column: int = 0,
+        sort_descending: bool = False,
+    ):
         self.name = name
         self.plugin = plugin
         self.position = position or (0.5, 0.5)
@@ -89,7 +97,7 @@ class PipelineNode:
         self.parent_nodes = set()
         self.child_nodes = set()
         self.output_queues = set()
-        self.config : list[tuple[str,str,str]] = []
+        self.config: list[tuple[str, str, str]] = []
 
     def set_config(self, key, value, base_dir):
         self.config.append((key, value, base_dir))
@@ -270,9 +278,9 @@ class PipelineGraph:
         node.detach()
         self.nodes.remove(node)
 
-    def find_node(self, label: str) -> Optional[PipelineNode]:
+    def find_node(self, name: str) -> Optional[PipelineNode]:
         for node in self.nodes:
-            if node.label == label:
+            if node.name == name:
                 return node
         return None
 
@@ -328,7 +336,6 @@ class PipelineGraph:
                     num = int(match.group(2))
                 node.name += f" {num + 1}"
             node_names_seen.add(node.name)
-
 
     def tidy(self):
         """Tidies the graph (sets all the node positions)"""

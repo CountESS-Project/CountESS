@@ -36,6 +36,11 @@ class DataTablePlugin(PandasInputPlugin):
     def fix_columns(self):
         old_rows = self.rows.params
 
+        # XXX should deal with duplicate column names more generally
+        for num, col in enumerate(self.columns):
+            if col.name == "":
+                col.name = f"col_{num+1}"
+
         self.params["rows"] = self.rows = ArrayParam(
             "Rows",
             TabularMultiParam("Row", {str(col.name): col.type.get_parameter(str(col.name)) for col in self.columns}),

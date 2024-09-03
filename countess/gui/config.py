@@ -208,7 +208,10 @@ class ParameterWrapper:
         elif isinstance(self.parameter, FileParam):
             self.entry["text"] = self.parameter.value
         else:
-            self.var.set(self.parameter.value)
+            if self.parameter.value is None:
+                self.var.set("")
+            else:
+                self.var.set(self.parameter.value)
 
         if self.label:
             self.label["text"] = self.parameter.label
@@ -448,7 +451,6 @@ class PluginConfigurator:
             self.change_callback(self)
 
     def update(self) -> None:
-
         # If there's only a single parameter it is presented a little differently.
         top_level = 0 if len(self.plugin.params) == 1 else 1
 

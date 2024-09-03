@@ -6,29 +6,27 @@ import multiprocessing
 import re
 import sys
 
-
 from countess import VERSION
 from countess.core.config import read_config
 
 logger = logging.getLogger(__name__)
 
 
-def run(args : list[str]) -> None:
-    options, args = getopt.getopt(args, '', ['version', 'set=', 'log='])
-    config : list[tuple[str,str,str]] = []
-
+def run(args: list[str]) -> None:
+    options, args = getopt.getopt(args, "", ["version", "set=", "log="])
+    config: list[tuple[str, str, str]] = []
 
     for opt_key, opt_val in options:
-        if opt_key == '--version':
+        if opt_key == "--version":
             print(f"CountESS {VERSION}")  # pylint: disable=bad-builtin
-        elif opt_key == '--set':
-            if m := re.match(r'([^.]+)\.([^=]+)=(.*)', opt_val):
-                config.append(m.groups())
+        elif opt_key == "--set":
+            if m := re.match(r"([^.]+)\.([^=]+)=(.*)", opt_val):
+                config.append((m.group(1), m.group(2), m.group(3)))
             else:
                 logger.warning("Bad --set option: %s", opt_val)
-        elif opt_key == '--log':
+        elif opt_key == "--log":
             try:
-                if re.match(r'\d+$', opt_val):
+                if re.match(r"\d+$", opt_val):
                     logging.getLogger().setLevel(int(opt_val))
                 else:
                     logging.getLogger().setLevel(opt_val.upper())
@@ -39,11 +37,15 @@ def run(args : list[str]) -> None:
 
     for filename in args:
         graph = read_config(filename)
-        for node_label, config_key, config_val in config:
-            try:
-                graph.find_node(node_label).set_config(config_key, ast.literal_eval(config_val), '.')
-            except (KeyError, ValueError):
-                logger.warning("Bad --set option: %s=%s", config_key, config_val)
+        for node_name, config_key, config_val in config:
+            node = graph.find_node(node_name)
+            if node:
+                try:
+                    node.set_config(config_key, ast.literal_eval(config_val), ".")
+                except (TypeError, KeyError, ValueError):
+                    logger.warning("Bad --set option: %s.%s=%s", node_name, config_key, config_val)
+            else:
+                logger.warning("Bad --set node name: %s", node_name)
 
         graph.run()
 
