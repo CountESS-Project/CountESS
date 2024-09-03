@@ -414,8 +414,10 @@ class ParameterWrapper:
         self.set_value("")
 
     def destroy(self):
-        self.label.destroy()
-        self.entry.destroy()
+        if self.label:
+            self.label.destroy()
+        if self.entry:
+            self.entry.destroy()
         if self.button:
             self.button.destroy()
 
@@ -446,14 +448,17 @@ class PluginConfigurator:
             self.change_callback(self)
 
     def update(self) -> None:
+
         # If there's only a single parameter it is presented a little differently.
         top_level = 0 if len(self.plugin.params) == 1 else 1
 
         # Create any new parameter wrappers needed & update existing ones
         for n, (key, parameter) in enumerate(self.plugin.params.items()):
-            if key in self.wrapper_cache:
+            if key in self.wrapper_cache and parameter == self.wrapper_cache[key].parameter:
                 self.wrapper_cache[key].update()
             else:
+                if key in self.wrapper_cache:
+                    self.wrapper_cache[key].destroy()
                 self.wrapper_cache[key] = ParameterWrapper(
                     self.frame, parameter, self.change_parameter, level=top_level
                 )
