@@ -104,10 +104,7 @@ class DoesNothingPlugin(ProcessPlugin):
 
 def test_plugin_config(caplog):
     dnp = DoesNothingPlugin()
-    dnn = PipelineNode(
-        "node",
-        plugin=dnp
-    )
+    dnn = PipelineNode("node", plugin=dnp)
     dnn.set_config("param", "1", ".")
     dnn.set_config("noparam", "whatever", ".")
     dnn.load_config()

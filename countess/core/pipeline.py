@@ -196,8 +196,10 @@ class PipelineNode:
             for key, val, base_dir in self.config:
                 try:
                     self.plugin.set_parameter(key, val, base_dir)
-                except (KeyError, ValueError):
+                except KeyError:
                     logger.warning("Parameter %s=%s Not Found", key, val)
+                except ValueError:
+                    logger.warning("Parameter %s=%s Not Valid", key, val)
             self.config = None
 
     def prerun(self, row_limit=PRERUN_ROW_LIMIT):

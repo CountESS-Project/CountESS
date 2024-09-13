@@ -1,6 +1,6 @@
 #!/bin/bash
 
-xvfb-run coverage run --source=countess -m pytest -v -rP --doctest-modules countess/ tests/
+xvfb-run -a coverage run --source=countess -m pytest -v -rP --doctest-modules countess/ tests/
 
 coverage report --skip-empty --sort=-cover
 

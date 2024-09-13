@@ -1,11 +1,15 @@
 import ast
 import io
+import logging
 import os.path
 import re
+import sys
 from configparser import ConfigParser
 
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import load_plugin
+
+logger = logging.getLogger(__name__)
 
 
 def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNode:
@@ -49,14 +53,20 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
 
 
 def read_config(
-    filename: str,
+    filenames: list[str],
 ) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
     cp = ConfigParser()
-    cp.read(filename)
+    for filename in filenames:
+        try:
+            with open(filename, "r", encoding="utf-8") as fh:
+                cp.read_file(fh)
+        except OSError as exc:
+            logger.error(str(exc))
+            sys.exit(2)
 
-    base_dir = os.path.dirname(filename)
+    base_dir = os.path.dirname(filenames[0])
 
     pipeline_graph = PipelineGraph()
     nodes_by_name: dict[str, PipelineNode] = {}
