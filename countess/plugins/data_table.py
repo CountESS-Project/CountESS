@@ -11,7 +11,7 @@ from countess.core.parameters import (
     StringParam,
     TabularMultiParam,
 )
-from countess.core.plugins import PandasInputPlugin
+from countess.core.plugins import BasePlugin
 
 
 class _ColumnsMultiParam(MultiParam):
@@ -20,13 +20,14 @@ class _ColumnsMultiParam(MultiParam):
     index = BooleanParam("Index?")
 
 
-class DataTablePlugin(PandasInputPlugin):
+class DataTablePlugin(BasePlugin):
     """DataTable"""
 
     name = "DataTable"
     description = "enter small amounts of data directly"
     link = "https://countess-project.github.io/CountESS/included-plugins/#data-table"
     version = VERSION
+    num_inputs = 0
 
     columns = ArrayParam("Columns", _ColumnsMultiParam("Column"))
     rows = ArrayParam("Rows", TabularMultiParam("Row"))
@@ -60,11 +61,7 @@ class DataTablePlugin(PandasInputPlugin):
             self.fix_columns()
         super().set_parameter(key, *a, **k)
 
-    def num_files(self):
-        return 1
-
-    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
-        assert file_number == 0
+    def finalize(self) -> Iterable[pd.DataFrame]:
         self.fix_columns()
         values = []
         for row in self.rows:

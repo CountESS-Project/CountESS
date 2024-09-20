@@ -10,6 +10,7 @@ import pandas as pd
 from countess import VERSION
 from countess.core.parameters import (
     ArrayParam,
+    BaseParam,
     BooleanParam,
     ChoiceParam,
     DataTypeOrNoneChoiceParam,
@@ -52,8 +53,7 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     filename_column = StringParam("Filename Column", "")
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
-    def read_file_to_dataframe(self, file_params, row_limit=None):
-        filename = file_params["filename"].value
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
 
         options = {
             "header": 0 if self.header else None,
