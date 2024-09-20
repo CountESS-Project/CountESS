@@ -1,6 +1,7 @@
 import logging
 from typing import Iterable, List
 
+import numpy as np
 import pandas as pd
 
 from countess import VERSION
@@ -17,9 +18,11 @@ class CollatePlugin(PandasProcessPlugin):
     name = "Collate"
     description = "Collate and sort records by column(s), taking the first N"
     version = VERSION
-    link = "https://countess-project.github.io/CountESS/included-p  lugins/#collate"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#collate"
 
-    columns = PerColumnArrayParam("Columns", ChoiceParam("Role", choices=["—", "Group", "Sort (Asc)", "Sort (Desc)"]))
+    COLUMN_CHOICES = ["—", "Group", "Sort (Asc)", "Sort (Desc)", "Drop"]
+
+    columns = PerColumnArrayParam("Columns", ChoiceParam("Role", choices=COLUMN_CHOICES))
     limit = IntegerParam("First N records", 0)
 
     dataframes: List[pd.DataFrame]
@@ -31,7 +34,8 @@ class CollatePlugin(PandasProcessPlugin):
         # XXX need a more general MapReduceFinalizePlugin class though.
         assert self.dataframes is not None
 
-        self.dataframes.append(data)
+        drop_cols = {p.label: np.NAN for p in self.columns if p.value == "Drop"}
+        self.dataframes.append(data.assign(**drop_cols))
         return []
 
     def finalize(self) -> Iterable[pd.DataFrame]:
@@ -40,11 +44,13 @@ class CollatePlugin(PandasProcessPlugin):
         df = pd.concat(self.dataframes)
         input_columns = get_all_columns(df).keys()
         self.columns.set_column_choices(input_columns)
-        column_parameters = list(zip(input_columns, self.columns))
-        group_cols = [col for col, param in column_parameters if param.value == "Group"]
-        sort_cols = {
-            col: param.value.endswith("(Asc)") for col, param in column_parameters if param.value.startswith("Sort")
-        }
+
+        drop_cols = [p.label for p in self.columns if p.value == "Drop"]
+        if drop_cols:
+            df.drop(columns=drop_cols, inplace=True)
+
+        group_cols = [p.label for p in self.columns if p.value == "Group"]
+        sort_cols = {p.label: p.value.endswith("(Asc)") for p in self.columns if p.value.startswith("Sort")}
 
         def sort_and_limit(df: pd.DataFrame) -> pd.DataFrame:
             df = df.sort_values(by=list(sort_cols.keys()), ascending=list(sort_cols.values()))
@@ -60,4 +66,4 @@ class CollatePlugin(PandasProcessPlugin):
 
             yield df
         except ValueError as exc:
-            logger.warning("Exception", exc_info=exc)
+            logger.error("Exception", exc_info=exc)
