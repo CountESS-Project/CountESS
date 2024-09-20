@@ -480,7 +480,12 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
 
 
 def find_variant_string(
-    prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None, offset: int = 0
+    prefix: str,
+    ref_seq: str,
+    var_seq: str,
+    max_mutations: Optional[int] = None,
+    offset: int = 0,
+    minus_strand: bool = False,
 ) -> str:
     """As above, but returns a single string instead of a generator
 
@@ -544,12 +549,16 @@ def find_variant_string(
     ValueError: Too many variations (2) in GATTACA
     """
 
-    if prefix.endswith("g.") and not prefix.endswith("n."):
+    if minus_strand:
+        ref_seq = reverse_complement(ref_seq)
+        var_seq = reverse_complement(var_seq)
+
+    if prefix.endswith("g.") or prefix.endswith("c."):
         variations = list(find_variant_dna(ref_seq, var_seq, offset))
     elif prefix.endswith("p."):
         variations = list(find_variant_protein(ref_seq, var_seq, offset))
     else:
-        raise ValueError("Only prefix types 'g.', 'n.' and 'p.' accepted at this time")
+        raise ValueError("Only prefix types 'g.', 'c.' and 'p.' accepted at this time")
 
     if len(variations) == 0:
         return prefix + "="

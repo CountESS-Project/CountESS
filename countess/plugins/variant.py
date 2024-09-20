@@ -28,14 +28,14 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
-    offset = ColumnOrIntegerParam("Genomic Offset (negative for reverse)", 0)
+    minus_strand = BooleanParam("Reference is on Minus Strand", False)
+    offset = ColumnOrIntegerParam("Reference Offset", 0)
+    prefix = StringParam("Output Prefix", "")
+    output = StringParam("Output Column", "variant")
 
-    prefix = StringParam("Genomic Prefix", "")
-    output = StringParam("Output Column (Genomic)", "variant")
-
-    coding_prefix = ColumnOrStringParam("Coding Prefix", "")
-    coding_offset = ColumnOrIntegerParam("Coding Offset", "")
-    coding_output = StringParam("Coding Output Column", "coding")
+    coding_prefix = StringParam("Coding Prefix", "c.")
+    coding_offset = ColumnOrIntegerParam("Coding Offset", 0)
+    coding_output = StringParam("Coding Output", "coding")
 
     max_mutations = IntegerParam("Max Mutations", 10)
     protein = StringParam("Protein Column", "protein")
@@ -50,28 +50,39 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
         reference = self.reference.get_value_from_dict(data)
         offset = int(self.offset.get_value_from_dict(data) or 0)
+        coding_offset = int(self.coding_offset.get_value_from_dict(data) or 0)
 
         r: dict[str, str] = {}
 
-        if self.output:
-            try:
+        try:
+            if self.output:
                 r[self.output.value] = find_variant_string(
-                    "g.", reference, sequence, int(self.max_mutations), offset=offset
+                    self.prefix + ":g." if self.prefix else "g.",
+                    reference,
+                    sequence,
+                    max_mutations=self.max_mutations.value,
+                    offset=offset,
+                    minus_strand=self.minus_strand.value,
                 )
-            except ValueError:
-                pass
-            except (TypeError, KeyError, IndexError) as exc:
-                logger.warning("Exception", exc_info=exc)
 
-        if self.protein:
-            try:
-                r[str(self.protein)] = find_variant_string(
-                    "p.", reference, sequence, int(self.max_protein), offset=offset
+            if self.coding_output:
+                r[self.coding_output.value] = find_variant_string(
+                    self.coding_prefix + ":c." if self.coding_prefix else "c.",
+                    reference,
+                    sequence,
+                    int(self.max_mutations),
+                    offset=coding_offset,
                 )
-            except ValueError:
-                pass
-            except (TypeError, KeyError, IndexError) as exc:
-                logger.warning("Exception", exc_info=exc)
+
+            if self.protein:
+                r[str(self.protein)] = find_variant_string(
+                    "p.", reference, sequence, int(self.max_protein), offset=coding_offset
+                )
+
+        #except ValueError:
+        #    pass
+        except (TypeError, KeyError, IndexError) as exc:
+            logger.warning("Exception", exc_info=exc)
 
         return r
 
