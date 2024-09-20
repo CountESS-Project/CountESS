@@ -52,6 +52,7 @@ dev = [
 [project.entry-points.countess_plugins]
 collate = "countess.plugins.collate:CollatePlugin"
 load_fastq = "countess.plugins.fastq:LoadFastqPlugin"
+load_fasta = "countess.plugins.fastq:LoadFastaPlugin"
 load_csv = "countess.plugins.csv:LoadCsvPlugin"
 group_by = "countess.plugins.group_by:GroupByPlugin"
 expression = "countess.plugins.expression:ExpressionPlugin"
