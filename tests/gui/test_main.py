@@ -50,7 +50,7 @@ def test_main():
 
 @pytest.mark.gui
 def test_run():
-    graph = read_config("tests/simple.ini")
+    graph = read_config(["tests/simple.ini"])
 
     runner = RunWindow(graph)
     for _ in range(0, 20):

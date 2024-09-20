@@ -488,7 +488,7 @@ class MainWindow:
         self.config_filename = filename
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
-        self.graph = read_config(filename)
+        self.graph = read_config([filename])
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.node_select(None)
 
