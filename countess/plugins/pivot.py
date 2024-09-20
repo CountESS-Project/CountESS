@@ -1,6 +1,6 @@
 import functools
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -22,9 +22,9 @@ class PivotPlugin(PandasProcessPlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
-    description = "Groups a dataframe and pivots column values into columns."
-    additional = """Expanded column values are duplicated for each combination of pivot values.
-        Missing values default to 0, and duplicate values are aggregated."""
+    description = "Pivots column values into columns."
+    additional = """Duplicate indexes on inputs may result in duplicate output rows.  If this is a problem,
+    perform an additional Group By before or after pivoting."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
@@ -39,7 +39,7 @@ class PivotPlugin(PandasProcessPlugin):
         self.input_columns = {}
         self.dataframes = []
 
-    def process(self, data: pd.DataFrame, source: str):
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         assert self.dataframes is not None
         self.input_columns.update(get_all_columns(data))
 
@@ -58,7 +58,7 @@ class PivotPlugin(PandasProcessPlugin):
 
         if not pivot_cols:
             logger.error("No columns to pivot on!")
-            return []
+            return
 
         for ec in expand_cols:
             if not is_numeric_dtype(data[ec]):
@@ -68,15 +68,15 @@ class PivotPlugin(PandasProcessPlugin):
         if n_pivot > 200:
             pivot_cols_str = ", ".join(pivot_cols)
             logger.error("Too many pivot combinations on %s (%d)", pivot_cols_str, n_pivot)
-            return []
+            return
 
         df = pd.pivot_table(
             data,
             values=expand_cols,
             index=index_cols,
             columns=pivot_cols,
+            fill_value=np.NAN,
             aggfunc=self.aggfunc.value,
-            fill_value=0,
         )
 
         if isinstance(df.columns, pd.MultiIndex):
@@ -85,18 +85,4 @@ class PivotPlugin(PandasProcessPlugin):
                 "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)]) for cc in df.columns
             ]  # type: ignore
 
-        self.dataframes.append(df)
-        return []
-
-    def finalize(self):
-        column_parameters = list(zip(self.input_columns, self.columns))
-        index_cols = [col for col, param in column_parameters if param.value == "Index"]
-        if self.dataframes:
-            df = pd.concat(self.dataframes)
-            self.dataframes = []
-            if index_cols:
-                df = df.groupby(by=index_cols, group_keys=True).sum()
-            yield df
-
-        for p in self.params.values():
-            p.set_column_choices(self.input_columns.keys())
+        yield df
