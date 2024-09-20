@@ -53,7 +53,8 @@ class CollatePlugin(PandasProcessPlugin):
         sort_cols = {p.label: p.value.endswith("(Asc)") for p in self.columns if p.value.startswith("Sort")}
 
         def sort_and_limit(df: pd.DataFrame) -> pd.DataFrame:
-            df = df.sort_values(by=list(sort_cols.keys()), ascending=list(sort_cols.values()))
+            if sort_cols:
+                df = df.sort_values(by=list(sort_cols.keys()), ascending=list(sort_cols.values()))
             if self.limit > 0:
                 df = df.head(self.limit.value)
             return df

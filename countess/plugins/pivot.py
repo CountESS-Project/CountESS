@@ -45,10 +45,9 @@ class PivotPlugin(PandasProcessPlugin):
 
         data.reset_index(drop=data.index.names == [None], inplace=True)
 
-        column_parameters = list(zip(self.input_columns, self.columns))
-        index_cols = [col for col, param in column_parameters if param.value == "Index"]
-        pivot_cols = [col for col, param in column_parameters if param.value == "Pivot"]
-        expand_cols = [col for col, param in column_parameters if param.value == "Expand"]
+        index_cols = [p.label for p in self.columns if p.value == "Index" and p.label in data.columns]
+        pivot_cols = [p.label for p in self.columns if p.value == "Pivot" and p.label in data.columns]
+        expand_cols = [p.label for p in self.columns if p.value == "Expand" and p.label in data.columns]
 
         if not index_cols:
             logger.warning("No columns to index!")
