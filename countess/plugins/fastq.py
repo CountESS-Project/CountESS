@@ -5,14 +5,15 @@ from typing import Iterable, Optional
 
 import pandas as pd
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
+from fqfa.fasta.fasta import parse_fasta_records  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import BooleanParam, FloatParam
+from countess.core.parameters import BooleanParam, FloatParam, StringParam
 from countess.core.plugins import PandasInputFilesPlugin
 from countess.utils.files import clean_filename
 
 
-def _file_reader(
+def _fastq_reader(
     file_handle, min_avg_quality: float, row_limit: Optional[int] = None, filename: str = ""
 ) -> Iterable[dict[str, str]]:
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
@@ -22,7 +23,6 @@ def _file_reader(
                 "header": fastq_read.header[1:],
                 "filename": clean_filename(filename),
             }
-
 
 class LoadFastqPlugin(PandasInputFilesPlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
@@ -47,13 +47,13 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
 
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
+                dataframe = pd.DataFrame(_fastq_reader(fh, min_avg_quality, row_limit, filename))
         elif filename.endswith(".bz2"):
             with bz2.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
+                dataframe = pd.DataFrame(_fastq_reader(fh, min_avg_quality, row_limit, filename))
         else:
             with open(filename, "r", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_file_reader(fh, min_avg_quality, row_limit, filename))
+                dataframe = pd.DataFrame(_fastq_reader(fh, min_avg_quality, row_limit, filename))
 
         group_columns = ["sequence"]
 
@@ -78,3 +78,49 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
             return dataframe.assign(count=1).groupby(group_columns).count()
         else:
             return dataframe
+
+
+def _fasta_reader(
+        file_handle, row_limit: Optional[int] = None
+) -> Iterable[dict[str, str]]:
+    for header, sequence in islice(parse_fasta_records(file_handle), 0, row_limit):
+        yield {
+            "__s": sequence,
+            "__h": header,
+        }
+
+class LoadFastaPlugin(PandasInputFilesPlugin):
+    name = "FASTA Load"
+    description = "Loads sequences from FASTA files"
+    link = "https://countess-project.github.io/CountESS/included-plugins/#fasta-load"
+    version = VERSION
+
+    file_types = [("FASTA", [".fasta", ".fa", ".fasta.gz", ".fa.gz", ".fasta.bz2", ".fa.bz2"])]
+
+    sequence_column = StringParam("Sequence Column", "sequence")
+    header_column = StringParam("Header Column", "header")
+    filename_column = StringParam("Filename Column", "filename")
+
+    def read_file_to_dataframe(self, file_params, row_limit=None):
+        filename = file_params.filename.value
+
+        if filename.endswith(".gz"):
+            with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
+                dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))
+        elif filename.endswith(".bz2"):
+            with bz2.open(filename, mode="rt", encoding="utf-8") as fh:
+                dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))
+        else:
+            with open(filename, "r", encoding="utf-8") as fh:
+                dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))
+
+        dataframe.rename(columns={"__s": self.sequence_column.value}, inplace=True)
+
+        if self.header_column:
+            dataframe.rename(columns={"__h": self.header_column.value}, inplace=True)
+        else:
+            dataframe.drop(columns=["__h"], inplace=True)
+
+        if self.filename_column:
+            dataframe[self.filename_column.value] = clean_filename(filename)
+        return dataframe
