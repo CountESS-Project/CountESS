@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 import multiprocessing
+import os
 import re
 import sys
 import threading
@@ -404,6 +405,7 @@ class MainWindow:
     preview_frame = None
     config_wrapper = None
     config_changed = False
+    config_filename = None
 
     def __init__(self, tk_parent: tk.Widget, config_filename: Optional[str] = None):
         self.tk_parent = tk_parent
@@ -474,6 +476,7 @@ class MainWindow:
                 return
         self.config_changed = False
         self.config_filename = None
+        self.update_title()
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph()
@@ -486,6 +489,9 @@ class MainWindow:
         if not filename:
             return
         self.config_filename = filename
+        self.config_changed = False
+        self.update_title()
+
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = read_config([filename])
@@ -501,7 +507,9 @@ class MainWindow:
         if not filename:
             return
         write_config(self.graph, filename)
+        self.config_filename = filename
         self.config_changed = False
+        self.update_title()
         # Names may have changed on save so redraw the tree
         self.graph_wrapper.destroy()
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
@@ -545,8 +553,20 @@ class MainWindow:
             self.config_wrapper = None
 
     def node_changed(self, node):
-        self.config_changed = True
         self.graph_wrapper.node_changed(node)
+        self.config_changed = True
+        self.update_title()
+
+    def update_title(self):
+        if self.config_filename:
+            title = "CountESS: " + os.path.relpath(self.config_filename)
+        else:
+            title = "CountESS " + VERSION
+
+        if self.config_changed:
+            title += " *"
+
+        self.tk_parent.title(title)
 
 
 class SplashScreen:
@@ -579,7 +599,6 @@ def make_root():
         root = tk.Tk()
         # XXX some kind of ttk style setup goes here as a fallback
 
-    root.title(f"CountESS {VERSION}")
     root.rowconfigure(0, weight=0)
     root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)
