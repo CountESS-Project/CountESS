@@ -19,6 +19,7 @@ class ColumnMultiParam(TabularMultiParam):
     max = BooleanParam("Max")
     sum = BooleanParam("Sum")
     mean = BooleanParam("Mean")
+    median = BooleanParam("Median")
 
 
 class GroupByPlugin(PandasConcatProcessPlugin):
