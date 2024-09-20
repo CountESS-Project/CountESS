@@ -4,8 +4,8 @@ from itertools import islice
 from typing import Iterable, Optional
 
 import pandas as pd
-from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 from fqfa.fasta.fasta import parse_fasta_records  # type: ignore
+from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, FloatParam, StringParam
@@ -23,6 +23,7 @@ def _fastq_reader(
                 "header": fastq_read.header[1:],
                 "filename": clean_filename(filename),
             }
+
 
 class LoadFastqPlugin(PandasInputFilesPlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
@@ -80,14 +81,13 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
             return dataframe
 
 
-def _fasta_reader(
-        file_handle, row_limit: Optional[int] = None
-) -> Iterable[dict[str, str]]:
+def _fasta_reader(file_handle, row_limit: Optional[int] = None) -> Iterable[dict[str, str]]:
     for header, sequence in islice(parse_fasta_records(file_handle), 0, row_limit):
         yield {
             "__s": sequence,
             "__h": header,
         }
+
 
 class LoadFastaPlugin(PandasInputFilesPlugin):
     name = "FASTA Load"
