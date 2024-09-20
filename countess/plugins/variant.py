@@ -28,8 +28,15 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
-    offset = ColumnOrIntegerParam("Reference Offset", 0)
-    output = StringParam("Output Column", "variant")
+    offset = ColumnOrIntegerParam("Genomic Offset (negative for reverse)", 0)
+
+    prefix = StringParam("Genomic Prefix", "")
+    output = StringParam("Output Column (Genomic)", "variant")
+
+    coding_prefix = ColumnOrStringParam("Coding Prefix", "")
+    coding_offset = ColumnOrIntegerParam("Coding Offset", "")
+    coding_output = StringParam("Coding Output Column", "coding")
+
     max_mutations = IntegerParam("Max Mutations", 10)
     protein = StringParam("Protein Column", "protein")
     max_protein = IntegerParam("Max Protein Variations", 10)
