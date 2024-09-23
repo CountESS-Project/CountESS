@@ -917,3 +917,8 @@ class MultiParam(HasSubParametersMixin, BaseParam):
 class TabularMultiParam(MultiParam):
     """This is just used to drop a hint to the GUI as to how the MultiParam
     is to be presented ... as a hierarchy or as a table ..."""
+
+class FramedMultiParam(MultiParam):
+    """This is just used to drop a hint to the GUI to display the MultiParam
+    in its own frame"""
+

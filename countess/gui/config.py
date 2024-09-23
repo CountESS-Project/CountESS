@@ -16,6 +16,7 @@ from ..core.parameters import (
     FileArrayParam,
     FileParam,
     FileSaveParam,
+    FramedMultiParam,
     MultiParam,
     ScalarParam,
     TabularMultiParam,
@@ -66,7 +67,7 @@ class ParameterWrapper:
         self.label: Optional[tk.Widget] = None
         self.row_labels: list[tk.Widget] = []
 
-        if isinstance(parameter, ArrayParam):
+        if isinstance(parameter, (ArrayParam, FramedMultiParam)):
             self.label = None
         else:
             self.label = tk.Label(tk_parent, text=parameter.label)
@@ -138,6 +139,15 @@ class ParameterWrapper:
                 tk.Label(self.entry, text="").grid()
 
                 self.update_subwrappers(parameter.params, drc)
+
+        elif isinstance(parameter, FramedMultiParam):
+            label_frame_label = tk.Frame(tk_parent)
+            tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
+            self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
+            self.entry.columnconfigure(0, weight=0)
+            self.entry.columnconfigure(1, weight=0)
+            self.entry.columnconfigure(2, weight=1)
+            self.update_subwrappers(parameter.params.values(), None)
 
         elif isinstance(parameter, (ArrayParam, MultiParam)):
             self.entry = tk.Frame(tk_parent)
