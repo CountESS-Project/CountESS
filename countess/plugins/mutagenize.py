@@ -49,6 +49,7 @@ class MutagenizePlugin(PandasInputPlugin):
     version = VERSION
 
     character_set = set(("A", "C", "G", "T", "N"))
+    row_limit: Optional[int] = None
 
     sequence = StringCharacterSetParam("Sequence", "", character_set=character_set)
     mutate = BooleanParam("All Single Mutations?", True)
@@ -58,12 +59,11 @@ class MutagenizePlugin(PandasInputPlugin):
     ins3 = BooleanParam("All Triple Inserts?", False)
     remove = BooleanParam("Remove Duplicates?", False)
 
-    def num_files(self):
-        return 1
+    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
+        assert len(sources) == 0
+        self.row_limit = row_limit
 
-    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
-        assert file_number == 0
-
+    def finalize(self) -> Iterable[pd.DataFrame]:
         df = pd.DataFrame(
             islice(
                 mutagenize(
@@ -75,7 +75,7 @@ class MutagenizePlugin(PandasInputPlugin):
                     bool(self.ins3),
                 ),
                 0,
-                row_limit,
+                self.row_limit,
             ),
             columns=["sequence", "position", "reference", "variation"],
         )

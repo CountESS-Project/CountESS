@@ -35,7 +35,7 @@ def test_reader():
     plugin.set_parameter("output.4.datatype", "integer")
     plugin.prepare([])
 
-    output_df = next(plugin.load_file(0))
+    output_df = next(plugin.finalize())
 
     assert list(output_df.columns) == ["thing", "foo", "bar", "baz", "qux"]
     assert list(output_df["thing"]) == ["foo", "bar", "baz", "qux"]

@@ -3,13 +3,14 @@ import csv
 import gzip
 import logging
 from io import BufferedWriter, BytesIO
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import (
     ArrayParam,
+    BaseParam,
     BooleanParam,
     ChoiceParam,
     DataTypeOrNoneChoiceParam,
@@ -52,10 +53,8 @@ class LoadCsvPlugin(PandasInputFilesPlugin):
     filename_column = StringParam("Filename Column", "")
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
-    def read_file_to_dataframe(self, file_params, row_limit=None):
-        filename = file_params["filename"].value
-
-        options = {
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
+        options: dict[str, Any] = {
             "header": 0 if self.header else None,
         }
         if row_limit is not None:

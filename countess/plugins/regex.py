@@ -111,7 +111,7 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
     skip = IntegerParam("Skip Lines", 0)
     output = ArrayParam("Output Columns", OutputColumnsMultiParam("Col"))
 
-    def read_file_to_dataframe(self, file_params, row_limit=None):
+    def read_file_to_dataframe(self, filename, file_param, row_limit=None):
         pdfs = []
 
         compiled_re = re.compile(self.regex.value)
@@ -123,7 +123,7 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
         columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
 
         records = []
-        with open(file_params["filename"].value, "r", encoding="utf-8") as fh:
+        with open(filename, "r", encoding="utf-8") as fh:
             for num, line in enumerate(fh):
                 if num < self.skip:
                     continue
@@ -147,7 +147,3 @@ class RegexReaderPlugin(PandasInputFilesPlugin):
 
         df = pd.concat(pdfs)
         return df
-
-    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable:
-        file_params = self.files[file_number]
-        yield self.read_file_to_dataframe(file_params, row_limit)

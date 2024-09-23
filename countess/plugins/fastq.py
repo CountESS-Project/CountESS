@@ -8,7 +8,7 @@ from fqfa.fasta.fasta import parse_fasta_records  # type: ignore
 from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
 
 from countess import VERSION
-from countess.core.parameters import BooleanParam, FloatParam, StringParam
+from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
 from countess.core.plugins import PandasInputFilesPlugin
 from countess.utils.files import clean_filename
 
@@ -42,8 +42,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
     filename_column = BooleanParam("Filename Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def read_file_to_dataframe(self, file_params, row_limit=None):
-        filename = file_params.filename.value
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
         min_avg_quality = float(self.min_avg_quality)
 
         if filename.endswith(".gz"):
@@ -101,9 +100,7 @@ class LoadFastaPlugin(PandasInputFilesPlugin):
     header_column = StringParam("Header Column", "header")
     filename_column = StringParam("Filename Column", "filename")
 
-    def read_file_to_dataframe(self, file_params, row_limit=None):
-        filename = file_params.filename.value
-
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
                 dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))

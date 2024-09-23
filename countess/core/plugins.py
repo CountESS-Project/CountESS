@@ -14,12 +14,12 @@ Plugin lifecycle:
     * Call Plugin.prerun() to generate new output
 """
 
+import glob
 import hashlib
 import importlib
 import importlib.metadata
 import logging
-from collections.abc import MutableMapping
-from typing import Dict, Iterable, List, Optional, Sequence, Type, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -145,44 +145,54 @@ class SimplePlugin(ProcessPlugin):
         raise NotImplementedError(f"{self.__class__}.process")
 
 
-class FileInputPlugin(BasePlugin):
-    """Mixin class to indicate that this plugin can read files from local
-    storage."""
+class FileInputPluginFilesMultiParam(MultiParam):
+    """MultiParam which only asks for one thing, a filename.  Using a MultiParam wrapper
+    because that makes it easier to extend the FileInputPlugin."""
 
-    file_number = 0
-    name = ""
-    row_limit = None
+    filename = FileParam("Filename")
+
+
+class FileInputPlugin(BasePlugin):
+    files = FileArrayParam("Files", FileInputPluginFilesMultiParam("File"))
+    file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
+    row_limit: Optional[int] = None
     num_inputs = 0
 
-    # used by the GUI file dialog
-    file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
-    file_params: MutableMapping[str, BaseParam] = {}
+    def __init__(self, *a, **k):
+        # Add in filenames
+        super().__init__(*a, **k)
+        self.files.file_types = self.file_types
 
-    def num_files(self) -> int:
-        """return the number of 'files' which are to be loaded.  The pipeline
-        will call code equivalent to
-        `[ p.load_file(n, row_limit) for n in range(0, p.num_files() ]`
-        although potentially using threads, multiprocessing, etc."""
-        raise NotImplementedError("FileInputMixin.num_files")
+    def filenames_and_params(self):
+        for file_param in self.files:
+            for filename in glob.iglob(file_param.filename.value):
+                yield filename, file_param
 
-    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable:
-        """Called potentially from multiple processes, see FileInputMixin.num_files()"""
-        raise NotImplementedError("FileInputMixin.load_file")
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None) -> Any:
+        """May be called from multiple processes at once.  Note that the 'filename' parameter
+        overrides the 'file_param.filename.value' as the latter may be a glob."""
+        raise NotImplementedError("{self.class}.read_file_to_dataframe")
+
+    def load_file(self, filename_and_param: Tuple[str, BaseParam], row_limit: Optional[int] = None) -> Iterable:
+        filename, file_param = filename_and_param
+        yield self.read_file_to_dataframe(filename, file_param, row_limit)
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
+        assert len(sources) == 0
         self.row_limit = row_limit
 
     def finalize(self) -> Iterable:
-        num_files = self.num_files()
+        filenames_and_params = list(self.filenames_and_params())
+        num_files = len(filenames_and_params)
         logger.info("%s: 0%%", self.name)
         if num_files > 1:
             row_limit_per_file = self.row_limit // num_files if self.row_limit else None
-            for n, r in enumerate(multiprocess_map(self.load_file, range(0, num_files), row_limit_per_file)):
+            for n, r in enumerate(multiprocess_map(self.load_file, filenames_and_params, row_limit_per_file)):
                 if n < num_files:
                     logger.info("%s: %d%%", self.name, int(100 * n / num_files))
                 yield r
         elif num_files == 1:
-            yield from self.load_file(0, self.row_limit)
+            yield from self.load_file(filenames_and_params[0], self.row_limit)
         logger.info("%s: 100%%", self.name)
 
 
@@ -622,38 +632,21 @@ class PandasTransformDictToDictPlugin(
         raise NotImplementedError(f"{self.__class__}.process_dict()")
 
 
-class PandasInputPlugin(FileInputPlugin):
-    """A specialization of the PandasBasePlugin to allow it to follow nothing,
-    eg: come first."""
-
-    def num_files(self):
-        raise NotImplementedError(f"{self.__class__}.num_files()")
-
-    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
-        raise NotImplementedError(f"{self.__class__}.load_file()")
+class PandasInputFilesPlugin(FileInputPlugin):
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None) -> pd.DataFrame:
+        """May be called from multiple processes at once.  Note that the 'filename' parameter
+        overrides the 'file_param.filename.value' as the latter may be a glob."""
+        raise NotImplementedError("{self.class}.read_file_to_dataframe")
 
 
-class PandasInputFilesPluginFilesMultiParam(MultiParam):
-    filename = FileParam("Filename")
+class PandasInputPlugin(PandasProcessPlugin):
+    num_inputs = 0
 
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
+        return []
 
-class PandasInputFilesPlugin(PandasInputPlugin):
-    files = FileArrayParam("Files", PandasInputFilesPluginFilesMultiParam("File"))
-
-    def __init__(self, *a, **k):
-        # Add in filenames
-        super().__init__(*a, **k)
-        self.files.file_types = self.file_types
-
-    def num_files(self):
-        return len(self.files)
-
-    def load_file(self, file_number: int, row_limit: Optional[int] = None) -> Iterable[pd.DataFrame]:
-        file_params = self.files[file_number]
-        yield self.read_file_to_dataframe(file_params, row_limit)
-
-    def read_file_to_dataframe(self, file_params, row_limit=None) -> pd.DataFrame:
-        raise NotImplementedError(f"{self.__class__}.read_file_to_dataframe")
+    def finalize(self) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError("{self.class}.finalize")
 
 
 class PandasOutputPlugin(PandasProcessPlugin):
