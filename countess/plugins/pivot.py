@@ -57,7 +57,7 @@ class PivotPlugin(PandasProcessPlugin):
 
         if not pivot_cols:
             logger.error("No columns to pivot on!")
-            return
+            return []
 
         for ec in expand_cols:
             if not is_numeric_dtype(data[ec]):
@@ -67,7 +67,15 @@ class PivotPlugin(PandasProcessPlugin):
         if n_pivot > 200:
             pivot_cols_str = ", ".join(pivot_cols)
             logger.error("Too many pivot combinations on %s (%d)", pivot_cols_str, n_pivot)
-            return
+            return []
+
+        # Duplicates should hopefully be rare ... where they do occur, the `tuple` function is called
+        # as an aggregator, so we end up with a series like [ 1, 2, (3, 4), 5, (6, 7, 8) ] ... this
+        # will then get cleared up in the `finalize` stage by the `aggregate` method ...
+
+        # XXX we don't need to do this for `min`, `max` and `sum` which are associative, and `mean`
+        # could be improved somewhat by storing tuples of (sum, count) and recombining them later,
+        # but that can wait ...
 
         df = pd.pivot_table(
             data,
@@ -75,7 +83,7 @@ class PivotPlugin(PandasProcessPlugin):
             index=index_cols,
             columns=pivot_cols,
             fill_value=np.NAN,
-            aggfunc=self.aggfunc.value,
+            aggfunc=tuple
         )
 
         if isinstance(df.columns, pd.MultiIndex):
@@ -84,4 +92,23 @@ class PivotPlugin(PandasProcessPlugin):
                 "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)]) for cc in df.columns
             ]  # type: ignore
 
-        yield df
+        self.dataframes.append(df)
+        return []
+
+    def aggregate(self, values):
+        # `explode()` expands the tuples out to get the full series, and then `.agg()` applies
+        # the appropriate aggregation function.
+        return values.explode().agg(self.aggfunc.value)
+
+    def finalize(self) -> Iterable[pd.DataFrame]:
+        if not self.dataframes:
+            return
+
+        dataframe = pd.concat(self.dataframes)
+        index_cols = [p.label for p in self.columns if p.value == "Index"]
+
+        if index_cols:
+            dataframe = dataframe.groupby(by=index_cols, group_keys=True).agg(self.aggregate)
+
+        yield dataframe
+        yield from super().finalize()
