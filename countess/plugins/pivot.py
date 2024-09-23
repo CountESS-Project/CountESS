@@ -69,13 +69,15 @@ class PivotPlugin(PandasProcessPlugin):
             logger.error("Too many pivot combinations on %s (%d)", pivot_cols_str, n_pivot)
             return []
 
-        # Duplicates should hopefully be rare ... where they do occur, the `tuple` function is called
-        # as an aggregator, so we end up with a series like [ 1, 2, (3, 4), 5, (6, 7, 8) ] ... this
-        # will then get cleared up in the `finalize` stage by the `aggregate` method ...
-
-        # XXX we don't need to do this for `min`, `max` and `sum` which are associative, and `mean`
-        # could be improved somewhat by storing tuples of (sum, count) and recombining them later,
-        # but that can wait ...
+        # `min`, `max` and `sum` are associative, so we just aggregate here and aggregate again
+        # at the end and all is fine.
+        # For non-associative functions like `mean` and `median`, the `tuple` function is called
+        # as a first aggregator, so we end up with a series like [ 1, 2, (3, 4), 5, (6, 7, 8) ] ...
+        # this will then get cleared up in the `finalize` stage by the `aggregate` method ...
+        def _aggfunc():
+            if self.aggfunc in ("min", "max", "sum"):
+                return self.aggfunc.value
+            return tuple
 
         df = pd.pivot_table(
             data,
@@ -83,7 +85,7 @@ class PivotPlugin(PandasProcessPlugin):
             index=index_cols,
             columns=pivot_cols,
             fill_value=np.NAN,
-            aggfunc=tuple
+            aggfunc=_aggfunc(),
         )
 
         if isinstance(df.columns, pd.MultiIndex):
@@ -95,20 +97,25 @@ class PivotPlugin(PandasProcessPlugin):
         self.dataframes.append(df)
         return []
 
-    def aggregate(self, values):
-        # `explode()` expands the tuples out to get the full series, and then `.agg()` applies
-        # the appropriate aggregation function.
-        return values.explode().agg(self.aggfunc.value)
-
     def finalize(self) -> Iterable[pd.DataFrame]:
         if not self.dataframes:
             return
+
+        # for the associative functions we just aggregate again, finding the sum-of-sums etc.
+        # for non-associative functions, `explode()` expands the tuples out to get the full
+        # series, and then `.agg()` applies the appropriate aggregation function.
+        # XXX `mean` could get streamlined by recording (sum, count) tuples at the first stage,
+        # and then adding those up here and dividing (but it's a bit tricky)
+        def _aggfunc():
+            if self.aggfunc in ("min", "max", "sum"):
+                return self.aggfunc.value
+            return lambda s: s.explode().agg(self.aggfunc.value)
 
         dataframe = pd.concat(self.dataframes)
         index_cols = [p.label for p in self.columns if p.value == "Index"]
 
         if index_cols:
-            dataframe = dataframe.groupby(by=index_cols, group_keys=True).agg(self.aggregate)
+            dataframe = dataframe.groupby(by=index_cols, group_keys=True).agg(_aggfunc())
 
         yield dataframe
         yield from super().finalize()
