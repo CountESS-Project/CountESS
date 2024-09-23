@@ -186,7 +186,8 @@ class FileInputPlugin(BasePlugin):
         if num_files > 1:
             row_limit_per_file = self.row_limit // num_files if self.row_limit else None
             for n, r in enumerate(multiprocess_map(self.load_file, filenames_and_params, row_limit_per_file)):
-                logger.info("%s: %d%%", self.name, int(100 * n / num_files))
+                if n < num_files:
+                    logger.info("%s: %d%%", self.name, int(100 * n / num_files))
                 yield r
         elif num_files == 1:
             yield from self.load_file(filenames_and_params[0], self.row_limit)

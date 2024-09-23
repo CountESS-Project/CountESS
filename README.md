@@ -1,4 +1,4 @@
-# CountESS 0.0.69
+# CountESS 0.0.71
 
 This is CountESS, a modular, Python 3 reimplementation of Enrich2.
 

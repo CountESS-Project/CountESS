@@ -58,7 +58,7 @@ def configure_graphs(args: list[str]) -> Iterable[PipelineGraph]:
                 logger.error("Bad --log level: %s", opt_val)
 
     for filename in args:
-        graph = read_config(filename)
+        graph = read_config([filename])
         for node_name, config_key, config_val in config:
             node = graph.find_node(node_name)
             if node:
