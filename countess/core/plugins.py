@@ -148,13 +148,14 @@ class SimplePlugin(ProcessPlugin):
 class FileInputPluginFilesMultiParam(MultiParam):
     """MultiParam which only asks for one thing, a filename.  Using a MultiParam wrapper
     because that makes it easier to extend the FileInputPlugin."""
+
     filename = FileParam("Filename")
 
 
 class FileInputPlugin(BasePlugin):
     files = FileArrayParam("Files", FileInputPluginFilesMultiParam("File"))
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
-    row_limit : Optional[int] = None
+    row_limit: Optional[int] = None
     num_inputs = 0
 
     def __init__(self, *a, **k):
@@ -164,19 +165,20 @@ class FileInputPlugin(BasePlugin):
 
     def filenames_and_params(self):
         for file_param in self.files:
-            for filename in glob.iglob(file_param.filename):
+            for filename in glob.iglob(file_param.filename.value):
                 yield filename, file_param
 
     def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None) -> Any:
-        """May be called from multiple processes at once.  Note that the 'filename' parameter 
+        """May be called from multiple processes at once.  Note that the 'filename' parameter
         overrides the 'file_param.filename.value' as the latter may be a glob."""
         raise NotImplementedError("{self.class}.read_file_to_dataframe")
 
-    def load_file(self, filename_and_param : Tuple[str, BaseParam], row_limit: int =None) -> Iterable:
+    def load_file(self, filename_and_param: Tuple[str, BaseParam], row_limit: Optional[int] = None) -> Iterable:
         filename, file_param = filename_and_param
         yield self.read_file_to_dataframe(filename, file_param, row_limit)
 
-    def prepare(self, row_limit: int) -> None:
+    def prepare(self, sources: List[str], row_limit: Optional[int] = None):
+        assert len(sources) == 0
         self.row_limit = row_limit
 
     def finalize(self) -> Iterable:
@@ -631,11 +633,20 @@ class PandasTransformDictToDictPlugin(
 
 
 class PandasInputFilesPlugin(FileInputPlugin):
-
     def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None) -> pd.DataFrame:
-        """May be called from multiple processes at once.  Note that the 'filename' parameter 
+        """May be called from multiple processes at once.  Note that the 'filename' parameter
         overrides the 'file_param.filename.value' as the latter may be a glob."""
         raise NotImplementedError("{self.class}.read_file_to_dataframe")
+
+
+class PandasInputPlugin(PandasProcessPlugin):
+    num_inputs = 0
+
+    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
+        return []
+
+    def finalize(self) -> Iterable[pd.DataFrame]:
+        raise NotImplementedError("{self.class}.finalize")
 
 
 class PandasOutputPlugin(PandasProcessPlugin):

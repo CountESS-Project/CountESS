@@ -100,9 +100,7 @@ class LoadFastaPlugin(PandasInputFilesPlugin):
     header_column = StringParam("Header Column", "header")
     filename_column = StringParam("Filename Column", "filename")
 
-    def read_file_to_dataframe(self, file_params, row_limit=None):
-        filename = file_params.filename.value
-
+    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
         if filename.endswith(".gz"):
             with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
                 dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))

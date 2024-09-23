@@ -110,31 +110,6 @@ def test_product_plugin_sources():
         list(ppp.finished("source3"))
 
 
-class FIP(FileInputPlugin):
-    version = "0"
-
-    def num_files(self):
-        return 3
-
-    def load_file(self, file_number, row_limit=None):
-        if row_limit is None:
-            row_limit = 1000000
-        return [f"hello{file_number}"] * row_limit
-
-
-def test_fileinput(caplog):
-    caplog.set_level("INFO")
-    fip = FIP("fip")
-
-    fip.prepare([], 1000)
-    data = list(fip.finalize())
-
-    assert len(data) >= 999
-    assert sorted(set(data)) == ["hello0", "hello1", "hello2"]
-
-    assert "100%" in caplog.text
-
-
 class TPCPP(PandasConcatProcessPlugin):
     version = "0"
 
