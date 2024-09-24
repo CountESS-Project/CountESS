@@ -29,8 +29,8 @@ REFERENCE_CHAR_SET = set(string.ascii_uppercase + string.digits + "_")
 # non-MT DNA call with an MT protein call or vice versa.
 
 SEQUENCE_TYPE_CHOICES = {
-    "g": "Linear Genomic",
-    "g-": "Linear Genomic (Minus Strand)",
+    "g": "Genomic",
+    "g-": "Genomic (Minus Strand)",
     # "o": "Circular Genomic",
     # "m": "Mitochondrial",
     "c": "Coding DNA",
@@ -58,7 +58,7 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
-    outputs = ArrayParam("Outputs", VariantOutputMultiParam("Output"))
+    outputs = ArrayParam("Outputs", VariantOutputMultiParam("Output"), min_size=1)
 
     def process_dict(self, data) -> dict:
         sequence = data[str(self.column)]

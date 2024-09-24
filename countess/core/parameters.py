@@ -361,6 +361,9 @@ class DictChoiceParam(ScalarWithOperatorsParam):
         if value in self.reverse:
             self._choice = self.reverse[value]
             self._value = value
+        elif value in self.choices:
+            self._choice = value
+            self._value = self.choices[value]
         else:
             self.set_default()
 
@@ -395,6 +398,9 @@ class DictChoiceParam(ScalarWithOperatorsParam):
         else:
             self._choice = ""
             self._value = ""
+
+    def get_parameters(self, key, base_dir="."):
+        return ((key, self._choice),)
 
     def copy(self) -> "DictChoiceParam":
         return self.__class__(self.label, self.value, self.choices)
