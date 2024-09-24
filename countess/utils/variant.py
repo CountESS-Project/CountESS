@@ -212,7 +212,6 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[st
 
     >>> list(find_variant_dna("AGAAGTAGAGG", "ATAAGAAGAGG", -200))
     ['198G>T', '194T>A']
-
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -523,6 +522,13 @@ def find_variant_string(
 
     >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGCTGCTTCA")
     'p.Val2_Gly3delinsAlaAla'
+
+    MINUS STRAND
+
+    this example is actually comparing TGTAATC and TCTGAAC ...
+
+    >>> find_variant_string("g.", "GATTACA", "GTTCAGA", minus_strand=True)
+    'g.[2G>C;3_4insG;6del]'
 
     CHECK FOR INVALID INPUTS
 
