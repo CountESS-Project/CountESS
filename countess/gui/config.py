@@ -13,6 +13,7 @@ from ..core.parameters import (
     BooleanParam,
     ChoiceParam,
     ColumnOrStringParam,
+    DictChoiceParam,
     FileArrayParam,
     FileParam,
     FileSaveParam,
@@ -72,10 +73,10 @@ class ParameterWrapper:
         else:
             self.label = tk.Label(tk_parent, text=parameter.label)
 
-        if isinstance(parameter, ChoiceParam):
+        if isinstance(parameter, (ChoiceParam, DictChoiceParam)):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
-            self.entry["values"] = parameter.choices or [""]
+            self.entry["values"] = parameter.get_values() or [""]
             if isinstance(parameter, ColumnOrStringParam):
                 self.entry.bind("<Key>", self.combobox_set)
                 self.entry["state"] = "normal"
@@ -203,9 +204,8 @@ class ParameterWrapper:
                 )
         elif isinstance(self.parameter, MultiParam):
             self.update_subwrappers(self.parameter.params.values(), None)
-        elif isinstance(self.parameter, ChoiceParam):
-            choices = self.parameter.choices or [""]
-            self.entry["values"] = choices
+        elif isinstance(self.parameter, (ChoiceParam, DictChoiceParam)):
+            self.entry["values"] = self.parameter.get_values() or [""]
             self.var.set(self.parameter.value)
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
@@ -393,8 +393,11 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
-        if isinstance(self.parameter, ChoiceParam) and self.entry.current() != -1:
-            self.set_choice(self.entry.current())
+        if isinstance(self.parameter, (ChoiceParam, DictChoiceParam)) and self.entry.current() != -1:
+            value = self.parameter.get_values()[self.entry.current()]
+            if value != self.parameter.value:
+                self.parameter.value = value
+                self.callback(self.parameter)
         else:
             self.var.set(self.set_value(self.var.get()))
 
