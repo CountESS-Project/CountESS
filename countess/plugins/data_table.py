@@ -11,7 +11,7 @@ from countess.core.parameters import (
     StringParam,
     TabularMultiParam,
 )
-from countess.core.plugins import BasePlugin
+from countess.core.plugins import PandasInputPlugin
 
 
 class _ColumnsMultiParam(MultiParam):
@@ -20,7 +20,7 @@ class _ColumnsMultiParam(MultiParam):
     index = BooleanParam("Index?")
 
 
-class DataTablePlugin(BasePlugin):
+class DataTablePlugin(PandasInputPlugin):
     """DataTable"""
 
     name = "DataTable"
