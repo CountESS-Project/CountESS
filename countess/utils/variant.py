@@ -205,6 +205,13 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[st
     >>> list(find_variant_dna("AAACCCTTT", "AAAGGGTTT"))
     ['4_6inv']
 
+    OFFSETS
+
+    >>> list(find_variant_dna("AGAAGTAGAGG", "ATAAGAAGAGG", 100))
+    ['102G>T', '106T>A']
+
+    >>> list(find_variant_dna("AGAAGTAGAGG", "ATAAGAAGAGG", -200))
+    ['198G>T', '194T>A']
     """
 
     ref_seq = ref_seq.strip().upper()
@@ -273,9 +280,9 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[st
             assert dest_seq == ""
             # 'delete' opcode maps to HGVS 'del' operation
             if len(src_seq) == 1:
-                yield f"{start+1}del"
+                yield f"{abs(start+1)}del"
             else:
-                yield f"{start+1}_{end}del"
+                yield f"{abs(start+1)}_{abs(end)}del"
 
         elif opcode.tag == "insert":
             assert src_seq == ""
@@ -285,12 +292,12 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[st
                 # This is a duplication of one or more symbols immediately
                 # preceding this point.
                 if len(dest_seq) == 1:
-                    yield f"{start}dup"
+                    yield f"{abs(start)}dup"
                 else:
-                    yield f"{start - len(dest_seq) + 1}_{start}dup"
+                    yield f"{abs(start - len(dest_seq) + 1)}_{abs(start)}dup"
             else:
                 inserted_sequence = search_for_sequence(ref_seq, dest_seq)
-                yield f"{start}_{start+1}ins{inserted_sequence}"
+                yield f"{abs(start)}_{abs(start+1)}ins{inserted_sequence}"
 
         elif opcode.tag == "replace":
             # 'replace' opcode maps to either an HGVS '>' (single substitution) or
@@ -301,12 +308,12 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[st
             # as this code has no concept of amino acid alignment.
 
             if len(src_seq) == 1 and len(dest_seq) == 1:
-                yield f"{start+1}{src_seq}>{dest_seq}"
+                yield f"{abs(start+1)}{src_seq}>{dest_seq}"
             elif len(src_seq) == len(dest_seq) and dest_seq == reverse_complement(src_seq):
-                yield f"{start+1}_{end}inv"
+                yield f"{abs(start+1)}_{abs(end)}inv"
             else:
                 inserted_sequence = search_for_sequence(ref_seq, dest_seq)
-                yield f"{start+1}_{end}delins{inserted_sequence}"
+                yield f"{abs(start+1)}_{abs(end)}delins{inserted_sequence}"
 
 
 def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
@@ -472,7 +479,12 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
 
 
 def find_variant_string(
-    prefix: str, ref_seq: str, var_seq: str, max_mutations: Optional[int] = None, offset: int = 0
+    prefix: str,
+    ref_seq: str,
+    var_seq: str,
+    max_mutations: Optional[int] = None,
+    offset: int = 0,
+    minus_strand: bool = False,
 ) -> str:
     """As above, but returns a single string instead of a generator
 
@@ -511,12 +523,19 @@ def find_variant_string(
     >>> find_variant_string("p.", "ATGGTTGGTTCA", "ATGGCTGCTTCA")
     'p.Val2_Gly3delinsAlaAla'
 
+    MINUS STRAND
+
+    this example is actually comparing TGTAATC and TCTGAAC ...
+
+    >>> find_variant_string("g.", "GATTACA", "GTTCAGA", minus_strand=True)
+    'g.[2G>C;3_4insG;6del]'
+
     CHECK FOR INVALID INPUTS
 
     >>> find_variant_string("x.", "CAT", "CAT")
     Traceback (most recent call last):
      ...
-    ValueError: Only prefix types 'g.', 'n.' and 'p.' accepted at this time
+    ValueError: Only prefix types 'g.', 'c.' and 'p.' accepted at this time
 
     >>> find_variant_string("g.", "HELLO", "CAT")
     Traceback (most recent call last):
@@ -536,12 +555,16 @@ def find_variant_string(
     ValueError: Too many variations (2) in GATTACA
     """
 
-    if prefix.endswith("g.") and not prefix.endswith("n."):
+    if minus_strand:
+        ref_seq = reverse_complement(ref_seq)
+        var_seq = reverse_complement(var_seq)
+
+    if prefix.endswith("g.") or prefix.endswith("c."):
         variations = list(find_variant_dna(ref_seq, var_seq, offset))
     elif prefix.endswith("p."):
         variations = list(find_variant_protein(ref_seq, var_seq, offset))
     else:
-        raise ValueError("Only prefix types 'g.', 'n.' and 'p.' accepted at this time")
+        raise ValueError("Only prefix types 'g.', 'c.' and 'p.' accepted at this time")
 
     if len(variations) == 0:
         return prefix + "="

@@ -339,6 +339,73 @@ class FileSaveParam(StringParam):
             self.file_types = file_types
 
 
+class DictChoiceParam(ScalarWithOperatorsParam):
+    """A drop-down menu parameter choosing between options.
+    Takes a mapping of choices where the key is the choice
+    and the value is the displayed value."""
+
+    _value: str = ""
+    _choice: str = ""
+    choices: dict[str, str]
+    reverse: dict[str, str]
+
+    def __init__(self, label: str, value: Optional[str] = None, choices: Optional[dict[str, str]] = None):
+        super().__init__(label)
+        self.set_choices(choices or {})
+        self.set_value(value)
+
+    def clean_value(self, value):
+        return value
+
+    def set_value(self, value):
+        if value in self.reverse:
+            self._choice = self.reverse[value]
+            self._value = value
+        elif value in self.choices:
+            self._choice = value
+            self._value = self.choices[value]
+        else:
+            self.set_default()
+
+    def get_choice(self):
+        return self._choice
+
+    def set_choice(self, choice):
+        if choice in self.choices:
+            self._choice = choice
+            self._value = self.choices[choice]
+        else:
+            self.set_default()
+
+    choice = property(get_choice, set_choice)
+
+    def set_choices(self, choices: dict[str, str]):
+        self.choices = dict(choices)
+        self.reverse = {v: k for k, v in choices.items()}
+        if self._choice in self.choices:
+            self._value = self.choices[self._choice]
+        elif self._value in self.reverse:
+            self._choice = self.reverse[self._value]
+        else:
+            self.set_default()
+
+    def get_values(self):
+        return list(self.choices.values())
+
+    def set_default(self):
+        if self.choices:
+            self._choice, self._value = list(self.choices.items())[0]
+        else:
+            self._choice = ""
+            self._value = ""
+
+    def get_parameters(self, key, base_dir="."):
+        return ((key, self._choice),)
+
+    def copy(self) -> "DictChoiceParam":
+        return self.__class__(self.label, self.value, self.choices)
+
+
 class ChoiceParam(ScalarWithOperatorsParam):
     """A drop-down menu parameter choosing between options.
     Defaults to 'None'"""
@@ -394,6 +461,9 @@ class ChoiceParam(ScalarWithOperatorsParam):
         else:
             self._value = self.DEFAULT_VALUE
             self._choice = None
+
+    def get_values(self):
+        return self.choices
 
     def copy(self) -> "ChoiceParam":
         return self.__class__(self.label, self.value, self.choices)
@@ -917,3 +987,8 @@ class MultiParam(HasSubParametersMixin, BaseParam):
 class TabularMultiParam(MultiParam):
     """This is just used to drop a hint to the GUI as to how the MultiParam
     is to be presented ... as a hierarchy or as a table ..."""
+
+
+class FramedMultiParam(MultiParam):
+    """This is just used to drop a hint to the GUI to display the MultiParam
+    in its own frame"""
