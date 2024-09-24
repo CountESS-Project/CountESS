@@ -529,7 +529,7 @@ def find_variant_string(
     >>> find_variant_string("x.", "CAT", "CAT")
     Traceback (most recent call last):
      ...
-    ValueError: Only prefix types 'g.', 'n.' and 'p.' accepted at this time
+    ValueError: Only prefix types 'g.', 'c.' and 'p.' accepted at this time
 
     >>> find_variant_string("g.", "HELLO", "CAT")
     Traceback (most recent call last):
