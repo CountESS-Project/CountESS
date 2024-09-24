@@ -1,15 +1,16 @@
 import logging
-from typing import Optional
-
-import pandas as pd
+import string
 
 from countess import VERSION
 from countess.core.parameters import (
-    BooleanParam,
+    ArrayParam,
     ColumnChoiceParam,
     ColumnOrIntegerParam,
     ColumnOrStringParam,
+    DictChoiceParam,
     IntegerParam,
+    MultiParam,
+    StringCharacterSetParam,
     StringParam,
 )
 from countess.core.plugins import PandasTransformDictToDictPlugin
@@ -17,72 +18,71 @@ from countess.utils.variant import find_variant_string
 
 logger = logging.getLogger(__name__)
 
+REFERENCE_CHAR_SET = set(string.ascii_uppercase + string.digits + "_")
+
+# XXX Should proabably support these other types as well but I don't
+# know what I don't know ...
+# XXX Supporting protein calls on mitochondrial (or other organisms)
+# DNA will required expansion of the variant caller routine to handle
+# different codon tables.  This opens up a can of worms of course.
+# XXX There should probably also be a warning generated if you ask for a
+# non-MT DNA call with an MT protein call or vice versa.
+
+SEQUENCE_TYPE_CHOICES = {
+    "g": "Linear Genomic",
+    "g-": "Linear Genomic (Minus Strand)",
+    # "o": "Circular Genomic",
+    # "m": "Mitochondrial",
+    "c": "Coding DNA",
+    # "n": "Non-Coding DNA",
+    "p": "Protein",
+    # "pm": "Protein (MT)",
+}
+
+
+class VariantOutputMultiParam(MultiParam):
+    prefix = StringCharacterSetParam("Prefix", "", character_set=REFERENCE_CHAR_SET)
+    seq_type = DictChoiceParam("Type", choices=SEQUENCE_TYPE_CHOICES)
+    offset = ColumnOrIntegerParam("Offset", 0)
+    maxlen = IntegerParam("Max Variations", 10)
+    output = StringParam("Output Column", "variant")
+
 
 class VariantPlugin(PandasTransformDictToDictPlugin):
     """Turns a DNA sequence into a HGVS variant code"""
 
-    name = "Variant Translator"
+    name = "Variant Caller"
     description = "Turns a DNA sequence into a HGVS variant code"
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#variant-caller"
 
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
-    offset = ColumnOrIntegerParam("Reference Offset", 0)
-    output = StringParam("Output Column", "variant")
-    max_mutations = IntegerParam("Max Mutations", 10)
-    protein = StringParam("Protein Column", "protein")
-    max_protein = IntegerParam("Max Protein Variations", 10)
-    drop = BooleanParam("Drop unidentified variants", False)
-    drop_columns = BooleanParam("Drop Input Column(s)", False)
+    outputs = ArrayParam("Outputs", VariantOutputMultiParam("Output"))
 
     def process_dict(self, data) -> dict:
         sequence = data[str(self.column)]
+        reference = self.reference.get_value_from_dict(data)
         if not sequence:
             return {}
 
-        reference = self.reference.get_value_from_dict(data)
-        offset = int(self.offset.get_value_from_dict(data) or 0)
-
         r: dict[str, str] = {}
+        for output in self.outputs:
+            seq_type = output.seq_type.get_choice() or "g"
+            prefix = f"{output.prefix + ':' if output.prefix else ''}{seq_type[0]}."
+            offset = int(output.offset.get_value_from_dict(data) or 0)
 
-        if self.output:
             try:
-                r[self.output.value] = find_variant_string(
-                    "g.", reference, sequence, int(self.max_mutations), offset=offset
+                r[output.output.value] = find_variant_string(
+                    prefix,
+                    reference,
+                    sequence,
+                    max_mutations=output.maxlen.value,
+                    offset=offset,
+                    minus_strand=seq_type.endswith("-"),
                 )
-            except ValueError:
-                pass
-            except (TypeError, KeyError, IndexError) as exc:
-                logger.warning("Exception", exc_info=exc)
 
-        if self.protein:
-            try:
-                r[str(self.protein)] = find_variant_string(
-                    "p.", reference, sequence, int(self.max_protein), offset=offset
-                )
-            except ValueError:
-                pass
             except (TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
         return r
-
-    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
-        df_out = super().process_dataframe(dataframe)
-
-        if df_out is not None:
-            if self.drop:
-                if self.output:
-                    df_out.dropna(subset=str(self.output), inplace=True)
-                if self.protein:
-                    df_out.dropna(subset=str(self.protein), inplace=True)
-            if self.drop_columns:
-                try:
-                    df_out.drop(columns=str(self.column), inplace=True)
-                    if self.reference.get_column_name():
-                        df_out.drop(columns=self.reference.get_column_name(), inplace=True)
-                except KeyError:
-                    pass
-
-        return df_out

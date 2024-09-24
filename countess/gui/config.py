@@ -13,9 +13,11 @@ from ..core.parameters import (
     BooleanParam,
     ChoiceParam,
     ColumnOrStringParam,
+    DictChoiceParam,
     FileArrayParam,
     FileParam,
     FileSaveParam,
+    FramedMultiParam,
     MultiParam,
     ScalarParam,
     TabularMultiParam,
@@ -66,15 +68,15 @@ class ParameterWrapper:
         self.label: Optional[tk.Widget] = None
         self.row_labels: list[tk.Widget] = []
 
-        if isinstance(parameter, ArrayParam):
+        if isinstance(parameter, (ArrayParam, FramedMultiParam)):
             self.label = None
         else:
             self.label = tk.Label(tk_parent, text=parameter.label)
 
-        if isinstance(parameter, ChoiceParam):
+        if isinstance(parameter, (ChoiceParam, DictChoiceParam)):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
             self.entry = ttk.Combobox(tk_parent, textvariable=self.var)
-            self.entry["values"] = parameter.choices or [""]
+            self.entry["values"] = parameter.get_values() or [""]
             if isinstance(parameter, ColumnOrStringParam):
                 self.entry.bind("<Key>", self.combobox_set)
                 self.entry["state"] = "normal"
@@ -139,6 +141,15 @@ class ParameterWrapper:
 
                 self.update_subwrappers(parameter.params, drc)
 
+        elif isinstance(parameter, FramedMultiParam):
+            label_frame_label = tk.Frame(tk_parent)
+            tk.Label(label_frame_label, text=parameter.label).grid(row=0, column=0, padx=5)
+            self.entry = tk.LabelFrame(tk_parent, labelwidget=label_frame_label, padx=10, pady=5)
+            self.entry.columnconfigure(0, weight=0)
+            self.entry.columnconfigure(1, weight=0)
+            self.entry.columnconfigure(2, weight=1)
+            self.update_subwrappers(parameter.params.values(), None)
+
         elif isinstance(parameter, (ArrayParam, MultiParam)):
             self.entry = tk.Frame(tk_parent)
             self.entry.columnconfigure(0, weight=0)
@@ -193,9 +204,8 @@ class ParameterWrapper:
                 )
         elif isinstance(self.parameter, MultiParam):
             self.update_subwrappers(self.parameter.params.values(), None)
-        elif isinstance(self.parameter, ChoiceParam):
-            choices = self.parameter.choices or [""]
-            self.entry["values"] = choices
+        elif isinstance(self.parameter, (ChoiceParam, DictChoiceParam)):
+            self.entry["values"] = self.parameter.get_values() or [""]
             self.var.set(self.parameter.value)
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
@@ -383,8 +393,11 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
-        if isinstance(self.parameter, ChoiceParam) and self.entry.current() != -1:
-            self.set_choice(self.entry.current())
+        if isinstance(self.parameter, (ChoiceParam, DictChoiceParam)) and self.entry.current() != -1:
+            value = self.parameter.get_values()[self.entry.current()]
+            if value != self.parameter.value:
+                self.parameter.value = value
+                self.callback(self.parameter)
         else:
             self.var.set(self.set_value(self.var.get()))
 

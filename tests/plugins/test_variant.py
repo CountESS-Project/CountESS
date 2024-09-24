@@ -9,7 +9,8 @@ def test_variant_ref_value():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
-    plugin.set_parameter("output", "out")
+    plugin.set_parameter("outputs.0.seq_type", "g")
+    plugin.set_parameter("outputs.0.output", "out")
 
     plugin.prepare(["test"], None)
 
@@ -30,7 +31,8 @@ def test_variant_ref_column():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "— ref")
-    plugin.set_parameter("output", "out")
+    plugin.set_parameter("outputs.0.seq_type", "g")
+    plugin.set_parameter("outputs.0.output", "out")
 
     plugin.prepare(["test"], None)
 
@@ -54,8 +56,9 @@ def test_variant_ref_offset():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
-    plugin.set_parameter("offset", "— offs")
-    plugin.set_parameter("output", "out")
+    plugin.set_parameter("outputs.0.offset", "— offs")
+    plugin.set_parameter("outputs.0.seq_type", "g")
+    plugin.set_parameter("outputs.0.output", "out")
 
     plugin.prepare(["test"], None)
 
