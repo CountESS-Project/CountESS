@@ -106,16 +106,22 @@ class PivotPlugin(PandasProcessPlugin):
         # series, and then `.agg()` applies the appropriate aggregation function.
         # XXX `mean` could get streamlined by recording (sum, count) tuples at the first stage,
         # and then adding those up here and dividing (but it's a bit tricky)
+
         def _aggfunc():
             if self.aggfunc in ("min", "max", "sum"):
                 return self.aggfunc.value
             return lambda s: s.explode().agg(self.aggfunc.value)
 
-        dataframe = pd.concat(self.dataframes)
-        index_cols = [p.label for p in self.columns if p.value == "Index"]
+        try:
+            dataframe = pd.concat(self.dataframes)
+            columns = get_all_columns(dataframe)
+            index_cols = [p.label for p in self.columns if p.value == "Index" and p.label in columns]
 
-        if index_cols:
-            dataframe = dataframe.groupby(by=index_cols, group_keys=True).agg(_aggfunc())
+            if index_cols:
+                dataframe = dataframe.groupby(by=index_cols, group_keys=True).agg(_aggfunc())
 
-        yield dataframe
+            yield dataframe
+        except (KeyError, ValueError, TypeError) as exc:
+            logger.warning("Exception", exc_info=exc)
+
         yield from super().finalize()
