@@ -232,25 +232,45 @@ class ConfiguratorWrapper:
         self.notes_widget.edit_modified(False)
 
     def config_change_callback(self, *_):
-        self.node.mark_dirty()
+        """Called immediately if a change to config has occurred."""
+        logger.info("config_change_callback")
+
+        # Leave it a bit to see if the user is still typing, if so cancel.
         if self.config_change_task:
             self.frame.after_cancel(self.config_change_task)
-        self.config_change_task = self.frame.after(1000, self.config_change_task_callback)
+        self.config_change_task = self.frame.after(2500, self.config_change_task_callback)
 
     def config_change_task_callback(self):
+        """Called when the user makes a change then pauses for a bit"""
+        logger.info("config_change_task_callback")
+
+        # if there's already an update running, delay a bit longer
+        if self.node_update_thread and self.node_update_thread.is_alive():
+            # XXX need some way to tell the thread to stop
+            logger.info("config_change_task_callback: waiting for thread %s", self.node_update_thread)
+            self.config_change_task = self.frame.after(1000, self.config_change_task_callback)
+            return
+
         self.config_change_task = None
+        self.node.mark_dirty()
 
         self.node_update_thread = threading.Thread(target=self.node.prerun)
+        logger.info("config_change_task_callback: starting thread %s", self.node_update_thread)
         self.node_update_thread.start()
 
         self.config_change_task_callback_2()
 
     def config_change_task_callback_2(self):
-        if self.node_update_thread.is_alive():
-            self.frame.after(100, self.config_change_task_callback_2)
+        logger.info("config_change_task_callback_2")
+
+        if self.node_update_thread and self.node_update_thread.is_alive():
+            logger.info("config_change_task_callback_2: waiting for thread %s", self.node_update_thread)
+            self.frame.after(500, self.config_change_task_callback_2)
             return
 
+        logger.info("config_change_task_callback_2: joining thread %s", self.node_update_thread)
         self.node_update_thread.join()
+        self.node_update_thread = None
 
         # XXX stop the form scrolling away when it is refreshed, by putting
         # it back where it belongs.
