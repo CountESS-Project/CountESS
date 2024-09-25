@@ -1,5 +1,5 @@
+import numpy as np
 import pandas as pd
-import pytest
 
 from countess.plugins.variant import VariantPlugin
 
@@ -70,6 +70,7 @@ def test_variant_ref_offset():
     assert output[1]["out"] == "g.[17A>T;19A>T]"
     assert output[2]["out"] == "g.[102G>T;106T>A]"
 
+
 def test_variant_ref_offset_minus():
     """check that the reverse-complement behaviour works on the minus strand."""
     # genes on the minus strand are reverse-complemented, so what we're actually
@@ -86,9 +87,9 @@ def test_variant_ref_offset_minus():
 
     input_df = pd.DataFrame(
         [
-            {"seq": "TGAAGTAGAGG" },
-            {"seq": "AGAAGTTGTGG" },
-            {"seq": "ATAAGAAGAGG" },
+            {"seq": "TGAAGTAGAGG"},
+            {"seq": "AGAAGTTGTGG"},
+            {"seq": "ATAAGAAGAGG"},
         ]
     )
 
@@ -108,3 +109,26 @@ def test_variant_ref_offset_minus():
     assert output[0]["out"] == "g.1011T>A"
     assert output[1]["out"] == "g.[1003T>A;1005T>A]"
     assert output[2]["out"] == "g.[1006A>T;1010C>A]"
+
+
+def test_variant_too_many():
+    input_df = pd.DataFrame(
+        [{"seq": "TGAAGTAGAGG"}, {"seq": "AGAAGTTGTGG"}, {"seq": "ATAAGAAGACG"}, {"seq": "AGAATTAGAGG"}]
+    )
+    plugin = VariantPlugin()
+    plugin.set_parameter("column", "seq")
+    plugin.set_parameter("reference", "AGAAGTAGAGG")
+    plugin.set_parameter("outputs.0.seq_type", "g")
+    plugin.set_parameter("outputs.0.output", "out")
+    plugin.set_parameter("outputs.0.maxlen", 2)
+
+    plugin.prepare(["test"], None)
+
+    output_df = plugin.process_dataframe(input_df)
+
+    output = output_df.to_records()
+
+    assert output[0]["out"] == "g.1A>T"
+    assert output[1]["out"] == "g.[7A>T;9A>T]"
+    assert output[2]["out"] is np.NAN
+    assert output[3]["out"] == "g.5G>T"

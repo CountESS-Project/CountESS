@@ -16,6 +16,10 @@ from rapidfuzz.distance.Levenshtein import opcodes as levenshtein_opcodes
 MIN_SEARCH_LENGTH = 10
 
 
+class TooManyVariationsException(ValueError):
+    pass
+
+
 def translate_aa(aa_seq: str) -> str:
     """translate a sequence of single-letter amino acid codes
     to a sequence of three-letter amindo acid codes
@@ -552,7 +556,7 @@ def find_variant_string(
     >>> find_variant_string("g.", "ATTACC", "GATTACA",1)
     Traceback (most recent call last):
      ...
-    ValueError: Too many variations (2) in GATTACA
+    countess.utils.variant.TooManyVariationsException: Too many variations (2) in GATTACA
     """
 
     if minus_strand:
@@ -570,7 +574,7 @@ def find_variant_string(
         return prefix + "="
 
     if max_mutations is not None and len(variations) > max_mutations:
-        raise ValueError("Too many variations (%d) in %s" % (len(variations), var_seq))
+        raise TooManyVariationsException("Too many variations (%d) in %s" % (len(variations), var_seq))
 
     if len(variations) == 1:
         return prefix + variations[0]

@@ -14,7 +14,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import PandasTransformDictToDictPlugin
-from countess.utils.variant import find_variant_string
+from countess.utils.variant import TooManyVariationsException, find_variant_string
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,9 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
                     minus_strand=seq_type.endswith("-"),
                 )
 
-            except (TypeError, KeyError, IndexError) as exc:
+            except TooManyVariationsException:
+                pass
+            except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
         return r
