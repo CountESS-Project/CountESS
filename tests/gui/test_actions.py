@@ -47,11 +47,10 @@ def test_open_new():
         button = _find_button(mw.config_wrapper.config_subframe, "")
         button.invoke()
         root.update()
-        time.sleep(1)
 
-    root.update()
-    time.sleep(1)
-    root.update()
+    for _ in range(0,30):
+        time.sleep(0.1)
+        root.update()
 
     preview_frame = mw.config_wrapper.preview_subframe
     assert isinstance(preview_frame, TabularDataFrame)
