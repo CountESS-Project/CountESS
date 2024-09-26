@@ -233,7 +233,7 @@ class ConfiguratorWrapper:
 
     def config_change_callback(self, *_):
         """Called immediately if a change to config has occurred."""
-        logger.info("config_change_callback")
+        logger.debug("config_change_callback")
 
         # Leave it a bit to see if the user is still typing, if so cancel.
         if self.config_change_task:
@@ -242,12 +242,12 @@ class ConfiguratorWrapper:
 
     def config_change_task_callback(self):
         """Called when the user makes a change then pauses for a bit"""
-        logger.info("config_change_task_callback")
+        logger.debug("config_change_task_callback")
 
         # if there's already an update running, delay a bit longer
         if self.node_update_thread and self.node_update_thread.is_alive():
             # XXX need some way to tell the thread to stop
-            logger.info("config_change_task_callback: waiting for thread %s", self.node_update_thread)
+            logger.debug("config_change_task_callback: waiting for thread %s", self.node_update_thread)
             self.config_change_task = self.frame.after(1000, self.config_change_task_callback)
             return
 
@@ -255,20 +255,20 @@ class ConfiguratorWrapper:
         self.node.mark_dirty()
 
         self.node_update_thread = threading.Thread(target=self.node.prerun)
-        logger.info("config_change_task_callback: starting thread %s", self.node_update_thread)
+        logger.debug("config_change_task_callback: starting thread %s", self.node_update_thread)
         self.node_update_thread.start()
 
         self.config_change_task_callback_2()
 
     def config_change_task_callback_2(self):
-        logger.info("config_change_task_callback_2")
+        logger.debug("config_change_task_callback_2")
 
         if self.node_update_thread and self.node_update_thread.is_alive():
-            logger.info("config_change_task_callback_2: waiting for thread %s", self.node_update_thread)
+            logger.debug("config_change_task_callback_2: waiting for thread %s", self.node_update_thread)
             self.frame.after(500, self.config_change_task_callback_2)
             return
 
-        logger.info("config_change_task_callback_2: joining thread %s", self.node_update_thread)
+        logger.debug("config_change_task_callback_2: joining thread %s", self.node_update_thread)
         self.node_update_thread.join()
         self.node_update_thread = None
 

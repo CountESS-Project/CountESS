@@ -98,6 +98,8 @@ class PivotPlugin(PandasProcessPlugin):
         return []
 
     def finalize(self) -> Iterable[pd.DataFrame]:
+        yield from super().finalize()
+
         if not self.dataframes:
             return
 
@@ -123,5 +125,3 @@ class PivotPlugin(PandasProcessPlugin):
             yield dataframe
         except (KeyError, ValueError, TypeError) as exc:
             logger.warning("Exception", exc_info=exc)
-
-        yield from super().finalize()

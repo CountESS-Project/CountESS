@@ -212,8 +212,7 @@ class PandasProcessPlugin(ProcessPlugin):
 
     def finalize(self) -> Iterable[pd.DataFrame]:
         yield from super().finalize()
-        for p in self.params.values():
-            p.set_column_choices(self.input_columns.keys())
+        self.set_column_choices(self.input_columns.keys())
 
 
 class PandasConcatProcessPlugin(PandasProcessPlugin):

@@ -48,7 +48,7 @@ def test_open_new():
         button.invoke()
         root.update()
 
-    for _ in range(0,30):
+    for _ in range(0, 30):
         time.sleep(0.1)
         root.update()
 
