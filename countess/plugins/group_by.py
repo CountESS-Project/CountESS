@@ -20,6 +20,7 @@ class ColumnMultiParam(TabularMultiParam):
     sum = BooleanParam("Sum")
     mean = BooleanParam("Mean")
     median = BooleanParam("Median")
+    std = BooleanParam("Std")
 
 
 class GroupByPlugin(PandasConcatProcessPlugin):
