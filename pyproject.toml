@@ -42,7 +42,7 @@ dev = [
     'semver~=3.0.2',
     'types-psutil~=5.9.5',
     'types-ttkthemes~=3.2',
-    'twine==4.0.2',
+    'twine~=4.0.2',
     'pandas-stubs~=2.1.0',
     'pytest~=7.2',
     'pytest-socket~=0.6.0',
