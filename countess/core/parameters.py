@@ -602,6 +602,11 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
             return None
         return super().get_column_prefix()
 
+    def get_column_names(self, df):
+        if self.is_none():
+            return []
+        return super().get_column_names(df)
+
 
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     DEFAULT_VALUE = "— INDEX —"

@@ -52,6 +52,7 @@ class ScoringPlugin(PandasConcatProcessPlugin):
     xaxis = ColumnGroupOrNoneChoiceParam("X Axis Columns")
     output = StringParam("Score Column", "score")
     variance = StringParam("Variance Column", "")
+    drop_input = BooleanParam("Drop Input Columns?", False)
 
     def process_row(
         self, row, count_prefix: str, xaxis_prefix: str, suffixes: List[str]
@@ -85,6 +86,7 @@ class ScoringPlugin(PandasConcatProcessPlugin):
         variant_col = self.variant.value
         replicate_col = self.replicate.value
         count_cols = self.columns.get_column_names(dataframe)
+        xaxis_cols = self.xaxis.get_column_names(dataframe)
         is_counts = self.inputtype == "counts"
         output = self.output.value
 
@@ -108,6 +110,9 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             xaxis_prefix=self.xaxis.get_column_prefix(),
             suffixes=suffixes,
         )
+
+        if self.drop_input:
+            dataframe.drop(columns=count_cols + xaxis_cols, inplace=True)
 
         if self.variance:
             dataframe[[self.output.value, self.variance.value]] = output
