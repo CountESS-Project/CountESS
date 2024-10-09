@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class ColumnMultiParam(TabularMultiParam):
     index = BooleanParam("Index")
     count = BooleanParam("Count")
+    nunique = BooleanParam("Count Distinct")
     min = BooleanParam("Min")
     max = BooleanParam("Max")
     sum = BooleanParam("Sum")
