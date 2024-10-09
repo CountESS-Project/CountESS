@@ -47,8 +47,7 @@ class ColumnToolPlugin(PandasSimplePlugin):
             if parameter.rename.value and parameter.rename.value.strip() and parameter.datatype.is_not_none()
         }
 
-        if dataframe.index.name is not None:
-            dataframe = dataframe.reset_index()
+        dataframe = dataframe.reset_index(drop=dataframe.index.names == [None])
 
         dataframe = dataframe.drop(columns=drop_columns).astype(type_columns)
 
