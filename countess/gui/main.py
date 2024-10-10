@@ -234,6 +234,7 @@ class ConfiguratorWrapper:
     def config_change_callback(self, *_):
         """Called immediately if a change to config has occurred."""
         logger.debug("config_change_callback")
+        self.node.mark_dirty()
 
         # Leave it a bit to see if the user is still typing, if so cancel.
         if self.config_change_task:
@@ -252,7 +253,6 @@ class ConfiguratorWrapper:
             return
 
         self.config_change_task = None
-        self.node.mark_dirty()
 
         self.node_update_thread = threading.Thread(target=self.node.prerun)
         logger.debug("config_change_task_callback: starting thread %s", self.node_update_thread)
