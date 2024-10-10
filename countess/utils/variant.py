@@ -536,11 +536,6 @@ def find_variant_string(
 
     CHECK FOR INVALID INPUTS
 
-    >>> find_variant_string("x.", "CAT", "CAT")
-    Traceback (most recent call last):
-     ...
-    ValueError: Only prefix types 'g.', 'c.' and 'p.' accepted at this time
-
     >>> find_variant_string("g.", "HELLO", "CAT")
     Traceback (most recent call last):
      ...
@@ -563,12 +558,10 @@ def find_variant_string(
         ref_seq = reverse_complement(ref_seq)
         var_seq = reverse_complement(var_seq)
 
-    if prefix.endswith("g.") or prefix.endswith("c."):
-        variations = list(find_variant_dna(ref_seq, var_seq, offset))
-    elif prefix.endswith("p."):
+    if prefix.endswith("p."):
         variations = list(find_variant_protein(ref_seq, var_seq, offset))
     else:
-        raise ValueError("Only prefix types 'g.', 'c.' and 'p.' accepted at this time")
+        variations = list(find_variant_dna(ref_seq, var_seq, offset))
 
     if len(variations) == 0:
         return prefix + "="

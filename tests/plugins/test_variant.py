@@ -9,8 +9,8 @@ def test_variant_ref_value():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
-    plugin.set_parameter("outputs.0.seq_type", "g")
-    plugin.set_parameter("outputs.0.output", "out")
+    plugin.set_parameter("variant.seq_type", "g")
+    plugin.set_parameter("variant.output", "out")
 
     plugin.prepare(["test"], None)
 
@@ -31,8 +31,8 @@ def test_variant_ref_column():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "— ref")
-    plugin.set_parameter("outputs.0.seq_type", "g")
-    plugin.set_parameter("outputs.0.output", "out")
+    plugin.set_parameter("variant.seq_type", "g")
+    plugin.set_parameter("variant.output", "out")
 
     plugin.prepare(["test"], None)
 
@@ -56,9 +56,9 @@ def test_variant_ref_offset():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
-    plugin.set_parameter("outputs.0.offset", "— offs")
-    plugin.set_parameter("outputs.0.seq_type", "g")
-    plugin.set_parameter("outputs.0.output", "out")
+    plugin.set_parameter("variant.offset", "— offs")
+    plugin.set_parameter("variant.seq_type", "g")
+    plugin.set_parameter("variant.output", "out")
 
     plugin.prepare(["test"], None)
 
@@ -96,9 +96,10 @@ def test_variant_ref_offset_minus():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
-    plugin.set_parameter("outputs.0.offset", "1000")
-    plugin.set_parameter("outputs.0.seq_type", "g-")
-    plugin.set_parameter("outputs.0.output", "out")
+    plugin.set_parameter("variant.offset", "1000")
+    plugin.set_parameter("variant.seq_type", "g")
+    plugin.set_parameter("variant.minus_strand", True)
+    plugin.set_parameter("variant.output", "out")
 
     plugin.prepare(["test"], None)
 
@@ -118,9 +119,9 @@ def test_variant_too_many():
     plugin = VariantPlugin()
     plugin.set_parameter("column", "seq")
     plugin.set_parameter("reference", "AGAAGTAGAGG")
-    plugin.set_parameter("outputs.0.seq_type", "g")
-    plugin.set_parameter("outputs.0.output", "out")
-    plugin.set_parameter("outputs.0.maxlen", 2)
+    plugin.set_parameter("variant.seq_type", "g")
+    plugin.set_parameter("variant.output", "out")
+    plugin.set_parameter("variant.maxlen", 2)
 
     plugin.prepare(["test"], None)
 

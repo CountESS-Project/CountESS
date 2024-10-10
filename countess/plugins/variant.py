@@ -1,15 +1,18 @@
 import logging
 import string
+from typing import Optional
+
+import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import (
-    ArrayParam,
+    BooleanParam,
     ColumnChoiceParam,
     ColumnOrIntegerParam,
     ColumnOrStringParam,
     DictChoiceParam,
+    FramedMultiParam,
     IntegerParam,
-    MultiParam,
     StringCharacterSetParam,
     StringParam,
 )
@@ -28,24 +31,30 @@ REFERENCE_CHAR_SET = set(string.ascii_uppercase + string.digits + "_")
 # XXX There should probably also be a warning generated if you ask for a
 # non-MT DNA call with an MT protein call or vice versa.
 
-SEQUENCE_TYPE_CHOICES = {
-    "g": "Genomic",
-    "g-": "Genomic (Minus Strand)",
+VARIANT_TYPE_CHOICES = {
+    "g": "Genomic (g.)",
     # "o": "Circular Genomic",
-    # "m": "Mitochondrial",
-    "c": "Coding DNA",
-    # "n": "Non-Coding DNA",
-    "p": "Protein",
-    # "pm": "Protein (MT)",
+    #"m": "Mitochondrial",
+    "c": "Coding DNA (c.)",
+    "n": "Non-Coding DNA (n.)",
 }
 
 
-class VariantOutputMultiParam(MultiParam):
+class DnaVariantMultiParam(FramedMultiParam):
     prefix = StringCharacterSetParam("Prefix", "", character_set=REFERENCE_CHAR_SET)
-    seq_type = DictChoiceParam("Type", choices=SEQUENCE_TYPE_CHOICES)
+    seq_type = DictChoiceParam("Type", choices=VARIANT_TYPE_CHOICES)
     offset = ColumnOrIntegerParam("Offset", 0)
+    minus_strand = BooleanParam("Minus Strand", False)
     maxlen = IntegerParam("Max Variations", 10)
     output = StringParam("Output Column", "variant")
+
+
+class ProteinVariantMultiParam(FramedMultiParam):
+    prefix = StringCharacterSetParam("Prefix", "", character_set=REFERENCE_CHAR_SET)
+    offset = ColumnOrIntegerParam("Offset", 0)
+    # XXX different codon tables go here
+    maxlen = IntegerParam("Max Variations", 10)
+    output = StringParam("Output Column", "protein")
 
 
 class VariantPlugin(PandasTransformDictToDictPlugin):
@@ -58,7 +67,12 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
 
     column = ColumnChoiceParam("Input Column", "sequence")
     reference = ColumnOrStringParam("Reference Sequence")
-    outputs = ArrayParam("Outputs", VariantOutputMultiParam("Output"), min_size=1)
+
+    variant = DnaVariantMultiParam("DNA Variant")
+    protein = ProteinVariantMultiParam("Protein Variant")
+
+    drop = BooleanParam("Drop unmatched rows", False)
+    drop_columns = BooleanParam("Drop Sequence / Reference Columns", False)
 
     def process_dict(self, data) -> dict:
         sequence = data[str(self.column)]
@@ -67,24 +81,55 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
             return {}
 
         r: dict[str, str] = {}
-        for output in self.outputs:
-            seq_type = output.seq_type.get_choice() or "g"
-            prefix = f"{output.prefix + ':' if output.prefix else ''}{seq_type[0]}."
-            offset = int(output.offset.get_value_from_dict(data) or 0)
 
+        if self.variant.output:
             try:
-                r[output.output.value] = find_variant_string(
-                    prefix,
+                prefix = self.variant.prefix + ":" if self.variant.prefix else ""
+                r[self.variant.output.value] = find_variant_string(
+                    f"{prefix}{self.variant.seq_type.get_choice()}.",
                     reference,
                     sequence,
-                    max_mutations=output.maxlen.value,
-                    offset=offset,
-                    minus_strand=seq_type.endswith("-"),
+                    max_mutations=self.variant.maxlen.value,
+                    offset=int(self.variant.offset.get_value_from_dict(data) or 0),
+                    minus_strand=self.variant.minus_strand.value,
                 )
+            except TooManyVariationsException:
+                pass
+            except (ValueError, TypeError, KeyError, IndexError) as exc:
+                logger.warning("Exception", exc_info=exc)
 
+        if self.protein.output:
+            try:
+                prefix = self.protein.prefix + ":" if self.protein.prefix else ""
+                r[self.protein.output.value] = find_variant_string(
+                    f"{prefix}p.",
+                    reference,
+                    sequence,
+                    max_mutations=self.protein.maxlen.value,
+                    offset=int(self.protein.offset.get_value_from_dict(data) or 0),
+                )
             except TooManyVariationsException:
                 pass
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
         return r
+
+    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
+        df_out = super().process_dataframe(dataframe)
+
+        if df_out is not None:
+            if self.drop:
+                if self.variant.output:
+                    df_out.dropna(subset=str(self.variant.output), inplace=True)
+                if self.protein.output:
+                    df_out.dropna(subset=str(self.protein.output), inplace=True)
+            if self.drop_columns:
+                try:
+                    df_out.drop(columns=str(self.column), inplace=True)
+                    if self.reference.get_column_name():
+                        df_out.drop(columns=self.reference.get_column_name(), inplace=True)
+                except KeyError:
+                    pass
+
+        return df_out
