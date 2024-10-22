@@ -778,8 +778,7 @@ class ArrayParam(BaseParam):
         read_only: Optional[bool] = None,
     ):
         super().__init__(label)
-        self.param = param
-
+        self.param = param.copy()
         self.min_size = min_size
         self.max_size = max_size
         if read_only is not None:
