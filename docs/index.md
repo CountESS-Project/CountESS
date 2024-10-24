@@ -17,6 +17,7 @@ CountESS "portrait" logo &copy; 2024 Sayeh Gorjifard, used with permission.
 
 ## Contents
 
+* [What is CountESS](what-is-countess/)
 * [Installing CountESS](installing-countess/)
 * [Running CountESS](running-countess/)
 * [Getting Started with CountESS](getting-started/)
