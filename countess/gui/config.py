@@ -393,11 +393,15 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
-        if isinstance(self.parameter, (ChoiceParam, DictChoiceParam)) and self.entry.current() != -1:
-            value = self.parameter.get_values()[self.entry.current()]
-            if value != self.parameter.value:
-                self.parameter.value = value
-                self.callback(self.parameter)
+        if isinstance(self.parameter, (ChoiceParam, DictChoiceParam)):
+            values = self.parameter.get_values()
+            if 0 <= self.entry.current() < len(values):
+                new_value = values[self.entry.current()]
+                if self.parameter.value != new_value:
+                    self.parameter.set_value(new_value)
+                    self.callback(self.parameter)
+            else:
+                self.var.set(self.set_value(self.var.get()))
         else:
             self.var.set(self.set_value(self.var.get()))
 

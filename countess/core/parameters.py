@@ -646,11 +646,14 @@ class ColumnOrStringParam(ColumnChoiceParam):
             return self.value
 
     def get_column_or_value(self, df: pd.DataFrame, numeric: bool) -> Union[float, str, pd.Series]:
-        if type(self.value) is str and self.value.startswith(self.PREFIX):
-            col = df[self.value[len(self.PREFIX) :]]
-            return col.astype(float if numeric else str)
-        else:
-            return float(self.value) if numeric else str(self.value)
+        try:
+            if type(self.value) is str and self.value.startswith(self.PREFIX):
+                col = df[self.value[len(self.PREFIX) :]]
+                return col.astype(float if numeric else str)
+            else:
+                return float(self.value) if numeric else str(self.value)
+        except ValueError:
+            return None
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)

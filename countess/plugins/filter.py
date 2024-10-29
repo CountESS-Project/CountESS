@@ -31,7 +31,7 @@ class _FilterColumnMultiParam(TabularMultiParam):
 class _FilterOutputMultiParam(TabularMultiParam):
     output = StringParam("Output Column")
     value = StringParam("Output Value")
-    type = DataTypeChoiceParam("Output Type")
+    type = DataTypeChoiceParam("Output Type", "string")
 
 
 class FilterMultiParam(MultiParam):
@@ -71,16 +71,16 @@ class FilterPlugin(PandasSimplePlugin):
                 return
 
             # Build up a pd.Series to mask dataframe entries into
-            # matching or not matching.  This starts as either
-            # `True` or `False` and then 'accumulates' logical
-            # operations using either `&` or `|` to end up with
-            # a boolean series.
-            series_acc = filt["combine"].value == "All"
+            # matching or not matching.
+            series_acc = None
 
             for param in filt.columns:
                 column = param.column.value
-                value = param.value.get_column_or_value(data, is_numeric_dtype(data[column]))
+                if column not in data.columns:
+                    continue
 
+                is_numeric = is_numeric_dtype(data[column])
+                value = param.value.get_column_or_value(data, is_numeric)
                 if param.operator == "equals":
                     series = data[column].eq(value)
                 elif param.operator == "greater than":
@@ -101,13 +101,16 @@ class FilterPlugin(PandasSimplePlugin):
                 if param.negate:
                     series = ~series
 
-                if filt.combine == "All":
+                if series_acc is None:
+                    series_acc = series
+                elif filt.combine == "All":
                     series_acc = series_acc & series
                 else:
                     series_acc = series_acc | series
 
-            # If no rows match, just move on to the next filter
-            if not any(series_acc):
+            # If no filters were valid, or if no rows match,
+            # just move on to the next filter
+            if series_acc is None or not any(series_acc):
                 continue
 
             # If all rows match, just return everything and then quit.
