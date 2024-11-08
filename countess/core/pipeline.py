@@ -1,9 +1,11 @@
 import logging
 import re
 import time
+import multiprocessing
 from queue import Empty, Queue
-from threading import Thread
+import threading
 from typing import Any, Iterable, Optional
+import os
 
 from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
 
@@ -159,7 +161,7 @@ class PipelineNode:
             only_parent_node = list(self.parent_nodes)[0]
             only_parent_queue = only_parent_node.add_output_queue()
             subthreads = [
-                Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, row_limit))
+                threading.Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, row_limit))
                 for _ in range(0, 4)
             ]
             for subthread in subthreads:
@@ -174,7 +176,7 @@ class PipelineNode:
             # there are multiple parent nodes: spawn off a subthread to handle
             # each of them.
             subthreads = [
-                Thread(
+                threading.Thread(
                     target=self.run_subthread,
                     args=(parent_node.add_output_queue(), parent_node.name, row_limit),
                 )
@@ -206,29 +208,52 @@ class PipelineNode:
         if not self.plugin:
             return
         self.load_config()
-        if self.is_dirty:
-            assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
-            self.result = []
-            self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
-            for parent_node in self.parent_nodes:
-                assert isinstance(self.plugin, ProcessPlugin)
-                parent_node.prerun(row_limit)
-                if parent_node.result:
-                    for data_in in parent_node.result:
-                        self.plugin.preprocess(data_in, parent_node.name)
-                    for data_in in parent_node.result:
-                        for data_out in self.plugin.process(data_in, parent_node.name):
-                            self.result.append(data_out)
-                            logger.info("%s: %s/0", self.name, len(self.result))
-                for data_out in self.plugin.finished(parent_node.name):
-                    self.result.append(data_out)
-                    logger.info("%s: %s/0", self.name, len(self.result))
+        if not self.is_dirty:
+            return
+
+        assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
+        self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
+
+        # prerun and preprocess are all about setting up the configurator
+        # so we run those in the main process
+        for parent_node in self.parent_nodes:
+            assert isinstance(self.plugin, ProcessPlugin)
+            parent_node.prerun(row_limit)
+            for data in parent_node.result or []:
+                self.plugin.preprocess(data, parent_node.name)
+
+        queue = multiprocessing.Queue(maxsize=3)
+
+        def __process():
+            logger.debug("process %d starts '%s'", os.getpid(), self.name)
+
+            # XXX would be nicer to interleave ...
+            for pn in self.parent_nodes:
+                for data in pn.result or []:
+                    for data_out in self.plugin.process(data, pn.name):
+                        queue.put(data_out)
+                for data_out in self.plugin.finished(pn.name):
+                    queue.put(data_out)
             for data_out in self.plugin.finalize():
-                self.result.append(data_out)
-                logger.info("%s: %s/0", self.name, len(self.result))
-            self.is_dirty = False
-            logger.info("%s: 100%%", self.name)
+                queue.put(data_out)
+            logger.debug("process %d finished '%s'", os.getpid(), self.name)
+
+        process = multiprocessing.Process(target=__process, name=f"node {self.name}")
+        process.start()
+
+        # XXX should this be run in a separate thread?
+        self.result = []
+        while True:
+            try:
+                data = queue.get(timeout=0.1)
+                self.result.append(data)
+            except Empty:
+                if not process.is_alive():
+                    break
+
+        process.join()
+        self.is_dirty = False
 
     def mark_dirty(self):
         self.is_dirty = True
