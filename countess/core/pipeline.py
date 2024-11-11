@@ -3,7 +3,9 @@ import re
 import time
 import multiprocessing
 from queue import Empty, Queue
-import threading
+import signal
+import sys
+from threading import Thread
 from typing import Any, Iterable, Optional
 import os
 
@@ -56,7 +58,7 @@ class SentinelQueue(Queue):
 
     def put(self, item, block=True, timeout=None):
         if self.finished:
-            raise ValueError("SentinelQueue stopped")
+            raise ValueError("SentinelQueue: can't put when finished")
         super().put(item, block, timeout)
 
 
@@ -76,6 +78,7 @@ class PipelineNode:
     output_queues: set[SentinelQueue]
     counter_in: int = 0
     counter_out: int = 0
+    prerun_process: Optional[multiprocessing.Process] = None
 
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
@@ -161,7 +164,7 @@ class PipelineNode:
             only_parent_node = list(self.parent_nodes)[0]
             only_parent_queue = only_parent_node.add_output_queue()
             subthreads = [
-                threading.Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, row_limit))
+                Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, row_limit))
                 for _ in range(0, 4)
             ]
             for subthread in subthreads:
@@ -176,7 +179,7 @@ class PipelineNode:
             # there are multiple parent nodes: spawn off a subthread to handle
             # each of them.
             subthreads = [
-                threading.Thread(
+                Thread(
                     target=self.run_subthread,
                     args=(parent_node.add_output_queue(), parent_node.name, row_limit),
                 )
@@ -210,6 +213,7 @@ class PipelineNode:
         self.load_config()
 
         if not self.is_dirty:
+            logger.debug("skipping %s (not dirty)", self.plugin.name)
             return
 
         assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
@@ -225,22 +229,39 @@ class PipelineNode:
 
         queue = multiprocessing.Queue(maxsize=3)
 
-        def __process():
+        def __prerun_process():
             logger.debug("process %d starts '%s'", os.getpid(), self.name)
 
-            # XXX would be nicer to interleave ...
-            for pn in self.parent_nodes:
-                for data in pn.result or []:
-                    for data_out in self.plugin.process(data, pn.name):
-                        queue.put(data_out)
-                for data_out in self.plugin.finished(pn.name):
-                    queue.put(data_out)
-            for data_out in self.plugin.finalize():
-                queue.put(data_out)
-            logger.debug("process %d finished '%s'", os.getpid(), self.name)
+            def __sigterm_handler(*_):
+                # If we get a SIGTERM, close the queue from our end before
+                # exiting.  This prevents the queue getting corrupted /
+                # deadlocked when calling process.terminate()
+                queue.close()
+                logger.debug("process %d aborted", os.getpid())
+                sys.exit()
+            signal.signal(signal.SIGTERM, __sigterm_handler)
 
-        process = multiprocessing.Process(target=__process, name=f"node {self.name}")
-        process.start()
+            def __generate():
+                # XXX would be nicer to interleave ...
+                for pn in self.parent_nodes:
+                    for data in pn.result or []:
+                        yield from self.plugin.process(data, pn.name)
+                    yield from self.plugin.finished(pn.name)
+                yield from self.plugin.finalize()
+
+            for count, data in enumerate(__generate()):
+                logger.info("%s: %s/0", self.name, count)
+                queue.put(data)
+
+            logger.debug("process %d finished '%s'", os.getpid(), self.name)
+            logger.info("%s: 100%%", self.name)
+
+        if self.prerun_process and self.prerun_process.is_alive():
+            self.prerun_process.terminate()
+
+        self.prerun_process = multiprocessing.Process(target=__prerun_process, name=f"node {self.name}")
+        self.prerun_process.start()
+        logger.debug("started process %d", self.prerun_process.pid)
 
         # XXX should this be run in a separate thread?
         self.result = []
@@ -249,11 +270,16 @@ class PipelineNode:
                 data = queue.get(timeout=0.1)
                 self.result.append(data)
             except Empty:
-                if not process.is_alive():
+                if not self.prerun_process.is_alive():
                     break
 
-        process.join()
-        self.is_dirty = False
+        logger.debug("joining process %d", self.prerun_process.pid)
+        self.prerun_process.join()
+        self.prerun_process = None
+
+    def prerun_stop(self):
+        if self.prerun_process and self.prerun_process.is_alive():
+            self.prerun_process.terminate()
 
     def mark_dirty(self):
         self.is_dirty = True
