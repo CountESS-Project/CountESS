@@ -1,5 +1,5 @@
-from typing import Iterable
 import warnings
+from typing import Iterable
 
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
@@ -96,7 +96,7 @@ class FilterPlugin(PandasSimplePlugin):
                     series = data[column].str.endswith(value)
                 elif param.operator == "matches regex":
                     with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", '.*has match groups')
+                        warnings.filterwarnings("ignore", ".*has match groups")
                         series = data[column].str.contains(value, regex=True)
                 else:
                     continue

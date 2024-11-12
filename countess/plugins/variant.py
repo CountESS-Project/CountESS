@@ -34,7 +34,7 @@ REFERENCE_CHAR_SET = set(string.ascii_uppercase + string.digits + "_")
 VARIANT_TYPE_CHOICES = {
     "g": "Genomic (g.)",
     # "o": "Circular Genomic",
-    #"m": "Mitochondrial",
+    # "m": "Mitochondrial",
     "c": "Coding DNA (c.)",
     "n": "Non-Coding DNA (n.)",
 }

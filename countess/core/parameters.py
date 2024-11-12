@@ -645,7 +645,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
         else:
             return self.value
 
-    def get_column_or_value(self, df: pd.DataFrame, numeric: bool) -> Union[float, str, pd.Series]:
+    def get_column_or_value(self, df: pd.DataFrame, numeric: bool) -> Union[float, str, pd.Series, None]:
         try:
             if type(self.value) is str and self.value.startswith(self.PREFIX):
                 col = df[self.value[len(self.PREFIX) :]]
