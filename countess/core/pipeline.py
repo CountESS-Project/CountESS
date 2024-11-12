@@ -1,13 +1,13 @@
 import logging
-import re
-import time
 import multiprocessing
-from queue import Empty, Queue
+import os
+import re
 import signal
 import sys
+import time
+from queue import Empty, Queue
 from threading import Thread
 from typing import Any, Iterable, Optional
-import os
 
 from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
 
@@ -230,6 +230,9 @@ class PipelineNode:
         queue = multiprocessing.Queue(maxsize=3)
 
         def __prerun_process():
+            """Run in a separate process, because just about everything compute-
+            intensive seems to interfere with the GUI even if it is in a separate
+            thread."""
             logger.debug("process %d starts '%s'", os.getpid(), self.name)
 
             def __sigterm_handler(*_):
@@ -238,7 +241,8 @@ class PipelineNode:
                 # deadlocked when calling process.terminate()
                 queue.close()
                 logger.debug("process %d aborted", os.getpid())
-                sys.exit()
+                sys.exit(1)
+
             signal.signal(signal.SIGTERM, __sigterm_handler)
 
             def __generate():
@@ -263,7 +267,8 @@ class PipelineNode:
         self.prerun_process.start()
         logger.debug("started process %d", self.prerun_process.pid)
 
-        # XXX should this be run in a separate thread?
+        # read results out of the queue until the process has finished
+        # *AND* the queue is empty.
         self.result = []
         while True:
             try:
@@ -275,6 +280,10 @@ class PipelineNode:
 
         logger.debug("joining process %d", self.prerun_process.pid)
         self.prerun_process.join()
+
+        # if __prerun_process was terminated early or threw an error,
+        # this node is still dirty.
+        self.is_dirty = self.prerun_process.exitcode != 0
         self.prerun_process = None
 
     def prerun_stop(self):
