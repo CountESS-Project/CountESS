@@ -28,6 +28,12 @@ used for this node:
     _class = LoadFastqPlugin
     _version = 0.0.37
 
+`_uuid` and `_hash` are used to keep the configuration file order stable
+under name changes and to track changes to input files, respectively:
+
+    _uuid = 0a0a9f2a6772942557ab5355d76a
+    _hash = dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f
+
 CountESS also uses a reserved key/value pair to store graphical layout
 information.  Currently this is stored as a major (flow-wards) and minor (sideways)
 coordinate, each between 0 and 1000:

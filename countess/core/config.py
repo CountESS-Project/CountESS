@@ -40,6 +40,7 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
 
     node = PipelineNode(
         name=name,
+        uuid=config_dict.get("_uuid"),
         plugin=plugin,
         position=position,
         notes=notes,
@@ -113,6 +114,7 @@ def write_config_node(node: PipelineNode, cp: ConfigParser, base_dir: str):
     if node.plugin:
         cp[node.name].update(
             {
+                "_uuid": node.uuid,
                 "_module": node.plugin.__module__,
                 "_class": node.plugin.__class__.__name__,
                 "_version": node.plugin.version,

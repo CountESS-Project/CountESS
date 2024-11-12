@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import os
 import re
+import secrets
 import signal
 import sys
 import time
@@ -64,6 +65,7 @@ class SentinelQueue(Queue):
 
 class PipelineNode:
     name: str
+    uuid: str
     plugin: Optional[BasePlugin] = None
     position: Optional[tuple[float, float]] = None
     sort_column: int = 0
@@ -87,6 +89,7 @@ class PipelineNode:
     def __init__(
         self,
         name: str,
+        uuid: Optional[str] = None,
         plugin: Optional[BasePlugin] = None,
         position: Optional[tuple[float, float]] = None,
         notes: Optional[str] = None,
@@ -94,6 +97,7 @@ class PipelineNode:
         sort_descending: bool = False,
     ):
         self.name = name
+        self.uuid = uuid or secrets.token_hex(16)
         self.plugin = plugin
         self.position = position or (0.5, 0.5)
         self.sort_column = sort_column
@@ -348,10 +352,10 @@ class PipelineGraph:
 
     def traverse_nodes(self) -> Iterable[PipelineNode]:
         found_nodes = set(node for node in self.nodes if not node.parent_nodes)
-        yield from found_nodes
+        yield from sorted(found_nodes, key=lambda n: n.uuid)
 
         while len(found_nodes) < len(self.nodes):
-            for node in self.nodes:
+            for node in sorted(self.nodes, key=lambda n: n.uuid):
                 if node not in found_nodes and node.parent_nodes.issubset(found_nodes):
                     yield node
                     found_nodes.add(node)
