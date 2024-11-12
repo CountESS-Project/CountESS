@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 usage = """usage: countess_cmd [--set NODENAME.CONFIG=VALUE] [--log LEVEL] [INIFILE ...]
 
+Run a CountESS configuration from the command line.
+
 options:
     --help                         show this message & exit.
     --version                      show version

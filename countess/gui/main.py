@@ -1,3 +1,4 @@
+import getopt
 import logging
 import logging.handlers
 import multiprocessing
@@ -8,7 +9,7 @@ import threading
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import messagebox, ttk
-from typing import Optional
+from typing import Optional, Union
 
 import psutil
 
@@ -29,6 +30,18 @@ from countess.gui.widgets import (
     info_button,
 )
 from countess.utils.pandas import concat_dataframes
+
+usage = """usage: countess_gui [--log LEVEL] [INIFILE]
+
+Start the CountESS GUI.
+
+options:
+    --help                         show this message & exit.
+    --version                      show version
+    --log LEVEL                    set log level to LEVEL
+    INIFILE                        load configuration file
+"""
+
 
 # import faulthandler
 # faulthandler.enable(all_threads=True)
@@ -254,9 +267,6 @@ class ConfiguratorWrapper:
             logger.debug("config_change_task_callback: stopping thread %s", self.node_update_thread)
             self.node.prerun_stop()
             self.node_update_thread.join()
-            #logger.debug("config_change_task_callback: waiting for thread %s", self.node_update_thread)
-            #self.config_change_task = self.frame.after(100, self.config_change_task_callback)
-            #return
 
         self.node_update_thread = threading.Thread(target=self.node.prerun)
         logger.debug("config_change_task_callback: starting thread %s", self.node_update_thread)
@@ -276,7 +286,6 @@ class ConfiguratorWrapper:
         logger.debug("config_change_task_callback_2: joining thread %s", self.node_update_thread)
         self.node_update_thread.join()
         self.node_update_thread = None
-        self.node.dirty = False
 
         # XXX stop the form scrolling away when it is refreshed, by putting
         # it back where it belongs.
@@ -639,19 +648,45 @@ def make_root():
     return root
 
 
-def main():
+def main() -> None:
+    args = sys.argv[1:]
+
+    try:
+        options, args = getopt.getopt(args, "", ["help", "version", "log="])
+    except getopt.GetoptError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
+
+    for opt_key, opt_val in options:
+        if opt_key == "--help":
+            print(usage)  # pylint: disable=bad-builtin
+            sys.exit(0)
+        elif opt_key == "--version":
+            print(f"CountESS {VERSION}")  # pylint: disable=bad-builtin
+            sys.exit(0)
+        elif opt_key == "--log":
+            try:
+                log_level: Union[int, str]
+                if re.match(r"\d+$", opt_val):
+                    log_level = int(opt_val)
+                else:
+                    log_level = str(opt_val).upper()
+                logging.getLogger().setLevel(log_level)
+                logger.warning("Log level set to %s", log_level)
+            except ValueError:
+                logger.error("Bad --log level: %s", opt_val)
+
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.
     logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
     logging.getLogger().addHandler(logging.StreamHandler())
-    logging.getLogger().setLevel(logging.INFO)
 
     root = make_root()
     SplashScreen(root)
-    MainWindow(root, sys.argv[1] if len(sys.argv) > 1 else None)
+    MainWindow(root, args[0] if args else None)
 
     root.mainloop()
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pragma: no cover
