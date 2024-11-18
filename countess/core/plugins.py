@@ -175,13 +175,17 @@ class FileInputPlugin(BasePlugin):
 
     def load_file(self, filename_and_param: Tuple[str, BaseParam], row_limit: Optional[int] = None) -> Iterable:
         filename, file_param = filename_and_param
-        yield self.read_file_to_dataframe(filename, file_param, row_limit)
+        logger.debug("FileInputPlugin.load_file load file %s", filename)
+        df = self.read_file_to_dataframe(filename, file_param, row_limit)
+        logger.debug("FileInputPlugin.load_file read %d rows", len(df))
+        yield df
 
     def prepare(self, sources: List[str], row_limit: Optional[int] = None):
         assert len(sources) == 0
         self.row_limit = row_limit
 
     def finalize(self) -> Iterable:
+        logger.debug("FileInputPlugin.finalize starting %s", self.name)
         filenames_and_params = list(self.filenames_and_params())
         num_files = len(filenames_and_params)
         logger.info("%s: 0%%", self.name)
@@ -194,6 +198,7 @@ class FileInputPlugin(BasePlugin):
         elif num_files == 1:
             yield from self.load_file(filenames_and_params[0], self.row_limit)
         logger.info("%s: 100%%", self.name)
+        logger.debug("FileInputPlugin.finalize finished %s", self.name)
 
 
 class PandasProcessPlugin(ProcessPlugin):

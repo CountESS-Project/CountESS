@@ -137,6 +137,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
 
     def prepare(self, sources: list[str], row_limit: Optional[int] = None):
         if row_limit is None:
+            logger.debug("SaveCsvPlugin.process %s prepare %s", self.name, self.filename)
             filename = str(self.filename)
             if filename.endswith(".gz"):
                 self.filehandle = gzip.open(filename, "wb")
@@ -145,6 +146,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
             else:
                 self.filehandle = open(filename, "wb")
         else:
+            logger.debug("SaveCsvPlugin.process %s prepare BytesIO", self.name)
             self.filehandle = BytesIO()
 
         self.csv_columns = None
@@ -171,6 +173,8 @@ class SaveCsvPlugin(PandasOutputPlugin):
             dataframe = dataframe.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
             emit_header = False
 
+        logger.debug("SaveCsvPlugin.process %s writing rows %d columns %d", self.name, len(dataframe), len(self.csv_columns))
+
         dataframe.to_csv(
             self.filehandle,
             header=emit_header,
@@ -182,6 +186,7 @@ class SaveCsvPlugin(PandasOutputPlugin):
         return []
 
     def finalize(self):
+        logger.debug("SaveCsvPlugin.process %s finalize", self.name)
         if isinstance(self.filehandle, BytesIO):
             yield self.filehandle.getvalue().decode("utf-8")
         else:

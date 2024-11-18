@@ -127,6 +127,7 @@ class PipelineNode:
 
     def queue_output(self, result):
         for data in result:
+            logger.debug("PipelineNode.queue_output %s %d rows", self.name, len(data))
             self.counter_out += 1
             # XXX can we do this out-of-order if any queues are full?
             for queue in self.output_queues:
@@ -139,23 +140,29 @@ class PipelineNode:
 
     def run_multithread(self, queue: SentinelQueue, name: str, row_limit: Optional[int] = None):
         assert isinstance(self.plugin, ProcessPlugin)
+        logger.debug("PipelineNode.run_multithread %s starting", self.name)
         for data_in in queue:
+            logger.debug("PipelineNode.run_multithread %s got %d rows", self.name, len(data_in))
             self.counter_in += 1
             self.plugin.preprocess(data_in, name)
             self.queue_output(self.plugin.process(data_in, name))
+        logger.debug("PipelineNode.run_multithread %s finished", self.name)
 
     def run_subthread(self, queue: SentinelQueue, name: str, row_limit: Optional[int] = None):
         assert isinstance(self.plugin, ProcessPlugin)
-
+        logger.debug("PipelineNode.run_subthread %s starting", self.name)
         for data_in in queue:
             self.counter_in += 1
             self.plugin.preprocess(data_in, name)
             self.queue_output(self.plugin.process(data_in, name))
+        logger.debug("PipelineNode.run_subthread %s finishing", self.name)
         self.queue_output(self.plugin.finished(name))
+        logger.debug("PipelineNode.run_subthread %s finished", self.name)
 
     def run_thread(self, row_limit: Optional[int] = None):
         """For each PipelineNode, this is run in its own thread."""
         assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
+        logger.debug("PipelineNode.run_thread %s starting", self.name)
 
         logger.info("%s: 0%%", self.name)
 
@@ -189,15 +196,18 @@ class PipelineNode:
                 )
                 for parent_node in self.parent_nodes
             ]
+            logger.debug("PipelineNode.run_thread %s starting %d subthreads", self.name, len(subthreads))
             for subthread in subthreads:
                 subthread.start()
             for subthread in subthreads:
                 subthread.join()
 
+        logger.debug("PipelineNode.run_thread %s finalizing", self.name)
         self.queue_output(self.plugin.finalize())
         self.finish_output()
 
         logger.info("%s: 100%%", self.name)
+        logger.debug("PipelineNode.run_thread %s finished", self.name)
 
     def load_config(self):
         assert isinstance(self.plugin, BasePlugin)
