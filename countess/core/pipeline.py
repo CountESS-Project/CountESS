@@ -174,27 +174,9 @@ class PipelineNode:
 
         self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
-        if len(self.parent_nodes) == 1:
+        # run each parent node in its own thread.
+        if self.parent_nodes:
             assert isinstance(self.plugin, ProcessPlugin)
-            # there is only a single parent node, run several subthreads to
-            # do the processing
-            only_parent_node = list(self.parent_nodes)[0]
-            only_parent_queue = only_parent_node.add_output_queue()
-            subthreads = [
-                Thread(target=self.run_multithread, args=(only_parent_queue, only_parent_node.name, row_limit))
-                for _ in range(0, 4)
-            ]
-            for subthread in subthreads:
-                subthread.start()
-            for subthread in subthreads:
-                subthread.join()
-
-            self.queue_output(self.plugin.finished(only_parent_node.name))
-
-        elif len(self.parent_nodes) > 1:
-            assert isinstance(self.plugin, ProcessPlugin)
-            # there are multiple parent nodes: spawn off a subthread to handle
-            # each of them.
             subthreads = [
                 Thread(
                     target=self.run_subthread,
