@@ -6,7 +6,7 @@ import secrets
 import signal
 import sys
 import time
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 from threading import Thread
 from typing import Any, Iterable, Optional
 
@@ -131,7 +131,13 @@ class PipelineNode:
             self.counter_out += 1
             # XXX can we do this out-of-order if any queues are full?
             for queue in self.output_queues:
-                queue.put(data)
+                while True:
+                    try:
+                        queue.put(data, timeout=1)
+                        break
+                    except Full:
+                        logger.debug("PipelineNode.queue_output %s queue full", self.name)
+
             logger.info("%s: %d/%d", self.name, self.counter_out, self.counter_in)
 
     def finish_output(self):
