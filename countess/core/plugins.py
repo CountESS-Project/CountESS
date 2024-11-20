@@ -34,7 +34,6 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.utils.pandas import get_all_columns
-from countess.utils.parallel import multiprocess_map
 
 PRERUN_ROW_LIMIT: int = 100000
 

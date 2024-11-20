@@ -173,7 +173,9 @@ class SaveCsvPlugin(PandasOutputPlugin):
             dataframe = dataframe.assign(**{c: None for c in self.csv_columns if c not in dataframe.columns})
             emit_header = False
 
-        logger.debug("SaveCsvPlugin.process %s writing rows %d columns %d", self.name, len(dataframe), len(self.csv_columns))
+        logger.debug(
+            "SaveCsvPlugin.process %s writing rows %d columns %d", self.name, len(dataframe), len(self.csv_columns)
+        )
 
         dataframe.to_csv(
             self.filehandle,

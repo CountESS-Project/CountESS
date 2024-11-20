@@ -1,7 +1,7 @@
 import bz2
 import gzip
-from itertools import islice
 import logging
+from itertools import islice
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 def _fastq_reader(
-        file_handle, min_avg_quality: float, row_limit: Optional[int] = None, header: bool = False
+    file_handle, min_avg_quality: float, row_limit: Optional[int] = None, header: bool = False
 ) -> Iterable[dict[str, str]]:
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
             if header:
-                yield { "sequence": fastq_read.sequence, "header": fastq_read.header[1:] }
+                yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:]}
             else:
-                yield { "sequence": fastq_read.sequence }
+                yield {"sequence": fastq_read.sequence}
 
 
 class LoadFastqPlugin(PandasInputFilesPlugin):
@@ -74,7 +74,7 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
                 dataframe = dataframe.assign(count=1).groupby(["sequence"]).count()
 
         if self.filename_column:
-            dataframe['filename'] = clean_filename(filename)
+            dataframe["filename"] = clean_filename(filename)
 
         logger.debug("LoadFastqPlugin: emit %d records", len(dataframe))
         return dataframe
