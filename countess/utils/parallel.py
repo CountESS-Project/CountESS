@@ -121,5 +121,8 @@ def multiprocess_map(
     thread.join()
     for p in processes:
         p.join()
+        if p.exitcode:
+            logger.error("process %d exited with code %d", p.pid, p.exitcode)
+
     input_queue.close()
     output_queue.close()
