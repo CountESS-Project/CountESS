@@ -1,6 +1,7 @@
 import bz2
 import gzip
 from itertools import islice
+import logging
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -12,17 +13,18 @@ from countess.core.parameters import BaseParam, BooleanParam, FloatParam, String
 from countess.core.plugins import PandasInputFilesPlugin
 from countess.utils.files import clean_filename
 
+logger = logging.getLogger(__name__)
+
 
 def _fastq_reader(
-    file_handle, min_avg_quality: float, row_limit: Optional[int] = None, filename: str = ""
+        file_handle, min_avg_quality: float, row_limit: Optional[int] = None, header: bool = False
 ) -> Iterable[dict[str, str]]:
     for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
         if fastq_read.average_quality() >= min_avg_quality:
-            yield {
-                "sequence": fastq_read.sequence,
-                "header": fastq_read.header[1:],
-                "filename": clean_filename(filename),
-            }
+            if header:
+                yield { "sequence": fastq_read.sequence, "header": fastq_read.header[1:] }
+            else:
+                yield { "sequence": fastq_read.sequence }
 
 
 class LoadFastqPlugin(PandasInputFilesPlugin):
@@ -46,38 +48,36 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
         min_avg_quality = float(self.min_avg_quality)
 
         if filename.endswith(".gz"):
-            with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_fastq_reader(fh, min_avg_quality, row_limit, filename))
+            fh = gzip.open(filename, mode="rt", encoding="utf-8")
         elif filename.endswith(".bz2"):
-            with bz2.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_fastq_reader(fh, min_avg_quality, row_limit, filename))
+            fh = bz2.open(filename, mode="rt", encoding="utf-8")
         else:
-            with open(filename, "r", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_fastq_reader(fh, min_avg_quality, row_limit, filename))
+            fh = open(filename, "r", encoding="utf-8")
 
-        group_columns = ["sequence"]
-
-        if not self.header_column:
-            dataframe.drop(columns="header", inplace=True)
-        elif self.group:
-            # if we've got a header column and we're grouping by sequence,
-            # find maximum common length of the 'header' field in this file
-            for common_length in range(0, dataframe["header"].str.len().min() - 1):
-                if dataframe["header"].str.slice(0, common_length + 1).nunique() > 1:
-                    break
-            if common_length > 0:
-                dataframe["header"] = dataframe["header"].str.slice(0, common_length)
-                group_columns.append("header")
-
-        if self.filename_column:
-            group_columns.append("filename")
-        else:
-            dataframe.drop(columns="filename", inplace=True)
+        fastq_iter = _fastq_reader(fh, min_avg_quality, row_limit, self.header_column.value)
+        dataframe = pd.DataFrame(fastq_iter)
+        fh.close()
+        logger.debug("LoadFastqPlugin: read %d records", len(dataframe))
 
         if self.group:
-            return dataframe.assign(count=1).groupby(group_columns).count()
-        else:
-            return dataframe
+            if self.header_column:
+                # if we've got a header column and we're grouping by sequence,
+                # find maximum common length of the 'header' field in this file
+                for common_length in range(0, dataframe["header"].str.len().min() - 1):
+                    if dataframe["header"].str.slice(0, common_length + 1).nunique() > 1:
+                        break
+                if common_length > 0:
+                    dataframe["header"] = dataframe["header"].str.slice(0, common_length)
+
+                dataframe = dataframe.assign(count=1).groupby(["sequence", "header"]).count()
+            else:
+                dataframe = dataframe.assign(count=1).groupby(["sequence"]).count()
+
+        if self.filename_column:
+            dataframe['filename'] = clean_filename(filename)
+
+        logger.debug("LoadFastqPlugin: emit %d records", len(dataframe))
+        return dataframe
 
 
 def _fasta_reader(file_handle, row_limit: Optional[int] = None) -> Iterable[dict[str, str]]:
