@@ -106,6 +106,11 @@ class BasePlugin(HasSubParametersMixin):
         """Returns a hex digest of the hash of all configuration parameters"""
         return self.get_parameter_hash().hexdigest()
 
+    def preconfigure(self) -> None:
+        """Called after everything else, to set up any configuration
+        which may have changed"""
+        return None
+
 
 class ProcessPlugin(BasePlugin):
     """A plugin which accepts data from one or more sources.  Each source is
@@ -206,12 +211,12 @@ class PandasProcessPlugin(ProcessPlugin):
 
     def preprocess(self, data: pd.DataFrame, source: str) -> None:
         self.input_columns.update(get_all_columns(data))
+        logger.debug("PandasProcessPlugin.preprocess %s input_columns %s", self.name, self.input_columns.keys())
 
     def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
         raise NotImplementedError(f"{self.__class__}.process")
 
-    def finalize(self) -> Iterable[pd.DataFrame]:
-        yield from super().finalize()
+    def preconfigure(self) -> None:
         self.set_column_choices(self.input_columns.keys())
 
 

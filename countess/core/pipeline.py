@@ -218,6 +218,8 @@ class PipelineNode:
             logger.debug("skipping %s (not dirty)", self.plugin.name)
             return
 
+        logger.debug("PipelineNode.prerun: starting %s", self.name)
+
         assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
         self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
 
@@ -228,6 +230,7 @@ class PipelineNode:
             parent_node.prerun(row_limit)
             for data in parent_node.result or []:
                 self.plugin.preprocess(data, parent_node.name)
+        self.plugin.preconfigure()
 
         queue = multiprocessing.Queue(maxsize=3)
 
@@ -267,7 +270,7 @@ class PipelineNode:
 
         self.prerun_process = multiprocessing.Process(target=__prerun_process, name=f"node {self.name}")
         self.prerun_process.start()
-        logger.debug("started process %d", self.prerun_process.pid)
+        logger.debug("PipelineNode.prerun %s started process %d", self.name, self.prerun_process.pid)
 
         # read results out of the queue until the process has finished
         # *AND* the queue is empty.
@@ -280,13 +283,21 @@ class PipelineNode:
                 if not self.prerun_process.is_alive():
                     break
 
-        logger.debug("joining process %d", self.prerun_process.pid)
+        logger.debug("PipelineNode.prerun %s joining process %d", self.name, self.prerun_process.pid)
         self.prerun_process.join()
 
         # if __prerun_process was terminated early or threw an error,
         # this node is still dirty.
+        logger.debug(
+            "PipelineNode.prerun %s process %d exitcode %d",
+            self.name,
+            self.prerun_process.pid,
+            self.prerun_process.exitcode,
+        )
         self.is_dirty = self.prerun_process.exitcode != 0
         self.prerun_process = None
+
+        logger.debug("PipelineNode.prerun: finished %s", self.name)
 
     def prerun_stop(self):
         if self.prerun_process and self.prerun_process.is_alive():
