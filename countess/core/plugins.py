@@ -23,6 +23,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type, U
 
 import numpy as np
 import pandas as pd
+import duckdb
 
 from countess.core.parameters import (
     ArrayParam,
@@ -199,6 +200,146 @@ class FileInputPlugin(BasePlugin):
             yield from self.load_file(filename_and_param, row_limit_per_file)
         logger.info("%s: 100%%", self.name)
         logger.debug("FileInputPlugin.finalize finished %s", self.name)
+
+
+class DuckdbPlugin(BasePlugin):
+
+    ALLOWED_TYPES = {'INTEGER', 'VARCHAR', 'FLOAT'}
+
+    def statement(self, sources):
+        raise NotImplementedError(f"{self.__class__}.statement")
+
+    def execute(self, duckdb_session, sources):
+        return duckdb_session.sql(self.statement)
+
+    def escape_identifier(self, identifier):
+        return '"' + identifier.replace('"', '""') + '"'
+
+class DuckdbLoadFilePlugin(DuckdbPlugin):
+
+    pass
+
+
+class DuckdbFilterPlugin(DuckdbPlugin):
+
+    def input_columns(self) -> dict[str,str]:
+        raise NotImplementedError(f"{self.__class__}.input_columns")
+
+    def query(self, ddbc, source):
+        """Perform a query which calls `self.transform` for every row."""
+
+        escaped_input_columns = {
+            self.escape_identifier(k): str(v).upper()
+            for k, v in self.input_columns()
+        }
+        assert all(v in self.ALLOWED_TYPES for v in escaped_input_columns.values())
+
+        # Make up an arbitrary unique name for our temporary function
+        function_name = f"f_{id(self)}"
+        function_call = function_name + "(" + ",".join(escaped_input_columns.keys()) + ")"
+        input_types = escaped_input_columns().values()
+
+        try:
+            ddbc.create_function(
+                name = function_name,
+                function = self.filter,
+                parameters = input_types,
+                return_type = 'boolean',
+                null_handling='special',
+                side_effects=False,
+            )
+            return source.filter(function_call)
+        finally:
+            ddbc.remove_function(function_name)
+
+    def filter(self, *_) -> bool:
+        """This will be called for each row, with the columns nominated in 
+        `self.input_columns` as parameters.  Returns a boolean."""
+        raise NotImplementedError(f"{self.__class__}.transform")
+
+
+class DuckdbTransformPlugin(DuckdbPlugin):
+
+    def drop_columns(self) -> set[str]:
+        return set()
+
+    def input_columns(self) -> dict[str,str]:
+        raise NotImplementedError(f"{self.__class__}.input_columns")
+
+    def output_columns(self) -> dict[str,str]:
+        raise NotImplementedError(f"{self.__class__}.output_columns")
+
+    def query(self, ddbc, source):
+        """Perform a query which calls `self.transform` for every row."""
+
+        escaped_input_columns = {
+            self.escape_identifier(k): str(v).upper()
+            for k, v in self.input_columns()
+        }
+
+        escaped_output_columns = {
+            self.escape_identifier(k): str(v).upper()
+            for k, v in self.output_columns()
+        }
+
+        # if you happen to have an output column with the same name as an
+        # input column this drops it, as well as any columns being explicitly
+        # dropped.
+        drop_columns_set = set(list(self.output_columns().keys()) + list(self.drop_columns()))
+
+        # source columns which aren't being dropped get copied into the projection
+        # in their original order, followed by the generated output columns.
+        escaped_keep_columns = [
+            self.escape_identifier(k)
+            for k in source.columns
+            if k not in drop_columns_set
+        ]
+
+        assert all(v in self.ALLOWED_TYPES for v in escaped_input_columns.values())
+        assert all(v in self.ALLOWED_TYPES for v in escaped_output_columns.values())
+
+        # Make up an arbitrary unique name for our temporary function
+        function_name = f"f_{id(self)}"
+
+        # this generates a clause like `f(x,y).a as a, f(x,y).b as b, f(x,y).c as c`
+        # which looks inefficient but duckdb only calls `f(x,y)` once per row
+        # so long as the function is created with `side_effects=False` ...
+        function_call = function_name + "(" + ",".join(escaped_input_columns.keys()) + ")"
+        function_calls = [
+            f"{function_call}.{oc} AS {oc}"
+            for oc in escaped_output_columns.keys()
+        ]
+        project_fields = ", ".join(escaped_keep_columns + function_calls)
+
+        input_types = escaped_input_columns().values()
+        output_type = "STRUCT(" + ",".join(
+            f"{k} {v}" for k, v in escaped_output_columns.items()
+        ) + ")"
+
+        logger.debug("DuckDbTransformPlugin.query function_name %s", function_name)
+        logger.debug("DuckDbTransformPlugin.query input_types %s", input_types)
+        logger.debug("DuckDbTransformPlugin.query output_type %s", output_type)
+        logger.debug("DuckDbTransformPlugin.query project_fields %s", project_fields)
+
+        try:
+            ddbc.create_function(
+                name = function_name,
+                function = self.transform,
+                parameters = input_types,
+                return_type = output_type,
+                null_handling='special',
+                side_effects=False,
+            )
+            return source.project(project_fields)
+        finally:
+            ddbc.remove_function(function_name)
+
+    def transform(self, *_):
+        """This will be called for each row, with the columns nominated in 
+        `self.input_columns` as parameters.  Return a tuple with the same
+        value types as (or a dictionary with the same keys and value types as)
+        those nominated by `self.output_columns`, or None to return all NULLs."""
+        raise NotImplementedError(f"{self.__class__}.transform")
 
 
 class PandasProcessPlugin(ProcessPlugin):
