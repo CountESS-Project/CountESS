@@ -12,6 +12,7 @@ from tkinter import messagebox, ttk
 from typing import Optional, Union
 
 import psutil
+import duckdb
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
@@ -197,38 +198,22 @@ class ConfiguratorWrapper:
         self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
 
     def show_preview_subframe(self):
+        logger.debug("ConfiguratorWrapper.show_preview_subframe")
         if self.preview_subframe:
             self.frame.remove_child(self.preview_subframe).destroy()
 
         if not self.node.plugin.show_preview:
             return
-        elif not self.node.result:
-            self.preview_subframe = tk.Frame(self.frame)
-            self.preview_subframe.columnconfigure(0, weight=1)
-            tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
-        elif all(isinstance(r, (str, bytes)) for r in self.node.result):
-            text_result = "".join(self.node.result)
-            self.preview_subframe = tk.Frame(self.frame)
-            self.preview_subframe.columnconfigure(0, weight=1)
-            self.preview_subframe.rowconfigure(1, weight=1)
-            n_lines = len(text_result.splitlines())
-            tk.Label(self.preview_subframe, text=f"Text Preview {n_lines} Lines").grid(sticky=tk.NSEW)
-            text = tk.Text(self.preview_subframe)
-            text.insert("1.0", text_result)
-            text["state"] = "disabled"
-            text.grid(sticky=tk.NSEW)
-        else:
-            try:
-                df = concat_dataframes(self.node.result)
-                self.preview_subframe = TabularDataFrame(self.frame, cursor="arrow")
-                self.preview_subframe.set_dataframe(df)
-                self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
-                self.preview_subframe.set_callback(self.preview_changed_callback)
-            except (TypeError, ValueError):
-                self.preview_subframe = tk.Frame(self.frame)
-                self.preview_subframe.columnconfigure(0, weight=1)
-                tk.Label(self.preview_subframe, text="no result").grid(sticky=tk.EW)
 
+        s = str(self.node.result)
+
+        logger.debug("ConfiguratorWrapper.show_preview_subframe %s", s)
+
+        self.preview_subframe = tk.Frame(self.frame)
+        text = tk.Text(self.preview_subframe)
+        text.insert("1.0", s)
+        text["state"] = "disabled"
+        text.grid(stick=tk.NSEW)
         self.frame.add_child(self.preview_subframe)
 
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
@@ -261,35 +246,9 @@ class ConfiguratorWrapper:
         self.config_change_task = None
         logger.debug("config_change_task_callback")
 
-        # if there's already an update running, request to stop it and then
-        # wait for it to stop.
-        if self.node_update_thread and self.node_update_thread.is_alive():
-            logger.debug("config_change_task_callback: stopping thread %s", self.node_update_thread)
-            self.node.prerun_stop()
-            self.node_update_thread.join()
-
-        self.node_update_thread = threading.Thread(target=self.node.prerun)
-        logger.debug("config_change_task_callback: starting thread %s", self.node_update_thread)
-        self.node_update_thread.start()
-        self.frame.after(500, self.config_change_task_callback_2)
-
-    def config_change_task_callback_2(self):
-        logger.debug("config_change_task_callback_2")
-        if not self.node_update_thread:
-            return
-
-        if self.node_update_thread.is_alive():
-            logger.debug("config_change_task_callback_2: waiting for thread %s", self.node_update_thread)
-            self.frame.after(500, self.config_change_task_callback_2)
-            return
-
-        logger.debug("config_change_task_callback_2: joining thread %s", self.node_update_thread)
-        self.node_update_thread.join()
-        self.node_update_thread = None
-
-        # XXX stop the form scrolling away when it is refreshed, by putting
-        # it back where it belongs.
-        pos1, pos2 = self.config_scrollbar.get()
+        # XXX temporary
+        ddbc = duckdb.connect("countess.duckdb")
+        self.node.run(ddbc)
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
@@ -298,7 +257,7 @@ class ConfiguratorWrapper:
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
-        self.node.prerun()
+        #self.node.prerun()
         self.node.is_dirty = True
         self.show_config_subframe()
         self.change_callback(self.node)

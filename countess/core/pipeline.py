@@ -1,66 +1,16 @@
 import logging
-import multiprocessing
-import os
 import re
 import secrets
-import signal
-import sys
 import time
-from queue import Empty, Full, Queue
-from threading import Thread
 from typing import Any, Iterable, Optional
 
-from countess.core.plugins import BasePlugin, FileInputPlugin, ProcessPlugin, get_plugin_classes
+import duckdb
+
+from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
 
 PRERUN_ROW_LIMIT = 100000
 
 logger = logging.getLogger(__name__)
-
-
-class SentinelQueue(Queue):
-
-    """This is an easy and a bit lazy way of making a queue iterable.
-    The writer is expected to call `queue.finish()` when it is done and
-    the reader can treat the queue like an iterable."""
-
-    # catch attempts to 'put' more data onto the queue after it has finished.
-    finished = False
-
-    # Handle multiple threads reading from the
-    # queue in parallel: once the sentinel has been received by any thread
-    # all further attempts to read get StopIterations.
-    stopped = False
-
-    class SENTINEL:
-        pass
-
-    def finish(self):
-        self.put(self.SENTINEL)
-        self.finished = True
-
-    def __iter__(self):
-        return self
-
-    def get_or_raise_on_stopped(self):
-        while True:
-            if self.stopped:
-                raise StopIteration
-            try:
-                return super().get(timeout=1)
-            except Empty:
-                pass
-
-    def __next__(self):
-        val = self.get_or_raise_on_stopped()
-        if val is self.SENTINEL:
-            self.stopped = True
-            raise StopIteration
-        return val
-
-    def put(self, item, block=True, timeout=None):
-        if self.finished:
-            raise ValueError("SentinelQueue: can't put when finished")
-        super().put(item, block, timeout)
 
 
 class PipelineNode:
@@ -73,18 +23,13 @@ class PipelineNode:
     notes: Optional[str] = None
     parent_nodes: set["PipelineNode"]
     child_nodes: set["PipelineNode"]
-    config: Optional[list[tuple[str, str, str]]] = None
-    result: Any = None
     is_dirty: bool = True
-
-    output_queues: set[SentinelQueue]
-    counter_in: int = 0
-    counter_out: int = 0
-    prerun_process: Optional[multiprocessing.Process] = None
+    result: Any = None
 
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
+    config: Optional[list[tuple[str, str, str]]] = None
 
     def __init__(
         self,
@@ -105,7 +50,6 @@ class PipelineNode:
         self.notes = notes
         self.parent_nodes = set()
         self.child_nodes = set()
-        self.output_queues = set()
         self.config: list[tuple[str, str, str]] = []
 
     def set_config(self, key, value, base_dir):
@@ -120,83 +64,6 @@ class PipelineNode:
     def is_descendant_of(self, node: "PipelineNode") -> bool:
         return (self in node.child_nodes) or any((self.is_descendant_of(n) for n in node.child_nodes))
 
-    def add_output_queue(self) -> SentinelQueue:
-        queue = SentinelQueue(maxsize=3)
-        self.output_queues.add(queue)
-        return queue
-
-    def queue_output(self, result):
-        for data in result:
-            logger.debug("PipelineNode.queue_output %s %d rows", self.name, len(data))
-            self.counter_out += 1
-            # XXX can we do this out-of-order if any queues are full?
-            for queue in self.output_queues:
-                while True:
-                    try:
-                        queue.put(data, timeout=1)
-                        break
-                    except Full:
-                        logger.debug("PipelineNode.queue_output %s queue full", self.name)
-
-            logger.info("%s: %d/%d", self.name, self.counter_out, self.counter_in)
-
-    def finish_output(self):
-        for queue in self.output_queues:
-            queue.finish()
-
-    def run_multithread(self, queue: SentinelQueue, name: str, row_limit: Optional[int] = None):
-        assert isinstance(self.plugin, ProcessPlugin)
-        logger.debug("PipelineNode.run_multithread %s starting", self.name)
-        for data_in in queue:
-            logger.debug("PipelineNode.run_multithread %s got %d rows", self.name, len(data_in))
-            self.counter_in += 1
-            self.plugin.preprocess(data_in, name)
-            self.queue_output(self.plugin.process(data_in, name))
-        logger.debug("PipelineNode.run_multithread %s finished", self.name)
-
-    def run_subthread(self, queue: SentinelQueue, name: str, row_limit: Optional[int] = None):
-        assert isinstance(self.plugin, ProcessPlugin)
-        logger.debug("PipelineNode.run_subthread %s starting", self.name)
-        for data_in in queue:
-            self.counter_in += 1
-            self.plugin.preprocess(data_in, name)
-            self.queue_output(self.plugin.process(data_in, name))
-        logger.debug("PipelineNode.run_subthread %s finishing", self.name)
-        self.queue_output(self.plugin.finished(name))
-        logger.debug("PipelineNode.run_subthread %s finished", self.name)
-
-    def run_thread(self, row_limit: Optional[int] = None):
-        """For each PipelineNode, this is run in its own thread."""
-        assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
-        logger.debug("PipelineNode.run_thread %s starting", self.name)
-
-        logger.info("%s: 0%%", self.name)
-
-        self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
-
-        # run each parent node in its own thread.
-        if self.parent_nodes:
-            assert isinstance(self.plugin, ProcessPlugin)
-            subthreads = [
-                Thread(
-                    target=self.run_subthread,
-                    args=(parent_node.add_output_queue(), parent_node.name, row_limit),
-                )
-                for parent_node in self.parent_nodes
-            ]
-            logger.debug("PipelineNode.run_thread %s starting %d subthreads", self.name, len(subthreads))
-            for subthread in subthreads:
-                subthread.start()
-            for subthread in subthreads:
-                subthread.join()
-
-        logger.debug("PipelineNode.run_thread %s finalizing", self.name)
-        self.queue_output(self.plugin.finalize())
-        self.finish_output()
-
-        logger.info("%s: 100%%", self.name)
-        logger.debug("PipelineNode.run_thread %s finished", self.name)
-
     def load_config(self):
         assert isinstance(self.plugin, BasePlugin)
         if self.config:
@@ -209,99 +76,20 @@ class PipelineNode:
                     logger.warning("Parameter %s=%s Not Valid", key, val)
             self.config = None
 
-    def prerun(self, row_limit=PRERUN_ROW_LIMIT):
+    def run(self, ddbc):
         if not self.plugin:
-            return
+            return None
         self.load_config()
 
-        if not self.is_dirty:
-            logger.debug("skipping %s (not dirty)", self.plugin.name)
-            return
+        assert isinstance(self.plugin, DuckdbPlugin)
+        if self.is_dirty:
+            sources = [ pn.run(ddbc) for pn in self.parent_nodes ]
+            ddbc.sql(f"DROP TABLE IF EXISTS n_{self.uuid}")
+            self.plugin.execute_multi(ddbc, sources).to_table(f"n_{self.uuid}")
+            self.result = ddbc.table(f"n_{self.uuid}")
+            self.is_dirty = False
 
-        logger.debug("PipelineNode.prerun: starting %s", self.name)
-
-        assert isinstance(self.plugin, (ProcessPlugin, FileInputPlugin))
-        self.plugin.prepare([node.name for node in self.parent_nodes], row_limit)
-
-        # prerun and preprocess are all about setting up the configurator
-        # so we run those in the main process
-        for parent_node in self.parent_nodes:
-            assert isinstance(self.plugin, ProcessPlugin)
-            parent_node.prerun(row_limit)
-            for data in parent_node.result or []:
-                self.plugin.preprocess(data, parent_node.name)
-        self.plugin.preconfigure()
-
-        queue = multiprocessing.Queue(maxsize=3)
-
-        def __prerun_process():
-            """Run in a separate process, because just about everything compute-
-            intensive seems to interfere with the GUI even if it is in a separate
-            thread."""
-            logger.debug("process %d starts '%s'", os.getpid(), self.name)
-
-            def __sigterm_handler(*_):
-                # If we get a SIGTERM, close the queue from our end before
-                # exiting.  This prevents the queue getting corrupted /
-                # deadlocked when calling process.terminate()
-                queue.close()
-                logger.debug("process %d aborted", os.getpid())
-                sys.exit(1)
-
-            signal.signal(signal.SIGTERM, __sigterm_handler)
-
-            def __generate():
-                # XXX would be nicer to interleave ...
-                for pn in self.parent_nodes:
-                    for data in pn.result or []:
-                        yield from self.plugin.process(data, pn.name)
-                    yield from self.plugin.finished(pn.name)
-                yield from self.plugin.finalize()
-
-            for count, data in enumerate(__generate()):
-                logger.info("%s: %s/0", self.name, count)
-                queue.put(data)
-
-            logger.debug("process %d finished '%s'", os.getpid(), self.name)
-            logger.info("%s: 100%%", self.name)
-
-        if self.prerun_process and self.prerun_process.is_alive():
-            self.prerun_process.terminate()
-
-        self.prerun_process = multiprocessing.Process(target=__prerun_process, name=f"node {self.name}")
-        self.prerun_process.start()
-        logger.debug("PipelineNode.prerun %s started process %d", self.name, self.prerun_process.pid)
-
-        # read results out of the queue until the process has finished
-        # *AND* the queue is empty.
-        self.result = []
-        while True:
-            try:
-                data = queue.get(timeout=0.1)
-                self.result.append(data)
-            except Empty:
-                if not self.prerun_process.is_alive():
-                    break
-
-        logger.debug("PipelineNode.prerun %s joining process %d", self.name, self.prerun_process.pid)
-        self.prerun_process.join()
-
-        # if __prerun_process was terminated early or threw an error,
-        # this node is still dirty.
-        logger.debug(
-            "PipelineNode.prerun %s process %d exitcode %d",
-            self.name,
-            self.prerun_process.pid,
-            self.prerun_process.exitcode,
-        )
-        self.is_dirty = self.prerun_process.exitcode != 0
-        self.prerun_process = None
-
-        logger.debug("PipelineNode.prerun: finished %s", self.name)
-
-    def prerun_stop(self):
-        if self.prerun_process and self.prerun_process.is_alive():
-            self.prerun_process.terminate()
+        return self.result
 
     def mark_dirty(self):
         self.is_dirty = True
@@ -380,19 +168,16 @@ class PipelineGraph:
                     found_nodes.add(node)
 
     def run(self):
-        threads_and_nodes = []
+        ddbc = duckdb.connect("countess-run.duckdb")
+        ddbc.sql("SET python_enable_replacements = false")
+
         logger.info("Starting")
         start_time = time.time()
-        for node in self.traverse_nodes_backwards():
+        for node in self.traverse_nodes():
             node.load_config()
-            threads_and_nodes.append((Thread(target=node.run_thread), node))
-
-        for thread, _ in threads_and_nodes:
-            thread.start()
-
-        while any(t.is_alive() for t, _ in threads_and_nodes):
-            logger.info("Elapsed time: %d", time.time() - start_time)
-            time.sleep(10)
+            node.result = node.plugin.execute_multi(ddbc, [ pn.result for pn in node.parent_nodes ])
+            logger.debug("Got result ...")
+            logger.debug("... %d", len(node.result))
 
         logger.info("Finished, elapsed time: %d", time.time() - start_time)
 

@@ -639,6 +639,11 @@ class ColumnOrStringParam(ColumnChoiceParam):
             return self.value[len(self.PREFIX) :]
         return None
 
+    def get_string_value(self) -> Optional[str]:
+        if type(self.value) is str and not self.value.startswith(self.PREFIX):
+            return self.value
+        return None
+
     def get_value_from_dict(self, data: dict) -> str:
         if type(self.value) is str and self.value.startswith(self.PREFIX):
             return data[self.value[len(self.PREFIX) :]]
@@ -678,6 +683,11 @@ class ColumnOrIntegerParam(ColumnOrStringParam):
     ):
         super().__init__(label, choices=choices)
         self.value = value
+
+    def get_integer_value(self) -> Optional[int]:
+        if type(self.value) is str and not self.value.startswith(self.PREFIX):
+            return int(self.value)
+        return None
 
     def clean_value(self, value):
         if type(value) is str and value.startswith(self.PREFIX):

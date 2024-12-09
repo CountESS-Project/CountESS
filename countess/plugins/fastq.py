@@ -3,31 +3,21 @@ import gzip
 import logging
 from itertools import islice
 from typing import Iterable, Optional
+import secrets
 
-import pandas as pd
-from fqfa.fasta.fasta import parse_fasta_records  # type: ignore
-from fqfa.fastq.fastq import parse_fastq_reads  # type: ignore
+import biobear
+import duckdb
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
-from countess.core.plugins import PandasInputFilesPlugin
+from countess.core.plugins import DuckdbLoadFilePlugin
 from countess.utils.files import clean_filename
 
 logger = logging.getLogger(__name__)
 
 
-def _fastq_reader(
-    file_handle, min_avg_quality: float, row_limit: Optional[int] = None, header: bool = False
-) -> Iterable[dict[str, str]]:
-    for fastq_read in islice(parse_fastq_reads(file_handle), 0, row_limit):
-        if fastq_read.average_quality() >= min_avg_quality:
-            if header:
-                yield {"sequence": fastq_read.sequence, "header": fastq_read.header[1:]}
-            else:
-                yield {"sequence": fastq_read.sequence}
-
-
-class LoadFastqPlugin(PandasInputFilesPlugin):
+class LoadFastqPlugin(DuckdbLoadFilePlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
     with count=1 and then grouping by sequence and summing counts.  It supports counting
     in multiple columns."""
@@ -44,51 +34,16 @@ class LoadFastqPlugin(PandasInputFilesPlugin):
     filename_column = BooleanParam("Filename Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
-        min_avg_quality = float(self.min_avg_quality)
+    def load_file(self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int) -> duckdb.DuckDBPyRelation:
 
-        if filename.endswith(".gz"):
-            fh = gzip.open(filename, mode="rt", encoding="utf-8")
-        elif filename.endswith(".bz2"):
-            fh = bz2.open(filename, mode="rt", encoding="utf-8")
-        else:
-            fh = open(filename, "r", encoding="utf-8")
-
-        fastq_iter = _fastq_reader(fh, min_avg_quality, row_limit, self.header_column.value)
-        dataframe = pd.DataFrame(fastq_iter)
-        fh.close()
-        logger.debug("LoadFastqPlugin: read %d records", len(dataframe))
-
-        if self.group:
-            if self.header_column:
-                # if we've got a header column and we're grouping by sequence,
-                # find maximum common length of the 'header' field in this file
-                for common_length in range(0, dataframe["header"].str.len().min() - 1):
-                    if dataframe["header"].str.slice(0, common_length + 1).nunique() > 1:
-                        break
-                if common_length > 0:
-                    dataframe["header"] = dataframe["header"].str.slice(0, common_length)
-
-                dataframe = dataframe.assign(count=1).groupby(["sequence", "header"]).count()
-            else:
-                dataframe = dataframe.assign(count=1).groupby(["sequence"]).count()
-
-        if self.filename_column:
-            dataframe["filename"] = clean_filename(filename)
-
-        logger.debug("LoadFastqPlugin: emit %d records", len(dataframe))
-        return dataframe
+        record_batch_reader = biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
+        reader_name = f"r_{file_number}"
+        logger.debug("LoadFastqPlugin.load_file reader_name %s filename %s", reader_name, filename)
+        cursor.register(reader_name, record_batch_reader)
+        return cursor.sql(f"select sequence, count(*) from {reader_name} group by sequence")
 
 
-def _fasta_reader(file_handle, row_limit: Optional[int] = None) -> Iterable[dict[str, str]]:
-    for header, sequence in islice(parse_fasta_records(file_handle), 0, row_limit):
-        yield {
-            "__s": sequence,
-            "__h": header,
-        }
-
-
-class LoadFastaPlugin(PandasInputFilesPlugin):
+class LoadFastaPlugin(DuckdbLoadFilePlugin):
     name = "FASTA Load"
     description = "Loads sequences from FASTA files"
     link = "https://countess-project.github.io/CountESS/included-plugins/#fasta-load"
@@ -100,24 +55,9 @@ class LoadFastaPlugin(PandasInputFilesPlugin):
     header_column = StringParam("Header Column", "header")
     filename_column = StringParam("Filename Column", "filename")
 
-    def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None):
-        if filename.endswith(".gz"):
-            with gzip.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))
-        elif filename.endswith(".bz2"):
-            with bz2.open(filename, mode="rt", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))
-        else:
-            with open(filename, "r", encoding="utf-8") as fh:
-                dataframe = pd.DataFrame(_fasta_reader(fh, row_limit))
+    def load_file(self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int) -> duckdb.DuckDBPyRelation:
 
-        dataframe.rename(columns={"__s": self.sequence_column.value}, inplace=True)
-
-        if self.header_column:
-            dataframe.rename(columns={"__h": self.header_column.value}, inplace=True)
-        else:
-            dataframe.drop(columns=["__h"], inplace=True)
-
-        if self.filename_column:
-            dataframe[self.filename_column.value] = clean_filename(filename)
-        return dataframe
+        record_batch_reader = biobear.connect().read_fasta_file(filename).to_arrow_record_batch_reader()
+        reader_name = f"r_{file_number}"
+        cursor.register(reader_name, record_batch_reader)
+        return cursor.sql(f"select * from {reader_name}")

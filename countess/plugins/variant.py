@@ -2,8 +2,6 @@ import logging
 import string
 from typing import Optional
 
-import pandas as pd
-
 from countess import VERSION
 from countess.core.parameters import (
     BooleanParam,
@@ -16,7 +14,7 @@ from countess.core.parameters import (
     StringCharacterSetParam,
     StringParam,
 )
-from countess.core.plugins import PandasTransformDictToDictPlugin
+from countess.core.plugins import DuckdbTransformPlugin
 from countess.utils.variant import TooManyVariationsException, find_variant_string
 
 logger = logging.getLogger(__name__)
@@ -57,7 +55,7 @@ class ProteinVariantMultiParam(FramedMultiParam):
     output = StringParam("Output Column", "protein")
 
 
-class VariantPlugin(PandasTransformDictToDictPlugin):
+class VariantPlugin(DuckdbTransformPlugin):
     """Turns a DNA sequence into a HGVS variant code"""
 
     name = "Variant Caller"
@@ -74,14 +72,32 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
     drop = BooleanParam("Drop unmatched rows", False)
     drop_columns = BooleanParam("Drop Sequence / Reference Columns", False)
 
-    def process_dict(self, data) -> dict:
+    def input_columns(self):
+        return {
+            self.column.value: 'VARCHAR',
+            self.reference.get_column_name(): 'VARCHAR',
+            self.variant.offset.get_column_name(): 'INTEGER',
+            self.protein.offset.get_column_name(): 'INTEGER',
+        }
+
+    def output_columns(self):
+        r = {}
+        if self.variant.output:
+            r[self.variant.output.value] = 'VARCHAR'
+        if self.protein.output:
+            r[self.protein.output.value] = 'VARCHAR'
+        return r
+
+    def transform(self, data):
         sequence = data[str(self.column)]
         reference = self.reference.get_value_from_dict(data)
-        if not sequence:
-            return {}
+        if not sequence or not reference:
+            return None
 
-        r: dict[str, str] = {}
-
+        r : dict[str, str] = {
+            self.variant.output.value: None,
+            self.protein.output.value: None
+        }
         if self.variant.output:
             try:
                 prefix = self.variant.prefix + ":" if self.variant.prefix else ""
@@ -114,22 +130,3 @@ class VariantPlugin(PandasTransformDictToDictPlugin):
                 logger.warning("Exception", exc_info=exc)
 
         return r
-
-    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
-        df_out = super().process_dataframe(dataframe)
-
-        if df_out is not None:
-            if self.drop:
-                if self.variant.output:
-                    df_out.dropna(subset=str(self.variant.output), inplace=True)
-                if self.protein.output:
-                    df_out.dropna(subset=str(self.protein.output), inplace=True)
-            if self.drop_columns:
-                try:
-                    df_out.drop(columns=str(self.column), inplace=True)
-                    if self.reference.get_column_name():
-                        df_out.drop(columns=self.reference.get_column_name(), inplace=True)
-                except KeyError:
-                    pass
-
-        return df_out

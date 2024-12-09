@@ -20,11 +20,13 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Bio-Informatics',
 ]
 dependencies = [
-    'fqfa~=1.3.0',
+    'biobear~=0.22.7',
+    'duckdb~=1.1.3',
     'more_itertools~=9.1.0',
     'numpy~=1.26',
     'pandas~=2.1.0',
     'psutil~=5.9.5',
+    'pyarrow~=18.1.0',
     'rapidfuzz~=2.15.1',
     'scipy~=1.13.1',
     'tkinterweb~=3.23.5',
