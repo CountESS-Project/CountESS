@@ -11,8 +11,9 @@ from collections.abc import Callable
 from tkinter import messagebox, ttk
 from typing import Optional, Union
 
-import psutil
 import duckdb
+import psutil
+from duckdb import DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.config import export_config_graphviz, read_config, write_config
@@ -30,7 +31,6 @@ from countess.gui.widgets import (
     get_icon,
     info_button,
 )
-from countess.utils.pandas import concat_dataframes
 
 usage = """usage: countess_gui [--log LEVEL] [INIFILE]
 
@@ -112,6 +112,8 @@ class ConfiguratorWrapper:
         self.label = tk.Label(self.subframe, justify=tk.LEFT, wraplength=500)
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
+
+        self.ddbc = duckdb.connect(":countess:")
 
         self.show_config_subframe()
 
@@ -205,15 +207,17 @@ class ConfiguratorWrapper:
         if not self.node.plugin.show_preview:
             return
 
-        s = str(self.node.result)
-
-        logger.debug("ConfiguratorWrapper.show_preview_subframe %s", s)
-
-        self.preview_subframe = tk.Frame(self.frame)
-        text = tk.Text(self.preview_subframe)
-        text.insert("1.0", s)
-        text["state"] = "disabled"
-        text.grid(stick=tk.NSEW)
+        if isinstance(self.node.result, DuckDBPyRelation):
+            self.preview_subframe = TabularDataFrame(self.frame, cursor="arrow")
+            self.preview_subframe.set_table(self.ddbc, self.node.result)
+            self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
+            self.preview_subframe.set_callback(self.preview_changed_callback)
+        else:
+            self.preview_subframe = tk.Frame(self.frame)
+            text = tk.Text(self.preview_subframe)
+            text.insert("1.0", str(self.node.result))
+            text["state"] = "disabled"
+            text.grid(sticky=tk.NSEW)
         self.frame.add_child(self.preview_subframe)
 
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
@@ -245,10 +249,9 @@ class ConfiguratorWrapper:
         """Called when the user makes a change and had paused for a bit"""
         self.config_change_task = None
         logger.debug("config_change_task_callback")
+        pos1, pos2 = self.config_scrollbar.get()
 
-        # XXX temporary
-        ddbc = duckdb.connect("countess.duckdb")
-        self.node.run(ddbc)
+        self.node.run(self.ddbc)
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
@@ -257,7 +260,7 @@ class ConfiguratorWrapper:
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
-        #self.node.prerun()
+        # self.node.prerun()
         self.node.is_dirty = True
         self.show_config_subframe()
         self.change_callback(self.node)
@@ -423,7 +426,7 @@ class MainWindow:
         # | tree_canvas  | config_wrapper.subframe     |
         # |              |                             |
         # |              +-----------------------------+
-        # |              | configw_wrapper.preview     |
+        # |              | config_wrapper.preview      |
         # |              |                             |
         # +--------------+-----------------------------+
         # | logger_subframe                            |

@@ -1,14 +1,15 @@
 import io
+import time
 import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
 from tkinter import ttk
 from typing import Callable, Optional, Union
 
-import pandas as pd
-from pandas.api.types import is_integer_dtype, is_numeric_dtype
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
+from countess.utils.duckdb import duckdb_dtype_is_integer, duckdb_dtype_is_numeric, duckdb_escape_identifier
 
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
@@ -17,18 +18,19 @@ from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
 # etc etc.
 
 
-def column_format_for(df_column: Union[pd.Index, pd.Series]) -> str:
-    if is_numeric_dtype(df_column.dtype):
+def column_format_for(table: DuckDBPyRelation, column: str) -> str:
+    dtype = table[column].dtypes[0]
+    if duckdb_dtype_is_numeric(dtype):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
-        column_min = df_column.min()
-        if isnan(column_min) or isinf(column_min):
+        column_esc = duckdb_escape_identifier(column)
+        column_min, column_max = table.aggregate(f"min({column_esc}), max({column_esc})").fetchone()
+        if column_min is None or isnan(column_min) or isinf(column_min):
             column_min = -100
-        column_max = df_column.max()
-        if isnan(column_max) or isinf(column_max):
+        if column_max is None or isnan(column_max) or isinf(column_max):
             column_max = 100
         width = max(len(str(floor(column_min))), len(str(ceil(column_max))))
-        if is_integer_dtype(df_column.dtype):
+        if duckdb_dtype_is_integer(dtype):
             return f"%{width}d"
         else:
             # leave room for the point and 12 decimals.
@@ -70,12 +72,13 @@ def format_value(value: Optional[Union[int, float, str]], column_format: str) ->
 
 
 class TabularDataFrame(tk.Frame):
-    """A frame for displaying a pandas (or similar) dataframe.
+    """A frame for displaying a duckdb relation
     Columns are displayed as individual tk.Text widgets which seems to be relatively efficient
     as they only hold the currently displayed rows.  Tested up to a million or so rows."""
 
     subframe: Optional[tk.Frame] = None
-    dataframe: Optional[pd.DataFrame] = None
+    ddbc: Optional[DuckDBPyConnection] = None
+    table: Optional[DuckDBPyRelation] = None
     offset = 0
     height = 1000
     length = 0
@@ -92,6 +95,7 @@ class TabularDataFrame(tk.Frame):
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
+
         self.rowconfigure(0, weight=0)
         self.rowconfigure(1, weight=0)
         self.rowconfigure(2, weight=1)
@@ -110,36 +114,14 @@ class TabularDataFrame(tk.Frame):
 
         self.bind("<Configure>", self._configure)
 
-    def set_dataframe(self, dataframe: pd.DataFrame, offset: Optional[int] = 0):
-        self.dataframe = dataframe
-        self.length = len(dataframe)
+    def set_table(self, ddbc: DuckDBPyConnection, table: DuckDBPyRelation, offset: Optional[int] = 0):
+        self.ddbc = ddbc
+        self.table = table
+        self.length = len(table)
 
-        # clean up column names
-
-        if hasattr(self.dataframe.index, "names") and hasattr(self.dataframe.index, "dtypes"):
-            # MultiIndex case
-            column_names = list(self.dataframe.index.names) + list(self.dataframe.columns)
-            column_dtypes = list(self.dataframe.index.dtypes) + list(self.dataframe.dtypes)
-            index_frame = self.dataframe.index.to_frame()
-            self.column_formats = [column_format_for(index_frame[name]) for name in dataframe.index.names] + [
-                column_format_for(dataframe[name]) for name in dataframe.columns
-            ]
-            self.index_cols = len(self.dataframe.index.names)
-        elif self.dataframe.index.name:
-            # a simple Index, with a name
-            column_names = [self.dataframe.index.name] + list(self.dataframe.columns)
-            column_dtypes = [self.dataframe.index.dtype] + list(self.dataframe.dtypes)
-            self.column_formats = [column_format_for(dataframe.index)] + [
-                column_format_for(dataframe[name]) for name in dataframe.columns
-            ]
-            self.index_cols = 1
-        else:
-            # if it doesn't have a name, don't bother displaying it
-            # XXX it's probably just a RangeIndex, should we display it anyway?
-            column_names = list(self.dataframe.columns)
-            column_dtypes = list(self.dataframe.dtypes)
-            self.column_formats = [column_format_for(dataframe[name]) for name in dataframe.columns]
-            self.index_cols = 0
+        column_names = table.columns
+        column_dtypes = table.dtypes
+        self.column_formats = [column_format_for(table, name) for name in column_names]
 
         n_columns = len(column_names)
         if n_columns == 0:
@@ -175,7 +157,7 @@ class TabularDataFrame(tk.Frame):
         self.subframe = ResizingFrame(self, orientation=ResizingFrame.Orientation.HORIZONTAL, bg="darkgrey")
         self.subframe.pack(side="left", fill="both", expand=True)
 
-        self.label["text"] = f"Dataframe Preview {len(self.dataframe)} rows"
+        self.label["text"] = f"Dataframe Preview {len(self.table)} rows"
 
         self.columns = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
@@ -211,52 +193,15 @@ class TabularDataFrame(tk.Frame):
         new_offset = max(0, min(self.length - self.height, int(new_offset)))
         offset_diff = new_offset - self.offset
 
-        # get the new rows as an iterator
-        if 1 <= offset_diff < self.height:
-            df = self.dataframe.iloc[self.offset + self.height : self.offset + self.height + offset_diff]
-            insert_at = tk.END
-        elif 1 <= -offset_diff < self.height:
-            # Get rows in reverse order so they can be inserted at the start
-            # note offset_diff is negative!
-            # XXX check this isn't horribly inefficient with pandas indexes
-            if new_offset:
-                df = self.dataframe.iloc[self.offset - 1 : new_offset - 1 : -1]
-            else:
-                df = self.dataframe.iloc[self.offset - 1 :: -1]
-            insert_at = "1.0"
-        else:
-            df = self.dataframe.iloc[new_offset : new_offset + self.height + 1]
-            insert_at = tk.END
-
-        # then unlock the columns and delete unnecessary rows
-        for cw in self.columns:
-            cw["state"] = tk.NORMAL
-            if 1 <= offset_diff < self.height:
-                # delete rows at start, add new rows on the end
-                cw.delete("1.0", f"{offset_diff+1}.0")
-            elif 1 <= -offset_diff < self.height:
-                # delete rows at end, insert new rows at start
-                # note offset_diff is negative!  Note we have to
-                # restore the deleted final "\n".  Sigh.
-                cw.delete(f"{self.height+offset_diff+2}.0", tk.END)
-                cw.insert(tk.END, "\n")
-            else:
-                # delete everything & add all new rows
-                cw.delete("1.0", tk.END)
-
-        for idx, row in df.iterrows():
-            if type(idx) is tuple:
-                values = list(idx) + list(row)
-            elif self.dataframe.index.name:
-                values = [idx] + list(row)
-            else:
-                values = list(row)
-
-            for value, column, column_format in zip(values, self.columns, self.column_formats):
-                column.insert(insert_at, format_value(value, column_format) + "\n")
-
-        for cw in self.columns:
-            cw["state"] = tk.DISABLED
+        rows = self.table.limit(self.height, offset=new_offset).fetchall()
+        for column_num, (column_name, column_widget, column_format) in enumerate(
+            zip(self.table.columns, self.columns, self.column_formats)
+        ):
+            column_widget["state"] = tk.NORMAL
+            column_widget.delete("1.0", tk.END)
+            for row in rows:
+                column_widget.insert(tk.END, format_value(row[column_num], column_format) + "\n")
+            column_widget["state"] = tk.DISABLED
 
         self.offset = new_offset
         if self.length:
@@ -272,19 +217,22 @@ class TabularDataFrame(tk.Frame):
         self.click_callback = click_callback
 
     def set_sort_order(self, column_num: int, descending: Optional[bool] = None):
-        assert self.dataframe is not None
+        assert self.table is not None
 
         if descending is None and column_num == self.sort_by_col:
             self.sort_ascending = not self.sort_ascending
         else:
             self.sort_by_col = column_num
             self.sort_ascending = not descending
-        if column_num < self.index_cols:
-            self.dataframe = self.dataframe.sort_index(level=column_num, ascending=self.sort_ascending)
-        elif column_num < self.index_cols + len(self.dataframe.columns):
-            self.dataframe = self.dataframe.sort_values(
-                self.dataframe.columns[column_num - self.index_cols], ascending=self.sort_ascending
-            )
+
+        old_table_alias = self.table.alias
+        new_preview_table = f"p_{time.time_ns()}"
+        self.table.order(self.table.columns[column_num] + (" ASC" if self.sort_ascending else " DESC")).to_table(
+            new_preview_table
+        )
+        self.table = self.ddbc.table(new_preview_table)
+        if old_table_alias.startswith("preview_"):
+            self.ddbc.sql(f"DROP TABLE IF EXISTS {old_table_alias}")
 
         for n, label in enumerate(self.labels):
             icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
@@ -372,9 +320,9 @@ class TabularDataFrame(tk.Frame):
 
         # Dump TSV into a StringIO ...
         r1, r2 = self.select_rows
-        df = self.dataframe.iloc[self.offset + r1 - 1 : self.offset + r2]
+        df = self.table.limit(r2 - r1, offset=self.offset + r1).to_df()
         buf = io.StringIO()
-        df.to_csv(buf, sep="\t")
+        df.to_csv(buf, sep="\t", index=False)
 
         # ... and then push that onto the clipboard
         copy_to_clipboard(buf.getvalue())

@@ -23,14 +23,9 @@ from typing import Any, Iterable, List, Optional, Sequence, Type, Union
 
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
-from countess.core.parameters import (
-    BaseParam,
-    FileArrayParam,
-    FileParam,
-    HasSubParametersMixin,
-    MultiParam,
-)
+from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
 from countess.utils.duckdb import duckdb_concatenate, duckdb_escape_identifier
+
 PRERUN_ROW_LIMIT: int = 100000
 
 logger = logging.getLogger(__name__)
@@ -112,14 +107,13 @@ class DuckdbPlugin(BasePlugin):
     """Base class for all DuckDB-based plugins"""
 
     # XXX expand this, or find in library somewhere
-    ALLOWED_TYPES = {'INTEGER', 'VARCHAR', 'FLOAT'}
+    ALLOWED_TYPES = {"INTEGER", "VARCHAR", "FLOAT"}
 
     def execute_multi(self, ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute_multi")
 
 
 class DuckdbSimplePlugin(DuckdbPlugin):
-
     def execute_multi(self, ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         if len(sources) > 1:
             return self.execute(ddbc, duckdb_concatenate(sources))
@@ -133,18 +127,17 @@ class DuckdbSimplePlugin(DuckdbPlugin):
 
 
 class DuckdbStatementPlugin(DuckdbSimplePlugin):
-
     def statement(self, ddbc: DuckDBPyConnection, source_table_name: str) -> str:
         raise NotImplementedError(f"{self.__class__}.statement")
 
     def execute(self, ddbc, source):
-
         source_table_name = f"r_{id(self)}"
         try:
             ddbc.register(source_table_name, source)
             return ddbc.sql(self.statement(ddbc, source_table_name))
         finally:
             ddbc.unregister(source_table_name)
+
 
 class LoadFileMultiParam(MultiParam):
     """MultiParam which only asks for one thing, a filename.  Using a MultiParam wrapper
@@ -154,7 +147,6 @@ class LoadFileMultiParam(MultiParam):
 
 
 class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
-
     files = FileArrayParam("Files", LoadFileMultiParam("File"))
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
     num_inputs = 0
@@ -170,28 +162,27 @@ class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
         filenames_and_params = list(self.filenames_and_params())
 
         cursor = ddbc
-        return duckdb_concatenate([
-            self.load_file(cursor, filename, file_param, num)
-            for num, (filename, file_param) in enumerate(filenames_and_params)
-        ])
+        return duckdb_concatenate(
+            [
+                self.load_file(cursor, filename, file_param, num)
+                for num, (filename, file_param) in enumerate(filenames_and_params)
+            ]
+        )
 
-    def load_file(self, cursor: DuckDBPyConnection, filename: str,
-                  file_param: BaseParam, file_number: int) -> DuckDBPyRelation:
+    def load_file(
+        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
+    ) -> DuckDBPyRelation:
         raise NotImplementedError(f"{self.__class__}.load_file")
 
 
 class DuckdbFilterPlugin(DuckdbSimplePlugin):
-
-    def input_columns(self) -> dict[str,str]:
+    def input_columns(self) -> dict[str, str]:
         raise NotImplementedError(f"{self.__class__}.input_columns")
 
     def execute(self, ddbc, source):
         """Perform a query which calls `self.transform` for every row."""
 
-        escaped_input_columns = {
-            duckdb_escape_identifier(k): str(v).upper()
-            for k, v in self.input_columns()
-        }
+        escaped_input_columns = {duckdb_escape_identifier(k): str(v).upper() for k, v in self.input_columns()}
         assert all(v in self.ALLOWED_TYPES for v in escaped_input_columns.values())
 
         # Make up an arbitrary unique name for our temporary function
@@ -204,11 +195,11 @@ class DuckdbFilterPlugin(DuckdbSimplePlugin):
 
         try:
             ddbc.create_function(
-                name = function_name,
-                function = self.filter,
-                parameters = input_types,
-                return_type = 'boolean',
-                null_handling='special',
+                name=function_name,
+                function=self.filter,
+                parameters=input_types,
+                return_type="boolean",
+                null_handling="special",
                 side_effects=False,
             )
             return source.filter(function_call)
@@ -216,20 +207,19 @@ class DuckdbFilterPlugin(DuckdbSimplePlugin):
             ddbc.remove_function(function_name)
 
     def filter(self, *_) -> bool:
-        """This will be called for each row, with the columns nominated in 
+        """This will be called for each row, with the columns nominated in
         `self.input_columns` as parameters.  Returns a boolean."""
         raise NotImplementedError(f"{self.__class__}.transform")
 
 
 class DuckdbTransformPlugin(DuckdbSimplePlugin):
-
     def dropped_columns(self) -> set[str]:
         return set()
 
-    def input_columns(self) -> dict[str,str]:
+    def input_columns(self) -> dict[str, str]:
         raise NotImplementedError(f"{self.__class__}.input_columns")
 
-    def output_columns(self) -> dict[str,str]:
+    def output_columns(self) -> dict[str, str]:
         raise NotImplementedError(f"{self.__class__}.output_columns")
 
     def execute(self, ddbc, source):
@@ -254,11 +244,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
 
         # source columns which aren't being dropped get copied into the projection
         # in their original order, followed by the generated output columns.
-        escaped_keep_columns = [
-            duckdb_escape_identifier(k)
-            for k in source.columns
-            if k not in drop_columns_set
-        ]
+        escaped_keep_columns = [duckdb_escape_identifier(k) for k in source.columns if k not in drop_columns_set]
 
         assert all(v in self.ALLOWED_TYPES for v in escaped_input_columns.values())
         assert all(v in self.ALLOWED_TYPES for v in escaped_output_columns.values())
@@ -269,19 +255,12 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         # this generates a clause like `f(x,y).a as a, f(x,y).b as b, f(x,y).c as c`
         # which looks inefficient but duckdb only calls `f(x,y)` once per row
         # so long as the function is created with `side_effects=False` ...
-        function_call = function_name + "(" + ",".join( k or 'NULL' for k in escaped_input_columns.keys()) + ")"
-        function_calls = [
-            f"{function_call}.{oc} AS {oc}"
-            for oc in escaped_output_columns.keys()
-            if oc is not None
-        ]
+        function_call = function_name + "(" + ",".join(k or "NULL" for k in escaped_input_columns.keys()) + ")"
+        function_calls = [f"{function_call}.{oc} AS {oc}" for oc in escaped_output_columns.keys() if oc is not None]
         project_fields = ", ".join(escaped_keep_columns + function_calls)
 
         input_types = list(escaped_input_columns.values())
-        output_type = "STRUCT(" + ",".join(
-            f"{k} {v}" for k, v in escaped_output_columns.items()
-            if k is not None
-        ) + ")"
+        output_type = "STRUCT(" + ",".join(f"{k} {v}" for k, v in escaped_output_columns.items() if k is not None) + ")"
 
         logger.debug("DuckDbTransformPlugin.query function_name %s", function_name)
         logger.debug("DuckDbTransformPlugin.query input_types %s", input_types)
@@ -290,29 +269,26 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
 
         try:
             ddbc.create_function(
-                name = function_name,
-                function = self.transform_tuple,
-                parameters = input_types,
-                return_type = output_type,
-                null_handling='special',
+                name=function_name,
+                function=self.transform_tuple,
+                parameters=input_types,
+                return_type=output_type,
+                null_handling="special",
                 side_effects=False,
             )
             return source.project(project_fields)
         finally:
             pass
-            #ddbc.remove_function(function_name)
+            # ddbc.remove_function(function_name)
 
     def transform_tuple(self, *data):
         logger.debug("DuckDbTransformPlugin.transform_tuple %s", data)
-        r =  self.transform(dict(zip(
-            [k for k in self.input_columns().keys() if k is not None],
-            data
-        )))
+        r = self.transform(dict(zip([k for k in self.input_columns().keys() if k is not None], data)))
         logger.debug("DuckDbTransformPlugin.transform_tuple %s", r)
         return r
 
-    def transform(self, data: dict[str,Any]):
-        """This will be called for each row, with the columns nominated in 
+    def transform(self, data: dict[str, Any]):
+        """This will be called for each row, with the columns nominated in
         `self.input_columns` as parameters.  Return a tuple with the same
         value types as (or a dictionary with the same keys and value types as)
         those nominated by `self.output_columns`, or None to return all NULLs."""

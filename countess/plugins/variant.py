@@ -74,18 +74,18 @@ class VariantPlugin(DuckdbTransformPlugin):
 
     def input_columns(self):
         return {
-            self.column.value: 'VARCHAR',
-            self.reference.get_column_name(): 'VARCHAR',
-            self.variant.offset.get_column_name(): 'INTEGER',
-            self.protein.offset.get_column_name(): 'INTEGER',
+            self.column.value: "VARCHAR",
+            self.reference.get_column_name(): "VARCHAR",
+            self.variant.offset.get_column_name(): "INTEGER",
+            self.protein.offset.get_column_name(): "INTEGER",
         }
 
     def output_columns(self):
         r = {}
         if self.variant.output:
-            r[self.variant.output.value] = 'VARCHAR'
+            r[self.variant.output.value] = "VARCHAR"
         if self.protein.output:
-            r[self.protein.output.value] = 'VARCHAR'
+            r[self.protein.output.value] = "VARCHAR"
         return r
 
     def transform(self, data):
@@ -94,10 +94,7 @@ class VariantPlugin(DuckdbTransformPlugin):
         if not sequence or not reference:
             return None
 
-        r : dict[str, str] = {
-            self.variant.output.value: None,
-            self.protein.output.value: None
-        }
+        r: dict[str, str] = {self.variant.output.value: None, self.protein.output.value: None}
         if self.variant.output:
             try:
                 prefix = self.variant.prefix + ":" if self.variant.prefix else ""

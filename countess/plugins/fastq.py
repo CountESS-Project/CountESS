@@ -1,9 +1,9 @@
 import bz2
 import gzip
 import logging
+import secrets
 from itertools import islice
 from typing import Iterable, Optional
-import secrets
 
 import biobear
 import duckdb
@@ -34,13 +34,26 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
     filename_column = BooleanParam("Filename Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def load_file(self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int) -> duckdb.DuckDBPyRelation:
-
+    def load_file(
+        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
+    ) -> duckdb.DuckDBPyRelation:
         record_batch_reader = biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
         reader_name = f"r_{file_number}"
         logger.debug("LoadFastqPlugin.load_file reader_name %s filename %s", reader_name, filename)
         cursor.register(reader_name, record_batch_reader)
-        return cursor.sql(f"select sequence, count(*) from {reader_name} group by sequence")
+
+        fields = ["sequence"]
+        group_by = ""
+        params = {}
+        if self.header_column and not self.group:
+            fields.append("name as header")
+        if self.filename_column:
+            fields.append("$filename as filename")
+            params["filename"] = filename
+        if self.group:
+            fields.append("count(*) as count")
+            group_by = "group by sequence"
+        return cursor.sql(f"select {', '.join(fields)} from {reader_name} {group_by}", params=params)
 
 
 class LoadFastaPlugin(DuckdbLoadFilePlugin):
@@ -55,8 +68,9 @@ class LoadFastaPlugin(DuckdbLoadFilePlugin):
     header_column = StringParam("Header Column", "header")
     filename_column = StringParam("Filename Column", "filename")
 
-    def load_file(self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int) -> duckdb.DuckDBPyRelation:
-
+    def load_file(
+        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
+    ) -> duckdb.DuckDBPyRelation:
         record_batch_reader = biobear.connect().read_fasta_file(filename).to_arrow_record_batch_reader()
         reader_name = f"r_{file_number}"
         cursor.register(reader_name, record_batch_reader)

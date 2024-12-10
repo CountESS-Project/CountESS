@@ -83,7 +83,7 @@ class PipelineNode:
 
         assert isinstance(self.plugin, DuckdbPlugin)
         if self.is_dirty:
-            sources = [ pn.run(ddbc) for pn in self.parent_nodes ]
+            sources = [pn.run(ddbc) for pn in self.parent_nodes]
             ddbc.sql(f"DROP TABLE IF EXISTS n_{self.uuid}")
             self.plugin.execute_multi(ddbc, sources).to_table(f"n_{self.uuid}")
             self.result = ddbc.table(f"n_{self.uuid}")
@@ -123,6 +123,8 @@ class PipelineGraph:
     def __init__(self, nodes: Optional[list[PipelineNode]] = None):
         self.plugin_classes = get_plugin_classes()
         self.nodes = nodes or []
+        self.duckdb = duckdb.connect()
+        self.duckdb.sql("SET python_enable_replacements = false")
 
     def reset_node_name(self, node: PipelineNode):
         node_names_seen = set(n.name for n in self.nodes if n != node)
@@ -168,14 +170,13 @@ class PipelineGraph:
                     found_nodes.add(node)
 
     def run(self):
-        ddbc = duckdb.connect("countess-run.duckdb")
-        ddbc.sql("SET python_enable_replacements = false")
+        ddbc = self.duckdb
 
         logger.info("Starting")
         start_time = time.time()
         for node in self.traverse_nodes():
             node.load_config()
-            node.result = node.plugin.execute_multi(ddbc, [ pn.result for pn in node.parent_nodes ])
+            node.result = node.plugin.execute_multi(ddbc, [pn.result for pn in node.parent_nodes])
             logger.debug("Got result ...")
             logger.debug("... %d", len(node.result))
 
