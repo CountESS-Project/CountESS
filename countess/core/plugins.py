@@ -19,8 +19,9 @@ import hashlib
 import importlib
 import importlib.metadata
 import logging
-from typing import Any, Iterable, List, Optional, Sequence, Type, Union
+from typing import Any, Iterable, List, Optional, Sequence, Tuple, Type, Union, Mapping
 
+import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
@@ -109,16 +110,17 @@ class DuckdbPlugin(BasePlugin):
     # XXX expand this, or find in library somewhere
     ALLOWED_TYPES = {"INTEGER", "VARCHAR", "FLOAT"}
 
-    def execute_multi(self, ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute_multi")
 
 
 class DuckdbSimplePlugin(DuckdbPlugin):
-    def execute_multi(self, ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+        tables = list(sources.values())
         if len(sources) > 1:
-            return self.execute(ddbc, duckdb_concatenate(sources))
+            return self.execute(ddbc, duckdb_concatenate(tables))
         elif len(sources) == 1:
-            return self.execute(ddbc, sources[0])
+            return self.execute(ddbc, tables[0])
         else:
             return self.execute(ddbc, None)
 
@@ -173,6 +175,10 @@ class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
         self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
     ) -> DuckDBPyRelation:
         raise NotImplementedError(f"{self.__class__}.load_file")
+
+
+class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
+    num_outputs = 0
 
 
 class DuckdbFilterPlugin(DuckdbSimplePlugin):
@@ -267,19 +273,22 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         logger.debug("DuckDbTransformPlugin.query output_type %s", output_type)
         logger.debug("DuckDbTransformPlugin.query project_fields %s", project_fields)
 
+        # if the function already exists, remove it
         try:
-            ddbc.create_function(
-                name=function_name,
-                function=self.transform_tuple,
-                parameters=input_types,
-                return_type=output_type,
-                null_handling="special",
-                side_effects=False,
-            )
-            return source.project(project_fields)
-        finally:
+            ddbc.remove_function(function_name)
+        except duckdb.InvalidInputException:
+            # it didn't exist
             pass
-            # ddbc.remove_function(function_name)
+
+        ddbc.create_function(
+            name=function_name,
+            function=self.transform_tuple,
+            parameters=input_types,
+            return_type=output_type,
+            null_handling="special",
+            side_effects=False,
+        )
+        return source.project(project_fields)
 
     def transform_tuple(self, *data):
         logger.debug("DuckDbTransformPlugin.transform_tuple %s", data)
@@ -287,7 +296,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         logger.debug("DuckDbTransformPlugin.transform_tuple %s", r)
         return r
 
-    def transform(self, data: dict[str, Any]):
+    def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
         """This will be called for each row, with the columns nominated in
         `self.input_columns` as parameters.  Return a tuple with the same
         value types as (or a dictionary with the same keys and value types as)

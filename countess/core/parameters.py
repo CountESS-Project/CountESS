@@ -471,10 +471,10 @@ class ChoiceParam(ScalarWithOperatorsParam):
 
 class DataTypeChoiceParam(ChoiceParam):
     DATA_TYPES: Mapping[str, tuple[type, Any, Type[ScalarParam]]] = {
-        "string": (str, "", StringParam),
-        "number": (float, math.nan, FloatParam),
-        "integer": (int, 0, IntegerParam),
-        "boolean": (bool, False, BooleanParam),
+        "VARCHAR": (str, "", StringParam),
+        "FLOAT": (float, math.nan, FloatParam),
+        "INTEGER": (int, 0, IntegerParam),
+        "BOOLEAN": (bool, False, BooleanParam),
     }
 
     def __init__(self, label: str, value: Optional[str] = None, choices: Optional[Iterable[str]] = None):

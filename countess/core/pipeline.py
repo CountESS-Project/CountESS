@@ -83,7 +83,7 @@ class PipelineNode:
 
         assert isinstance(self.plugin, DuckdbPlugin)
         if self.is_dirty:
-            sources = [pn.run(ddbc) for pn in self.parent_nodes]
+            sources = {pn.name: pn.run(ddbc) for pn in self.parent_nodes }
             ddbc.sql(f"DROP TABLE IF EXISTS n_{self.uuid}")
             self.plugin.execute_multi(ddbc, sources).to_table(f"n_{self.uuid}")
             self.result = ddbc.table(f"n_{self.uuid}")
@@ -176,9 +176,7 @@ class PipelineGraph:
         start_time = time.time()
         for node in self.traverse_nodes():
             node.load_config()
-            node.result = node.plugin.execute_multi(ddbc, [pn.result for pn in node.parent_nodes])
-            logger.debug("Got result ...")
-            logger.debug("... %d", len(node.result))
+            node.result = node.plugin.execute_multi(ddbc, {pn.name: pn.result for pn in node.parent_nodes})
 
         logger.info("Finished, elapsed time: %d", time.time() - start_time)
 

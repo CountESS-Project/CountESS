@@ -1,6 +1,6 @@
 import logging
 import string
-from typing import Optional
+from typing import Any, Optional
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -88,13 +88,13 @@ class VariantPlugin(DuckdbTransformPlugin):
             r[self.protein.output.value] = "VARCHAR"
         return r
 
-    def transform(self, data):
+    def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         sequence = data[str(self.column)]
         reference = self.reference.get_value_from_dict(data)
         if not sequence or not reference:
             return None
 
-        r: dict[str, str] = {self.variant.output.value: None, self.protein.output.value: None}
+        r: dict[str, Any] = {self.variant.output.value: None, self.protein.output.value: None}
         if self.variant.output:
             try:
                 prefix = self.variant.prefix + ":" if self.variant.prefix else ""

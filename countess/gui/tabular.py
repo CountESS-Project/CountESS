@@ -2,6 +2,7 @@ import io
 import time
 import tkinter as tk
 from functools import partial
+import logging
 from math import ceil, floor, isinf, isnan
 from tkinter import ttk
 from typing import Callable, Optional, Union
@@ -11,6 +12,9 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
 from countess.utils.duckdb import duckdb_dtype_is_integer, duckdb_dtype_is_numeric, duckdb_escape_identifier
 
+
+logger = logging.getLogger(__name__)
+
 # XXX columns should automatically resize based on information
 # from _column_xscrollcommand which can tell if they're
 # overflowing.  Or maybe use
@@ -19,12 +23,21 @@ from countess.utils.duckdb import duckdb_dtype_is_integer, duckdb_dtype_is_numer
 
 
 def column_format_for(table: DuckDBPyRelation, column: str) -> str:
-    dtype = table[column].dtypes[0]
+    #logger.debug("column_format_for column %s %s", column, table.columns)
+
+    # XXX https://github.com/duckdb/duckdb/issues/15267
+    dtype = table.project(duckdb_escape_identifier(column)).dtypes[0]
+
+    logger.debug("column_format_for dtype %s", dtype)
+
     if duckdb_dtype_is_numeric(dtype):
         # Work out the maximum width required to represent the integer part in this
         # column, so we can pad values to that width.
         column_esc = duckdb_escape_identifier(column)
-        column_min, column_max = table.aggregate(f"min({column_esc}), max({column_esc})").fetchone()
+        column_min_max = table.aggregate(f"min({column_esc}), max({column_esc})").fetchone()
+        if column_min_max is None:
+            return "%s"
+        column_min, column_max = column_min_max
         if column_min is None or isnan(column_min) or isinf(column_min):
             column_min = -100
         if column_max is None or isnan(column_max) or isinf(column_max):
@@ -191,12 +204,9 @@ class TabularDataFrame(tk.Frame):
         # with some window managers. Needs refactoring.
 
         new_offset = max(0, min(self.length - self.height, int(new_offset)))
-        offset_diff = new_offset - self.offset
 
         rows = self.table.limit(self.height, offset=new_offset).fetchall()
-        for column_num, (column_name, column_widget, column_format) in enumerate(
-            zip(self.table.columns, self.columns, self.column_formats)
-        ):
+        for column_num, (column_widget, column_format) in enumerate(zip(self.columns, self.column_formats)):
             column_widget["state"] = tk.NORMAL
             column_widget.delete("1.0", tk.END)
             for row in rows:
@@ -217,6 +227,7 @@ class TabularDataFrame(tk.Frame):
         self.click_callback = click_callback
 
     def set_sort_order(self, column_num: int, descending: Optional[bool] = None):
+        assert self.ddbc is not None
         assert self.table is not None
 
         if descending is None and column_num == self.sort_by_col:

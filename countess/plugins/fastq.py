@@ -1,13 +1,8 @@
-import bz2
-import gzip
 import logging
-import secrets
-from itertools import islice
-from typing import Iterable, Optional
 
 import biobear
 import duckdb
-from duckdb import DuckDBPyConnection, DuckDBPyRelation
+from duckdb import DuckDBPyConnection
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
@@ -49,7 +44,7 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
             fields.append("name as header")
         if self.filename_column:
             fields.append("$filename as filename")
-            params["filename"] = filename
+            params["filename"] = clean_filename(filename)
         if self.group:
             fields.append("count(*) as count")
             group_by = "group by sequence"
