@@ -9,7 +9,7 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import DuckdbSimplePlugin
-from countess.utils.duckdb import duckdb_escape_identifier
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,23 @@ class PivotPlugin(DuckdbSimplePlugin):
         if not expand_cols or not pivot_cols:
             return source
 
-        pivot_str = ", ".join(duckdb_escape_identifier(pc) for pc in pivot_cols)
+        # Override the default pivoted column naming convention with
+        # our own custom one ... this is what previous CountESS used
+        # but it frankly could be better or customizable.
+        pivot_str = " || '__' || ".join(
+            duckdb_escape_literal(pc + "_") + " || " + duckdb_escape_identifier(pc) for pc in pivot_cols
+        )
+
+        # Pick an arbitrary character that isn't in any of the
+        # index column or expand column names so we can
+        # definitively pick out the pivot output columns later ...
+        # also it mustn't have a special meaning in regexps ...
+        pivot_char = chr(ord(max(c for s in index_cols + expand_cols + ["}"] for c in s)) + 1)
+
         using_str = ", ".join(
-            "%s(%s) AS C%d" % (self.aggfunc.value, duckdb_escape_identifier(ec), num)
-            for num, ec in enumerate(expand_cols)
+            "%s(%s) AS %s"
+            % (self.aggfunc.value, duckdb_escape_identifier(ec), duckdb_escape_identifier(pivot_char + ec))
+            for ec in expand_cols
         )
         group_str = ", ".join(duckdb_escape_identifier(ic) for ic in index_cols)
 
@@ -55,43 +68,11 @@ class PivotPlugin(DuckdbSimplePlugin):
 
         logger.debug("PivotPlugin.execute query_str %s", query_str)
 
-        # pivot works nice but the column names aren't what I want.
-        # let's rename them with a projection.
-
-        # XXX working this list out is a fair fraction of the
-        # work required to do the pivot in the first place, so
-        # not sure if it'd be easier to just write our own
-        # pivot function
-
-        pivot_values = list(
-            product(
-                *[
-                    sorted(r[0] for r in source.project(duckdb_escape_identifier(pc)).distinct().fetchall())
-                    for pc in pivot_cols
-                ]
-            )
-        )
-
-        logger.debug("PivotPlugin.execute pivot_values %s", pivot_values)
-
-        # XXX https://github.com/duckdb/duckdb/issues/15293
-        # this corrects column names if there are duplicates.
-        # our version is still possible to have duplicates, just
-        # less likely.
-        names = [ [pv, "_".join(pv), 0] for pv in pivot_values ]
-        for n1 in range(1, len(names)):
-            for n2 in range(0, n1):
-                if names[n1][1] == names[n2][1]:
-                    names[n1][2] += 1
-
+        # Rename the columns to match the old CountESS naming,
+        # with the original column at the start instead of the end.
         project_str = ", ".join(
-            duckdb_escape_identifier(
-                f"{pc}_C{num}" +
-                ("_%d" % xn if xn > 0 else "")
-            ) + " AS "
-            + duckdb_escape_identifier("__".join([ec] + ["%s_%s" % (pc, v) for pc, v in zip(pivot_cols, pv)]))
-            for num, ec in enumerate(expand_cols)
-            for pv, pc, xn in names
+            [duckdb_escape_identifier(ic) for ic in index_cols] + [f"COLUMNS('(.*)_{pivot_char}(.*)') AS '\\2__\\1'"]
         )
         logger.debug("PivotPlugin.execute project_str %s", project_str)
+
         return ddbc.sql(query_str).project(project_str)
