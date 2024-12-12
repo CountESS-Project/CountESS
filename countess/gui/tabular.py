@@ -1,8 +1,8 @@
 import io
+import logging
 import time
 import tkinter as tk
 from functools import partial
-import logging
 from math import ceil, floor, isinf, isnan
 from tkinter import ttk
 from typing import Callable, Optional, Union
@@ -11,7 +11,6 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
 from countess.utils.duckdb import duckdb_dtype_is_integer, duckdb_dtype_is_numeric, duckdb_escape_identifier
-
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 def column_format_for(table: DuckDBPyRelation, column: str) -> str:
-    #logger.debug("column_format_for column %s %s", column, table.columns)
+    # logger.debug("column_format_for column %s %s", column, table.columns)
 
     # XXX https://github.com/duckdb/duckdb/issues/15267
+    # dtype = table[column].dtypes[0]
     dtype = table.project(duckdb_escape_identifier(column)).dtypes[0]
-
-    logger.debug("column_format_for dtype %s", dtype)
 
     if duckdb_dtype_is_numeric(dtype):
         # Work out the maximum width required to represent the integer part in this
@@ -235,6 +233,9 @@ class TabularDataFrame(tk.Frame):
         else:
             self.sort_by_col = column_num
             self.sort_ascending = not descending
+
+        if column_num > len(self.table.columns):
+            column_num = 0
 
         old_table_alias = self.table.alias
         new_preview_table = f"p_{time.time_ns()}"

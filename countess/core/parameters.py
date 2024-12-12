@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import math
 import os.path
 import re
@@ -10,6 +11,9 @@ import pandas as pd
 from countess.utils.pandas import get_all_columns
 
 PARAM_DIGEST_HASH = "sha256"
+
+
+logger = logging.getLogger(__name__)
 
 
 def make_prefix_groups(strings: List[str]) -> Dict[str, List[str]]:
@@ -48,7 +52,7 @@ class BaseParam:
     def get_hash_value(self):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.get_hash_value()")
 
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
         pass
 
 
@@ -542,7 +546,7 @@ class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
 
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
         self.set_choices(list(choices))
 
     def get_column(self, df):
@@ -569,7 +573,7 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
 
 class ColumnGroupChoiceParam(ChoiceParam):
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
         self.set_choices([n + "*" for n in make_prefix_groups(choices).keys()])
 
     def get_column_prefix(self):
@@ -631,7 +635,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
     DEFAULT_VALUE: Any = ""
     PREFIX = "— "
 
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
         self.set_choices([self.PREFIX + c for c in choices])
 
     def get_column_name(self) -> Optional[str]:
@@ -752,7 +756,8 @@ class HasSubParametersMixin:
             elif isinstance(param, ScalarParam):
                 param.set_value(value)
 
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
+        logger.debug("HasSubParametersMixin.set_column_choices %s", choices)
         for p in self.params.values():
             p.set_column_choices(choices)
 
@@ -852,7 +857,7 @@ class ArrayParam(BaseParam):
             digest.update(p.get_hash_value().encode("utf-8"))
         return digest.hexdigest()
 
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
         self.param.set_column_choices(choices)
         for p in self.params:
             p.set_column_choices(choices)
@@ -893,7 +898,7 @@ class PerColumnArrayParam(ArrayParam):
             yield f"{key}.{n}._label", p.label
             yield from p.get_parameters(f"{key}.{n}", base_dir)
 
-    def set_column_choices(self, choices):
+    def set_column_choices(self, choices: List[str]):
         params_by_label = {p.label: p for p in self.params}
         self.params = []
         for label in choices:

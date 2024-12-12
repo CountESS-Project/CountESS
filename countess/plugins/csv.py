@@ -20,8 +20,8 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 from countess.utils.files import clean_filename
-from countess.utils.duckdb import duckdb_escape_literal, duckdb_escape_identifier
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz"]),
@@ -37,14 +37,8 @@ class ColumnsMultiParam(MultiParam):
     type = DataTypeOrNoneChoiceParam("Column Type")
 
 
-CSV_DELIMITER_CHOICES = {
-    ',': ',',
-    ';': ';',
-    '|': '|',
-    'TAB': '\t',
-    'SPACE': ' ',
-    'NONE': None
-}
+CSV_DELIMITER_CHOICES = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " ", "NONE": None}
+
 
 class LoadCsvPlugin(DuckdbLoadFilePlugin):
     """Load CSV files"""
@@ -66,8 +60,8 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
         if self.header and len(self.columns) == 0:
             table = cursor.read_csv(
                 filename,
-                header = True,
-                delimiter = CSV_DELIMITER_CHOICES[self.delimiter.value],
+                header=True,
+                delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value],
             )
             for column_name, column_dtype in zip(table.columns, table.dtypes):
                 column_param = self.columns.add_row()
@@ -76,10 +70,12 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
         else:
             table = cursor.read_csv(
                 filename,
-                header = False,
-                skiprows = 1 if self.header else 0,
-                delimiter = CSV_DELIMITER_CHOICES[self.delimiter.value],
-                columns = { str(c.name): str(c.type) for c in self.columns } if self.columns else None
+                header=False,
+                skiprows=1 if self.header else 0,
+                delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value],
+                columns={str(c.name): "VARCHAR" if c.type.is_none() else str(c.type) for c in self.columns}
+                if self.columns
+                else None,
             )
 
         if self.filename_column:
@@ -108,5 +104,5 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     SEPARATORS = {",": ",", ";": ";", "SPACE": " ", "TAB": "\t"}
     QUOTING = {False: csv.QUOTE_MINIMAL, True: csv.QUOTE_NONNUMERIC}
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional  [DuckDBPyRelation]:
+    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         pass

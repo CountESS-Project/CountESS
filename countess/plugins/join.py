@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, Mapping, Optional
 
 import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
@@ -38,19 +38,20 @@ class JoinPlugin(DuckdbPlugin):
     input_columns_1: Optional[Dict] = None
     input_columns_2: Optional[Dict] = None
 
-    def execute_multi(self, ddbc: DuckDBPyConnection,
-        sources: Dict[str, DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute_multi(
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+    ) -> Optional[DuckDBPyRelation]:
         # Can't join relations in different connections, so give them temporary views
         # in our connection.
-        #views = [duckdb_source_to_view(ddbc, source) for source in sources]
+        # views = [duckdb_source_to_view(ddbc, source) for source in sources]
 
-        #result = duckdb_source_to_table(ddbc, duckdb_concatenate(views))
+        # result = duckdb_source_to_table(ddbc, duckdb_concatenate(views))
 
         if len(sources) <= 1:
             return None
 
         while len(self.inputs) > len(sources):
-            self.inputs.del_row(len(self.inputs)-1)
+            self.inputs.del_row(len(self.inputs) - 1)
 
         while len(self.inputs) < len(sources):
             self.inputs.add_row()
@@ -59,17 +60,25 @@ class JoinPlugin(DuckdbPlugin):
             self.inputs[num].label = f"Input {num+1}: {label}"
             self.inputs[num].join_on.set_choices(table.columns)
 
+        # XXX this isn't quite right for >2 tables where some
+        # are required and some aren't.  I think what I need to
+        # do is join all the required tables to each other and
+        # then join the non-required ones on on top.
         tables = list(sources.values())
-        identifiers = [
-            duckdb_escape_identifier(input_.join_on.value)
-            for input_ in self.inputs
-        ]
-        required = [ input_.required.value for input_ in self.inputs ]
-        query = f"SELECT * FROM {tables[0].alias} AS N_0"
+        identifiers = [duckdb_escape_identifier(input_.join_on.value) for input_ in self.inputs]
+        required = [input_.required.value for input_ in self.inputs]
+
+        select_str = ", ".join(
+            f"N_{num}.{duckdb_escape_identifier(column)}"
+            for num, (input_, table) in enumerate(zip(self.inputs, tables))
+            for column in table.columns
+            if not (input_.drop and input_.join_on == column)
+        )
+        query = f"SELECT {select_str} FROM {tables[0].alias} AS N_0"
         for num, table in enumerate(tables[1:], 1):
             query += (
-                f" {_join_how(required[0], required[num])} JOIN {table.alias} AS N_{num}" +
-                f" ON N_0.{identifiers[0]} = N_{num}.{identifiers[num]}"
+                f" {_join_how(required[0], required[num])} JOIN {table.alias} AS N_{num}"
+                + f" ON N_0.{identifiers[0]} = N_{num}.{identifiers[num]}"
             )
         logger.debug(query)
 

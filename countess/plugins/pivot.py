@@ -1,21 +1,20 @@
 import functools
 import logging
-from itertools import product
-from typing import Dict, Optional
+from typing import Optional
 
-import numpy as np
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import DuckdbSimplePlugin
-from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
+from countess.utils.duckdb import (
+    duckdb_choose_special,
+    duckdb_escape_identifier,
+    duckdb_escape_literal,
+    duckdb_source_to_view,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _product(iterable):
-    return functools.reduce(lambda x, y: x * y, iterable, 1)
 
 
 class PivotPlugin(DuckdbSimplePlugin):
@@ -52,8 +51,7 @@ class PivotPlugin(DuckdbSimplePlugin):
         # Pick an arbitrary character that isn't in any of the
         # index column or expand column names so we can
         # definitively pick out the pivot output columns later ...
-        # also it mustn't have a special meaning in regexps ...
-        pivot_char = chr(ord(max(c for s in index_cols + expand_cols + ["}"] for c in s)) + 1)
+        pivot_char = duckdb_choose_special(index_cols + expand_cols)
 
         using_str = ", ".join(
             "%s(%s) AS %s"

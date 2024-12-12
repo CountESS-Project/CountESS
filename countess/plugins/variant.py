@@ -88,6 +88,12 @@ class VariantPlugin(DuckdbTransformPlugin):
             r[self.protein.output.value] = "VARCHAR"
         return r
 
+    def dropped_columns(self):
+        if self.drop_columns:
+            return set([self.column.value, self.reference.get_column_name()])
+        else:
+            return {}
+
     def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         sequence = data[str(self.column)]
         reference = self.reference.get_value_from_dict(data)

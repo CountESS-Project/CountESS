@@ -83,10 +83,18 @@ class PipelineNode:
 
         assert isinstance(self.plugin, DuckdbPlugin)
         if self.is_dirty:
-            sources = {pn.name: pn.run(ddbc) for pn in self.parent_nodes }
+            sources = {pn.name: pn.run(ddbc) for pn in self.parent_nodes}
             ddbc.sql(f"DROP TABLE IF EXISTS n_{self.uuid}")
-            self.plugin.execute_multi(ddbc, sources).to_table(f"n_{self.uuid}")
-            self.result = ddbc.table(f"n_{self.uuid}")
+            result = self.plugin.execute_multi(ddbc, sources)
+            if result is not None:
+                try:
+                    result.to_table(f"n_{self.uuid}")
+                    self.result = ddbc.table(f"n_{self.uuid}")
+                except Exception as exc:
+                    logger.warning(exc)
+                    self.result = None
+            else:
+                self.result = None
             self.is_dirty = False
 
         return self.result

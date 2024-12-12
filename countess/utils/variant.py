@@ -224,7 +224,7 @@ def find_variant_dna(ref_seq: str, var_seq: str, offset: int = 0) -> Iterable[st
     if not re.match("[AGTCN]+$", ref_seq):
         raise ValueError("Invalid reference sequence")
 
-    if not re.match("[AGTCN]+$", var_seq):
+    if not re.match("[AGTC]+$", var_seq):
         raise ValueError("Invalid variant sequence")
 
     # Levenshtein algorithm finds the overlapping parts of our reference and
@@ -395,10 +395,10 @@ def find_variant_protein(ref_seq: str, var_seq: str, offset: int = 0):
     ref_seq = ref_seq.strip().upper()
     var_seq = var_seq.strip().upper()
 
-    if not re.match("[AGTCN]+$", ref_seq):
+    if not re.match("[AGTC]+$", ref_seq):
         raise ValueError("Invalid reference sequence")  # pragma: no cover
 
-    if not re.match("[AGTCN]+$", var_seq):
+    if not re.match("[AGTC]+$", var_seq):
         raise ValueError("Invalid variant sequence")  # pragma: no cover
 
     frame = (3 - offset) % 3

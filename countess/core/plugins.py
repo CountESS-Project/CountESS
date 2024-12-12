@@ -19,13 +19,13 @@ import hashlib
 import importlib
 import importlib.metadata
 import logging
-from typing import Any, Iterable, List, Optional, Sequence, Tuple, Type, Union, Mapping
+from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
-from countess.utils.duckdb import duckdb_concatenate, duckdb_escape_identifier
+from countess.utils.duckdb import duckdb_concatenate, duckdb_escape_identifier, duckdb_source_to_view
 
 PRERUN_ROW_LIMIT: int = 100000
 
@@ -110,19 +110,27 @@ class DuckdbPlugin(BasePlugin):
     # XXX expand this, or find in library somewhere
     ALLOWED_TYPES = {"INTEGER", "VARCHAR", "FLOAT"}
 
-    def execute_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute_multi(
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+    ) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute_multi")
 
 
 class DuckdbSimplePlugin(DuckdbPlugin):
-    def execute_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute_multi(
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+    ) -> Optional[DuckDBPyRelation]:
         tables = list(sources.values())
         if len(sources) > 1:
-            return self.execute(ddbc, duckdb_concatenate(tables))
+            source = duckdb_source_to_view(ddbc, duckdb_concatenate(tables))
         elif len(sources) == 1:
-            return self.execute(ddbc, tables[0])
+            source = tables[0]
         else:
-            return self.execute(ddbc, None)
+            source = None
+
+        self.set_column_choices([] if source is None else source.columns)
+
+        return self.execute(ddbc, source)
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute")
@@ -179,6 +187,9 @@ class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
 
 class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
     num_outputs = 0
+
+    def execute(self, ddbc, source):
+        raise NotImplementedError(f"{self.__class__}.execute")
 
 
 class DuckdbFilterPlugin(DuckdbSimplePlugin):
