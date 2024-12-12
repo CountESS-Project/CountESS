@@ -1,15 +1,15 @@
 import functools
 import logging
-from typing import Dict, Iterable, List, Optional
+from itertools import product
+from typing import Dict, Optional
 
 import numpy as np
-import pandas as pd
-from pandas.api.types import is_numeric_dtype
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import ChoiceParam, PerColumnArrayParam
-from countess.core.plugins import PandasProcessPlugin
-from countess.utils.pandas import get_all_columns
+from countess.core.plugins import DuckdbSimplePlugin
+from countess.utils.duckdb import duckdb_escape_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -18,110 +18,80 @@ def _product(iterable):
     return functools.reduce(lambda x, y: x * y, iterable, 1)
 
 
-class PivotPlugin(PandasProcessPlugin):
+class PivotPlugin(DuckdbSimplePlugin):
     """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
 
     name = "Pivot Tool"
     description = "Pivots column values into columns."
-    additional = """Duplicate indexes on inputs may result in duplicate output rows.  If this is a problem,
-    perform an additional Group By before or after pivoting."""
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#pivot-tool"
 
     columns = PerColumnArrayParam("Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
     aggfunc = ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "median", "min", "max"])
 
-    input_columns: Dict[str, np.dtype] = {}
+    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+        if source is None:
+            return None
+        index_cols = [p.label for p in self.columns if p.value == "Index" and p.label in source.columns]
+        pivot_cols = [p.label for p in self.columns if p.value == "Pivot" and p.label in source.columns]
+        expand_cols = [p.label for p in self.columns if p.value == "Expand" and p.label in source.columns]
 
-    dataframes: Optional[List[pd.DataFrame]] = None
+        logger.debug("PivotPlugin.execute index_cols %s", index_cols)
+        logger.debug("PivotPlugin.execute pivot_cols %s", pivot_cols)
+        logger.debug("PivotPlugin.execute expand_cols %s", expand_cols)
+        if not expand_cols or not pivot_cols:
+            return source
 
-    def prepare(self, sources: List[str], row_limit: Optional[int] = None):
-        self.input_columns = {}
-        self.dataframes = []
+        pivot_str = ", ".join(duckdb_escape_identifier(pc) for pc in pivot_cols)
+        using_str = ", ".join(
+            "%s(%s) AS C%d" % (self.aggfunc.value, duckdb_escape_identifier(ec), num)
+            for num, ec in enumerate(expand_cols)
+        )
+        group_str = ", ".join(duckdb_escape_identifier(ic) for ic in index_cols)
 
-    def process(self, data: pd.DataFrame, source: str) -> Iterable[pd.DataFrame]:
-        assert self.dataframes is not None
-        self.input_columns.update(get_all_columns(data))
+        query_str = f"PIVOT {source.alias} ON {pivot_str} USING {using_str}"
+        if group_str:
+            query_str = f"{query_str} GROUP BY {group_str}"
 
-        data.reset_index(drop=data.index.names == [None], inplace=True)
+        logger.debug("PivotPlugin.execute query_str %s", query_str)
 
-        index_cols = [p.label for p in self.columns if p.value == "Index" and p.label in data.columns]
-        pivot_cols = [p.label for p in self.columns if p.value == "Pivot" and p.label in data.columns]
-        expand_cols = [p.label for p in self.columns if p.value == "Expand" and p.label in data.columns]
+        # pivot works nice but the column names aren't what I want.
+        # let's rename them with a projection.
 
-        if not index_cols:
-            logger.warning("No columns to index!")
+        # XXX working this list out is a fair fraction of the
+        # work required to do the pivot in the first place, so
+        # not sure if it'd be easier to just write our own
+        # pivot function
 
-        if not expand_cols:
-            logger.warning("No columns to expand!")
-
-        if not pivot_cols:
-            logger.error("No columns to pivot on!")
-            return []
-
-        for ec in expand_cols:
-            if not is_numeric_dtype(data[ec]):
-                logger.warning("Expanding non-numeric column %s", ec)
-
-        n_pivot = _product(data[pc].nunique() for pc in pivot_cols) * len(expand_cols)
-        if n_pivot > 200:
-            pivot_cols_str = ", ".join(pivot_cols)
-            logger.error("Too many pivot combinations on %s (%d)", pivot_cols_str, n_pivot)
-            return []
-
-        # `min`, `max` and `sum` are associative, so we just aggregate here and aggregate again
-        # at the end and all is fine.
-        # For non-associative functions like `mean` and `median`, the `tuple` function is called
-        # as a first aggregator, so we end up with a series like [ 1, 2, (3, 4), 5, (6, 7, 8) ] ...
-        # this will then get cleared up in the `finalize` stage by the `aggregate` method ...
-        def _aggfunc():
-            if self.aggfunc in ("min", "max", "sum"):
-                return self.aggfunc.value
-            return tuple
-
-        df = pd.pivot_table(
-            data,
-            values=expand_cols,
-            index=index_cols,
-            columns=pivot_cols,
-            fill_value=np.NAN,
-            aggfunc=_aggfunc(),
+        pivot_values = list(
+            product(
+                *[
+                    sorted(r[0] for r in source.project(duckdb_escape_identifier(pc)).distinct().fetchall())
+                    for pc in pivot_cols
+                ]
+            )
         )
 
-        if isinstance(df.columns, pd.MultiIndex):
-            # Clean up MultiIndex names ... XXX until such time as CountESS supports them
-            df.columns = [
-                "__".join([f"{cn}_{cv}" if cn else cv for cn, cv in zip(df.columns.names, cc)]) for cc in df.columns
-            ]  # type: ignore
+        logger.debug("PivotPlugin.execute pivot_values %s", pivot_values)
 
-        self.dataframes.append(df)
-        return []
+        # XXX https://github.com/duckdb/duckdb/issues/15293
+        # this corrects column names if there are duplicates.
+        # our version is still possible to have duplicates, just
+        # less likely.
+        names = [ [pv, "_".join(pv), 0] for pv in pivot_values ]
+        for n1 in range(1, len(names)):
+            for n2 in range(0, n1):
+                if names[n1][1] == names[n2][1]:
+                    names[n1][2] += 1
 
-    def finalize(self) -> Iterable[pd.DataFrame]:
-        yield from super().finalize()
-
-        if not self.dataframes:
-            return
-
-        # for the associative functions we just aggregate again, finding the sum-of-sums etc.
-        # for non-associative functions, `explode()` expands the tuples out to get the full
-        # series, and then `.agg()` applies the appropriate aggregation function.
-        # XXX `mean` could get streamlined by recording (sum, count) tuples at the first stage,
-        # and then adding those up here and dividing (but it's a bit tricky)
-
-        def _aggfunc():
-            if self.aggfunc in ("min", "max", "sum"):
-                return self.aggfunc.value
-            return lambda s: s.explode().agg(self.aggfunc.value)
-
-        try:
-            dataframe = pd.concat(self.dataframes)
-            columns = get_all_columns(dataframe)
-            index_cols = [p.label for p in self.columns if p.value == "Index" and p.label in columns]
-
-            if index_cols:
-                dataframe = dataframe.groupby(by=index_cols, group_keys=True).agg(_aggfunc())
-
-            yield dataframe
-        except (KeyError, ValueError, TypeError) as exc:
-            logger.warning("Exception", exc_info=exc)
+        project_str = ", ".join(
+            duckdb_escape_identifier(
+                f"{pc}_C{num}" +
+                ("_%d" % xn if xn > 0 else "")
+            ) + " AS "
+            + duckdb_escape_identifier("__".join([ec] + ["%s_%s" % (pc, v) for pc, v in zip(pivot_cols, pv)]))
+            for num, ec in enumerate(expand_cols)
+            for pv, pc, xn in names
+        )
+        logger.debug("PivotPlugin.execute project_str %s", project_str)
+        return ddbc.sql(query_str).project(project_str)
