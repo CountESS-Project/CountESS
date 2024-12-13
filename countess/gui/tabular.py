@@ -10,7 +10,12 @@ from typing import Callable, Optional, Union
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
-from countess.utils.duckdb import duckdb_dtype_is_integer, duckdb_dtype_is_numeric, duckdb_escape_identifier
+from countess.utils.duckdb import (
+    duckdb_dtype_is_integer,
+    duckdb_dtype_is_numeric,
+    duckdb_escape_identifier,
+    duckdb_source_to_table,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +95,7 @@ class TabularDataFrame(tk.Frame):
     subframe: Optional[tk.Frame] = None
     ddbc: Optional[DuckDBPyConnection] = None
     table: Optional[DuckDBPyRelation] = None
+    sorted_table_alias: Optional[str] = None
     offset = 0
     height = 1000
     length = 0
@@ -185,25 +191,30 @@ class TabularDataFrame(tk.Frame):
             column_text.bind("<Configure>", partial(self._column_configure, num))
             self.columns.append(column_text)
 
-    def _column_configure(self, num, ev):
+    def _column_configure(self, num: int, ev):
         # when the column changes position, move the labels around
         # to match
         self.labels[num].place(x=ev.x, width=ev.width)
 
-    def _column_click(self, col, ev):
+    def _column_click(self, col: int, ev):
         if self.click_callback:
             line, char = ev.widget.index("current").split(".")
             row = min(self.offset + int(line), self.length) - 1
             self.click_callback(col, row, int(char))
 
-    def refresh(self, new_offset=0):
+    def refresh(self, new_offset: float =0):
         # Refreshes the column widgets.
-        # XXX should handle new_height as well, as this changes a fair bit
-        # with some window managers. Needs refactoring.
 
-        new_offset = max(0, min(self.length - self.height, int(new_offset)))
+        self.offset = max(0, min(self.length - self.height, int(new_offset)))
 
-        rows = self.table.limit(self.height, offset=new_offset).fetchall()
+        rows = self.table.limit(self.height, offset=self.offset).fetchall()
+
+        # XXX duckdb is a bit slower with large offsets, so there's potential to
+        # flip the sort order if we're down at the bottom of the table and do
+        # something clever like:
+        #     rows = self.table.limit(self.height, offset=self.length - self.offset - self.height).fetchall()
+        #     rows.reverse()
+
         for column_num, (column_widget, column_format) in enumerate(zip(self.columns, self.column_formats)):
             column_widget["state"] = tk.NORMAL
             column_widget.delete("1.0", tk.END)
@@ -211,7 +222,6 @@ class TabularDataFrame(tk.Frame):
                 column_widget.insert(tk.END, format_value(row[column_num], column_format) + "\n")
             column_widget["state"] = tk.DISABLED
 
-        self.offset = new_offset
         if self.length:
             self.scrollbar.set(self.offset / self.length, (self.offset + self.height) / self.length)
 
@@ -228,29 +238,38 @@ class TabularDataFrame(tk.Frame):
         assert self.ddbc is not None
         assert self.table is not None
 
-        if descending is None and column_num == self.sort_by_col:
-            self.sort_ascending = not self.sort_ascending
-        else:
-            self.sort_by_col = column_num
-            self.sort_ascending = not descending
-
         if column_num > len(self.table.columns):
             column_num = 0
 
-        old_table_alias = self.table.alias
-        new_preview_table = f"p_{time.time_ns()}"
-        self.table.order(self.table.columns[column_num] + (" ASC" if self.sort_ascending else " DESC")).to_table(
-            new_preview_table
+        if descending is None and column_num == self.sort_by_col:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            self.sort_ascending = not descending
+
+        self.sort_by_col = column_num
+
+        escaped_column_name = duckdb_escape_identifier(self.table.columns[column_num])
+        self.table = duckdb_source_to_table(
+            self.ddbc,
+            self.table.order(
+                escaped_column_name + (" ASC" if self.sort_ascending else " DESC")
+            ),
         )
-        self.table = self.ddbc.table(new_preview_table)
-        if old_table_alias.startswith("preview_"):
-            self.ddbc.sql(f"DROP TABLE IF EXISTS {old_table_alias}")
+        self.ddbc.sql(f"CREATE INDEX {self.table.alias}_idx ON {self.table.alias} ({escaped_column_name})")
+
+        if self.sorted_table_alias:
+            self.ddbc.sql(f"DROP TABLE IF EXISTS {self.sorted_table_alias}")
+        self.sorted_table_alias = self.table.alias
 
         for n, label in enumerate(self.labels):
             icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
             label.configure(image=get_icon(self, icon))
 
         self.refresh()
+
+    def __del__(self):
+        if self.sorted_table_alias:
+            self.ddbc.sql(f"DROP TABLE IF EXISTS {self.sorted_table_alias}")
 
     def _label_button_1(self, num, event):
         """Click on column labels to set sort order"""
