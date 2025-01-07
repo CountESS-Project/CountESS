@@ -161,6 +161,10 @@ class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
     num_inputs = 0
 
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.files.file_types = self.file_types
+
     def filenames_and_params(self):
         for file_param in self.files:
             for filename in glob.iglob(file_param.filename.value):
