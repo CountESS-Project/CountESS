@@ -136,6 +136,19 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         raise NotImplementedError(f"{self.__class__}.execute")
 
 
+class DuckdbInputPlugin(DuckdbPlugin):
+    num_inputs = 0
+
+    def execute_multi(
+        self, ddbc: DuckDBPyConnection, sources: Mapping
+    ) -> Optional[DuckDBPyRelation]:
+        assert len(sources) == 0
+        return self.execute(ddbc, None)
+
+    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
+        raise NotImplementedError(f"{self.__class__}.execute")
+
+
 class DuckdbStatementPlugin(DuckdbSimplePlugin):
     def statement(self, ddbc: DuckDBPyConnection, source_table_name: str) -> str:
         raise NotImplementedError(f"{self.__class__}.statement")
@@ -156,10 +169,9 @@ class LoadFileMultiParam(MultiParam):
     filename = FileParam("Filename")
 
 
-class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
+class DuckdbLoadFilePlugin(DuckdbInputPlugin):
     files = FileArrayParam("Files", LoadFileMultiParam("File"))
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
-    num_inputs = 0
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
@@ -170,9 +182,7 @@ class DuckdbLoadFilePlugin(DuckdbSimplePlugin):
             for filename in glob.iglob(file_param.filename.value):
                 yield filename, file_param
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
-        assert source is None
-
+    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
         filenames_and_params = list(self.filenames_and_params())
 
         cursor = ddbc
@@ -238,7 +248,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         return set()
 
     def input_columns(self) -> dict[str, str]:
-        raise NotImplementedError(f"{self.__class__}.input_columns")
+        return None
 
     def output_columns(self) -> dict[str, str]:
         raise NotImplementedError(f"{self.__class__}.output_columns")
@@ -246,11 +256,17 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
     def execute(self, ddbc, source):
         """Perform a query which calls `self.transform` for every row."""
 
-        escaped_input_columns = {
-            duckdb_escape_identifier(k): str(v).upper()
-            for k, v in self.input_columns().items()
-            if k is not None and v is not None
-        }
+        if self.input_columns() is None:
+            escaped_input_columns = {
+                duckdb_escape_identifier(k): str(v).upper()
+                for k, v in zip(source.columns, source.dtypes)
+            }
+        else:
+            escaped_input_columns = {
+                duckdb_escape_identifier(k): str(v).upper()
+                for k, v in self.input_columns().items()
+                if k is not None and v is not None
+            }
 
         escaped_output_columns = {
             duckdb_escape_identifier(k): str(v).upper()

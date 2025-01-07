@@ -1,6 +1,6 @@
-from typing import Iterable
+import logging
 
-import pandas as pd
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -11,16 +11,18 @@ from countess.core.parameters import (
     StringParam,
     TabularMultiParam,
 )
-from countess.core.plugins import PandasInputPlugin
+from countess.core.plugins import DuckdbInputPlugin
+from countess.utils.duckdb import duckdb_escape_literal, duckdb_escape_identifier
 
+logger = logging.getLogger(__name__)
 
 class _ColumnsMultiParam(MultiParam):
     name = StringParam("Name")
-    type = DataTypeChoiceParam("Type", "string")
+    type = DataTypeChoiceParam("Type")
     index = BooleanParam("Index?")
 
 
-class DataTablePlugin(PandasInputPlugin):
+class DataTablePlugin(DuckdbInputPlugin):
     """DataTable"""
 
     name = "DataTable"
@@ -32,7 +34,7 @@ class DataTablePlugin(PandasInputPlugin):
     columns = ArrayParam("Columns", _ColumnsMultiParam("Column"))
     rows = ArrayParam("Rows", TabularMultiParam("Row"))
 
-    show_preview = False
+    #show_preview = False
 
     def fix_columns(self):
         old_rows = self.rows.params
@@ -61,17 +63,22 @@ class DataTablePlugin(PandasInputPlugin):
             self.fix_columns()
         super().set_parameter(key, *a, **k)
 
-    def finalize(self) -> Iterable[pd.DataFrame]:
+    def execute(self, ddbc: DuckDBPyConnection, source: None) -> DuckDBPyRelation:
         self.fix_columns()
-        values = []
-        for row in self.rows:
-            values.append({str(col.name): row[str(col.name)].value for col in self.columns})
 
-        df = pd.DataFrame(values)
+        if len(self.rows) == 0:
+            return None
 
-        index_cols = [str(col.name) for col in self.columns if col.index]
+        sql = ("SELECT * FROM (VALUES " + 
+            (", ".join(
+                "(" + (", ".join(duckdb_escape_literal(val.value) for val in row.values())) + ")"
+                for row in self.rows
+            )) +
+            ") _(" +
+            (", ".join(duckdb_escape_identifier(col.name.value) for col in self.columns)) +
+            ")"
+        )
 
-        if index_cols:
-            df = df.set_index(index_cols)
+        logger.debug("DataTablePlugin.execute sql %s", sql)
 
-        yield df
+        return ddbc.sql(sql)
