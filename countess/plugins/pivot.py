@@ -5,7 +5,7 @@ from typing import Optional
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import ChoiceParam, PerColumnArrayParam
+from countess.core.parameters import BooleanParam, ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import DuckdbSimplePlugin
 from countess.utils.duckdb import (
     duckdb_choose_special,
@@ -27,6 +27,7 @@ class PivotPlugin(DuckdbSimplePlugin):
 
     columns = PerColumnArrayParam("Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
     aggfunc = ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "median", "min", "max"])
+    short_names = BooleanParam("Short Output Names?", False)
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         if source is None:
@@ -44,9 +45,14 @@ class PivotPlugin(DuckdbSimplePlugin):
         # Override the default pivoted column naming convention with
         # our own custom one ... this is what previous CountESS used
         # but it frankly could be better or customizable.
-        pivot_str = " || '__' || ".join(
-            duckdb_escape_literal(pc + "_") + " || " + duckdb_escape_identifier(pc) for pc in pivot_cols
-        )
+        if self.short_names:
+            pivot_str = " || '_' || ".join(
+                duckdb_escape_identifier(pc) for pc in pivot_cols
+            )
+        else:
+            pivot_str = " || '__' || ".join(
+                duckdb_escape_literal(pc + "_") + " || " + duckdb_escape_identifier(pc) for pc in pivot_cols
+            )
 
         # Pick an arbitrary character that isn't in any of the
         # index column or expand column names so we can
@@ -66,11 +72,14 @@ class PivotPlugin(DuckdbSimplePlugin):
 
         logger.debug("PivotPlugin.execute query_str %s", query_str)
 
-        # Rename the columns to match the old CountESS naming,
-        # with the original column at the start instead of the end.
-        project_str = ", ".join(
-            [duckdb_escape_identifier(ic) for ic in index_cols] + [f"COLUMNS('(.*)_{pivot_char}(.*)') AS '\\2__\\1'"]
-        )
+        if self.short_names:
+            project_str = f"COLUMNS('(.*)_{pivot_char}(.*)') AS '\\2_\\1'"
+        else:
+            project_str = f"COLUMNS('(.*)_{pivot_char}(.*)') AS '\\2__\\1'"
+
+        if index_cols:
+            project_str = (", ".join([duckdb_escape_identifier(ic) for ic in index_cols])) + ", " + project_str
+
         logger.debug("PivotPlugin.execute project_str %s", project_str)
 
         return ddbc.sql(query_str).project(project_str)
