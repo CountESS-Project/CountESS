@@ -23,6 +23,7 @@ from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Unio
 
 import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
+import pyarrow
 
 from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
 from countess.utils.duckdb import duckdb_concatenate, duckdb_escape_identifier, duckdb_source_to_view
@@ -108,7 +109,7 @@ class DuckdbPlugin(BasePlugin):
     """Base class for all DuckDB-based plugins"""
 
     # XXX expand this, or find in library somewhere
-    ALLOWED_TYPES = {"INTEGER", "VARCHAR", "FLOAT"}
+    ALLOWED_TYPES = {"INTEGER", "VARCHAR", "FLOAT", "DOUBLE", "DECIMAL"}
 
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
@@ -127,6 +128,8 @@ class DuckdbSimplePlugin(DuckdbPlugin):
             source = tables[0]
         else:
             source = None
+
+        logger.debug("DuckdbSimplePlugin execute_multi %s", source)
 
         self.set_column_choices([] if source is None else source.columns)
 
@@ -247,62 +250,34 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
     def dropped_columns(self) -> set[str]:
         return set()
 
-    def input_columns(self) -> dict[str, str]:
-        return None
-
     def output_columns(self) -> dict[str, str]:
         raise NotImplementedError(f"{self.__class__}.output_columns")
 
     def execute(self, ddbc, source):
         """Perform a query which calls `self.transform` for every row."""
 
-        if self.input_columns() is None:
-            escaped_input_columns = {
-                duckdb_escape_identifier(k): str(v).upper()
-                for k, v in zip(source.columns, source.dtypes)
-            }
-        else:
-            escaped_input_columns = {
-                duckdb_escape_identifier(k): str(v).upper()
-                for k, v in self.input_columns().items()
-                if k is not None and v is not None
-            }
-
-        escaped_output_columns = {
-            duckdb_escape_identifier(k): str(v).upper()
-            for k, v in self.output_columns().items()
-            if k is not None and v is not None
-        }
-
         # if you happen to have an output column with the same name as an
         # input column this drops it, as well as any columns being explicitly
         # dropped.
         drop_columns_set = set(list(self.output_columns().keys()) + list(self.dropped_columns()))
 
-        # source columns which aren't being dropped get copied into the projection
-        # in their original order, followed by the generated output columns.
-        escaped_keep_columns = [duckdb_escape_identifier(k) for k in source.columns if k not in drop_columns_set]
-
-        assert all(v in self.ALLOWED_TYPES for v in escaped_input_columns.values())
-        assert all(v in self.ALLOWED_TYPES for v in escaped_output_columns.values())
-
         # Make up an arbitrary unique name for our temporary function
         function_name = f"f_{id(self)}"
 
-        # this generates a clause like `f(x,y).a as a, f(x,y).b as b, f(x,y).c as c`
-        # which looks inefficient but duckdb only calls `f(x,y)` once per row
-        # so long as the function is created with `side_effects=False` ...
-        function_call = function_name + "(" + ",".join(k or "NULL" for k in escaped_input_columns.keys()) + ")"
-        function_calls = [f"{function_call}.{oc} AS {oc}" for oc in escaped_output_columns.keys() if oc is not None]
-        project_fields = ", ".join(escaped_keep_columns + function_calls)
+        # Output type has to be completely defined, with types and all
+        output_type = "STRUCT(" + ",".join(
+            f"{duckdb_escape_identifier(k)} {str(v).upper()}"
+            for k, v in self.output_columns().items()
+            if k is not None and v is not None
+        ) + ")"
 
-        input_types = list(escaped_input_columns.values())
-        output_type = "STRUCT(" + ",".join(f"{k} {v}" for k, v in escaped_output_columns.items() if k is not None) + ")"
+        # source columns which aren't being dropped get copied into the projection
+        # in their original order, followed by the generated output columns.
+        keep_columns = " ".join(f"{duckdb_escape_identifier(k)}," for k in source.columns if k not in drop_columns_set)
 
         logger.debug("DuckDbTransformPlugin.query function_name %s", function_name)
-        logger.debug("DuckDbTransformPlugin.query input_types %s", input_types)
         logger.debug("DuckDbTransformPlugin.query output_type %s", output_type)
-        logger.debug("DuckDbTransformPlugin.query project_fields %s", project_fields)
+        logger.debug("DuckDbTransformPlugin.query keep_columns %s", keep_columns)
 
         # if the function already exists, remove it
         try:
@@ -313,19 +288,27 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
 
         ddbc.create_function(
             name=function_name,
-            function=self.transform_tuple,
-            parameters=input_types,
+            function=self.transform_arrow,
             return_type=output_type,
+            type="arrow",
             null_handling="special",
             side_effects=False,
         )
-        return source.project(project_fields)
 
-    def transform_tuple(self, *data):
-        logger.debug("DuckDbTransformPlugin.transform_tuple %s", data)
-        r = self.transform(dict(zip([k for k in self.input_columns().keys() if k is not None], data)))
-        logger.debug("DuckDbTransformPlugin.transform_tuple %s", r)
-        return r
+        sql_command = (
+            f"SELECT {keep_columns} _out.* FROM (" +
+            f"SELECT {keep_columns} {function_name}(_row) AS _out " +
+            f"FROM {source.alias} _row)"
+        )
+        logger.debug("DuckDbTransformPlugin.query sql_command %s", sql_command)
+        return ddbc.sql(sql_command)
+
+    def transform_arrow(self, data: pyarrow.Table) -> pyarrow.Table:
+
+        return pyarrow.array((
+            self.transform( row.as_py())
+            for row in data
+        ))
 
     def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
         """This will be called for each row, with the columns nominated in
