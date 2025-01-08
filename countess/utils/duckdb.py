@@ -44,10 +44,14 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
         return "NULL"
     elif type(literal) is str:
         return "'" + literal.replace("'", "''") + "'"
-    elif type(literal) in (int, float, decimal.Decimal):
-        return str(literal)
+    elif type(literal) is int:
+        return str(literal) + "::INTEGER"
+    elif type(literal) is float:
+        return str(literal) + "::DOUBLE"
+    elif type(literal) is decimal.Decimal:
+        return str(literal) + "::DECIMAL"
     elif type(literal) is bool:
-        return 'TRUE' if literal else 'FALSE'
+        return "TRUE" if literal else "FALSE"
     elif type(literal) is list:
         return "[" + ",".join(duckdb_escape_literal(x) for x in literal) + "]"
     else:
@@ -75,15 +79,17 @@ def duckdb_concatenate(tables: List[DuckDBPyRelation]) -> DuckDBPyRelation:
     return result
 
 
-def duckdb_source_to_view(cursor: DuckDBPyConnection, source: DuckDBPyRelation):
-    view_name = "v_" + secrets.token_hex(16)
+def duckdb_source_to_view(cursor: DuckDBPyConnection, source: DuckDBPyRelation, view_name: Optional[str] = None):
+    if view_name is None:
+        view_name = "v_" + secrets.token_hex(16)
     logger.debug("creating view %s for %s", view_name, source.alias)
     source.to_view(view_name)
     return cursor.view(view_name)
 
 
-def duckdb_source_to_table(cursor: DuckDBPyConnection, source: DuckDBPyRelation):
-    table_name = "t_" + secrets.token_hex(16)
+def duckdb_source_to_table(cursor: DuckDBPyConnection, source: DuckDBPyRelation, table_name: Optional[str] = None):
+    if table_name is None:
+        table_name = "t_" + secrets.token_hex(16)
     logger.debug("creating table %s for %s", table_name, source.alias)
     source.to_table(table_name)
     return cursor.table(table_name)
