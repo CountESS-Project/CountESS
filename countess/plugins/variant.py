@@ -1,3 +1,4 @@
+from functools import lru_cache
 import logging
 import string
 from typing import Any, Optional
@@ -72,14 +73,6 @@ class VariantPlugin(DuckdbTransformPlugin):
     drop = BooleanParam("Drop unmatched rows", False)
     drop_columns = BooleanParam("Drop Sequence / Reference Columns", False)
 
-    def input_columns(self):
-        return {
-            self.column.value: "VARCHAR",
-            self.reference.get_column_name(): "VARCHAR",
-            self.variant.offset.get_column_name(): "INTEGER",
-            self.protein.offset.get_column_name(): "INTEGER",
-        }
-
     def output_columns(self):
         r = {}
         if self.variant.output:
@@ -94,14 +87,19 @@ class VariantPlugin(DuckdbTransformPlugin):
         else:
             return {}
 
+    @lru_cache(maxsize=10000)
+    def find_variant_string_cached(self, *a, **k):
+        return find_variant_string(*a, **k)
+
     def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         sequence = data[str(self.column)]
         reference = self.reference.get_value_from_dict(data)
         if not sequence or not reference:
             return None
 
-        r: dict[str, Any] = {self.variant.output.value: None, self.protein.output.value: None}
+        r: dict[str, Any] = {}
         if self.variant.output:
+            r[self.variant.output.value] = None
             try:
                 prefix = self.variant.prefix + ":" if self.variant.prefix else ""
                 r[self.variant.output.value] = find_variant_string(
@@ -118,6 +116,7 @@ class VariantPlugin(DuckdbTransformPlugin):
                 logger.warning("Exception", exc_info=exc)
 
         if self.protein.output:
+            r[self.protein.output.value] = None
             try:
                 prefix = self.protein.prefix + ":" if self.protein.prefix else ""
                 r[self.protein.output.value] = find_variant_string(
@@ -131,5 +130,7 @@ class VariantPlugin(DuckdbTransformPlugin):
                 pass
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
+
+        logger.debug(r)
 
         return r
