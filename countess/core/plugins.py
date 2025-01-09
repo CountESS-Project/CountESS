@@ -295,7 +295,6 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         # to allow easy parallelization, but see:
         # https://github.com/duckdb/duckdb/issues/15626
 
-
         ddbc.create_function(
             name=function_name,
             function=self.transform,
@@ -307,15 +306,8 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         # the "SELECT func(_row) FROM {table} _row" bit passes
         # a whole row to the function, sadly there's no way
         # to express this in a `.project()`.
-        # the "SELECT _out.* FROM (SELECT func(_row) AS _out)"
-        # unpacks the output of the function into the row.
-        # (it'd be nice if you could say "func(_row).*" but no)
 
-        sql_command = (
-            f"SELECT {keep_columns} _out.* FROM (" +
-            f"SELECT {keep_columns} {function_name}(_row) AS _out " +
-            f"FROM {source.alias} _row)"
-        )
+        sql_command = f"SELECT {keep_columns} UNNEST({function_name}(_row)) FROM {source.alias} _row"
         logger.debug("DuckDbTransformPlugin.query sql_command %s", sql_command)
 
         self.prepare(source)
