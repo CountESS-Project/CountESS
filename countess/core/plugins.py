@@ -251,6 +251,11 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         return set()
 
     def output_columns(self) -> dict[str, str]:
+        """Return a dictionary of `column name` -> `dbtype` 
+        which will be used to construct the user-defined 
+        function.  The columns returned by transform() must
+        match the columns declared here."""
+
         raise NotImplementedError(f"{self.__class__}.output_columns")
 
     def execute(self, ddbc, source):
@@ -286,14 +291,25 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
             # it didn't exist
             pass
 
+        # XXX it'd be nice to have an an arrow version of this
+        # to allow easy parallelization, but see:
+        # https://github.com/duckdb/duckdb/issues/15626
+
+
         ddbc.create_function(
             name=function_name,
-            function=self.transform_arrow,
+            function=self.transform,
             return_type=output_type,
-            type="arrow",
             null_handling="special",
             side_effects=False,
         )
+
+        # the "SELECT func(_row) FROM {table} _row" bit passes
+        # a whole row to the function, sadly there's no way
+        # to express this in a `.project()`.
+        # the "SELECT _out.* FROM (SELECT func(_row) AS _out)"
+        # unpacks the output of the function into the row.
+        # (it'd be nice if you could say "func(_row).*" but no)
 
         sql_command = (
             f"SELECT {keep_columns} _out.* FROM (" +
@@ -301,18 +317,18 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
             f"FROM {source.alias} _row)"
         )
         logger.debug("DuckDbTransformPlugin.query sql_command %s", sql_command)
+
+        self.prepare(source)
+
         return ddbc.sql(sql_command)
 
-    def transform_arrow(self, data: pyarrow.Table) -> pyarrow.Table:
-
-        return pyarrow.array((
-            self.transform( row.as_py())
-            for row in data
-        ))
+    def prepare(self, source: DuckDBPyRelation):
+        """Called before the transform functions are run, to prepare anything
+        which needs preparation ..."""
+        pass
 
     def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
-        """This will be called for each row, with the columns nominated in
-        `self.input_columns` as parameters.  Return a tuple with the same
+        """This will be called for each row. Return a tuple with the same
         value types as (or a dictionary with the same keys and value types as)
         those nominated by `self.output_columns`, or None to return all NULLs."""
         raise NotImplementedError(f"{self.__class__}.transform")
