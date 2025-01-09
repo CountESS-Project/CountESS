@@ -14,7 +14,7 @@ from countess.core.parameters import (
     ColumnGroupOrNoneChoiceParam,
     StringParam,
 )
-from countess.core.plugins import PandasConcatProcessPlugin
+from countess.core.plugins import DuckdbTransformPlugin
 
 
 def float_or_none(s: Any) -> Optional[float]:
@@ -38,7 +38,7 @@ def score(xs: list[float], ys: list[float]) -> Optional[tuple[float, float]]:
         return None
 
 
-class ScoringPlugin(PandasConcatProcessPlugin):
+class ScoringPlugin(DuckdbTransformPlugin):
     name = "Scoring"
     description = "Score variants using counts or frequencies"
     version = VERSION
@@ -54,15 +54,33 @@ class ScoringPlugin(PandasConcatProcessPlugin):
     variance = StringParam("Variance Column", "")
     drop_input = BooleanParam("Drop Input Columns?", False)
 
-    def process_row(
-        self, row, count_prefix: str, xaxis_prefix: str, suffixes: List[str]
-    ) -> Union[float, tuple[float, float], None]:
-        if xaxis_prefix:
-            x_values = [row.get(xaxis_prefix + s) for s in suffixes]
-        else:
-            x_values = [float_or_none(s) for s in suffixes]
+    suffixes: Optional[list[str]] = None
 
-        y_values = [row.get(count_prefix + s) for s in suffixes]
+    def output_columns(self) -> dict[str, str]:
+        if self.variance:
+            return { self.output.value: "DOUBLE", self.variance.value: "DOUBLE" }
+        else:
+            return { self.output.value: "DOUBLE" }
+
+    def prepare(self, source):
+        yaxis_prefix = self.columns.get_column_prefix()
+        suffix_set = set([k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)])
+
+        if self.xaxis.is_not_none():
+            xaxis_prefix = self.xaxis.get_column_prefix()
+            suffix_set.update([k.removeprefix(xaxis_prefix) for k in source.columns if k.startswith(xaxis_prefix)])
+
+        self.suffixes = sorted(suffix_set)
+
+    def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
+        if self.xaxis.is_not_none():
+            xaxis_prefix = self.xaxis.get_column_prefix()
+            x_values = [data.get(xaxis_prefix + s) for s in self.suffixes]
+        else:
+            x_values = [float_or_none(s) for s in self.suffixes]
+
+        count_prefix = self.columns.get_column_prefix()
+        y_values = [data.get(count_prefix + s) for s in self.suffixes]
         if any(y is None for y in y_values):
             return None
 
@@ -73,50 +91,11 @@ class ScoringPlugin(PandasConcatProcessPlugin):
             y_values = [y / max_y for y in y_values]
 
         x_values, y_values = zip(*[(x, y) for x, y in zip(x_values, y_values) if x > 0 or y > 0])
-        if len(x_values) < len(suffixes) / 2 + 1:
+        if len(x_values) < len(self.suffixes) / 2 + 1:
             return None
 
         if self.variance:
             return score(x_values, y_values)
         else:
             s = score(x_values, y_values)
-            return s[0] if s else None
-
-    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
-        variant_col = self.variant.value
-        replicate_col = self.replicate.value
-        count_cols = self.columns.get_column_names(dataframe)
-        xaxis_cols = self.xaxis.get_column_names(dataframe)
-        is_counts = self.inputtype == "counts"
-        output = self.output.value
-
-        if variant_col and replicate_col and is_counts:
-            # convert counts to frequencies by finding totals
-            dataframe = dataframe.set_index([variant_col, replicate_col])
-
-            totals_df = dataframe.groupby(by=replicate_col).agg({c: "sum" for c in count_cols})
-            dataframe[count_cols] = dataframe[count_cols].div(totals_df, level=replicate_col)
-
-        suffix_set = set(self.columns.get_column_suffixes(dataframe))
-        if self.xaxis.is_not_none():
-            suffix_set.update(self.xaxis.get_column_suffixes(dataframe))
-        suffixes = sorted(suffix_set)
-
-        output = dataframe.apply(
-            self.process_row,
-            axis="columns",
-            result_type="expand",
-            count_prefix=self.columns.get_column_prefix(),
-            xaxis_prefix=self.xaxis.get_column_prefix(),
-            suffixes=suffixes,
-        )
-
-        if self.drop_input:
-            dataframe.drop(columns=count_cols + xaxis_cols, inplace=True)
-
-        if self.variance:
-            dataframe[[self.output.value, self.variance.value]] = output
-        else:
-            dataframe[self.output.value] = output
-
-        return dataframe
+            return s[:1] if s else None
