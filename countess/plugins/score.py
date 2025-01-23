@@ -94,8 +94,8 @@ class ScoringPlugin(DuckdbTransformPlugin):
         if len(x_values) < len(self.suffixes) / 2 + 1:
             return None
 
+        s, v = score(x_values, y_values)
         if self.variance:
-            return score(x_values, y_values)
+            return { self.output.value: s, self.variance.value: v }
         else:
-            s = score(x_values, y_values)
-            return s[:1] if s else None
+            return { self.output.value: s }

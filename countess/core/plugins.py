@@ -19,6 +19,7 @@ import hashlib
 import importlib
 import importlib.metadata
 import logging
+import multiprocessing
 from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import duckdb
@@ -287,17 +288,20 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         # if the function already exists, remove it
         try:
             ddbc.remove_function(function_name)
-        except duckdb.InvalidInputException:
+            logger.debug("DuckDbTransformPlugin.query removed function %s", function_name)
+        except duckdb.InvalidInputException as exc:
             # it didn't exist
-            pass
+            logger.debug("DuckDbTransformPlugin.query can't remove function %s: %s", function_name, exc)
 
         # XXX it'd be nice to have an an arrow version of this
         # to allow easy parallelization, but see:
         # https://github.com/duckdb/duckdb/issues/15626
+        # Appears to be fixed in 1.1.4.dev4815
 
         ddbc.create_function(
             name=function_name,
-            function=self.transform,
+            function=self.transform_arrow,
+            type='arrow',
             return_type=output_type,
             null_handling="special",
             side_effects=False,
@@ -318,6 +322,16 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         """Called before the transform functions are run, to prepare anything
         which needs preparation ..."""
         pass
+
+    def transform_arrow(self, data: pyarrow.array) -> pyarrow.array:
+        logger.debug("DuckDbTransformPlugin.transform_arrow %d", len(data))
+        pool = multiprocessing.Pool(processes=4)
+        return pyarrow.array(
+            pool.imap_unordered(
+                self.transform,
+                data.to_pylist()
+            )
+        )
 
     def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
         """This will be called for each row. Return a tuple with the same
