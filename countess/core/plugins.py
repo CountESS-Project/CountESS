@@ -170,6 +170,7 @@ class FileInputPlugin(BasePlugin):
     def filenames_and_params(self):
         for file_param in self.files:
             for filename in glob.iglob(file_param.filename.value):
+                logger.debug("FileInputPlugin.filenames_and_params glob(%s) => %s", repr(file_param.filename.value), repr(filename))
                 yield filename, file_param
 
     def read_file_to_dataframe(self, filename: str, file_param: BaseParam, row_limit=None) -> Any:
