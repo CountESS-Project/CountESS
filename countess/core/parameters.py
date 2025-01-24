@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import math
 import os.path
 import re
@@ -10,6 +11,8 @@ import pandas as pd
 from countess.utils.pandas import get_all_columns
 
 PARAM_DIGEST_HASH = "sha256"
+
+logger = logging.getLogger(__name__)
 
 
 def make_prefix_groups(strings: List[str]) -> Dict[str, List[str]]:
@@ -725,6 +728,7 @@ class HasSubParametersMixin:
             yield from param.get_parameters(f"{key}.{subkey}" if key else subkey, base_dir)
 
     def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
+        logger.debug("HasSubParametersMixin.set_parameter %s %s %s", key, value, base_dir)
         if "." in key:
             key, subkey = key.split(".", 1)
             param = self.params[key]

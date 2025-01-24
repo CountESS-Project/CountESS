@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class SentinelQueue(Queue):
-
     """This is an easy and a bit lazy way of making a queue iterable.
     The writer is expected to call `queue.finish()` when it is done and
     the reader can treat the queue like an iterable."""
@@ -201,6 +200,7 @@ class PipelineNode:
         assert isinstance(self.plugin, BasePlugin)
         if self.config:
             for key, val, base_dir in self.config:
+                logger.debug("PipelineNode.load_config %s %s %s %s", self.name, key, val, base_dir)
                 try:
                     self.plugin.set_parameter(key, val, base_dir)
                 except KeyError:

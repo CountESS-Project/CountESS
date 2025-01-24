@@ -1,4 +1,5 @@
 """ pandas utility functions """
+
 from typing import Any, Dict, Iterable
 
 import pandas as pd

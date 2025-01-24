@@ -44,7 +44,8 @@ def configure_graphs(args: list[str]) -> Iterable[PipelineGraph]:
             sys.exit(0)
         elif opt_key == "--set":
             if m := re.match(r"([^.]+)\.([^=]+)=(.*)", opt_val):
-                config.append((m.group(1), m.group(2), m.group(3)))
+                node_name, config_key, config_val = m.groups()
+                config.append((node_name, config_key, config_val))
             else:
                 logger.warning("Bad --set option: %s", opt_val)
         elif opt_key == "--log":
