@@ -237,10 +237,11 @@ class PandasConcatProcessPlugin(PandasProcessPlugin):
         return []
 
     def finalize(self) -> Iterable[pd.DataFrame]:
-        data_in = pd.concat(self.dataframes)
-        data_out = self.process_dataframe(data_in)
-        if data_out is not None:
-            yield data_out
+        if len(self.dataframes):
+            data_in = pd.concat(self.dataframes)
+            data_out = self.process_dataframe(data_in)
+            if data_out is not None:
+                yield data_out
         yield from super().finalize()
 
     def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
