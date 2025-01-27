@@ -7,6 +7,7 @@ from typing import Any, Iterable, Optional
 import duckdb
 
 from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
+from countess.utils.duckdb import duckdb_source_to_view
 
 PRERUN_ROW_LIMIT = 100000
 
@@ -184,7 +185,10 @@ class PipelineGraph:
         start_time = time.time()
         for node in self.traverse_nodes():
             node.load_config()
-            node.result = node.plugin.execute_multi(ddbc, {pn.name: pn.result for pn in node.parent_nodes})
+            node.result = duckdb_source_to_view(
+                ddbc,
+                node.plugin.execute_multi(ddbc, {pn.name: pn.result for pn in node.parent_nodes})
+            )
 
         logger.info("Finished, elapsed time: %d", time.time() - start_time)
 

@@ -130,10 +130,10 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         else:
             source = None
 
-        logger.debug("DuckdbSimplePlugin execute_multi %s", source)
+        logger.debug("DuckdbSimplePlugin execute_multi %s", source.alias)
 
         self.set_column_choices([] if source is None else source.columns)
-
+        
         return self.execute(ddbc, source)
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
@@ -190,12 +190,12 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         filenames_and_params = list(self.filenames_and_params())
 
         cursor = ddbc
-        return duckdb_concatenate(
+        return duckdb_source_to_view(ddbc, duckdb_concatenate(
             [
                 self.load_file(cursor, filename, file_param, num)
                 for num, (filename, file_param) in enumerate(filenames_and_params)
             ]
-        )
+        ))
 
     def load_file(
         self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
@@ -290,8 +290,9 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
             ddbc.remove_function(function_name)
             logger.debug("DuckDbTransformPlugin.query removed function %s", function_name)
         except duckdb.InvalidInputException as exc:
-            # it didn't exist
-            logger.debug("DuckDbTransformPlugin.query can't remove function %s: %s", function_name, exc)
+            if not str(exc).startswith("Invalid Input Error: No function by the name of '"):
+                # some other error
+                logger.debug("DuckDbTransformPlugin.query can't remove function %s: %s", function_name, exc)
 
         # XXX it'd be nice to have an an arrow version of this
         # to allow easy parallelization, but see:
@@ -316,7 +317,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
 
         self.prepare(source)
 
-        return ddbc.sql(sql_command)
+        return duckdb_source_to_view(ddbc, ddbc.sql(sql_command))
 
     def prepare(self, source: DuckDBPyRelation):
         """Called before the transform functions are run, to prepare anything
