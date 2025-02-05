@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import multiprocessing
 import os
+import queue
 import re
 import sys
 import threading
@@ -113,7 +114,7 @@ class ConfiguratorWrapper:
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
 
-        self.ddbc = duckdb.connect(":countess:")
+        self.ddbc = duckdb.connect()
 
         self.show_config_subframe()
 
@@ -356,7 +357,11 @@ class LoggerFrame(tk.Frame):
         # Start a QueueListener in its own thread,
         # logging_callback gets called for each record
         # received.
-        logging.handlers.QueueListener(logging_queue, _CallbackLoggingHandler(self.logging_callback)).start()
+        #logging.handlers.QueueListener(logging_queue, _CallbackLoggingHandler(self.logging_callback)).start()
+
+        # XXX tkinter doesn't seem happy with updating widgets from threads,
+        # so here's an alternative, we poll from a tkinter event.
+        self.logging_handler = logging.handlers.QueueListener(logging_queue)
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -364,6 +369,17 @@ class LoggerFrame(tk.Frame):
 
         self.pbars_done: list[LabeledProgressbar] = []
         self.hide_event()
+
+        self.logging_event()
+
+    def logging_event(self, ev=None):
+        try:
+            for _ in range(0,10):
+                rec = self.logging_handler.dequeue(block=False)
+                self.logging_callback(rec)
+            self.after(1000, self.logging_event)
+        except queue.Empty:
+            self.after(100, self.logging_event)
 
     def logging_callback(self, record: logging.LogRecord) -> None:
         message = record.getMessage()
@@ -407,6 +423,8 @@ class MainWindow:
     def __init__(self, tk_parent: tk.Widget, config_filename: Optional[str] = None):
         self.tk_parent = tk_parent
 
+        logger.debug("MainWindow.__init__")
+
         ButtonMenu(
             tk_parent,
             [
@@ -448,6 +466,7 @@ class MainWindow:
         self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")
         self.main_subframe.add_child(self.tree_canvas)
 
+        logger.debug("MainWindow.__init__(%s)" % repr(config_filename))
         if config_filename:
             self.config_load(config_filename)
         else:
