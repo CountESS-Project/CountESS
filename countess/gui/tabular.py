@@ -1,6 +1,5 @@
 import io
 import logging
-import time
 import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
@@ -14,7 +13,7 @@ from countess.utils.duckdb import (
     duckdb_dtype_is_integer,
     duckdb_dtype_is_numeric,
     duckdb_escape_identifier,
-    duckdb_source_to_table,
+    duckdb_escape_literal,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,7 +94,7 @@ class TabularDataFrame(tk.Frame):
     subframe: Optional[tk.Frame] = None
     ddbc: Optional[DuckDBPyConnection] = None
     table: Optional[DuckDBPyRelation] = None
-    sorted_table_alias: Optional[str] = None
+    table_order: str = ""
     offset = 0
     height = 1000
     length = 0
@@ -104,7 +103,6 @@ class TabularDataFrame(tk.Frame):
     columns: list[tk.Text] = []
     column_formats: list[str] = []
     scrollbar = None
-    index_cols = 0
     sort_by_col = None
     sort_ascending = True
     callback: Optional[Callable[[int, int, bool], None]] = None
@@ -145,22 +143,18 @@ class TabularDataFrame(tk.Frame):
             self.label["text"] = "Dataframe Preview\n\nno data"
             return
 
-        # make labels for all the columns
-        ### XXX add in proper handling for MultiIndexes here
-
+        # make new labels for all the columns
         for label in self.labels:
             label.destroy()
-
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
             if type(name) is tuple:
                 name = "\n".join([str(n) for n in name])
             else:
                 name = str(name)
-            is_index = " (index)" if num < self.index_cols else ""
             column_label = tk.Label(
                 self.label_frame,
-                text=f"{name}\n{dtype}{is_index}",
+                text=f"{name}\n{dtype}",
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
@@ -207,13 +201,9 @@ class TabularDataFrame(tk.Frame):
 
         self.offset = max(0, min(self.length - self.height, int(new_offset)))
 
-        rows = self.table.limit(self.height, offset=self.offset).fetchall()
-
-        # XXX duckdb is a bit slower with large offsets, so there's potential to
-        # flip the sort order if we're down at the bottom of the table and do
-        # something clever like:
-        #     rows = self.table.limit(self.height, offset=self.length - self.offset - self.height).fetchall()
-        #     rows.reverse()
+        logger.debug("TabularDataFrame.refresh %s %d %d", self.table_order, self.offset, self.height)
+        table = self.table.order(self.table_order) if self.table_order else self.table
+        rows = table.limit(self.height, offset=self.offset).fetchall()
 
         for column_num, (column_widget, column_format) in enumerate(zip(self.columns, self.column_formats)):
             column_widget["state"] = tk.NORMAL
@@ -245,31 +235,32 @@ class TabularDataFrame(tk.Frame):
             self.sort_ascending = not self.sort_ascending
         else:
             self.sort_ascending = not descending
-
         self.sort_by_col = column_num
 
-        escaped_column_name = duckdb_escape_identifier(self.table.columns[column_num])
-        self.table = duckdb_source_to_table(
-            self.ddbc,
-            self.table.order(
-                escaped_column_name + (" ASC" if self.sort_ascending else " DESC")
-            ),
-        )
-        self.ddbc.sql(f"CREATE INDEX {self.table.alias}_idx ON {self.table.alias} ({escaped_column_name})")
+        column_name = self.table.columns[column_num]
+        escaped_column_name = duckdb_escape_identifier(column_name)
 
-        if self.sorted_table_alias:
-            self.ddbc.sql(f"DROP TABLE IF EXISTS {self.sorted_table_alias}")
-        self.sorted_table_alias = self.table.alias
+        # We add an index for whatever column we're sorting by,
+        # if it doesn't already exist.
+        # XXX could do this in a thread?
+        index_name = f"{self.table.alias}__{column_name}__idx"
+        index_identifier = duckdb_escape_identifier(index_name)
+        index_literal = duckdb_escape_literal(index_name)
+
+        # XXX workaround for https://github.com/duckdb/duckdb/issues/16086
+        if not self.ddbc.sql(f"select 1 from duckdb_indexes() where index_name = {index_literal}"):
+            self.ddbc.sql(
+                f"CREATE INDEX IF NOT EXISTS {index_identifier} ON {self.table.alias} ({escaped_column_name})"
+            )
+
+        direction = "ASC" if self.sort_ascending else "DESC"
+        self.table_order = f"{escaped_column_name} {direction}"
 
         for n, label in enumerate(self.labels):
             icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
             label.configure(image=get_icon(self, icon))
 
         self.refresh()
-
-    def __del__(self):
-        if self.sorted_table_alias:
-            self.ddbc.sql(f"DROP TABLE IF EXISTS {self.sorted_table_alias}")
 
     def _label_button_1(self, num, event):
         """Click on column labels to set sort order"""
