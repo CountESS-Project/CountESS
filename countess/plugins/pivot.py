@@ -46,9 +46,7 @@ class PivotPlugin(DuckdbSimplePlugin):
         # our own custom one ... this is what previous CountESS used
         # but it frankly could be better or customizable.
         if self.short_names:
-            pivot_str = " || '_' || ".join(
-                duckdb_escape_identifier(pc) for pc in pivot_cols
-            )
+            pivot_str = " || '_' || ".join(duckdb_escape_identifier(pc) for pc in pivot_cols)
         else:
             pivot_str = " || '__' || ".join(
                 duckdb_escape_literal(pc + "_") + " || " + duckdb_escape_identifier(pc) for pc in pivot_cols

@@ -12,9 +12,10 @@ from countess.core.parameters import (
     TabularMultiParam,
 )
 from countess.core.plugins import DuckdbInputPlugin
-from countess.utils.duckdb import duckdb_escape_literal, duckdb_escape_identifier
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
+
 
 class _ColumnsMultiParam(MultiParam):
     name = StringParam("Name")
@@ -34,7 +35,7 @@ class DataTablePlugin(DuckdbInputPlugin):
     columns = ArrayParam("Columns", _ColumnsMultiParam("Column"))
     rows = ArrayParam("Rows", TabularMultiParam("Row"))
 
-    #show_preview = False
+    show_preview = False
 
     def fix_columns(self):
         old_rows = self.rows.params
@@ -69,15 +70,11 @@ class DataTablePlugin(DuckdbInputPlugin):
         if len(self.rows) == 0:
             return None
 
-        sql = ("SELECT * FROM (VALUES " + 
-            (", ".join(
-                "(" + (", ".join(duckdb_escape_literal(val.value) for val in row.values())) + ")"
-                for row in self.rows
-            )) +
-            ") _(" +
-            (", ".join(duckdb_escape_identifier(col.name.value) for col in self.columns)) +
-            ")"
+        values_str = ", ".join(
+            "(" + (", ".join(duckdb_escape_literal(val.value) for val in row.values())) + ")" for row in self.rows
         )
+        columns_str = ",".join(duckdb_escape_identifier(col.name.value) for col in self.columns)
+        sql = f"SELECT * FROM (VALUES {values_str}) _({columns_str})"
 
         logger.debug("DataTablePlugin.execute sql %s", sql)
 

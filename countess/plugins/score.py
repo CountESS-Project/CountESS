@@ -58,9 +58,9 @@ class ScoringPlugin(DuckdbTransformPlugin):
 
     def output_columns(self) -> dict[str, str]:
         if self.variance:
-            return { self.output.value: "DOUBLE", self.variance.value: "DOUBLE" }
+            return {self.output.value: "DOUBLE", self.variance.value: "DOUBLE"}
         else:
-            return { self.output.value: "DOUBLE" }
+            return {self.output.value: "DOUBLE"}
 
     def prepare(self, source):
         yaxis_prefix = self.columns.get_column_prefix()
@@ -96,6 +96,6 @@ class ScoringPlugin(DuckdbTransformPlugin):
 
         s, v = score(x_values, y_values)
         if self.variance:
-            return { self.output.value: s, self.variance.value: v }
+            return {self.output.value: s, self.variance.value: v}
         else:
-            return { self.output.value: s }
+            return {self.output.value: s}

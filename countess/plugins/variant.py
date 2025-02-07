@@ -1,6 +1,6 @@
-from functools import lru_cache
 import logging
 import string
+from functools import lru_cache
 from typing import Any, Optional
 
 from countess import VERSION
@@ -131,6 +131,6 @@ class VariantPlugin(DuckdbTransformPlugin):
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
-        logger.debug(r)
+        # logger.debug(r)
 
         return r

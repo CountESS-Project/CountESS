@@ -23,8 +23,8 @@ import multiprocessing
 from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import duckdb
-from duckdb import DuckDBPyConnection, DuckDBPyRelation
 import pyarrow
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
 from countess.utils.duckdb import duckdb_concatenate, duckdb_escape_identifier, duckdb_source_to_view
@@ -133,7 +133,7 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         logger.debug("DuckdbSimplePlugin execute_multi %s", source.alias)
 
         self.set_column_choices([] if source is None else source.columns)
-        
+
         return self.execute(ddbc, source)
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
@@ -143,9 +143,7 @@ class DuckdbSimplePlugin(DuckdbPlugin):
 class DuckdbInputPlugin(DuckdbPlugin):
     num_inputs = 0
 
-    def execute_multi(
-        self, ddbc: DuckDBPyConnection, sources: Mapping
-    ) -> Optional[DuckDBPyRelation]:
+    def execute_multi(self, ddbc: DuckDBPyConnection, sources: Mapping) -> Optional[DuckDBPyRelation]:
         assert len(sources) == 0
         return self.execute(ddbc, None)
 
@@ -190,12 +188,15 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         filenames_and_params = list(self.filenames_and_params())
 
         cursor = ddbc
-        return duckdb_source_to_view(ddbc, duckdb_concatenate(
-            [
-                self.load_file(cursor, filename, file_param, num)
-                for num, (filename, file_param) in enumerate(filenames_and_params)
-            ]
-        ))
+        return duckdb_source_to_view(
+            ddbc,
+            duckdb_concatenate(
+                [
+                    self.load_file(cursor, filename, file_param, num)
+                    for num, (filename, file_param) in enumerate(filenames_and_params)
+                ]
+            ),
+        )
 
     def load_file(
         self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
@@ -252,8 +253,8 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         return set()
 
     def output_columns(self) -> dict[str, str]:
-        """Return a dictionary of `column name` -> `dbtype` 
-        which will be used to construct the user-defined 
+        """Return a dictionary of `column name` -> `dbtype`
+        which will be used to construct the user-defined
         function.  The columns returned by transform() must
         match the columns declared here."""
 
@@ -271,11 +272,15 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         function_name = f"f_{id(self)}"
 
         # Output type has to be completely defined, with types and all
-        output_type = "STRUCT(" + ",".join(
-            f"{duckdb_escape_identifier(k)} {str(v).upper()}"
-            for k, v in self.output_columns().items()
-            if k is not None and v is not None
-        ) + ")"
+        output_type = (
+            "STRUCT("
+            + ",".join(
+                f"{duckdb_escape_identifier(k)} {str(v).upper()}"
+                for k, v in self.output_columns().items()
+                if k is not None and v is not None
+            )
+            + ")"
+        )
 
         # source columns which aren't being dropped get copied into the projection
         # in their original order, followed by the generated output columns.
@@ -302,7 +307,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         ddbc.create_function(
             name=function_name,
             function=self.transform_arrow,
-            type='arrow',
+            type="arrow",
             return_type=output_type,
             null_handling="special",
             side_effects=False,
@@ -327,12 +332,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
     def transform_arrow(self, data: pyarrow.array) -> pyarrow.array:
         logger.debug("DuckDbTransformPlugin.transform_arrow %d", len(data))
         pool = multiprocessing.Pool(processes=4)
-        return pyarrow.array(
-            pool.imap_unordered(
-                self.transform,
-                data.to_pylist()
-            )
-        )
+        return pyarrow.array(pool.imap_unordered(self.transform, data.to_pylist()))
 
     def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
         """This will be called for each row. Return a tuple with the same

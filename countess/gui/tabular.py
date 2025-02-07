@@ -196,7 +196,7 @@ class TabularDataFrame(tk.Frame):
             row = min(self.offset + int(line), self.length) - 1
             self.click_callback(col, row, int(char))
 
-    def refresh(self, new_offset: float =0):
+    def refresh(self, new_offset: float = 0):
         # Refreshes the column widgets.
 
         self.offset = max(0, min(self.length - self.height, int(new_offset)))

@@ -46,7 +46,7 @@ options:
 # import faulthandler
 # faulthandler.enable(all_threads=True)
 
-#logging.basicConfig(format="%(threadName)s:%(message)s")
+# logging.basicConfig(format="%(threadName)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 logging_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -355,7 +355,7 @@ class LoggerFrame(tk.Frame):
         # Start a QueueListener in its own thread,
         # logging_callback gets called for each record
         # received.
-        #logging.handlers.QueueListener(logging_queue, _CallbackLoggingHandler(self.logging_callback)).start()
+        # logging.handlers.QueueListener(logging_queue, _CallbackLoggingHandler(self.logging_callback)).start()
 
         # XXX tkinter doesn't seem happy with updating widgets from threads,
         # so here's an alternative, we poll from a tkinter event.
@@ -372,7 +372,7 @@ class LoggerFrame(tk.Frame):
 
     def logging_event(self, ev=None):
         try:
-            for _ in range(0,10):
+            for _ in range(0, 10):
                 rec = self.logging_handler.dequeue(block=False)
                 self.logging_callback(rec)
             self.after(1000, self.logging_event)
@@ -658,7 +658,7 @@ def main() -> None:
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.
     logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
-    #logging.getLogger().addHandler(logging.StreamHandler())
+    # logging.getLogger().addHandler(logging.StreamHandler())
 
     root = make_root()
     SplashScreen(root)

@@ -57,7 +57,7 @@ class JoinPlugin(DuckdbPlugin):
             self.inputs.add_row()
 
         for num, (label, table) in enumerate(sources.items()):
-            logger.debug("JoinPlugin.execute_multi %d %s %s", num+1, repr(label), table.alias)
+            logger.debug("JoinPlugin.execute_multi %d %s %s", num + 1, repr(label), table.alias)
             self.inputs[num].label = f"Input {num+1}: {label}"
             self.inputs[num].join_on.set_choices(table.columns)
 
