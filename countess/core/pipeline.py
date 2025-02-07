@@ -85,13 +85,16 @@ class PipelineNode:
         assert isinstance(self.plugin, DuckdbPlugin)
         if self.is_dirty:
             sources = {pn.name: pn.run(ddbc) for pn in self.parent_nodes}
-            ddbc.sql(f"DROP TABLE IF EXISTS n_{self.uuid}")
+
             result = self.plugin.execute_multi(ddbc, sources)
             if result is not None:
                 try:
-                    result.to_table(f"n_{self.uuid}")
-                    self.result = ddbc.table(f"n_{self.uuid}")
-                except Exception as exc:
+                    table_name = f"n_{self.uuid}"
+                    ddbc.sql(f"DROP TABLE IF EXISTS {table_name}")
+                    result.to_table(table_name)
+                    self.result = ddbc.table(table_name)
+                    logger.debug("PipelineNode.run saved table %s", table_name)
+                except duckdb.CatalogException as exc:
                     logger.warning(exc)
                     self.result = None
             else:
@@ -132,8 +135,8 @@ class PipelineGraph:
     def __init__(self, nodes: Optional[list[PipelineNode]] = None):
         self.plugin_classes = get_plugin_classes()
         self.nodes = nodes or []
-        self.duckdb = duckdb.connect()
-        self.duckdb.sql("SET python_enable_replacements = false")
+        self.ddbc = duckdb.connect()
+        self.ddbc.sql("SET python_enable_replacements = false")
 
     def reset_node_name(self, node: PipelineNode):
         node_names_seen = set(n.name for n in self.nodes if n != node)
@@ -178,17 +181,19 @@ class PipelineGraph:
                     yield node
                     found_nodes.add(node)
 
-    def run(self):
-        ddbc = self.duckdb
+    def run_node(self, node: PipelineNode):
+        return node.run(self.ddbc)
 
+    def run(self):
         logger.info("Starting")
         start_time = time.time()
         for node in self.traverse_nodes():
             node.load_config()
-            node.result = duckdb_source_to_view(
-                ddbc,
-                node.plugin.execute_multi(ddbc, {pn.name: pn.result for pn in node.parent_nodes})
-            )
+            result = node.plugin.execute_multi(self.ddbc, {pn.name: pn.result for pn in node.parent_nodes})
+            if result:
+                node.result = duckdb_source_to_view(self.ddbc, result)
+            else:
+                node.result = None
 
         logger.info("Finished, elapsed time: %d", time.time() - start_time)
 

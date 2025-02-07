@@ -6,13 +6,11 @@ import os
 import queue
 import re
 import sys
-import threading
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import messagebox, ttk
 from typing import Optional, Union
 
-import duckdb
 import psutil
 from duckdb import DuckDBPyRelation
 
@@ -48,6 +46,7 @@ options:
 # import faulthandler
 # faulthandler.enable(all_threads=True)
 
+#logging.basicConfig(format="%(threadName)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 logging_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -95,8 +94,9 @@ class ConfiguratorWrapper:
     info_toplevel = None
     info_frame = None
 
-    def __init__(self, tk_parent, node, change_callback):
+    def __init__(self, tk_parent, node, ddbc, change_callback):
         self.node = node
+        self.ddbc = ddbc
         self.change_callback = change_callback
 
         self.frame = ResizingFrame(tk_parent, orientation=ResizingFrame.Orientation.VERTICAL, bg="darkgrey")
@@ -113,8 +113,6 @@ class ConfiguratorWrapper:
         self.label = tk.Label(self.subframe, justify=tk.LEFT, wraplength=500)
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
-
-        self.ddbc = duckdb.connect()
 
         self.show_config_subframe()
 
@@ -466,7 +464,7 @@ class MainWindow:
         self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")
         self.main_subframe.add_child(self.tree_canvas)
 
-        logger.debug("MainWindow.__init__(%s)" % repr(config_filename))
+        logger.debug("MainWindow.__init__(%s)", repr(config_filename))
         if config_filename:
             self.config_load(config_filename)
         else:
@@ -555,7 +553,7 @@ class MainWindow:
 
     def node_select(self, node):
         if node:
-            new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.node_changed)
+            new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.graph.ddbc, self.node_changed)
             if self.config_wrapper:
                 self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
                 self.config_wrapper.destroy()
@@ -660,7 +658,7 @@ def main() -> None:
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.
     logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
-    logging.getLogger().addHandler(logging.StreamHandler())
+    #logging.getLogger().addHandler(logging.StreamHandler())
 
     root = make_root()
     SplashScreen(root)
