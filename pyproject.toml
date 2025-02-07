@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     'biobear~=0.23.2',
-    'duckdb~=1.1.4.dev4815',
+    'duckdb~=1.2.0',
     'more_itertools~=9.1.0',
     'numpy~=1.26',
     'pandas~=2.1.0',
@@ -52,27 +52,27 @@ dev = [
 ]
 
 [project.entry-points.countess_plugins]
-collate = "countess.plugins.collate:CollatePlugin"
+#collate = "countess.plugins.collate:CollatePlugin"
 load_fastq = "countess.plugins.fastq:LoadFastqPlugin"
 load_fasta = "countess.plugins.fastq:LoadFastaPlugin"
 load_csv = "countess.plugins.csv:LoadCsvPlugin"
-group_by = "countess.plugins.group_by:GroupByPlugin"
-expression = "countess.plugins.expression:ExpressionPlugin"
+#group_by = "countess.plugins.group_by:GroupByPlugin"
+#expression = "countess.plugins.expression:ExpressionPlugin"
 pivot = "countess.plugins.pivot:PivotPlugin"
 join = "countess.plugins.join:JoinPlugin"
-python = "countess.plugins.python:PythonPlugin"
+#python = "countess.plugins.python:PythonPlugin"
 save_csv = "countess.plugins.csv:SaveCsvPlugin"
-sequence = "countess.plugins.sequence:SequencePlugin"
-regex_tool = "countess.plugins.regex:RegexToolPlugin"
-regex_reader = "countess.plugins.regex:RegexReaderPlugin"
+#sequence = "countess.plugins.sequence:SequencePlugin"
+#regex_tool = "countess.plugins.regex:RegexToolPlugin"
+#regex_reader = "countess.plugins.regex:RegexReaderPlugin"
 variants = "countess.plugins.variant:VariantPlugin"
-mutagenize = "countess.plugins.mutagenize:MutagenizePlugin"
+#mutagenize = "countess.plugins.mutagenize:MutagenizePlugin"
 data_table = "countess.plugins.data_table:DataTablePlugin"
-correlation = "countess.plugins.correlation:CorrelationPlugin"
-hgvs_parser = "countess.plugins.hgvs_parser:HgvsParserPlugin"
-column = "countess.plugins.column:ColumnToolPlugin"
-curve_fit = "countess.plugins.curve_fit:CurveFitPlugin"
-filter = "countess.plugins.filter:FilterPlugin"
+#correlation = "countess.plugins.correlation:CorrelationPlugin"
+#hgvs_parser = "countess.plugins.hgvs_parser:HgvsParserPlugin"
+#column = "countess.plugins.column:ColumnToolPlugin"
+#curve_fit = "countess.plugins.curve_fit:CurveFitPlugin"
+#filter = "countess.plugins.filter:FilterPlugin"
 score = "countess.plugins.score:ScoringPlugin"
 
 [project.entry-points.gui_scripts]
