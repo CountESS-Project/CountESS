@@ -1,8 +1,7 @@
 from math import log
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
-import pandas as pd
 from scipy.optimize import curve_fit
 
 from countess import VERSION
@@ -64,7 +63,7 @@ class ScoringPlugin(DuckdbTransformPlugin):
 
     def prepare(self, source):
         yaxis_prefix = self.columns.get_column_prefix()
-        suffix_set = set([k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)])
+        suffix_set = {k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)}
 
         if self.xaxis.is_not_none():
             xaxis_prefix = self.xaxis.get_column_prefix()
@@ -73,6 +72,8 @@ class ScoringPlugin(DuckdbTransformPlugin):
         self.suffixes = sorted(suffix_set)
 
     def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
+        assert self.suffixes
+
         if self.xaxis.is_not_none():
             xaxis_prefix = self.xaxis.get_column_prefix()
             x_values = [data.get(xaxis_prefix + s) for s in self.suffixes]
@@ -85,17 +86,22 @@ class ScoringPlugin(DuckdbTransformPlugin):
             return None
 
         if self.log:
-            y_values = [log(y + 1) for y in y_values]
+            y_values = [log(y + 1) if y is not None else None for y in y_values]
         if self.normalize:
-            max_y = max(y_values)
-            y_values = [y / max_y for y in y_values]
+            max_y = max(y for y in y_values if y is not None)
+            y_values = [y / max_y if y is not None else None for y in y_values]
 
-        x_values, y_values = zip(*[(x, y) for x, y in zip(x_values, y_values) if x > 0 or y > 0])
+        x_values, y_values = zip(
+            *[(x, y) for x, y in zip(x_values, y_values) if x is not None and y is not None and (x > 0 or y > 0)]
+        )
         if len(x_values) < len(self.suffixes) / 2 + 1:
             return None
 
-        s, v = score(x_values, y_values)
-        if self.variance:
-            return {self.output.value: s, self.variance.value: v}
-        else:
-            return {self.output.value: s}
+        try:
+            s, v = score(x_values, y_values)
+            if self.variance:
+                return {self.output.value: s, self.variance.value: v}
+            else:
+                return {self.output.value: s}
+        except TypeError:
+            return None

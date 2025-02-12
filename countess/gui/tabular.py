@@ -103,7 +103,7 @@ class TabularDataFrame(tk.Frame):
     columns: list[tk.Text] = []
     column_formats: list[str] = []
     scrollbar = None
-    sort_by_col = None
+    sort_by_col: Optional[int] = None
     sort_ascending = True
     callback: Optional[Callable[[int, int, bool], None]] = None
     click_callback: Optional[Callable[[int, int, int], None]] = None
@@ -198,6 +198,8 @@ class TabularDataFrame(tk.Frame):
 
     def refresh(self, new_offset: float = 0):
         # Refreshes the column widgets.
+        assert self.table
+        assert self.scrollbar
 
         self.offset = max(0, min(self.length - self.height, int(new_offset)))
 

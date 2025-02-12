@@ -3,7 +3,7 @@ import csv
 import gzip
 import logging
 from io import BufferedWriter, BytesIO
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
@@ -20,7 +20,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin
-from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal, duckdb_source_to_view
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 from countess.utils.files import clean_filename
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [

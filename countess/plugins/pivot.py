@@ -1,4 +1,3 @@
-import functools
 import logging
 from typing import Optional
 
@@ -7,12 +6,7 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess import VERSION
 from countess.core.parameters import BooleanParam, ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import DuckdbSimplePlugin
-from countess.utils.duckdb import (
-    duckdb_choose_special,
-    duckdb_escape_identifier,
-    duckdb_escape_literal,
-    duckdb_source_to_view,
-)
+from countess.utils.duckdb import duckdb_choose_special, duckdb_escape_identifier, duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
 
