@@ -1,3 +1,4 @@
+import logging
 from math import log
 from typing import Any, Optional, Union
 
@@ -13,7 +14,9 @@ from countess.core.parameters import (
     ColumnGroupOrNoneChoiceParam,
     StringParam,
 )
-from countess.core.plugins import DuckdbTransformPlugin
+from countess.core.plugins import DuckdbParallelTransformPlugin
+
+logger = logging.getLogger(__name__)
 
 
 def float_or_none(s: Any) -> Optional[float]:
@@ -37,7 +40,7 @@ def score(xs: list[float], ys: list[float]) -> Optional[tuple[float, float]]:
         return None
 
 
-class ScoringPlugin(DuckdbTransformPlugin):
+class ScoringPlugin(DuckdbParallelTransformPlugin):
     name = "Scoring"
     description = "Score variants using counts or frequencies"
     version = VERSION
@@ -61,7 +64,9 @@ class ScoringPlugin(DuckdbTransformPlugin):
         else:
             return {self.output.value: "DOUBLE"}
 
-    def prepare(self, source):
+    def prepare(self, ddbc, source):
+        logger.debug("ScoringPlugin.prepare")
+        super().prepare(ddbc, source)
         yaxis_prefix = self.columns.get_column_prefix()
         suffix_set = {k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)}
 
@@ -70,9 +75,24 @@ class ScoringPlugin(DuckdbTransformPlugin):
             suffix_set.update([k.removeprefix(xaxis_prefix) for k in source.columns if k.startswith(xaxis_prefix)])
 
         self.suffixes = sorted(suffix_set)
+        logger.debug("ScoringPlugin.prepare suffixes %s", self.suffixes)
+
+    def add_fields(self):
+        return {self.output.value: float, self.variance.value: float}
+
+    def remove_fields(self, field_names: list[str]):
+        if self.drop_input:
+            return [
+                name
+                for name in field_names
+                if name.startswith(self.columns.get_column_prefix())
+                or (self.xaxis.is_not_none() and name.startswith(self.xaxis.get_column_prefix()))
+            ]
+        else:
+            return []
 
     def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
-        assert self.suffixes
+        assert self.suffixes is not None
 
         if self.xaxis.is_not_none():
             xaxis_prefix = self.xaxis.get_column_prefix()
@@ -99,9 +119,9 @@ class ScoringPlugin(DuckdbTransformPlugin):
 
         try:
             s, v = score(x_values, y_values)
+            data[self.output.value] = s
             if self.variance:
-                return {self.output.value: s, self.variance.value: v}
-            else:
-                return {self.output.value: s}
+                data[self.variance.value] = v
+            return data
         except TypeError:
             return None

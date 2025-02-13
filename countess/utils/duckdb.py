@@ -79,6 +79,15 @@ def duckdb_concatenate(tables: List[DuckDBPyRelation]) -> DuckDBPyRelation:
     return result
 
 
+def duckdb_combine(ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    if len(sources) > 1:
+        return duckdb_source_to_view(ddbc, duckdb_concatenate(sources))
+    elif len(sources) == 1:
+        return sources[0]
+    else:
+        return None
+
+
 def duckdb_source_to_view(cursor: DuckDBPyConnection, source: DuckDBPyRelation, view_name: Optional[str] = None):
     if view_name is None:
         view_name = "v_" + secrets.token_hex(16)

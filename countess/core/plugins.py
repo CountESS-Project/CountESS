@@ -14,20 +14,23 @@ Plugin lifecycle:
     * Call Plugin.prerun() to generate new output
 """
 
+import decimal
 import glob
 import hashlib
 import importlib
 import importlib.metadata
 import logging
 import multiprocessing
+from multiprocessing.pool import ThreadPool
 from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import duckdb
+import psutil
 import pyarrow
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
-from countess.utils.duckdb import duckdb_concatenate, duckdb_escape_identifier, duckdb_source_to_view
+from countess.utils.duckdb import duckdb_combine, duckdb_concatenate, duckdb_escape_identifier, duckdb_source_to_view
 
 PRERUN_ROW_LIMIT: int = 100000
 
@@ -112,6 +115,9 @@ class DuckdbPlugin(BasePlugin):
     # XXX expand this, or find in library somewhere
     ALLOWED_TYPES = {"INTEGER", "VARCHAR", "FLOAT", "DOUBLE", "DECIMAL"}
 
+    def prepare_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> None:
+        pass
+
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
     ) -> Optional[DuckDBPyRelation]:
@@ -119,22 +125,16 @@ class DuckdbPlugin(BasePlugin):
 
 
 class DuckdbSimplePlugin(DuckdbPlugin):
+    def prepare_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> None:
+        self.prepare(ddbc, duckdb_combine(ddbc, list(sources.values())))
+
+    def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
+        self.set_column_choices([] if source is None else source.columns)
+
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
     ) -> Optional[DuckDBPyRelation]:
-        tables = list(sources.values())
-        if len(sources) > 1:
-            source = duckdb_source_to_view(ddbc, duckdb_concatenate(tables))
-        elif len(sources) == 1:
-            source = tables[0]
-        else:
-            source = None
-
-        logger.debug("DuckdbSimplePlugin execute_multi %s", source.alias)
-
-        self.set_column_choices([] if source is None else source.columns)
-
-        return self.execute(ddbc, source)
+        return self.execute(ddbc, duckdb_combine(ddbc, list(sources.values())))
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute")
@@ -248,94 +248,72 @@ class DuckdbFilterPlugin(DuckdbSimplePlugin):
         raise NotImplementedError(f"{self.__class__}.transform")
 
 
+def _python_type_to_arrow_dtype(ttype: type) -> pyarrow.DataType:
+    if ttype in (float, decimal.Decimal):
+        return pyarrow.float64()
+    elif ttype is int:
+        return pyarrow.int64()
+    elif ttype is bool:
+        return pyarrow.bool8()
+    else:
+        return pyarrow.string()
+
+
 class DuckdbTransformPlugin(DuckdbSimplePlugin):
-    def dropped_columns(self) -> set[str]:
-        return set()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view_name = f"v_{id(self)}"
 
-    def output_columns(self) -> dict[str, str]:
-        """Return a dictionary of `column name` -> `dbtype`
-        which will be used to construct the user-defined
-        function.  The columns returned by transform() must
-        match the columns declared here."""
+    def get_reader(self, source):
+        return source.to_arrow_table().to_reader(max_chunksize=2048)
 
-        raise NotImplementedError(f"{self.__class__}.output_columns")
+    def remove_fields(self, field_names: list[str]) -> list[str]:
+        return []
 
-    def execute(self, ddbc, source):
+    def add_fields(self) -> Mapping[str, type]:
+        return {}
+
+    def fix_schema(self, schema: pyarrow.Schema) -> pyarrow.Schema:
+        logger.debug("DuckdbTransformPlugin.fix_schema in %s", schema.to_string())
+        for field_name in self.remove_fields(schema.names):
+            if field_name in schema.names:
+                schema = schema.remove(schema.get_field_index(field_name))
+        for field_name, ttype in self.add_fields().items():
+            if field_name and ttype is not None:
+                schema = schema.append(pyarrow.field(field_name, _python_type_to_arrow_dtype(ttype)))
+        return schema
+
+    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
         """Perform a query which calls `self.transform` for every row."""
 
-        # if you happen to have an output column with the same name as an
-        # input column this drops it, as well as any columns being explicitly
-        # dropped.
-        drop_columns_set = set(list(self.output_columns().keys()) + list(self.dropped_columns()))
+        reader = self.get_reader(source)
+        ddbc.register(self.view_name, pyarrow.Table.from_batches(self.transform_batch(batch) for batch in reader))
+        return ddbc.view(self.view_name)
 
-        # Make up an arbitrary unique name for our temporary function
-        function_name = f"f_{id(self)}"
-
-        # Output type has to be completely defined, with types and all
-        output_type = (
-            "STRUCT("
-            + ",".join(
-                f"{duckdb_escape_identifier(k)} {str(v).upper()}"
-                for k, v in self.output_columns().items()
-                if k is not None and v is not None
-            )
-            + ")"
+    def transform_batch(self, batch: pyarrow.RecordBatch) -> pyarrow.RecordBatch:
+        schema = self.fix_schema(batch.schema)
+        return pyarrow.RecordBatch.from_pylist(
+            [t for t in (self.transform(row) for row in batch.to_pylist()) if t is not None], schema=schema
         )
-
-        # source columns which aren't being dropped get copied into the projection
-        # in their original order, followed by the generated output columns.
-        keep_columns = " ".join(f"{duckdb_escape_identifier(k)}," for k in source.columns if k not in drop_columns_set)
-
-        logger.debug("DuckDbTransformPlugin.query function_name %s", function_name)
-        logger.debug("DuckDbTransformPlugin.query output_type %s", output_type)
-        logger.debug("DuckDbTransformPlugin.query keep_columns %s", keep_columns)
-
-        # if the function already exists, remove it
-        try:
-            ddbc.remove_function(function_name)
-            logger.debug("DuckDbTransformPlugin.query removed function %s", function_name)
-        except duckdb.InvalidInputException as exc:
-            if not str(exc).startswith("Invalid Input Error: No function by the name of '"):
-                # some other error
-                logger.debug("DuckDbTransformPlugin.query can't remove function %s: %s", function_name, exc)
-
-        # XXX it'd be nice to have an an arrow version of this
-        # to allow easy parallelization, but see:
-        # https://github.com/duckdb/duckdb/issues/15626
-        # Appears to be fixed in 1.1.4.dev4815
-
-        ddbc.create_function(
-            name=function_name,
-            function=self.transform_arrow,
-            type="arrow",
-            return_type=output_type,
-            null_handling="special",
-            side_effects=False,
-        )
-
-        # the "SELECT func(_row) FROM {table} _row" bit passes
-        # a whole row to the function, sadly there's no way
-        # to express this in a `.project()`.
-
-        sql_command = f"SELECT {keep_columns} UNNEST({function_name}(_row)) FROM {source.alias} _row"
-        logger.debug("DuckDbTransformPlugin.query sql_command %s", sql_command)
-
-        self.prepare(source)
-
-        return duckdb_source_to_view(ddbc, ddbc.sql(sql_command))
-
-    def prepare(self, source: DuckDBPyRelation):
-        """Called before the transform functions are run, to prepare anything
-        which needs preparation ..."""
-        pass
-
-    def transform_arrow(self, data: pyarrow.array) -> pyarrow.array:
-        logger.debug("DuckDbTransformPlugin.transform_arrow %d", len(data))
-        pool = multiprocessing.Pool(processes=4)
-        return pyarrow.array(pool.imap_unordered(self.transform, data.to_pylist()))
 
     def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
         """This will be called for each row. Return a tuple with the same
         value types as (or a dictionary with the same keys and value types as)
         those nominated by `self.output_columns`, or None to return all NULLs."""
         raise NotImplementedError(f"{self.__class__}.transform")
+
+
+class DuckdbThreadedTransformPlugin(DuckdbTransformPlugin):
+    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
+        with multiprocessing.pool.ThreadPool(processes=psutil.cpu_count()) as pool:
+            reader = self.get_reader(source)
+            ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
+        return ddbc.view(self.view_name)
+
+
+class DuckdbParallelTransformPlugin(DuckdbTransformPlugin):
+    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
+        with multiprocessing.Pool(processes=psutil.cpu_count()) as pool:
+            reader = self.get_reader(source)
+            ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
+        return ddbc.view(self.view_name)

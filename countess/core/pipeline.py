@@ -85,7 +85,7 @@ class PipelineNode:
         assert isinstance(self.plugin, DuckdbPlugin)
         if self.is_dirty:
             sources = {pn.name: pn.run(ddbc) for pn in self.parent_nodes}
-
+            self.plugin.prepare_multi(ddbc, sources)
             result = self.plugin.execute_multi(ddbc, sources)
             if result is not None:
                 try:
@@ -189,7 +189,9 @@ class PipelineGraph:
         start_time = time.time()
         for node in self.traverse_nodes():
             node.load_config()
-            result = node.plugin.execute_multi(self.ddbc, {pn.name: pn.result for pn in node.parent_nodes})
+            sources = {pn.name: pn.result for pn in node.parent_nodes}
+            node.plugin.prepare_multi(self.ddbc, sources)
+            result = node.plugin.execute_multi(self.ddbc, sources)
             if result:
                 node.result = duckdb_source_to_view(self.ddbc, result)
             else:

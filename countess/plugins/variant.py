@@ -15,7 +15,7 @@ from countess.core.parameters import (
     StringCharacterSetParam,
     StringParam,
 )
-from countess.core.plugins import DuckdbTransformPlugin
+from countess.core.plugins import DuckdbParallelTransformPlugin
 from countess.utils.variant import TooManyVariationsException, find_variant_string
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class ProteinVariantMultiParam(FramedMultiParam):
     output = StringParam("Output Column", "protein")
 
 
-class VariantPlugin(DuckdbTransformPlugin):
+class VariantPlugin(DuckdbParallelTransformPlugin):
     """Turns a DNA sequence into a HGVS variant code"""
 
     name = "Variant Caller"
@@ -73,23 +73,21 @@ class VariantPlugin(DuckdbTransformPlugin):
     drop = BooleanParam("Drop unmatched rows", False)
     drop_columns = BooleanParam("Drop Sequence / Reference Columns", False)
 
-    def output_columns(self):
-        r = {}
-        if self.variant.output:
-            r[self.variant.output.value] = "VARCHAR"
-        if self.protein.output:
-            r[self.protein.output.value] = "VARCHAR"
-        return r
-
-    def dropped_columns(self):
-        if self.drop_columns:
-            return set([self.column.value, self.reference.get_column_name()])
-        else:
-            return {}
-
     @lru_cache(maxsize=10000)
     def find_variant_string_cached(self, *a, **k):
         return find_variant_string(*a, **k)
+
+    def add_fields(self):
+        return {
+            self.variant.output.value: str,
+            self.protein.output.value: str,
+        }
+
+    def remove_fields(self, field_names: list[str]) -> list[str]:
+        if self.drop_columns:
+            return [self.column.value, self.reference.get_column_name()]
+        else:
+            return []
 
     def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         sequence = data[str(self.column)]
@@ -97,12 +95,12 @@ class VariantPlugin(DuckdbTransformPlugin):
         if not sequence or not reference:
             return None
 
-        r: dict[str, Any] = {}
+        # r: dict[str, Any] = data
         if self.variant.output:
-            r[self.variant.output.value] = None
+            data[self.variant.output.value] = None
             try:
                 prefix = self.variant.prefix + ":" if self.variant.prefix else ""
-                r[self.variant.output.value] = find_variant_string(
+                data[self.variant.output.value] = find_variant_string(
                     f"{prefix}{self.variant.seq_type.get_choice()}.",
                     reference,
                     sequence,
@@ -116,10 +114,10 @@ class VariantPlugin(DuckdbTransformPlugin):
                 logger.warning("Exception", exc_info=exc)
 
         if self.protein.output:
-            r[self.protein.output.value] = None
+            data[self.protein.output.value] = None
             try:
                 prefix = self.protein.prefix + ":" if self.protein.prefix else ""
-                r[self.protein.output.value] = find_variant_string(
+                data[self.protein.output.value] = find_variant_string(
                     f"{prefix}p.",
                     reference,
                     sequence,
@@ -131,6 +129,4 @@ class VariantPlugin(DuckdbTransformPlugin):
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
-        # logger.debug(r)
-
-        return r
+        return data
