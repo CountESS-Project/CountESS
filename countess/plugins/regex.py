@@ -1,8 +1,6 @@
 import logging
 import re
-from typing import Iterable, Optional
-
-import pandas as pd
+from typing import Optional, Any
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -10,11 +8,10 @@ from countess.core.parameters import (
     BooleanParam,
     ColumnChoiceParam,
     DataTypeChoiceParam,
-    IntegerParam,
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import PandasInputFilesPlugin, PandasTransformSingleToTuplePlugin
+from countess.core.plugins import DuckdbThreadedTransformPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +21,7 @@ class OutputColumnsMultiParam(MultiParam):
     datatype = DataTypeChoiceParam("Column Type", "string")
 
 
-class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
+class RegexToolPlugin(DuckdbThreadedTransformPlugin):
     name = "Regex Tool"
     description = "Apply regular expressions to a column to make new column(s)"
     link = "https://countess-project.github.io/CountESS/included-plugins/#regex-tool"
@@ -39,37 +36,33 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
 
     compiled_re = None
 
-    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
-        super().prepare(sources, row_limit)
+    def prepare(self, *a) -> None:
+        super().prepare(*a)
         self.compiled_re = re.compile(self.regex.value)
 
-    def process_dataframe(self, dataframe: pd.DataFrame) -> Optional[pd.DataFrame]:
-        df = super().process_dataframe(dataframe)
-        if df is None:
-            return None
+    def add_fields(self):
+        return { op.name.value: op.datatype.get_selected_type() for op in self.output }
 
+    def remove_fields(self, field_names):
         if self.drop_column:
-            column_name = self.column.value
-            if column_name in df.columns:
-                df = df.drop(columns=column_name)
-            else:
-                # XXX maybe set up a helper function for this
-                try:
-                    df = df.reset_index(column_name, drop=True)
-                except KeyError:
-                    pass
+            return [ self.column.value ]
+        else:
+            return []
 
-        return df
-
-    def process_value(self, value: str) -> Optional[Iterable]:
+    def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         assert self.compiled_re is not None
+        value = data[self.column.value]
         if value is not None:
             try:
                 if self.multi:
                     return self.compiled_re.findall(str(value))
                 else:
                     if match := self.compiled_re.match(str(value)):
-                        return [op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())]
+                        data.update({
+                            op.name.value: op.datatype.cast_value(val)
+                            for op, val in zip(self.output, match.groups())
+                        })
+                        return data
                     else:
                         logger.info("%s didn't match", repr(value))
             except (TypeError, ValueError) as exc:
@@ -82,68 +75,4 @@ class RegexToolPlugin(PandasTransformSingleToTuplePlugin):
         if self.drop_unmatch:
             return None
         else:
-            return [None] * self.compiled_re.groups
-
-    def series_to_dataframe(self, series: pd.Series) -> pd.DataFrame:
-        # Unmatched rows return a single None, so we can easily drop
-        # them out before doing further processing
-        if self.drop_unmatch:
-            series.dropna(inplace=True)
-
-        if self.multi:
-            series = series.explode()
-
-        return super().series_to_dataframe(series)
-
-
-class RegexReaderPlugin(PandasInputFilesPlugin):
-    name = "Regex Reader"
-    description = "Loads arbitrary data from line-delimited files"
-    additional = """Applies a regular expression to each line to extract fields.
-        If you're trying to read generic CSV or TSV files, use the CSV plugin
-        instead as it handles escaping correctly."""
-    link = "https://countess-project.github.io/CountESS/included-plugins/#regex-reader"
-    version = VERSION
-
-    file_types = [("CSV", "*.csv"), ("TXT", "*.txt")]
-
-    regex = StringParam("Regular Expression", "(.*)")
-    skip = IntegerParam("Skip Lines", 0)
-    output = ArrayParam("Output Columns", OutputColumnsMultiParam("Col"))
-
-    def read_file_to_dataframe(self, filename, file_param, row_limit=None):
-        pdfs = []
-
-        compiled_re = re.compile(self.regex.value)
-
-        while compiled_re.groups > len(self.output.params):
-            self.output.add_row()
-
-        output_parameters = list(self.output)[: compiled_re.groups]
-        columns = [p.name.value or f"column_{n+1}" for n, p in enumerate(output_parameters)]
-
-        records = []
-        with open(filename, "r", encoding="utf-8") as fh:
-            for num, line in enumerate(fh):
-                if num < self.skip:
-                    continue
-                match = compiled_re.match(line)
-                if match:
-                    records.append((output_parameters[n].datatype.cast_value(g) for n, g in enumerate(match.groups())))
-                else:
-                    logger.warning("Row %d did not match", num)
-                if row_limit is not None:
-                    if len(records) >= row_limit or num > 100 * row_limit:
-                        break
-                elif len(records) >= 100000:
-                    pdfs.append(pd.DataFrame.from_records(records, columns=columns))
-                    records = []
-
-        if len(records) > 0:
-            pdfs.append(pd.DataFrame.from_records(records, columns=columns))
-
-        if len(pdfs) == 0:
-            return pd.DataFrame([], columns=columns)
-
-        df = pd.concat(pdfs)
-        return df
+            return data
