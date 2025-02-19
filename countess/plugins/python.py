@@ -3,14 +3,13 @@ import logging
 import math
 import re
 from types import BuiltinFunctionType, FunctionType, ModuleType
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
-import pandas as pd
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, TextParam
-from countess.core.plugins import PandasTransformDictToDictPlugin
+from countess.core.plugins import DuckdbThreadedTransformPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ AVAILABLE_FUNCTIONS: list[str] = sorted(
 )
 
 
-class PythonPlugin(PandasTransformDictToDictPlugin):
+class PythonPlugin(DuckdbThreadedTransformPlugin):
     name = "Python Code"
     description = "Apply python code to each row."
     additional = """
@@ -85,7 +84,11 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
     code_object = None
     code_globals: dict[str, Any] = {"__builtins__": SAFE_BUILTINS, **MATH_FUNCTIONS, **RE_FUNCTIONS, **NUMPY_IMPORTS}
 
-    def process_dict(self, data: dict):
+    def prepare(self, *a) -> None:
+        super().prepare(*a)
+        self.code_object = compile(self.code.value or "", "<PythonPlugin>", mode="exec")
+
+    def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         assert self.code_object is not None
         try:
             exec(self.code_object, CODE_GLOBALS, data)  # pylint: disable=exec-used
@@ -93,25 +96,3 @@ class PythonPlugin(PandasTransformDictToDictPlugin):
             logger.warning("Exception", exc_info=exc)
 
         return dict((k, v) for k, v in data.items() if type(v) in SIMPLE_TYPES or isinstance(v, np.generic))
-
-    def process_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
-        """Override parent class because we a) want to reset
-        the indexes so we can use their values easily and
-        b) we don't need to merge afterwards"""
-
-        # XXX cache this?
-        self.code_object = compile(self.code.value or "", "<PythonPlugin>", mode="exec")
-
-        dataframe = dataframe.reset_index(drop=dataframe.index.names == [None])
-        series = self.dataframe_to_series(dataframe)
-        dataframe = self.series_to_dataframe(series)
-
-        if "__filter" in dataframe.columns:
-            dataframe = dataframe.query("not `__filter`.isnull() and `__filter` not in (False, 0, '')").drop(
-                columns="__filter"
-            )
-
-        if self.dropna:
-            dataframe.dropna(axis=1, how="all", inplace=True)
-
-        return dataframe

@@ -2,12 +2,12 @@ import logging
 
 import biobear
 import duckdb
-from duckdb import DuckDBPyConnection
+import pyarrow
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
 from countess.core.plugins import DuckdbLoadFilePlugin
-from countess.utils.files import clean_filename
+from countess.utils.duckdb import duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
 
@@ -26,29 +26,52 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
 
     min_avg_quality = FloatParam("Minimum Average Quality", 10)
     header_column = BooleanParam("Header Column?", False)
-    filename_column = BooleanParam("Filename Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def load_file(
-        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
-    ) -> duckdb.DuckDBPyRelation:
-        record_batch_reader = biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
-        reader_name = f"r_{file_number}"
-        logger.debug("LoadFastqPlugin.load_file reader_name %s filename %s", reader_name, filename)
-        cursor.register(reader_name, record_batch_reader)
+    def load_file(self, filename: str, file_param: BaseParam) -> pyarrow.RecordBatchReader:
+        return biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
 
-        fields = ["sequence"]
-        group_by = ""
-        params = {}
-        if self.header_column and not self.group:
-            fields.append("name as header")
+    def get_schema(self):
+        r = {"sequence": str}
+        if self.header_column:
+            r["header"] = str
         if self.filename_column:
-            fields.append("$filename as filename")
-            params["filename"] = clean_filename(filename)
+            r["filename"] = str
+        return r
+
+    def post_process(self, ddbc, view):
+        sql = "SELECT sequence"
+        if self.filename_column:
+            sql += ", filename"
         if self.group:
-            fields.append("count(*) as count")
-            group_by = "group by sequence"
-        return cursor.sql(f"select {', '.join(fields)} from {reader_name} {group_by}", params=params)
+            sql += ", COUNT(*) AS count"
+        else:
+            sql += ", name || ' ' || description AS header"
+        sql += " FROM " + view.alias
+
+        if self.min_avg_quality.value:
+            # XXX it would be great to do this as a native
+            # DuckDB function as calling a Python UDF is quite
+            # slow.
+            def _avg_quality(quality: str) -> float:
+                q_bytes = quality.encode("ascii")
+                return sum(q_bytes) / len(q_bytes) - 33
+
+            try:
+                ddbc.create_function(
+                    "fastq_avg_quality", _avg_quality, exception_handling="return_null", side_effects=False
+                )
+            except duckdb.NotImplementedException as exc:
+                assert "'fastq_avg_quality' is already created" in str(exc)
+            sql += " WHERE fastq_avg_quality(quality_scores) >= " + duckdb_escape_literal(self.min_avg_quality.value)
+
+        if self.group:
+            sql += " GROUP BY sequence"
+            if self.filename_column:
+                sql += ", filename"
+
+        logger.debug("LoadFastqPlugin SQL %s", sql)
+        return ddbc.sql(sql)
 
 
 class LoadFastaPlugin(DuckdbLoadFilePlugin):
@@ -63,10 +86,8 @@ class LoadFastaPlugin(DuckdbLoadFilePlugin):
     header_column = StringParam("Header Column", "header")
     filename_column = StringParam("Filename Column", "filename")
 
-    def load_file(
-        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
-    ) -> duckdb.DuckDBPyRelation:
-        record_batch_reader = biobear.connect().read_fasta_file(filename).to_arrow_record_batch_reader()
-        reader_name = f"r_{file_number}"
-        cursor.register(reader_name, record_batch_reader)
-        return cursor.sql(f"select * from {reader_name}")
+    def load_file(self, filename: str, file_param: BaseParam) -> duckdb.DuckDBPyRelation:
+        return biobear.connect().read_fasta_file(filename).to_arrow_record_batch_reader()
+
+    def get_schema(self):
+        return {self.sequence_column.value: str, self.header_column.value: str, self.filename_column.value: str}

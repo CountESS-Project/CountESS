@@ -198,7 +198,7 @@ class TabularDataFrame(tk.Frame):
 
     def refresh(self, new_offset: float = 0):
         # Refreshes the column widgets.
-        assert self.table
+        assert self.table is not None
         assert self.scrollbar
 
         self.offset = max(0, min(self.length - self.height, int(new_offset)))
@@ -230,7 +230,7 @@ class TabularDataFrame(tk.Frame):
         assert self.ddbc is not None
         assert self.table is not None
 
-        if column_num > len(self.table.columns):
+        if not 0 <= column_num < len(self.table.columns):
             column_num = 0
 
         if descending is None and column_num == self.sort_by_col:

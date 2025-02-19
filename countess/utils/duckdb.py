@@ -59,28 +59,14 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
 
 
 def duckdb_combine(ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    """Combine several tables into a new table using UNION ALL BY NAME"""
 
     # can't have a table with no columns, therefore
     # can't combine no inputs.
     if len(sources) == 0:
         return None
 
-    # uses a dict not a set to preserve column order
-    all_columns = list({c: 1 for source in sources for c in source.columns}.keys())
-
-    def _select_clause(source):
-        if source.columns == all_columns:
-            return "*"
-        else:
-            return ", ".join(
-                ("NULL AS " if c not in source.columns else "") + duckdb_escape_identifier(c)
-                for c in all_columns
-            )
-
-    sql = " UNION ALL ".join(
-        f"SELECT {_select_clause(source)} FROM {source.alias}"
-        for source in sources
-    )
+    sql = " UNION ALL BY NAME ".join(f"SELECT * FROM {source.alias}" for source in sources)
 
     logger.debug("duckdb_combine %s", sql)
     return duckdb_source_to_view(ddbc, ddbc.sql(sql))

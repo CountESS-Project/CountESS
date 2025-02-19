@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Optional, Any
+from typing import Any, Optional
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -41,11 +41,11 @@ class RegexToolPlugin(DuckdbThreadedTransformPlugin):
         self.compiled_re = re.compile(self.regex.value)
 
     def add_fields(self):
-        return { op.name.value: op.datatype.get_selected_type() for op in self.output }
+        return {op.name.value: op.datatype.get_selected_type() for op in self.output}
 
     def remove_fields(self, field_names):
         if self.drop_column:
-            return [ self.column.value ]
+            return [self.column.value]
         else:
             return []
 
@@ -58,10 +58,9 @@ class RegexToolPlugin(DuckdbThreadedTransformPlugin):
                     return self.compiled_re.findall(str(value))
                 else:
                     if match := self.compiled_re.match(str(value)):
-                        data.update({
-                            op.name.value: op.datatype.cast_value(val)
-                            for op, val in zip(self.output, match.groups())
-                        })
+                        data.update(
+                            {op.name.value: op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())}
+                        )
                         return data
                     else:
                         logger.info("%s didn't match", repr(value))

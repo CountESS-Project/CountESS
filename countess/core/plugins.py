@@ -29,8 +29,17 @@ import psutil
 import pyarrow
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
-from countess.core.parameters import BaseParam, FileArrayParam, FileParam, HasSubParametersMixin, MultiParam
-from countess.utils.duckdb import duckdb_combine, duckdb_concatenate, duckdb_escape_identifier, duckdb_source_to_view
+from countess.core.parameters import (
+    BaseParam,
+    BooleanParam,
+    FileArrayParam,
+    FileParam,
+    HasSubParametersMixin,
+    MultiParam,
+)
+from countess.utils.duckdb import duckdb_combine, duckdb_escape_identifier, duckdb_escape_literal, duckdb_source_to_view
+from countess.utils.files import clean_filename
+from countess.utils.pyarrow import python_type_to_arrow_dtype
 
 PRERUN_ROW_LIMIT: int = 100000
 
@@ -173,6 +182,7 @@ class LoadFileMultiParam(MultiParam):
 
 class DuckdbLoadFilePlugin(DuckdbInputPlugin):
     files = FileArrayParam("Files", LoadFileMultiParam("File"))
+    filename_column = BooleanParam("Filename Column?", False)
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
 
     def __init__(self, *a, **k):
@@ -185,23 +195,47 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
                 yield filename, file_param
 
     def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
-        filenames_and_params = list(self.filenames_and_params())
+        def _load(tn_fn_fp):
+            # This may be run in a different thread, so it needs to create a cursor
+            # to be thread-safe, and it uses a table rather than
+            # a view to store the data: views are not (currently) shared across cursors
+            tablename, filename, file_param = tn_fn_fp
+            cursor = ddbc.cursor()
+            cursor.register(tablename + "_x", self.load_file(filename, file_param))
+            cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
+            if self.filename_column:
+                filename_literal = duckdb_escape_literal(clean_filename(filename))
+                cursor.sql(f"CREATE TABLE {tablename} AS (select *, {filename_literal} AS filename FROM {tablename}_x)")
+            else:
+                cursor.sql(f"CREATE TABLE {tablename} AS (select * FROM {tablename}_x)")
 
-        cursor = ddbc
-        return duckdb_source_to_view(
-            ddbc,
-            duckdb_concatenate(
-                [
-                    self.load_file(cursor, filename, file_param, num)
-                    for num, (filename, file_param) in enumerate(filenames_and_params)
-                ]
-            ),
-        )
+            return tablename
+
+        tablenames_filenames_and_params = [
+            (f"t_{id(self)}_{num}", filename, file_param)
+            for num, (filename, file_param) in enumerate(self.filenames_and_params())
+        ]
+        if len(tablenames_filenames_and_params) == 0:
+            return None
+        elif len(tablenames_filenames_and_params) > 1:
+            with multiprocessing.pool.ThreadPool() as pool:
+                tablenames = list(pool.imap_unordered(_load, tablenames_filenames_and_params))
+
+            return self.post_process(ddbc, duckdb_combine(ddbc, [ddbc.table(tn) for tn in tablenames]))
+        else:
+            tablename = _load(tablenames_filenames_and_params[0])
+            return self.post_process(ddbc, ddbc.table(tablename))
+
+    def get_schema(self):
+        return {}
 
     def load_file(
-        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
-    ) -> DuckDBPyRelation:
+        self, filename: str, file_param: BaseParam
+    ) -> Union[pyarrow.Table, pyarrow.RecordBatchReader, Iterable[pyarrow.RecordBatch]]:
         raise NotImplementedError(f"{self.__class__}.load_file")
+
+    def post_process(self, ddbc, view):
+        return view
 
 
 class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
@@ -248,17 +282,6 @@ class DuckdbFilterPlugin(DuckdbSimplePlugin):
         raise NotImplementedError(f"{self.__class__}.transform")
 
 
-def _python_type_to_arrow_dtype(ttype: type) -> pyarrow.DataType:
-    if ttype in (float, decimal.Decimal):
-        return pyarrow.float64()
-    elif ttype is int:
-        return pyarrow.int64()
-    elif ttype is bool:
-        return pyarrow.bool8()
-    else:
-        return pyarrow.string()
-
-
 class DuckdbTransformPlugin(DuckdbSimplePlugin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -280,7 +303,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
                 schema = schema.remove(schema.get_field_index(field_name))
         for field_name, ttype in self.add_fields().items():
             if field_name and ttype is not None:
-                schema = schema.append(pyarrow.field(field_name, _python_type_to_arrow_dtype(ttype)))
+                schema = schema.append(pyarrow.field(field_name, python_type_to_arrow_dtype(ttype)))
         return schema
 
     def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:

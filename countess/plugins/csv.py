@@ -6,6 +6,8 @@ from io import BufferedWriter, BytesIO
 from typing import List, Optional, Sequence, Tuple, Union
 
 import duckdb
+import pyarrow
+import pyarrow.csv
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
@@ -20,8 +22,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin
-from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
-from countess.utils.files import clean_filename
+from countess.utils.pyarrow import python_type_to_arrow_dtype
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz"]),
@@ -51,39 +52,15 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
 
     delimiter = ChoiceParam("Delimiter", ",", choices=CSV_DELIMITER_CHOICES.keys())
     header = BooleanParam("CSV file has header row?", True)
-    filename_column = StringParam("Filename Column", "")
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
-    def load_file(
-        self, cursor: DuckDBPyConnection, filename: str, file_param: BaseParam, file_number: int
-    ) -> duckdb.DuckDBPyRelation:
-        if self.header and len(self.columns) == 0:
-            table = cursor.read_csv(
-                filename,
-                header=True,
-                delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value],
-            )
-            for column_name, column_dtype in zip(table.columns, table.dtypes):
-                column_param = self.columns.add_row()
-                column_param.name.value = column_name
-                column_param.type.value = str(column_dtype)
-        else:
-            table = cursor.read_csv(
-                filename,
-                header=False,
-                skiprows=1 if self.header else 0,
-                delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value],
-                columns={str(c.name): "VARCHAR" if c.type.is_none() else str(c.type) for c in self.columns}
-                if self.columns
-                else None,
-            )
-
-        if self.filename_column:
-            escaped_filename = duckdb_escape_literal(clean_filename(filename))
-            escaped_column = duckdb_escape_identifier(self.filename_column.value)
-            table = table.project(f"*, {escaped_filename} AS {escaped_column}")
-
-        return table
+    def load_file(self, filename: str, file_param: BaseParam) -> duckdb.DuckDBPyRelation:
+        read_options = pyarrow.csv.ReadOptions(column_names=[c.name.value for c in self.columns])
+        parse_options = pyarrow.csv.ParseOptions(delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value])
+        convert_options = pyarrow.csv.ConvertOptions(
+            column_types={c.name.value: python_type_to_arrow_dtype(c.type.get_selected_type()) for c in self.columns}
+        )
+        return pyarrow.csv.read_csv(filename, read_options, parse_options, convert_options)
 
 
 class SaveCsvPlugin(DuckdbSaveFilePlugin):
