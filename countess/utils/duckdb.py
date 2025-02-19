@@ -58,34 +58,32 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
         raise TypeError("can't escape literal of type %s" % type(literal))
 
 
-def duckdb_add_null_columns(table: DuckDBPyRelation, columns: List[str]) -> DuckDBPyRelation:
-    return table.project(
-        ", ".join(("NULL AS " if c not in table.columns else "") + duckdb_escape_identifier(c) for c in columns)
-    )
+def duckdb_combine(ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
 
-
-def duckdb_concatenate(tables: List[DuckDBPyRelation]) -> DuckDBPyRelation:
-    # can't have an no-columns table, therefore can't concatenate 0 tables.
-    assert len(tables)
+    # can't have a table with no columns, therefore
+    # can't combine no inputs.
+    if len(sources) == 0:
+        return None
 
     # uses a dict not a set to preserve column order
-    all_columns = list({c: 1 for t in tables for c in t.columns}.keys())
-    logger.debug("duckdb_concatenate all_columns %s", all_columns)
+    all_columns = list({c: 1 for source in sources for c in source.columns}.keys())
 
-    result = duckdb_add_null_columns(tables[0], all_columns)
-    for table in tables[1:]:
-        result = result.union(duckdb_add_null_columns(table, all_columns))
+    def _select_clause(source):
+        if source.columns == all_columns:
+            return "*"
+        else:
+            return ", ".join(
+                ("NULL AS " if c not in source.columns else "") + duckdb_escape_identifier(c)
+                for c in all_columns
+            )
 
-    return result
+    sql = " UNION ALL ".join(
+        f"SELECT {_select_clause(source)} FROM {source.alias}"
+        for source in sources
+    )
 
-
-def duckdb_combine(ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
-    if len(sources) > 1:
-        return duckdb_source_to_view(ddbc, duckdb_concatenate(sources))
-    elif len(sources) == 1:
-        return sources[0]
-    else:
-        return None
+    logger.debug("duckdb_combine %s", sql)
+    return duckdb_source_to_view(ddbc, ddbc.sql(sql))
 
 
 def duckdb_source_to_view(cursor: DuckDBPyConnection, source: DuckDBPyRelation, view_name: Optional[str] = None):
