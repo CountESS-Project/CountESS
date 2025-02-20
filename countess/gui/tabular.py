@@ -14,6 +14,7 @@ from countess.utils.duckdb import (
     duckdb_dtype_is_numeric,
     duckdb_escape_identifier,
     duckdb_escape_literal,
+    duckdb_dtype_to_datatype_choice,
 )
 
 logger = logging.getLogger(__name__)
@@ -148,13 +149,10 @@ class TabularDataFrame(tk.Frame):
             label.destroy()
         self.labels = []
         for num, (name, dtype) in enumerate(zip(column_names, column_dtypes)):
-            if type(name) is tuple:
-                name = "\n".join([str(n) for n in name])
-            else:
-                name = str(name)
+            label_text = f"{name}\n{duckdb_dtype_to_datatype_choice(dtype)}"
             column_label = tk.Label(
                 self.label_frame,
-                text=f"{name}\n{dtype}",
+                text=label_text,
                 image=get_icon(self, "sort_un"),
                 compound=tk.RIGHT,
             )
