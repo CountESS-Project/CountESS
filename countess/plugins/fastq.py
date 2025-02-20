@@ -1,14 +1,12 @@
 import logging
-import secrets
+from typing import Iterable
 
 import biobear
 import duckdb
-import pyarrow
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
 from countess.core.plugins import DuckdbLoadFilePlugin
-from countess.utils.duckdb import duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +38,10 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
     ) -> duckdb.DuckDBPyRelation:
-        # Convert the RecordBatchReader to a DuckDBPyRelation
-        reader_name = "t_" + secrets.token_hex(10)
-        cursor.register(reader_name, biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader())
-        rel = cursor.sql(f"SELECT * FROM {reader_name}")
+        # Open the file, convert it to a RecordBatchReader and then
+        # wrap that up as a DuckDBPyRelation so we can filter it.
+        reader = biobear.connect().read_fastq_file(filename)
+        rel = cursor.from_arrow(reader.to_arrow_record_batch_reader())
 
         if self.min_avg_quality > 0:
             try:
@@ -58,15 +56,18 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
             rel = rel.aggregate("sequence, count(*) as count")
         elif self.header_column:
             rel = rel.project("sequence, name || ' ' || description as header")
+        else:
+            rel = rel.project("sequence")
         return rel
 
-    def get_schema(self):
-        r = {"sequence": str}
-        if self.header_column:
-            r["header"] = str
-        if self.filename_column:
-            r["filename"] = str
-        return r
+    def combine(
+        self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
+    ) -> duckdb.DuckDBPyRelation:
+        combined_view = super().combine(ddbc, tables)
+        if self.filename_column or self.header_column:
+            return combined_view
+        else:
+            return combined_view.aggregate("sequence, sum(count) as count")
 
 
 class LoadFastaPlugin(DuckdbLoadFilePlugin):
@@ -83,6 +84,3 @@ class LoadFastaPlugin(DuckdbLoadFilePlugin):
 
     def load_file(self, filename: str, file_param: BaseParam) -> duckdb.DuckDBPyRelation:
         return biobear.connect().read_fasta_file(filename).to_arrow_record_batch_reader()
-
-    def get_schema(self):
-        return {self.sequence_column.value: str, self.header_column.value: str, self.filename_column.value: str}

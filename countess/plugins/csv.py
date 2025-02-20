@@ -3,7 +3,7 @@ import csv
 import gzip
 import logging
 from io import BufferedWriter, BytesIO
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union, Iterable
 
 import duckdb
 import pyarrow
@@ -23,6 +23,7 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin
 from countess.utils.pyarrow import python_type_to_arrow_dtype
+from countess.utils.duckdb import duckdb_dtype_to_datatype_choice
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz"]),
@@ -54,13 +55,40 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
     header = BooleanParam("CSV file has header row?", True)
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
-    def load_file(self, filename: str, file_param: BaseParam) -> duckdb.DuckDBPyRelation:
-        read_options = pyarrow.csv.ReadOptions(column_names=[c.name.value for c in self.columns])
+    def load_file(self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam) -> duckdb.DuckDBPyRelation:
+        if len(self.columns):
+            column_names = [c.name.value for c in self.columns]
+            read_options = pyarrow.csv.ReadOptions(
+                column_names=column_names,
+                skip_rows=1
+            )
+            convert_options = pyarrow.csv.ConvertOptions(
+                column_types = { c.name.value: python_type_to_arrow_dtype(c.type.get_selected_type()) for c in self.columns }
+            )
+        else:
+            read_options = None
+            convert_options = None
+
         parse_options = pyarrow.csv.ParseOptions(delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value])
-        convert_options = pyarrow.csv.ConvertOptions(
-            column_types={c.name.value: python_type_to_arrow_dtype(c.type.get_selected_type()) for c in self.columns}
-        )
-        return pyarrow.csv.read_csv(filename, read_options, parse_options, convert_options)
+
+        try:
+            t = pyarrow.csv.read_csv(filename, read_options, parse_options, convert_options)
+        except pyarrow.ArrowInvalid:
+            t = pyarrow.csv.read_csv(filename, None, parse_options, None)
+
+        return cursor.from_arrow(t)
+
+    def combine(self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
+    ) -> duckdb.DuckDBPyRelation:
+        combined = super().combine(ddbc, tables)
+        for num, (column, dtype) in enumerate(zip(combined.columns, combined.dtypes)):
+            if num >= len(self.columns):
+                new_param = self.columns.add_row()
+                new_param.name.value = column
+                new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
+        return combined
+
+
 
 
 class SaveCsvPlugin(DuckdbSaveFilePlugin):

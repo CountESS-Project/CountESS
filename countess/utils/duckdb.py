@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 # XXX This stuff would probably be better as a DuckdbWrapper class
 
 
+def duckdb_dtype_is_boolean(dtype: DuckDBPyType) -> bool:
+    return dtype.id == 'boolean'
+
 def duckdb_dtype_is_integer(dtype: DuckDBPyType) -> bool:
     return dtype.id in (
         "bigint",
@@ -30,6 +33,17 @@ def duckdb_dtype_is_integer(dtype: DuckDBPyType) -> bool:
 def duckdb_dtype_is_numeric(dtype: DuckDBPyType) -> bool:
     return dtype.id in ("float", "decimal", "double") or duckdb_dtype_is_integer(dtype)
 
+
+def duckdb_dtype_to_datatype_choice(dtype: DuckDBPyType) -> str:
+    """Convert a duckdb dtype to make the choices of a DataTypeChoicesParam"""
+    if duckdb_dtype_is_boolean(dtype):
+        return "BOOLEAN"
+    if duckdb_dtype_is_integer(dtype):
+        return "INTEGER"
+    elif duckdb_dtype_is_numeric(dtype):
+        return "FLOAT"
+    else:
+        return "STRING"
 
 def duckdb_escape_identifier(identifier: str) -> str:
     if identifier is None:
