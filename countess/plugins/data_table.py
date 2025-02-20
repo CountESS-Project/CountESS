@@ -5,7 +5,6 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess import VERSION
 from countess.core.parameters import (
     ArrayParam,
-    BooleanParam,
     DataTypeChoiceParam,
     MultiParam,
     StringParam,
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 class _ColumnsMultiParam(MultiParam):
     name = StringParam("Name")
     type = DataTypeChoiceParam("Type")
-    index = BooleanParam("Index?")
 
 
 class DataTablePlugin(DuckdbInputPlugin):
