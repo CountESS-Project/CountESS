@@ -21,6 +21,7 @@ class PivotPlugin(DuckdbSimplePlugin):
 
     columns = PerColumnArrayParam("Columns", ChoiceParam("Role", "Drop", choices=["Index", "Pivot", "Expand", "Drop"]))
     aggfunc = ChoiceParam("Aggregation Function", "sum", choices=["sum", "mean", "median", "min", "max"])
+    default_0 = BooleanParam("Default value 0?", False)
     short_names = BooleanParam("Short Output Names?", False)
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
@@ -64,10 +65,14 @@ class PivotPlugin(DuckdbSimplePlugin):
 
         logger.debug("PivotPlugin.execute query_str %s", query_str)
 
+        project_str = f"COLUMNS('(.*)_{pivot_char}(.*)')"
+        if self.default_0:
+            project_str = f"COALESCE({project_str}, 0)"
+
         if self.short_names:
-            project_str = f"COLUMNS('(.*)_{pivot_char}(.*)') AS '\\2_\\1'"
+            project_str += " AS '\\2_\\1'"
         else:
-            project_str = f"COLUMNS('(.*)_{pivot_char}(.*)') AS '\\2__\\1'"
+            project_str += " AS '\\2__\\1'"
 
         if index_cols:
             project_str = (", ".join([duckdb_escape_identifier(ic) for ic in index_cols])) + ", " + project_str
