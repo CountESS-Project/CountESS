@@ -475,7 +475,7 @@ class ChoiceParam(ScalarWithOperatorsParam):
 
 class DataTypeChoiceParam(ChoiceParam):
     DATA_TYPES: Mapping[str, tuple[type, Any, Type[ScalarParam]]] = {
-        "VARCHAR": (str, "", StringParam),
+        "STRING": (str, "", StringParam),
         "FLOAT": (float, math.nan, FloatParam),
         "INTEGER": (int, 0, IntegerParam),
         "BOOLEAN": (bool, False, BooleanParam),

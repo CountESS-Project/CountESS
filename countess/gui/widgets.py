@@ -39,6 +39,7 @@ def delete_button(parent: tk.Widget, *args, **kwargs) -> tk.Button:
 
 class BooleanCheckbox(tk.Button):
     def __init__(self, *args, **kwargs):
+        kwargs.setdefault('width', 100)
         super().__init__(*args, **kwargs)
 
     def set_value(self, value: Optional[bool]):
