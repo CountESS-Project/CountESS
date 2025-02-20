@@ -201,14 +201,12 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
             # a view to store the data: views are not (currently) shared across cursors
             tablename, filename, file_param = tn_fn_fp
             cursor = ddbc.cursor()
-            cursor.register(tablename + "_x", self.load_file(filename, file_param))
-            cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
+            rel = self.load_file(cursor, filename, file_param)
             if self.filename_column:
                 filename_literal = duckdb_escape_literal(clean_filename(filename))
-                cursor.sql(f"CREATE TABLE {tablename} AS (select *, {filename_literal} AS filename FROM {tablename}_x)")
-            else:
-                cursor.sql(f"CREATE TABLE {tablename} AS (select * FROM {tablename}_x)")
-
+                rel = rel.project(f"*, {filename_literal} as filename")
+            cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
+            rel.create(tablename)
             return tablename
 
         tablenames_filenames_and_params = [
@@ -230,7 +228,7 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         return {}
 
     def load_file(
-        self, filename: str, file_param: BaseParam
+            self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
     ) -> Union[pyarrow.Table, pyarrow.RecordBatchReader, Iterable[pyarrow.RecordBatch]]:
         raise NotImplementedError(f"{self.__class__}.load_file")
 

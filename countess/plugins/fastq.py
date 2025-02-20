@@ -1,4 +1,5 @@
 import logging
+import secrets
 
 import biobear
 import duckdb
@@ -28,8 +29,18 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
     header_column = BooleanParam("Header Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def load_file(self, filename: str, file_param: BaseParam) -> pyarrow.RecordBatchReader:
-        return biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
+    def load_file(self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam) -> pyarrow.RecordBatchReader:
+        reader_name = "t_" + secrets.token_hex(10)
+        cursor.register(
+            reader_name,
+            biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
+        )
+        rel = cursor.sql(f"SELECT * FROM {reader_name}")
+        if self.group:
+            rel = rel.aggregate("sequence, count(*) as count")
+        elif self.header_column:
+            rel = rel.project("sequence, name || ' ' || description as header")
+        return rel
 
     def get_schema(self):
         r = {"sequence": str}
@@ -39,7 +50,7 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
             r["filename"] = str
         return r
 
-    def post_process(self, ddbc, view):
+    def x_post_process(self, ddbc, view):
         sql = "SELECT sequence"
         if self.filename_column:
             sql += ", filename"
