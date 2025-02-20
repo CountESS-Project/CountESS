@@ -20,7 +20,9 @@ import importlib
 import importlib.metadata
 import logging
 import multiprocessing
+import multiprocessing.pool
 from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
+import decimal
 
 import duckdb
 import psutil
@@ -196,7 +198,7 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         def _load(tn_fn_fp):
             # This may be run in a different thread, so it needs to create a cursor
             # to be thread-safe, and it uses a table rather than
-            # a view to store the data: views are not (currently) shared across cursors
+            # a view to store the data once it has been filtered.
             tablename, filename, file_param = tn_fn_fp
             cursor = ddbc.cursor()
             rel = self.load_file(cursor, filename, file_param)
@@ -217,18 +219,20 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
             with multiprocessing.pool.ThreadPool() as pool:
                 tablenames = list(pool.imap_unordered(_load, tablenames_filenames_and_params))
 
-            return duckdb_combine(ddbc, [ddbc.table(tn) for tn in tablenames])
+            return self.combine(ddbc, [ddbc.table(tn) for tn in tablenames])
         else:
             tablename = _load(tablenames_filenames_and_params[0])
-            return ddbc.table(tablename)
-
-    def get_schema(self):
-        return {}
+            return self.combine(ddbc, [ddbc.table(tablename)])
 
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
     ) -> Union[pyarrow.Table, pyarrow.RecordBatchReader, Iterable[pyarrow.RecordBatch]]:
         raise NotImplementedError(f"{self.__class__}.load_file")
+
+    def combine(
+        self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
+    ) -> duckdb.DuckDBPyRelation:
+        return duckdb_combine(ddbc, tables)
 
 
 class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
@@ -290,7 +294,6 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         return {}
 
     def fix_schema(self, schema: pyarrow.Schema) -> pyarrow.Schema:
-        logger.debug("DuckdbTransformPlugin.fix_schema in %s", schema.to_string())
         for field_name in self.remove_fields(schema.names):
             if field_name in schema.names:
                 schema = schema.remove(schema.get_field_index(field_name))
