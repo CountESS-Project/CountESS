@@ -13,6 +13,14 @@ from countess.utils.duckdb import duckdb_escape_literal
 logger = logging.getLogger(__name__)
 
 
+# UDF for calculating average quality so it can be filtered.
+# XXX it would be great to do this as a native DuckDB function
+# as calling a Python UDF is quite slow.
+def _fastq_avg_quality(quality: str) -> float:
+    q_bytes = quality.encode("ascii")
+    return sum(q_bytes) / len(q_bytes) - 33
+
+
 class LoadFastqPlugin(DuckdbLoadFilePlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
     with count=1 and then grouping by sequence and summing counts.  It supports counting
@@ -29,13 +37,23 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
     header_column = BooleanParam("Header Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
-    def load_file(self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam) -> pyarrow.RecordBatchReader:
+    def load_file(
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+    ) -> duckdb.DuckDBPyRelation:
+        # Convert the RecordBatchReader to a DuckDBPyRelation
         reader_name = "t_" + secrets.token_hex(10)
-        cursor.register(
-            reader_name,
-            biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader()
-        )
+        cursor.register(reader_name, biobear.connect().read_fastq_file(filename).to_arrow_record_batch_reader())
         rel = cursor.sql(f"SELECT * FROM {reader_name}")
+
+        if self.min_avg_quality > 0:
+            try:
+                cursor.create_function(
+                    "fastq_avg_quality", _fastq_avg_quality, exception_handling="return_null", side_effects=False
+                )
+            except duckdb.CatalogException as exc:
+                assert "fastq_avg_quality" in str(exc)
+            rel = rel.filter("fastq_avg_quality(quality_scores) >= %f" % self.min_avg_quality.value)
+
         if self.group:
             rel = rel.aggregate("sequence, count(*) as count")
         elif self.header_column:
@@ -49,40 +67,6 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
         if self.filename_column:
             r["filename"] = str
         return r
-
-    def x_post_process(self, ddbc, view):
-        sql = "SELECT sequence"
-        if self.filename_column:
-            sql += ", filename"
-        if self.group:
-            sql += ", COUNT(*) AS count"
-        else:
-            sql += ", name || ' ' || description AS header"
-        sql += " FROM " + view.alias
-
-        if self.min_avg_quality.value:
-            # XXX it would be great to do this as a native
-            # DuckDB function as calling a Python UDF is quite
-            # slow.
-            def _avg_quality(quality: str) -> float:
-                q_bytes = quality.encode("ascii")
-                return sum(q_bytes) / len(q_bytes) - 33
-
-            try:
-                ddbc.create_function(
-                    "fastq_avg_quality", _avg_quality, exception_handling="return_null", side_effects=False
-                )
-            except duckdb.NotImplementedException as exc:
-                assert "'fastq_avg_quality' is already created" in str(exc)
-            sql += " WHERE fastq_avg_quality(quality_scores) >= " + duckdb_escape_literal(self.min_avg_quality.value)
-
-        if self.group:
-            sql += " GROUP BY sequence"
-            if self.filename_column:
-                sql += ", filename"
-
-        logger.debug("LoadFastqPlugin SQL %s", sql)
-        return ddbc.sql(sql)
 
 
 class LoadFastaPlugin(DuckdbLoadFilePlugin):

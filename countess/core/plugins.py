@@ -14,14 +14,12 @@ Plugin lifecycle:
     * Call Plugin.prerun() to generate new output
 """
 
-import decimal
 import glob
 import hashlib
 import importlib
 import importlib.metadata
 import logging
 import multiprocessing
-from multiprocessing.pool import ThreadPool
 from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import duckdb
@@ -37,7 +35,7 @@ from countess.core.parameters import (
     HasSubParametersMixin,
     MultiParam,
 )
-from countess.utils.duckdb import duckdb_combine, duckdb_escape_identifier, duckdb_escape_literal, duckdb_source_to_view
+from countess.utils.duckdb import duckdb_combine, duckdb_escape_identifier, duckdb_escape_literal
 from countess.utils.files import clean_filename
 from countess.utils.pyarrow import python_type_to_arrow_dtype
 
@@ -219,21 +217,18 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
             with multiprocessing.pool.ThreadPool() as pool:
                 tablenames = list(pool.imap_unordered(_load, tablenames_filenames_and_params))
 
-            return self.post_process(ddbc, duckdb_combine(ddbc, [ddbc.table(tn) for tn in tablenames]))
+            return duckdb_combine(ddbc, [ddbc.table(tn) for tn in tablenames])
         else:
             tablename = _load(tablenames_filenames_and_params[0])
-            return self.post_process(ddbc, ddbc.table(tablename))
+            return ddbc.table(tablename)
 
     def get_schema(self):
         return {}
 
     def load_file(
-            self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
     ) -> Union[pyarrow.Table, pyarrow.RecordBatchReader, Iterable[pyarrow.RecordBatch]]:
         raise NotImplementedError(f"{self.__class__}.load_file")
-
-    def post_process(self, ddbc, view):
-        return view
 
 
 class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
@@ -331,6 +326,9 @@ class DuckdbThreadedTransformPlugin(DuckdbTransformPlugin):
             ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
         return ddbc.view(self.view_name)
 
+    def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
+        raise NotImplementedError(f"{self.__class__}.transform")
+
 
 class DuckdbParallelTransformPlugin(DuckdbTransformPlugin):
     def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
@@ -338,3 +336,6 @@ class DuckdbParallelTransformPlugin(DuckdbTransformPlugin):
             reader = self.get_reader(source)
             ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
         return ddbc.view(self.view_name)
+
+    def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
+        raise NotImplementedError(f"{self.__class__}.transform")
