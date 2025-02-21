@@ -14,10 +14,45 @@ from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_litera
 logger = logging.getLogger(__name__)
 
 UNOPS = {ast.UAdd: "+", ast.USub: "-"}
-BINOPS = {ast.Add: "add", ast.Mult: "multiply", ast.Div: "divide", ast.Sub: "subtract", ast.FloorDiv: "fdiv", ast.Mod: "fmod", ast.Pow: "pow"}
-FUNCOPS = {"abs", "len", "sin", "cos", "tan", "sqrt", "log", "log2", "log10", "pow", "exp", "concat", "least", "greatest", "floor", "ceil" }
-LISTOPS = {"sum": "list_sum", "product": "list_product", "avg": "list_avg", "median": "list_median", "var": "list_var_pop", "std": "list_stddev_pop", "var_samp": "list_var_samp", "std_samp": "list_stddev_samp"}
+BINOPS = {
+    ast.Add: "add",
+    ast.Mult: "multiply",
+    ast.Div: "divide",
+    ast.Sub: "subtract",
+    ast.FloorDiv: "fdiv",
+    ast.Mod: "fmod",
+    ast.Pow: "pow",
+}
+FUNCOPS = {
+    "abs",
+    "len",
+    "sin",
+    "cos",
+    "tan",
+    "sqrt",
+    "log",
+    "log2",
+    "log10",
+    "pow",
+    "exp",
+    "concat",
+    "least",
+    "greatest",
+    "floor",
+    "ceil",
+}
+LISTOPS = {
+    "sum": "list_sum",
+    "product": "list_product",
+    "avg": "list_avg",
+    "median": "list_median",
+    "var": "list_var_pop",
+    "std": "list_stddev_pop",
+    "var_samp": "list_var_samp",
+    "std_samp": "list_stddev_samp",
+}
 COMPOPS = {ast.Eq: "=", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">="}
+
 
 def _transmogrify(ast_node):
     """Transform an AST node back into a string which can be parsed by DuckDB's expression
@@ -38,10 +73,7 @@ def _transmogrify(ast_node):
         return f"{func}({left}, {right})"
     elif type(ast_node) is ast.Compare and all(type(op) in COMPOPS for op in ast_node.ops):
         args = [_transmogrify(x) for x in [ast_node.left] + ast_node.comparators]
-        comps = [
-            args[num] + COMPOPS[type(op)] + args[num+1]
-            for num, op in enumerate(ast_node.ops)
-        ]
+        comps = [args[num] + COMPOPS[type(op)] + args[num + 1] for num, op in enumerate(ast_node.ops)]
         return "(" + (" AND ".join(comps)) + ")"
     elif type(ast_node) is ast.IfExp:
         expr1 = _transmogrify(ast_node.test)
@@ -73,7 +105,9 @@ class ExpressionPlugin(DuckdbSimplePlugin):
         Available operators: + - * ** / //
         
         Available functions:
-    """ + " ".join(sorted(list(FUNCOPS) + list(LISTOPS.keys())))
+    """ + " ".join(
+        sorted(list(FUNCOPS) + list(LISTOPS.keys()))
+    )
 
     version = VERSION
 
@@ -104,12 +138,9 @@ class ExpressionPlugin(DuckdbSimplePlugin):
                 logger.debug("Bad AST Node: %s %s", ast_node, exc)
 
     def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+        old_columns = [duckdb_escape_identifier(c) for c in source.columns if c not in self.projection]
+        new_columns = [v + " AS " + duckdb_escape_identifier(k) for k, v in self.projection.items() if v != "NULL"]
+        projection = ", ".join( old_columns + new_columns )
 
-        sql = ','.join([
-            duckdb_escape_identifier(c) for c in source.columns if c not in self.projection
-        ] + [
-            v + " AS " + duckdb_escape_identifier(k) for k, v in self.projection.items() if v != "NULL"
-        ])
-
-        logger.debug("ExpressionPlugin.execute projection %s", sql)
-        return source.project(sql)
+        logger.debug("ExpressionPlugin.execute projection %s", projection)
+        return source.project(projection)
