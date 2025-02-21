@@ -99,7 +99,7 @@ class ExpressionPlugin(DuckdbSimplePlugin):
     additional = """
         Expressions are applied to each row.  Syntax is python-like, but to concatenate strings,
         use 'concat' function.  For selection use python-like "a if b else c".  To remove a column,
-        set it to constant None.
+        set it to constant None.   Set a variable '__filter' to False to remove rows.
 
         Available operators: + - * ** / //
         
@@ -139,8 +139,15 @@ class ExpressionPlugin(DuckdbSimplePlugin):
     def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
         assert self.projection is not None
         old_columns = [duckdb_escape_identifier(c) for c in source.columns if c not in self.projection]
-        new_columns = [v + " AS " + duckdb_escape_identifier(k) for k, v in self.projection.items() if v != "NULL"]
+        new_columns = [
+            v + " AS " + duckdb_escape_identifier(k)
+            for k, v in self.projection.items()
+            if v != "NULL" and k != "__filter"
+        ]
         projection = ", ".join(old_columns + new_columns)
 
         logger.debug("ExpressionPlugin.execute projection %s", projection)
-        return source.project(projection)
+        if "__filter" in self.projection:
+            return source.project(projection).filter(self.projection["__filter"])
+        else:
+            return source.project(projection)
