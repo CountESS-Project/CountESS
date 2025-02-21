@@ -12,9 +12,9 @@ from countess.gui.widgets import ResizingFrame, copy_to_clipboard, get_icon
 from countess.utils.duckdb import (
     duckdb_dtype_is_integer,
     duckdb_dtype_is_numeric,
+    duckdb_dtype_to_datatype_choice,
     duckdb_escape_identifier,
     duckdb_escape_literal,
-    duckdb_dtype_to_datatype_choice,
 )
 
 logger = logging.getLogger(__name__)
@@ -201,7 +201,6 @@ class TabularDataFrame(tk.Frame):
 
         self.offset = max(0, min(self.length - self.height, int(new_offset)))
 
-        logger.debug("TabularDataFrame.refresh %s %d %d", self.table_order, self.offset, self.height)
         table = self.table.order(self.table_order) if self.table_order else self.table
         rows = table.limit(self.height, offset=self.offset).fetchall()
 
