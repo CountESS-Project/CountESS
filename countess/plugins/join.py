@@ -23,7 +23,7 @@ class JoinPlugin(DuckdbPlugin):
     """Joins DuckDB tables"""
 
     name = "Join"
-    description = "Joins two Pandas Dataframes by indexes or columns"
+    description = "Joins by indexes or columns"
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#join"
 

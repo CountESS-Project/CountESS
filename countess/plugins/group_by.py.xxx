@@ -1,0 +1,95 @@
+from typing import Iterable, List, Optional, Dict
+
+import pandas as pd
+import numpy as np
+
+from countess import VERSION
+from countess.core.logger import Logger
+from countess.core.parameters import BooleanParam, PerColumnMultiParam, TabularMultiParam
+from countess.core.plugins import PandasProcessPlugin
+from countess.utils.pandas import get_all_columns
+
+def _column_renamer(col):
+    if isinstance(col, tuple):
+        if col[-1] == "first":
+            return "__".join(col[:-1])
+        else:
+            return "__".join(col)
+    return col
+
+
+class GroupByPlugin(PandasProcessPlugin):
+    """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
+
+    name = "Group By"
+    description = "Group records by column(s) and calculate aggregates"
+    version = VERSION
+
+    input_columns: Dict[str, np.dtype] = {}
+
+    parameters = {
+        "columns": PerColumnMultiParam(
+            "Columns",
+            TabularMultiParam(
+                "Fnord",
+                {
+                    "index": BooleanParam("Index"),
+                    "count": BooleanParam("Count"),
+                    "min": BooleanParam("Min"),
+                    "max": BooleanParam("Max"),
+                    "sum": BooleanParam("Sum"),
+                    "mean": BooleanParam("Mean"),
+                },
+            ),
+        ),
+        "join": BooleanParam("Join Back?"),
+    }
+
+    dataframes: Optional[List[pd.DataFrame]] = None
+
+    def prepare(self, *_):
+        self.dataframes = []
+
+    def process(self, data: pd.DataFrame, source: str, logger: Logger) -> None:
+        # XXX can do this in two stages
+        assert self.dataframes is not None
+        self.dataframes.append(data)
+        self.input_columns.update(get_all_columns(data))
+        return []
+
+    def finalize(self, logger: Logger) -> Iterable[pd.DataFrame]:
+        assert isinstance(self.parameters["columns"], PerColumnMultiParam)
+        assert self.dataframes
+        params_by_column_name = self.parameters["columns"].params.items()
+        index_cols = [
+            col
+            for col, param in params_by_column_name
+            for k, pp in param.params.items()
+            if pp.value and k == 'index'
+        ]
+        agg_ops = dict(
+            (
+                col,
+                [k for k, pp in col_param.params.items() if pp.value and k != "index"],
+            )
+            for col, col_param in params_by_column_name
+            if any(pp.value for k, pp in col_param.params.items() if k != "index")
+        )
+
+        data_in = pd.concat(self.dataframes)
+
+        print(f"INDEX_COLS {index_cols}")
+        print(f"AGG_OPS {agg_ops}")
+
+        try:
+            data_out = data_in.groupby(index_cols or data_in.index).agg(agg_ops)
+            if self.parameters["join"].value:
+                yield data_in.merge(data_out, how="left", left_on=index_cols, right_on=index_cols)
+            else:
+                yield data_out
+        except ValueError:
+            pass
+
+        for p in self.parameters.values():
+            p.set_column_choices(self.input_columns.keys())
+

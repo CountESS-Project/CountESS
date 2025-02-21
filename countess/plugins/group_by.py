@@ -35,7 +35,7 @@ def _op(op_name, col_name):
 
 
 class GroupByPlugin(DuckdbSimplePlugin):
-    """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
+    """Groups by an arbitrary column and rolls up rows"""
 
     name = "Group By"
     description = "Group records by column(s) and calculate aggregates"

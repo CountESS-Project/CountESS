@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class PivotPlugin(DuckdbSimplePlugin):
-    """Groups a Pandas Dataframe by an arbitrary column and rolls up rows"""
+    """Pivots columns by other columns."""
 
     name = "Pivot Tool"
     description = "Pivots column values into columns."
