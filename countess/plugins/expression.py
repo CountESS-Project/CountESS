@@ -15,21 +15,9 @@ logger = logging.getLogger(__name__)
 
 UNOPS = {ast.UAdd: "+", ast.USub: "-"}
 BINOPS = {ast.Add: "add", ast.Mult: "multiply", ast.Div: "divide", ast.Sub: "subtract", ast.FloorDiv: "fdiv", ast.Mod: "fmod", ast.Pow: "pow"}
-FUNCOPS = {"abs", "len", "sin", "cos", "tan", "sqrt", "log", "log2", "log10", "pow", "exp", "concat", "least", "greatest", "floor", "ceil", "sum", "avg", "var"}
-LISTOPS = {"sum": "list_sum", "product": "list_product", "avg": "list_avg", "median": "list_median", "var": "list_var_pop", "std": "list_stddev_pop"}
+FUNCOPS = {"abs", "len", "sin", "cos", "tan", "sqrt", "log", "log2", "log10", "pow", "exp", "concat", "least", "greatest", "floor", "ceil" }
+LISTOPS = {"sum": "list_sum", "product": "list_product", "avg": "list_avg", "median": "list_median", "var": "list_var_pop", "std": "list_stddev_pop", "var_samp": "list_var_samp", "std_samp": "list_stddev_samp"}
 COMPOPS = {ast.Eq: "=", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">="}
-
-def _expr_sum(args):
-    return "(" + ("+".join(args)) + ")"
-
-def _expr_avg(args):
-    return f"( {_expr_sum(args)} / {len(args)} )"
-
-def _expr_var(args):
-    avg = _expr_avg(args)
-    return "(" + _expr_avg([f"({arg} - {avg})**2" for arg in args]) + ")"
-
-# XXX median
 
 def _transmogrify(ast_node):
     """Transform an AST node back into a string which can be parsed by DuckDB's expression
@@ -61,17 +49,14 @@ def _transmogrify(ast_node):
         expr3 = _transmogrify(ast_node.orelse)
         return f"CASE WHEN {expr1} THEN {expr2} ELSE {expr3} END"
     elif type(ast_node) is ast.Call:
-        args = [_transmogrify(x) for x in ast_node.args]
-        if ast_node.func.id == 'sum':
-            return _expr_sum(args)
-        elif ast_node.func.id == 'avg':
-            return _expr_avg(args)
-        elif ast_node.func.id == 'var':
-            return _expr_var(args)
-        elif ast_node.func.id in FUNCOPS:
-            return ast_node.func.id + "(" + (",".join(args)) + ")"
+        args = ",".join(_transmogrify(x) for x in ast_node.args)
+        if ast_node.func.id in FUNCOPS:
+            return f"{ast_node.func.id}({args})"
+        elif ast_node.func.id in LISTOPS:
+            func = LISTOPS[ast_node.func.id]
+            return f"{func}([{args}])"
         else:
-            raise NotImplementedError(f"Unknown Call {ast_node.func.id}")
+            raise NotImplementedError(f"Unknown Function {ast_node.func.id}")
 
     else:
         raise NotImplementedError(f"Unknown Node {ast_node}")
@@ -82,13 +67,13 @@ class ExpressionPlugin(DuckdbSimplePlugin):
     description = "Apply simple expressions to each row"
     additional = """
         Expressions are applied to each row.  Syntax is python-like, but to concatenate strings,
-        use 'concat' function.  For selection use python-like "a if b else c".
-        
+        use 'concat' function.  For selection use python-like "a if b else c".  To remove a column,
+        set it to constant None.
 
         Available operators: + - * ** / //
         
         Available functions:
-    """ + " ".join(sorted(FUNCOPS + list(LISTOPS.keys())))
+    """ + " ".join(sorted(list(FUNCOPS) + list(LISTOPS.keys())))
 
     version = VERSION
 
