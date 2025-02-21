@@ -20,7 +20,7 @@ class ColumnMultiParam(TabularMultiParam):
     sum = BooleanParam("Sum")
     mean = BooleanParam("Mean")
     median = BooleanParam("Median")
-    stddev = BooleanParam("Std")
+    var_pop = BooleanParam("Var")
 
 
 def _op(op_name, col_name):
@@ -41,6 +41,7 @@ class GroupByPlugin(DuckdbSimplePlugin):
     description = "Group records by column(s) and calculate aggregates"
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#group-by"
+    additional = "Note: 'Var' is uncorrected population variance."
 
     columns = PerColumnArrayParam("Columns", ColumnMultiParam("Column"))
     join = BooleanParam("Join Back?")
