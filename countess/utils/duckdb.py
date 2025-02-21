@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 def duckdb_dtype_is_boolean(dtype: DuckDBPyType) -> bool:
-    return dtype.id == 'boolean'
+    return dtype.id == "boolean"
+
 
 def duckdb_dtype_is_integer(dtype: DuckDBPyType) -> bool:
     return dtype.id in (
@@ -45,6 +46,7 @@ def duckdb_dtype_to_datatype_choice(dtype: DuckDBPyType) -> str:
     else:
         return "STRING"
 
+
 def duckdb_escape_identifier(identifier: str) -> str:
     if identifier is None:
         return None
@@ -59,7 +61,7 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
     elif type(literal) is str:
         return "'" + literal.replace("'", "''") + "'"
     elif type(literal) is int:
-        return str(literal) + "::INTEGER"
+        return str(literal)
     elif type(literal) is float:
         return str(literal) + "::DOUBLE"
     elif type(literal) is decimal.Decimal:
