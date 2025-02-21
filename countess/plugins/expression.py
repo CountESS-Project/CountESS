@@ -1,9 +1,11 @@
-import logging
-from typing import Optional
 import ast
+import logging
 import re
+from typing import Optional
 
+import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
+
 from countess import VERSION
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
 from countess.core.plugins import DuckdbSimplePlugin
@@ -11,10 +13,23 @@ from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_litera
 
 logger = logging.getLogger(__name__)
 
-UNOPS = { ast.UAdd: '+', ast.USub: '-' }
-BINOPS = { ast.Add: '+', ast.Mult: '*', ast.Div: '/', ast.Sub: '-', ast.FloorDiv: '//', ast.Mod: '%', ast.Pow: '**' }
-FUNCOPS = {'abs', 'len', 'sin', 'cos', 'tan', 'sqrt', 'log', 'log2', 'log10', 'pow', 'exp' }
-COMPOP = { ast.Eq: '=', ast.NotEq: '!=', ast.Lt: '<', ast.LtE: '<=', ast.Gt: '>', ast.GtE: '>=' }
+UNOPS = {ast.UAdd: "+", ast.USub: "-"}
+BINOPS = {ast.Add: "add", ast.Mult: "multiply", ast.Div: "divide", ast.Sub: "subtract", ast.FloorDiv: "fdiv", ast.Mod: "fmod", ast.Pow: "pow"}
+FUNCOPS = {"abs", "len", "sin", "cos", "tan", "sqrt", "log", "log2", "log10", "pow", "exp", "concat", "least", "greatest", "floor", "ceil", "sum", "avg", "var"}
+LISTOPS = {"sum": "list_sum", "product": "list_product", "avg": "list_avg", "median": "list_median", "var": "list_var_pop", "std": "list_stddev_pop"}
+COMPOPS = {ast.Eq: "=", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">="}
+
+def _expr_sum(args):
+    return "(" + ("+".join(args)) + ")"
+
+def _expr_avg(args):
+    return f"( {_expr_sum(args)} / {len(args)} )"
+
+def _expr_var(args):
+    avg = _expr_avg(args)
+    return "(" + _expr_avg([f"({arg} - {avg})**2" for arg in args]) + ")"
+
+# XXX median
 
 def _transmogrify(ast_node):
     """Transform an AST node back into a string which can be parsed by DuckDB's expression
@@ -29,16 +44,35 @@ def _transmogrify(ast_node):
     elif type(ast_node) is ast.UnaryOp and type(ast_node.op) in UNOPS:
         return "(" + UNOPS[type(ast_node.op)] + _transmogrify(ast_node.operand) + ")"
     elif type(ast_node) is ast.BinOp and type(ast_node.op) in BINOPS:
-        return "(" + _transmogrify(ast_node.left) +  BINOPS[type(ast_node.op)] + _transmogrify(ast_node.right) + ")"
-    elif type(ast_node) is ast.Compare and all(type(op) in COMPOP for op in ast_node.ops):
-        args = [ _transmogrify(x) for x in [ ast_node.left ] + ast_node.comparators ]
-        return "(" + (" AND ".join(
-            args[num] + COMPOP[type(op)] + args[num+1]
+        func = BINOPS[type(ast_node.op)]
+        left = _transmogrify(ast_node.left)
+        right = _transmogrify(ast_node.right)
+        return f"{func}({left}, {right})"
+    elif type(ast_node) is ast.Compare and all(type(op) in COMPOPS for op in ast_node.ops):
+        args = [_transmogrify(x) for x in [ast_node.left] + ast_node.comparators]
+        comps = [
+            args[num] + COMPOPS[type(op)] + args[num+1]
             for num, op in enumerate(ast_node.ops)
-        )) + ")"
-    elif type(ast_node) is ast.Call and ast_node.func.id in FUNCOPS:
-        args = [ _transmogrify(x) for x in ast_node.args ]
-        return ast_node.func.id + "(" + (",".join(args)) + ")"
+        ]
+        return "(" + (" AND ".join(comps)) + ")"
+    elif type(ast_node) is ast.IfExp:
+        expr1 = _transmogrify(ast_node.test)
+        expr2 = _transmogrify(ast_node.body)
+        expr3 = _transmogrify(ast_node.orelse)
+        return f"CASE WHEN {expr1} THEN {expr2} ELSE {expr3} END"
+    elif type(ast_node) is ast.Call:
+        args = [_transmogrify(x) for x in ast_node.args]
+        if ast_node.func.id == 'sum':
+            return _expr_sum(args)
+        elif ast_node.func.id == 'avg':
+            return _expr_avg(args)
+        elif ast_node.func.id == 'var':
+            return _expr_var(args)
+        elif ast_node.func.id in FUNCOPS:
+            return ast_node.func.id + "(" + (",".join(args)) + ")"
+        else:
+            raise NotImplementedError(f"Unknown Call {ast_node.func.id}")
+
     else:
         raise NotImplementedError(f"Unknown Node {ast_node}")
 
@@ -46,15 +80,24 @@ def _transmogrify(ast_node):
 class ExpressionPlugin(DuckdbSimplePlugin):
     name = "Expression"
     description = "Apply simple expressions to each row"
+    additional = """
+        Expressions are applied to each row.  Syntax is python-like, but to concatenate strings,
+        use 'concat' function.  For selection use python-like "a if b else c".
+        
+
+        Available operators: + - * ** / //
+        
+        Available functions:
+    """ + " ".join(sorted(FUNCOPS + list(LISTOPS.keys())))
+
     version = VERSION
 
     code = TextParam("Expressions")
-    drop = PerColumnArrayParam("Drop Columns", BooleanParam("Drop"))
     projection = None
 
     def prepare(self, *a) -> None:
         super().prepare(*a)
-        self.projection = []
+        self.projection = {}
         try:
             ast_root = ast.parse(self.code.value or "")
         except SyntaxError as exc:
@@ -63,32 +106,25 @@ class ExpressionPlugin(DuckdbSimplePlugin):
         for ast_node in ast_root.body:
             try:
                 if type(ast_node) is ast.Assign:
+                    expr = _transmogrify(ast_node.value)
                     for ast_target in ast_node.targets:
                         if type(ast_target) is ast.Name:
-                            expr = _transmogrify(ast_node.value)
-                            tgt = duckdb_escape_identifier(ast_target.id)
-                            self.projection.append(f"{expr} AS {tgt}")
+                            self.projection[ast_target.id] = expr
                 elif type(ast_node) is ast.Expr:
-                    tgt = duckdb_escape_identifier(re.sub(r'_+$', '', re.sub(r'\W+', '_', ast.unparse(ast_node))))
+                    tgt = re.sub(r"_+$", "", re.sub(r"\W+", "_", ast.unparse(ast_node)))
                     expr = _transmogrify(ast_node.value)
-                    self.projection.append(f"{expr} AS {tgt}")
+                    self.projection[tgt] = _transmogrify(ast_node.value)
 
             except (NotImplementedError, KeyError) as exc:
                 logger.debug("Bad AST Node: %s %s", ast_node, exc)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional  [DuckDBPyRelation]:
+    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
 
-        column_params = dict(self.drop.get_column_params())
-        if any(v.value for k, v in column_params.items()):
-            projection = [
-                duckdb_escape_identifier(column)
-                for column in source.columns
-                if not column_params[column].value
-            ]
-        else:
-            projection = [ '*' ]
+        sql = ','.join([
+            duckdb_escape_identifier(c) for c in source.columns if c not in self.projection
+        ] + [
+            v + " AS " + duckdb_escape_identifier(k) for k, v in self.projection.items() if v != "NULL"
+        ])
 
-        sql = ', '.join(projection + self.projection)
-        print(">>> " + sql)
-        logger.debug("ExpressionPlugin.execute %s", sql)
+        logger.debug("ExpressionPlugin.execute projection %s", sql)
         return source.project(sql)
