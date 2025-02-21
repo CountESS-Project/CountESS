@@ -2,10 +2,11 @@ from itertools import islice, product
 from typing import Iterable, Optional
 
 import pandas as pd
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, StringCharacterSetParam
-from countess.core.plugins import PandasInputPlugin
+from countess.core.plugins import DuckdbInputPlugin
 
 
 def mutagenize(
@@ -40,7 +41,7 @@ def mutagenize(
             yield sequence + ins_str, ll, None, ins_str
 
 
-class MutagenizePlugin(PandasInputPlugin):
+class MutagenizePlugin(DuckdbInputPlugin):
     """Mutagenize"""
 
     name = "Mutagenize"
@@ -59,11 +60,7 @@ class MutagenizePlugin(PandasInputPlugin):
     ins3 = BooleanParam("All Triple Inserts?", False)
     remove = BooleanParam("Remove Duplicates?", False)
 
-    def prepare(self, sources: list[str], row_limit: Optional[int] = None):
-        assert len(sources) == 0
-        self.row_limit = row_limit
-
-    def finalize(self) -> Iterable[pd.DataFrame]:
+    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
         df = pd.DataFrame(
             islice(
                 mutagenize(
@@ -80,5 +77,5 @@ class MutagenizePlugin(PandasInputPlugin):
             columns=["sequence", "position", "reference", "variation"],
         )
         if self.remove.value:
-            df = df.groupby(["sequence"]).agg({"sequence": "count"}).rename(columns={"sequence": "count"})
-        yield df
+            df = df.groupby(["sequence"]).size().reset_index(name="count")
+        return ddbc.from_df(df)
