@@ -1,5 +1,5 @@
 import logging
-from typing import Iterable
+from typing import Iterable, Optional
 
 import biobear
 import duckdb
@@ -46,7 +46,10 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
         if self.min_avg_quality > 0:
             try:
                 cursor.create_function(
-                    "fastq_avg_quality", _fastq_avg_quality, exception_handling="return_null", side_effects=False
+                    "fastq_avg_quality",
+                    _fastq_avg_quality,
+                    exception_handling=duckdb.PythonExceptionHandling.RETURN_NULL,
+                    side_effects=False,
                 )
             except duckdb.CatalogException as exc:
                 assert "fastq_avg_quality" in str(exc)
@@ -62,9 +65,9 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
 
     def combine(
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
-    ) -> duckdb.DuckDBPyRelation:
+    ) -> Optional[duckdb.DuckDBPyRelation]:
         combined_view = super().combine(ddbc, tables)
-        if self.filename_column or self.header_column:
+        if self.filename_column or self.header_column or combined_view is None:
             return combined_view
         else:
             return combined_view.aggregate("sequence, sum(count) as count")
@@ -80,7 +83,9 @@ class LoadFastaPlugin(DuckdbLoadFilePlugin):
 
     sequence_column = StringParam("Sequence Column", "sequence")
     header_column = StringParam("Header Column", "header")
-    filename_column = StringParam("Filename Column", "filename")
 
-    def load_file(self, filename: str, file_param: BaseParam) -> duckdb.DuckDBPyRelation:
-        return biobear.connect().read_fasta_file(filename).to_arrow_record_batch_reader()
+    def load_file(
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+    ) -> duckdb.DuckDBPyRelation:
+        reader = biobear.connect().read_fasta_file(filename)
+        return cursor.from_arrow(reader.to_arrow_record_batch_reader())

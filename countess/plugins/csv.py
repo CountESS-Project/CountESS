@@ -39,7 +39,7 @@ class ColumnsMultiParam(MultiParam):
     type = DataTypeOrNoneChoiceParam("Column Type")
 
 
-CSV_DELIMITER_CHOICES = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " ", "NONE": None}
+CSV_DELIMITER_CHOICES = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " "}
 
 
 class LoadCsvPlugin(DuckdbLoadFilePlugin):
@@ -81,13 +81,14 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
 
     def combine(
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
-    ) -> duckdb.DuckDBPyRelation:
+    ) -> Optional[duckdb.DuckDBPyRelation]:
         combined = super().combine(ddbc, tables)
-        for num, (column, dtype) in enumerate(zip(combined.columns, combined.dtypes)):
-            if num >= len(self.columns):
-                new_param = self.columns.add_row()
-                new_param.name.value = column
-                new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
+        if combined is not None:
+            for num, (column, dtype) in enumerate(zip(combined.columns, combined.dtypes)):
+                if num >= len(self.columns):
+                    new_param = self.columns.add_row()
+                    new_param.name.value = column
+                    new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
         return combined
 
 

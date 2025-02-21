@@ -21,8 +21,7 @@ import importlib.metadata
 import logging
 import multiprocessing
 import multiprocessing.pool
-from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Type, Union
-import decimal
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Type, Union
 
 import duckdb
 import psutil
@@ -143,9 +142,12 @@ class DuckdbSimplePlugin(DuckdbPlugin):
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
     ) -> Optional[DuckDBPyRelation]:
-        return self.execute(ddbc, duckdb_combine(ddbc, list(sources.values())))
+        combined_source = duckdb_combine(ddbc, sources.values())
+        if combined_source is None:
+            return None
+        return self.execute(ddbc, combined_source)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute")
 
 
@@ -226,12 +228,12 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
 
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
-    ) -> Union[pyarrow.Table, pyarrow.RecordBatchReader, Iterable[pyarrow.RecordBatch]]:
+    ) -> duckdb.DuckDBPyRelation:
         raise NotImplementedError(f"{self.__class__}.load_file")
 
     def combine(
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
-    ) -> duckdb.DuckDBPyRelation:
+    ) -> Optional[duckdb.DuckDBPyRelation]:
         return duckdb_combine(ddbc, tables)
 
 
@@ -287,10 +289,10 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
     def get_reader(self, source):
         return source.to_arrow_table().to_reader(max_chunksize=2048)
 
-    def remove_fields(self, field_names: list[str]) -> list[str]:
+    def remove_fields(self, field_names: list[str]) -> list[Optional[str]]:
         return []
 
-    def add_fields(self) -> Mapping[str, type]:
+    def add_fields(self) -> Mapping[Optional[str], Optional[type]]:
         return {}
 
     def fix_schema(self, schema: pyarrow.Schema) -> pyarrow.Schema:
@@ -315,7 +317,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
             [t for t in (self.transform(row) for row in batch.to_pylist()) if t is not None], schema=schema
         )
 
-    def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
+    def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         """This will be called for each row. Return a tuple with the same
         value types as (or a dictionary with the same keys and value types as)
         those nominated by `self.output_columns`, or None to return all NULLs."""
@@ -329,7 +331,7 @@ class DuckdbThreadedTransformPlugin(DuckdbTransformPlugin):
             ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
         return ddbc.view(self.view_name)
 
-    def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
+    def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         raise NotImplementedError(f"{self.__class__}.transform")
 
 
@@ -340,5 +342,5 @@ class DuckdbParallelTransformPlugin(DuckdbTransformPlugin):
             ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
         return ddbc.view(self.view_name)
 
-    def transform(self, data: dict[str, Any]) -> Union[dict[str, Any], Tuple[Any], None]:
+    def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         raise NotImplementedError(f"{self.__class__}.transform")

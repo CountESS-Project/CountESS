@@ -1,15 +1,10 @@
 import logging
+from typing import Optional
 
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import (
-    ArrayParam,
-    DataTypeChoiceParam,
-    MultiParam,
-    StringParam,
-    TabularMultiParam,
-)
+from countess.core.parameters import ArrayParam, DataTypeChoiceParam, MultiParam, StringParam, TabularMultiParam
 from countess.core.plugins import DuckdbInputPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -62,7 +57,7 @@ class DataTablePlugin(DuckdbInputPlugin):
             self.fix_columns()
         super().set_parameter(key, *a, **k)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: None) -> DuckDBPyRelation:
+    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
         self.fix_columns()
 
         if len(self.rows) == 0:

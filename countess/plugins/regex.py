@@ -32,7 +32,6 @@ class RegexToolPlugin(DuckdbThreadedTransformPlugin):
     output = ArrayParam("Output Columns", OutputColumnsMultiParam("Col"))
     drop_column = BooleanParam("Drop Column", False)
     drop_unmatch = BooleanParam("Drop Unmatched Rows", False)
-    multi = BooleanParam("Multi Match", False)
 
     compiled_re = None
 
@@ -54,22 +53,15 @@ class RegexToolPlugin(DuckdbThreadedTransformPlugin):
         value = data[self.column.value]
         if value is not None:
             try:
-                if self.multi:
-                    return self.compiled_re.findall(str(value))
+                if match := self.compiled_re.match(str(value)):
+                    data.update(
+                        {op.name.value: op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())}
+                    )
+                    return data
                 else:
-                    if match := self.compiled_re.match(str(value)):
-                        data.update(
-                            {op.name.value: op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())}
-                        )
-                        return data
-                    else:
-                        logger.info("%s didn't match", repr(value))
+                    logger.info("%s didn't match", repr(value))
             except (TypeError, ValueError) as exc:
                 logger.warning("Exception", exc_info=exc)
-
-        # If dropping unmatched values, return a simple None which will
-        # be filtered out in series_to_dataframe below, otherwise return
-        # a tuple of Nones which will fill in the unmatched row.
 
         if self.drop_unmatch:
             return None

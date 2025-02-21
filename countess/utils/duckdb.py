@@ -1,7 +1,7 @@
 import decimal
 import logging
 import secrets
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, Optional, Union
 
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from duckdb.typing import DuckDBPyType
@@ -74,15 +74,13 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
         raise TypeError("can't escape literal of type %s" % type(literal))
 
 
-def duckdb_combine(ddbc: DuckDBPyConnection, sources: List[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+def duckdb_combine(ddbc: DuckDBPyConnection, sources: Iterable[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
     """Combine several tables into a new table using UNION ALL BY NAME"""
 
-    # can't have a table with no columns, therefore
-    # can't combine no inputs.
-    if len(sources) == 0:
-        return None
-
     sql = " UNION ALL BY NAME ".join(f"SELECT * FROM {source.alias}" for source in sources)
+    if not sql:
+        # there are no sources, and we can't have a table without columns, so we have to return None.
+        return None
 
     logger.debug("duckdb_combine %s", sql)
     return duckdb_source_to_view(ddbc, ddbc.sql(sql))

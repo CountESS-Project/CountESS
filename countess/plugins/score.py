@@ -1,6 +1,6 @@
 import logging
 from math import log
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -111,17 +111,20 @@ class ScoringPlugin(DuckdbParallelTransformPlugin):
             max_y = max(y for y in y_values if y is not None)
             y_values = [y / max_y if y is not None else None for y in y_values]
 
-        x_values, y_values = zip(
-            *[(x, y) for x, y in zip(x_values, y_values) if x is not None and y is not None and (x > 0 or y > 0)]
-        )
-        if len(x_values) < len(self.suffixes) / 2 + 1:
+        valid_x_values: List[float] = []
+        valid_y_values: List[float] = []
+        for x, y in zip(x_values, y_values):
+            if x is not None and y is not None and (x > 0 or y > 0):
+                valid_x_values.append(x)
+                valid_y_values.append(y)
+
+        if len(valid_x_values) < len(self.suffixes) / 2 + 1:
             return None
 
-        try:
-            s, v = score(x_values, y_values)
-            data[self.output.value] = s
-            if self.variance:
-                data[self.variance.value] = v
-            return data
-        except TypeError:
+        score_var = score(valid_x_values, valid_y_values)
+        if score_var is None:
             return None
+        data[self.output.value] = score_var[0]
+        if self.variance:
+            data[self.variance.value] = score_var[1]
+        return data

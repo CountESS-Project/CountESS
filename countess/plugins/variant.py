@@ -83,7 +83,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
             self.protein.output.value: str,
         }
 
-    def remove_fields(self, field_names: list[str]) -> list[str]:
+    def remove_fields(self, field_names: list[str]) -> list[Optional[str]]:
         if self.drop_columns:
             return [self.column.value, self.reference.get_column_name()]
         else:

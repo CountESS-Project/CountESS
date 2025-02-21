@@ -1,13 +1,12 @@
 import ast
 import logging
 import re
-from typing import Optional
+from typing import Dict, Optional
 
-import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import BooleanParam, PerColumnArrayParam, TextParam
+from countess.core.parameters import TextParam
 from countess.core.plugins import DuckdbSimplePlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -112,7 +111,7 @@ class ExpressionPlugin(DuckdbSimplePlugin):
     version = VERSION
 
     code = TextParam("Expressions")
-    projection = None
+    projection: Optional[Dict[str, str]] = None
 
     def prepare(self, *a) -> None:
         super().prepare(*a)
@@ -137,10 +136,11 @@ class ExpressionPlugin(DuckdbSimplePlugin):
             except (NotImplementedError, KeyError) as exc:
                 logger.debug("Bad AST Node: %s %s", ast_node, exc)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
+        assert self.projection is not None
         old_columns = [duckdb_escape_identifier(c) for c in source.columns if c not in self.projection]
         new_columns = [v + " AS " + duckdb_escape_identifier(k) for k, v in self.projection.items() if v != "NULL"]
-        projection = ", ".join( old_columns + new_columns )
+        projection = ", ".join(old_columns + new_columns)
 
         logger.debug("ExpressionPlugin.execute projection %s", projection)
         return source.project(projection)
