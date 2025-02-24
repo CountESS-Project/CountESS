@@ -2,13 +2,13 @@ import bz2
 import gzip
 import time
 
-import pandas as pd
 import duckdb
+import pandas as pd
 
 from countess.plugins.csv import LoadCsvPlugin, SaveCsvPlugin
 
-
 ddbc = duckdb.connect()
+
 
 def test_load_csv():
     plugin = LoadCsvPlugin()
@@ -16,6 +16,7 @@ def test_load_csv():
     output = plugin.execute(ddbc, None)
     assert output.columns == ["thing", "count"]
     assert len(output) == 4
+
 
 def test_load_csv_gz():
     plugin = LoadCsvPlugin()
@@ -62,6 +63,7 @@ def test_filename_column():
 
 df = pd.DataFrame([[1, 2.01, "three"], [4, 5.5, "six"], [7, 8.8, "nine"]], columns=["a", "b", "c"])
 ddbc.from_df(df).create("n_0")
+
 
 def test_save_csv():
     plugin = SaveCsvPlugin()

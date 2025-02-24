@@ -1,6 +1,6 @@
+import duckdb
 import numpy as np
 import pandas as pd
-import duckdb
 
 from countess.plugins.variant import VariantPlugin
 
@@ -39,9 +39,10 @@ def test_variant_ref_offset():
     plugin.set_parameter("variant.output", "out")
     plugin.set_column_choices(["seq", "offs"])
 
-    assert plugin.transform({"seq": "TGAAGTAGAGG", "offs": "0"})["out"] =="g.1A>T"
+    assert plugin.transform({"seq": "TGAAGTAGAGG", "offs": "0"})["out"] == "g.1A>T"
     assert plugin.transform({"seq": "AGAAGTTGTGG", "offs": "10"})["out"] == "g.[17A>T;19A>T]"
     assert plugin.transform({"seq": "ATAAGAAGAGG", "offs": "100"})["out"] == "g.[102G>T;106T>A]"
+
 
 def test_variant_ref_offset_minus():
     """check that the reverse-complement behaviour works on the minus strand."""
@@ -65,7 +66,7 @@ def test_variant_ref_offset_minus():
     plugin.set_parameter("variant.minus_strand", True)
     plugin.set_parameter("variant.output", "out")
     plugin.set_column_choices(["seq", "offs"])
-    
+
     assert plugin.transform({"seq": "TGAAGTAGAGG"})["out"] == "g.1011T>A"
     assert plugin.transform({"seq": "AGAAGTTGTGG"})["out"] == "g.[1003T>A;1005T>A]"
     assert plugin.transform({"seq": "ATAAGAAGAGG"})["out"] == "g.[1006A>T;1010C>A]"

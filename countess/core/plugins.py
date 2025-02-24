@@ -25,7 +25,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Type, Union
 
 import duckdb
 import psutil
-import pyarrow
+import pyarrow  # type: ignore
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.core.parameters import (
@@ -228,7 +228,7 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
             if row_limit_per_file is not None:
                 rel = rel.limit(row_limit_per_file)
             cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
-            logger.debug("DuckdbLoadFilePlugin.execute._load sql %s" % rel.sql_query())
+            logger.debug("DuckdbLoadFilePlugin.execute._load sql %s", rel.sql_query())
             rel.create(tablename)
             return tablename
 

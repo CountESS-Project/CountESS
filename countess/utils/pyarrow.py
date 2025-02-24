@@ -1,6 +1,6 @@
 import decimal
 
-import pyarrow
+import pyarrow  # type: ignore
 
 
 def python_type_to_arrow_dtype(ttype: type) -> pyarrow.DataType:

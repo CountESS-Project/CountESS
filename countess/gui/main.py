@@ -648,7 +648,7 @@ def main() -> None:
             print(f"CountESS {VERSION}")  # pylint: disable=bad-builtin
             sys.exit(0)
         elif opt_key == "--preview":
-            if opt_val.upper() == 'NONE':
+            if opt_val.upper() == "NONE":
                 preview_row_limit = None
             elif re.match(r"\d+$", opt_val):
                 preview_row_limit = int(opt_val)
@@ -665,7 +665,6 @@ def main() -> None:
                 logger.warning("Log level set to %s", log_level)
             except ValueError:
                 logger.error("Bad --log level: %s", opt_val)
-
 
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.

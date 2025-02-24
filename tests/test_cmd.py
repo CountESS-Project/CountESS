@@ -13,6 +13,7 @@ expected_output = """"thing","result"
 "qux",14728.114285714286
 """
 
+
 @pytest.mark.slow
 def test_command_invocation():
     run(["tests/simple.ini"])

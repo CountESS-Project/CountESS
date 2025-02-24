@@ -6,8 +6,8 @@ from io import BufferedWriter, BytesIO
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 import duckdb
-import pyarrow
-import pyarrow.csv
+import pyarrow  # type: ignore
+import pyarrow.csv  # type: ignore
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
@@ -116,18 +116,16 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
-    ) -> Optional[DuckDBPyRelation]:
-
+    ) -> None:
         filename = self.filename.value
 
         def _write(fh):
             for num, record_batch in enumerate(source.record_batch()):
                 write_options = pyarrow.csv.WriteOptions(
-                    include_header = self.header.value and num == 0,
-                    delimiter = self.delimiter.value,
+                    include_header=self.header.value and num == 0,
+                    delimiter=self.delimiter.value,
                 )
                 pyarrow.csv.write_csv(record_batch, fh, write_options)
-
 
         if filename and row_limit is None:
             if filename.endswith(".gz"):

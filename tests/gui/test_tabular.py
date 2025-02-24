@@ -1,7 +1,7 @@
 import time
 
-import pytest
 import duckdb
+import pytest
 
 from countess.gui.main import make_root
 from countess.gui.tabular import TabularDataFrame
@@ -10,6 +10,7 @@ ddbc = duckdb.connect()
 
 ddbc.sql("create table n_0 as (select unnest(range(0,1000000)) as x, hash(x) as y, hash(y) as z )")
 source = ddbc.table("n_0")
+
 
 @pytest.mark.gui
 def test_tabular_1():
@@ -41,5 +42,6 @@ def test_tabular_copy():
     tt._column_copy(None)
 
     x = root.selection_get(selection="CLIPBOARD")
-    assert x == "x\ty\tz\n30\t6255274016445075936\t1382406602978853548\n31\t13285076694688170502\t14198994021025867918\n\n"
-
+    assert (
+        x == "x\ty\tz\n30\t6255274016445075936\t1382406602978853548\n31\t13285076694688170502\t14198994021025867918\n\n"
+    )
