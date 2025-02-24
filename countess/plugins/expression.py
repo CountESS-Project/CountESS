@@ -136,7 +136,9 @@ class ExpressionPlugin(DuckdbSimplePlugin):
             except (NotImplementedError, KeyError) as exc:
                 logger.debug("Bad AST Node: %s %s", ast_node, exc)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         assert self.projection is not None
         old_columns = [duckdb_escape_identifier(c) for c in source.columns if c not in self.projection]
         new_columns = [

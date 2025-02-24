@@ -57,7 +57,9 @@ class DataTablePlugin(DuckdbInputPlugin):
             self.fix_columns()
         super().set_parameter(key, *a, **k)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         self.fix_columns()
 
         if len(self.rows) == 0:

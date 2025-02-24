@@ -39,7 +39,7 @@ class JoinPlugin(DuckdbPlugin):
     input_columns_2: Optional[Dict] = None
 
     def execute_multi(
-        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         # Can't join relations in different connections, so give them temporary views
         # in our connection.
@@ -81,6 +81,8 @@ class JoinPlugin(DuckdbPlugin):
                 f" {_join_how(required[0], required[num])} JOIN {table.alias} AS N_{num}"
                 + f" ON N_0.{identifiers[0]} = N_{num}.{identifiers[num]}"
             )
+        if row_limit is not None:
+            query += f" LIMIT {row_limit}"
         logger.debug(query)
 
         try:

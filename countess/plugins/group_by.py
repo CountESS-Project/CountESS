@@ -46,7 +46,9 @@ class GroupByPlugin(DuckdbSimplePlugin):
     columns = PerColumnArrayParam("Columns", ColumnMultiParam("Column"))
     join = BooleanParam("Join Back?")
 
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         column_params = list(self.columns.get_column_params())
         columns = (
             ", ".join(

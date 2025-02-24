@@ -36,7 +36,7 @@ from countess.core.parameters import (
     HasSubParametersMixin,
     MultiParam,
 )
-from countess.utils.duckdb import duckdb_combine, duckdb_escape_identifier, duckdb_escape_literal
+from countess.utils.duckdb import duckdb_combine, duckdb_escape_literal
 from countess.utils.files import clean_filename
 from countess.utils.pyarrow import python_type_to_arrow_dtype
 
@@ -127,7 +127,7 @@ class DuckdbPlugin(BasePlugin):
         pass
 
     def execute_multi(
-        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute_multi")
 
@@ -140,37 +140,43 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         self.set_column_choices([] if source is None else source.columns)
 
     def execute_multi(
-        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         combined_source = duckdb_combine(ddbc, sources.values())
         if combined_source is None:
             return None
-        return self.execute(ddbc, combined_source)
+        return self.execute(ddbc, combined_source, row_limit)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute")
 
 
 class DuckdbInputPlugin(DuckdbPlugin):
     num_inputs = 0
 
-    def execute_multi(self, ddbc: DuckDBPyConnection, sources: Mapping) -> Optional[DuckDBPyRelation]:
+    def execute_multi(
+        self, ddbc: DuckDBPyConnection, sources: Mapping, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         assert len(sources) == 0
-        return self.execute(ddbc, None)
+        return self.execute(ddbc, None, row_limit)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute")
 
 
 class DuckdbStatementPlugin(DuckdbSimplePlugin):
-    def statement(self, ddbc: DuckDBPyConnection, source_table_name: str) -> str:
+    def statement(self, ddbc: DuckDBPyConnection, source_table_name: str, row_limit: Optional[int] = None) -> str:
         raise NotImplementedError(f"{self.__class__}.statement")
 
-    def execute(self, ddbc, source):
+    def execute(self, ddbc, source, row_limit: Optional[int] = None):
         source_table_name = f"r_{id(self)}"
         try:
             ddbc.register(source_table_name, source)
-            return ddbc.sql(self.statement(ddbc, source_table_name))
+            return ddbc.sql(self.statement(ddbc, source_table_name, row_limit))
         finally:
             ddbc.unregister(source_table_name)
 
@@ -196,38 +202,46 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
             for filename in glob.iglob(file_param.filename.value):
                 yield filename, file_param
 
-    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
-        def _load(tn_fn_fp):
-            # This may be run in a different thread, so it needs to create a cursor
-            # to be thread-safe, and it uses a table rather than
-            # a view to store the data once it has been filtered.
-            tablename, filename, file_param = tn_fn_fp
-            cursor = ddbc.cursor()
-            rel = self.load_file(cursor, filename, file_param)
-            if self.filename_column:
-                filename_literal = duckdb_escape_literal(clean_filename(filename))
-                rel = rel.project(f"*, {filename_literal} as filename")
-            cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
-            rel.create(tablename)
-            return tablename
-
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         tablenames_filenames_and_params = [
             (f"t_{id(self)}_{num}", filename, file_param)
             for num, (filename, file_param) in enumerate(self.filenames_and_params())
         ]
         if len(tablenames_filenames_and_params) == 0:
             return None
-        elif len(tablenames_filenames_and_params) > 1:
+        row_limit_per_file = (row_limit // len(tablenames_filenames_and_params)) if row_limit else None
+        logger.debug("row_limit_per_file %s", row_limit_per_file)
+
+        def _load(tn_fn_fp):
+            # This may be run in a different thread, so it needs to create a cursor
+            # to be thread-safe, and it uses a table rather than
+            # a view to store the data once it has been filtered.
+
+            tablename, filename, file_param = tn_fn_fp
+            cursor = ddbc.cursor()
+            rel = self.load_file(cursor, filename, file_param, row_limit_per_file)
+            if self.filename_column:
+                filename_literal = duckdb_escape_literal(clean_filename(filename))
+                rel = rel.project(f"*, {filename_literal} as filename")
+            if row_limit_per_file is not None:
+                rel = rel.limit(row_limit_per_file)
+            cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
+            logger.debug("DuckdbLoadFilePlugin.execute._load sql %s" % rel.sql_query())
+            rel.create(tablename)
+            return tablename
+
+        if len(tablenames_filenames_and_params) > 1:
             with multiprocessing.pool.ThreadPool() as pool:
                 tablenames = list(pool.imap_unordered(_load, tablenames_filenames_and_params))
-
             return self.combine(ddbc, [ddbc.table(tn) for tn in tablenames])
         else:
             tablename = _load(tablenames_filenames_and_params[0])
             return self.combine(ddbc, [ddbc.table(tablename)])
 
     def load_file(
-        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         raise NotImplementedError(f"{self.__class__}.load_file")
 
@@ -240,45 +254,8 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
 class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
     num_outputs = 0
 
-    def execute(self, ddbc, source):
+    def execute(self, ddbc, source, row_limit: Optional[int] = None):
         raise NotImplementedError(f"{self.__class__}.execute")
-
-
-class DuckdbFilterPlugin(DuckdbSimplePlugin):
-    def input_columns(self) -> dict[str, str]:
-        raise NotImplementedError(f"{self.__class__}.input_columns")
-
-    def execute(self, ddbc, source):
-        """Perform a query which calls `self.transform` for every row."""
-
-        escaped_input_columns = {duckdb_escape_identifier(k): str(v).upper() for k, v in self.input_columns()}
-        assert all(v in self.ALLOWED_TYPES for v in escaped_input_columns.values())
-
-        # Make up an arbitrary unique name for our temporary function
-        function_name = f"f_{id(self)}"
-        function_call = function_name + "(" + ",".join(escaped_input_columns.keys()) + ")"
-        input_types = escaped_input_columns().values()
-
-        logger.debug("DuckDbFilterPlugin.query function_name %s", function_name)
-        logger.debug("DuckDbFilterPlugin.query input_types %s", input_types)
-
-        try:
-            ddbc.create_function(
-                name=function_name,
-                function=self.filter,
-                parameters=input_types,
-                return_type="boolean",
-                null_handling="special",
-                side_effects=False,
-            )
-            return source.filter(function_call)
-        finally:
-            ddbc.remove_function(function_name)
-
-    def filter(self, *_) -> bool:
-        """This will be called for each row, with the columns nominated in
-        `self.input_columns` as parameters.  Returns a boolean."""
-        raise NotImplementedError(f"{self.__class__}.transform")
 
 
 class DuckdbTransformPlugin(DuckdbSimplePlugin):
@@ -304,7 +281,9 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
                 schema = schema.append(pyarrow.field(field_name, python_type_to_arrow_dtype(ttype)))
         return schema
 
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> DuckDBPyRelation:
         """Perform a query which calls `self.transform` for every row."""
 
         reader = self.get_reader(source)
@@ -325,7 +304,9 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
 
 
 class DuckdbThreadedTransformPlugin(DuckdbTransformPlugin):
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> DuckDBPyRelation:
         with multiprocessing.pool.ThreadPool(processes=psutil.cpu_count()) as pool:
             reader = self.get_reader(source)
             ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
@@ -336,7 +317,9 @@ class DuckdbThreadedTransformPlugin(DuckdbTransformPlugin):
 
 
 class DuckdbParallelTransformPlugin(DuckdbTransformPlugin):
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> DuckDBPyRelation:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> DuckDBPyRelation:
         with multiprocessing.Pool(processes=psutil.cpu_count()) as pool:
             reader = self.get_reader(source)
             ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))

@@ -36,12 +36,14 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
     group = BooleanParam("Group by Sequence?", True)
 
     def load_file(
-        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         # Open the file, convert it to a RecordBatchReader and then
         # wrap that up as a DuckDBPyRelation so we can filter it.
         reader = biobear.connect().read_fastq_file(filename)
         rel = cursor.from_arrow(reader.to_arrow_record_batch_reader())
+        if row_limit is not None:
+            rel = rel.limit(row_limit)
 
         if self.min_avg_quality > 0:
             try:
@@ -85,7 +87,10 @@ class LoadFastaPlugin(DuckdbLoadFilePlugin):
     header_column = StringParam("Header Column", "header")
 
     def load_file(
-        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         reader = biobear.connect().read_fasta_file(filename)
-        return cursor.from_arrow(reader.to_arrow_record_batch_reader())
+        rel = cursor.from_arrow(reader.to_arrow_record_batch_reader())
+        if row_limit is not None:
+            rel = rel.limit(row_limit)
+        return rel

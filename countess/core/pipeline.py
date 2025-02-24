@@ -77,16 +77,16 @@ class PipelineNode:
                     logger.warning("Parameter %s=%s Not Valid", key, val)
             self.config = None
 
-    def run(self, ddbc):
+    def run(self, ddbc, row_limit: Optional[int] = None):
         if not self.plugin:
             return None
         self.load_config()
 
         assert isinstance(self.plugin, DuckdbPlugin)
         if self.is_dirty:
-            sources = {pn.name: pn.run(ddbc) for pn in self.parent_nodes}
+            sources = {pn.name: pn.run(ddbc, row_limit) for pn in self.parent_nodes}
             self.plugin.prepare_multi(ddbc, sources)
-            result = self.plugin.execute_multi(ddbc, sources)
+            result = self.plugin.execute_multi(ddbc, sources, row_limit)
             if result is not None:
                 try:
                     table_name = f"n_{self.uuid}"

@@ -77,7 +77,7 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
 def duckdb_combine(ddbc: DuckDBPyConnection, sources: Iterable[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
     """Combine several tables into a new table using UNION ALL BY NAME"""
 
-    sql = " UNION ALL BY NAME ".join(f"SELECT * FROM {source.alias}" for source in sources)
+    sql = " UNION ALL BY NAME ".join(f"SELECT * FROM {source.alias}" for source in sources if source is not None)
     if not sql:
         # there are no sources, and we can't have a table without columns, so we have to return None.
         return None

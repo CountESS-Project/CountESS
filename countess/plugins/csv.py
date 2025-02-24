@@ -56,7 +56,7 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
 
     def load_file(
-        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         if len(self.columns):
             column_names = [c.name.value for c in self.columns]
@@ -77,7 +77,10 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
         except pyarrow.ArrowInvalid:
             t = pyarrow.csv.read_csv(filename, None, parse_options, None)
 
-        return cursor.from_arrow(t)
+        rel = cursor.from_arrow(t)
+        if row_limit:
+            rel = rel.limit(row_limit)
+        return rel
 
     def combine(
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
@@ -112,5 +115,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
 
     show_preview = False
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         pass

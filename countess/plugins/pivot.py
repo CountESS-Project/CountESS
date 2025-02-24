@@ -24,7 +24,9 @@ class PivotPlugin(DuckdbSimplePlugin):
     default_0 = BooleanParam("Default value 0?", False)
     short_names = BooleanParam("Short Output Names?", False)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         if source is None:
             return None
         index_cols = [p.label for p in self.columns if p.value == "Index" and p.label in source.columns]

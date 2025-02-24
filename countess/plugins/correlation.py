@@ -24,8 +24,9 @@ class CorrelationPlugin(DuckdbSimplePlugin):
     columns: list[str] = []
     dataframes: list[pd.DataFrame] = []
 
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> Optional[DuckDBPyRelation]:
-
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         col1 = duckdb_escape_identifier(self.column1.value)
         col2 = duckdb_escape_identifier(self.column2.value)
 

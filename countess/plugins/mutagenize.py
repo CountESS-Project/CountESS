@@ -50,7 +50,6 @@ class MutagenizePlugin(DuckdbInputPlugin):
     version = VERSION
 
     character_set = set(("A", "C", "G", "T", "N"))
-    row_limit: Optional[int] = None
 
     sequence = StringCharacterSetParam("Sequence", "", character_set=character_set)
     mutate = BooleanParam("All Single Mutations?", True)
@@ -60,7 +59,9 @@ class MutagenizePlugin(DuckdbInputPlugin):
     ins3 = BooleanParam("All Triple Inserts?", False)
     remove = BooleanParam("Remove Duplicates?", False)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: None) -> Optional[DuckDBPyRelation]:
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
         df = pd.DataFrame(
             islice(
                 mutagenize(
@@ -72,7 +73,7 @@ class MutagenizePlugin(DuckdbInputPlugin):
                     bool(self.ins3),
                 ),
                 0,
-                self.row_limit,
+                row_limit,
             ),
             columns=["sequence", "position", "reference", "variation"],
         )

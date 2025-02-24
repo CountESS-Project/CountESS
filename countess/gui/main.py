@@ -31,6 +31,8 @@ from countess.gui.widgets import (
     info_button,
 )
 
+preview_row_limit: Optional[int] = 10000000
+
 usage = """usage: countess_gui [--log LEVEL] [INIFILE]
 
 Start the CountESS GUI.
@@ -38,6 +40,7 @@ Start the CountESS GUI.
 options:
     --help                         show this message & exit.
     --version                      show version
+    --preview LIMIT                set preview mode row limit (default: %d)
     --log LEVEL                    set log level to LEVEL
     INIFILE                        load configuration file
 """
@@ -250,7 +253,7 @@ class ConfiguratorWrapper:
         logger.debug("config_change_task_callback")
         pos1, pos2 = self.config_scrollbar.get()
 
-        self.node.run(self.ddbc)
+        self.node.run(self.ddbc, preview_row_limit)
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
@@ -629,9 +632,10 @@ def make_root():
 
 def main() -> None:
     args = sys.argv[1:]
+    global preview_row_limit  # pylint: disable=global-statement
 
     try:
-        options, args = getopt.getopt(args, "", ["help", "version", "log="])
+        options, args = getopt.getopt(args, "", ["help", "version", "preview=", "log="])
     except getopt.GetoptError as exc:
         logger.error(str(exc))
         sys.exit(1)
@@ -643,6 +647,13 @@ def main() -> None:
         elif opt_key == "--version":
             print(f"CountESS {VERSION}")  # pylint: disable=bad-builtin
             sys.exit(0)
+        elif opt_key == "--preview":
+            if opt_val.upper() == 'NONE':
+                preview_row_limit = None
+            elif re.match(r"\d+$", opt_val):
+                preview_row_limit = int(opt_val)
+            else:
+                logger.warning("Bad --preview value: %s", opt_val)
         elif opt_key == "--log":
             try:
                 log_level: Union[int, str]
@@ -654,6 +665,7 @@ def main() -> None:
                 logger.warning("Log level set to %s", log_level)
             except ValueError:
                 logger.error("Bad --log level: %s", opt_val)
+
 
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.

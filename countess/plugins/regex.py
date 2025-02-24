@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class OutputColumnsMultiParam(MultiParam):
     name = StringParam("Column Name")
-    datatype = DataTypeChoiceParam("Column Type", "string")
+    datatype = DataTypeChoiceParam("Column Type", "STRING")
 
 
 class RegexToolPlugin(DuckdbThreadedTransformPlugin):
