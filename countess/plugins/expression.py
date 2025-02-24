@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 
 UNOPS = {ast.UAdd: "+", ast.USub: "-"}
 BINOPS = {
-    ast.Add: "add",
-    ast.Mult: "multiply",
-    ast.Div: "divide",
-    ast.Sub: "subtract",
-    ast.FloorDiv: "fdiv",
-    ast.Mod: "fmod",
-    ast.Pow: "pow",
+    ast.Add: "+",
+    ast.Mult: "*",
+    ast.Div: "/",
+    ast.Sub: "-",
+    ast.FloorDiv: "//",
+    ast.Mod: "%",
+    ast.Pow: "**",
 }
 FUNCOPS = {
     "abs",
@@ -66,10 +66,10 @@ def _transmogrify(ast_node):
     elif type(ast_node) is ast.UnaryOp and type(ast_node.op) in UNOPS:
         return "(" + UNOPS[type(ast_node.op)] + _transmogrify(ast_node.operand) + ")"
     elif type(ast_node) is ast.BinOp and type(ast_node.op) in BINOPS:
-        func = BINOPS[type(ast_node.op)]
+        binop = BINOPS[type(ast_node.op)]
         left = _transmogrify(ast_node.left)
         right = _transmogrify(ast_node.right)
-        return f"{func}({left}, {right})"
+        return f"({left} {binop} {right})"
     elif type(ast_node) is ast.Compare and all(type(op) in COMPOPS for op in ast_node.ops):
         args = [_transmogrify(x) for x in [ast_node.left] + ast_node.comparators]
         comps = [args[num] + COMPOPS[type(op)] + args[num + 1] for num, op in enumerate(ast_node.ops)]
