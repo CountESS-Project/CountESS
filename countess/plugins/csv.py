@@ -60,7 +60,7 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
     ) -> duckdb.DuckDBPyRelation:
         if len(self.columns):
             column_names = [c.name.value for c in self.columns]
-            read_options = pyarrow.csv.ReadOptions(column_names=column_names, skip_rows=1)
+            read_options = pyarrow.csv.ReadOptions(column_names=column_names, skip_rows=1 if self.header else 0)
             convert_options = pyarrow.csv.ConvertOptions(
                 column_types={
                     c.name.value: python_type_to_arrow_dtype(c.type.get_selected_type()) for c in self.columns
