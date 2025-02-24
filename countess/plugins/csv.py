@@ -105,7 +105,6 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     header = BooleanParam("CSV header row?", True)
     filename = FileSaveParam("Filename", file_types=file_types)
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
-    quoting = BooleanParam("Quote all Strings", False)
 
     filehandle: Optional[Union[BufferedWriter, BytesIO, gzip.GzipFile, bz2.BZ2File]] = None
     csv_columns = None
@@ -118,4 +117,6 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     def execute(
         self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        pass
+
+        if row_limit is None:
+            source.write_csv(self.filename.value, sep=self.delimiter.value, header=self.header.value)
