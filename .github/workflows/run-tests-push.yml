@@ -41,21 +41,22 @@ jobs:
     - run: python3.11 -m pip install -e .[dev]
     - run: xvfb-run python3.11 -m pytest -v -rP --doctest-modules countess/ tests/
 
-  run-tests-ubuntu-24_04-python-3_12_from_apt:
-    runs-on: ubuntu-24.04
-    name: Ubuntu 24.04, Python 3.12 from Apt
-    steps:
-    - uses: actions/checkout@v4
-    - run: sudo apt install python3.12-full python3-pip xvfb
-    - run: python3.12 -m venv /tmp/venv
-    - run: /tmp/venv/bin/python -m pip install --upgrade pip
-    - run: /tmp/venv/bin/python -m pip install -e .[dev]
-    - run: xvfb-run /tmp/venv/bin/python -m pytest -v -rP --doctest-modules countess/ tests/
+#  run-tests-ubuntu-24_04-python-3_12_from_apt:
+#    runs-on: ubuntu-24.04
+#    name: Ubuntu 24.04, Python 3.12 from Apt
+#    steps:
+#    - uses: actions/checkout@v4
+#    - run: sudo apt install python3.12-full python3-pip xvfb
+#    - run: python3.12 -m venv /tmp/venv
+#    - run: /tmp/venv/bin/python -m pip install --upgrade pip
+#    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+#    - run: xvfb-run /tmp/venv/bin/python -m pytest -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-24_04-python-3_x:
     runs-on: ubuntu-24.04
     name: Ubuntu 24.04, Python 3.x
     steps:
+    - run: sudo apt-get -U upgrade -y
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
