@@ -2,7 +2,7 @@ import pytest
 
 from countess.core.parameters import IntegerParam
 from countess.core.pipeline import PipelineGraph, PipelineNode
-from countess.core.plugins import ProcessPlugin
+from countess.core.plugins import DuckdbSimplePlugin
 
 
 @pytest.fixture(name="pg")
@@ -91,15 +91,12 @@ def test_pg_reset(pg):
     assert all(pn.is_dirty for pn in pg.traverse_nodes())
 
 
-class DoesNothingPlugin(ProcessPlugin):
+class DoesNothingPlugin(DuckdbSimplePlugin):
     version = "0"
     param = IntegerParam("param", 0)
 
-    def process(self, data, source):
-        yield data
-
-    def finished(self, source):
-        yield 107
+    def execute(self, ddbc, source):
+        return None
 
 
 def test_plugin_config(caplog):
@@ -119,15 +116,13 @@ def test_noplugin_prerun():
     with pytest.raises(AssertionError):
         pn.load_config()
 
-    pn.prerun()
-
 
 def test_mark_dirty():
     pn1 = PipelineNode("node1", plugin=DoesNothingPlugin())
     pn2 = PipelineNode("node2", plugin=DoesNothingPlugin())
     pn2.add_parent(pn1)
 
-    pn2.prerun()
+    pn2.run(None)
 
     assert not pn1.is_dirty
     assert not pn2.is_dirty

@@ -1,5 +1,3 @@
-import csv
-import sys
 import time
 from unittest.mock import patch
 
@@ -9,10 +7,10 @@ import countess.core.cmd
 from countess import VERSION
 from countess.core.cmd import configure_graphs, main, run
 
-expected_output = """"thing","foo","bar","baz","qux","number","zz"
-"bar",10,2,1,4,232,0.08620689655172414
-"baz",11,3,2,1,565,0.0584070796460177
-"qux",12,9,8,7,999,0.10810810810810811
+expected_output = """"thing","result"
+"baz",12769.
+"foo",23512.799999999999
+"qux",14728.114285714286
 """
 
 

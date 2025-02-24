@@ -176,7 +176,7 @@ def test_dtcp2():
     assert cp.cast_value("whatever") is None
     assert cp.is_none()
 
-    cp.value = "integer"
+    cp.value = "INTEGER"
     assert cp.get_selected_type() == int
     assert cp.cast_value(7.3) == 7
     assert cp.cast_value("whatever") == 0

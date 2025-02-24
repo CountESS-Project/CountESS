@@ -118,5 +118,5 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
         self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
 
-        if row_limit is None:
+        if self.filename.value and row_limit is None:
             source.write_csv(self.filename.value, sep=self.delimiter.value, header=self.header.value)
