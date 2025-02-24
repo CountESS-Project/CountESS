@@ -7,10 +7,10 @@ import countess.core.cmd
 from countess import VERSION
 from countess.core.cmd import configure_graphs, main, run
 
-expected_output = """thing,result
-foo,23512.8
-baz,12769.0
-qux,14728.114285714286
+expected_output = """"thing","result"
+"foo",23512.8
+"baz",12769
+"qux",14728.114285714286
 """
 
 @pytest.mark.slow

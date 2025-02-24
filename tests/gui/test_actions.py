@@ -54,7 +54,6 @@ def test_open_new():
 
     preview_frame = mw.config_wrapper.preview_subframe
     assert isinstance(preview_frame, TabularDataFrame)
-    dataframe = preview_frame.dataframe
 
-    assert len(dataframe) == 4
-    assert len(dataframe.columns) == 2
+    assert len(preview_frame.table) == 4
+    assert len(preview_frame.columns) == 2
