@@ -41,11 +41,6 @@ class JoinPlugin(DuckdbPlugin):
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        # Can't join relations in different connections, so give them temporary views
-        # in our connection.
-        # views = [duckdb_source_to_view(ddbc, source) for source in sources]
-
-        # result = duckdb_source_to_table(ddbc, duckdb_concatenate(views))
 
         if len(sources) <= 1:
             return None
@@ -69,12 +64,17 @@ class JoinPlugin(DuckdbPlugin):
         identifiers = [duckdb_escape_identifier(input_.join_on.value) for input_ in self.inputs]
         required = [input_.required.value for input_ in self.inputs]
 
-        select_str = ", ".join(
+        select_str = ", ".join([
+            f"N_{num}.{duckdb_escape_identifier(input_.join_on.value)}"
+            for num, (input_, table) in enumerate(zip(self.inputs, tables))
+            if not input_.drop and not (num > 0 and identifiers[num] == identifiers[0])
+        ] + [
             f"N_{num}.{duckdb_escape_identifier(column)}"
             for num, (input_, table) in enumerate(zip(self.inputs, tables))
             for column in table.columns
-            if not (input_.drop and input_.join_on == column)
-        )
+            if not input_.join_on == column
+        ])
+        
         query = f"SELECT {select_str} FROM {tables[0].alias} AS N_0"
         for num, table in enumerate(tables[1:], 1):
             query += (

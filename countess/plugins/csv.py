@@ -118,5 +118,24 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
         self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
 
-        if self.filename.value and row_limit is None:
-            source.write_csv(self.filename.value, sep=self.delimiter.value, header=self.header.value)
+        filename = self.filename.value
+
+        def _write(fh):
+            for num, record_batch in enumerate(source.record_batch()):
+                write_options = pyarrow.csv.WriteOptions(
+                    include_header = self.header.value and num == 0,
+                    delimiter = self.delimiter.value,
+                )
+                pyarrow.csv.write_csv(record_batch, fh, write_options)
+
+
+        if filename and row_limit is None:
+            if filename.endswith(".gz"):
+                with gzip.open(filename, "wb") as fh:
+                    _write(fh)
+            elif filename.endswith(".bz2"):
+                with bz2.open(filename, "wb") as fh:
+                    _write(fh)
+            else:
+                with open(filename, "wb") as fh:
+                    _write(fh)
