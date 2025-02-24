@@ -8,8 +8,6 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from countess.utils.pandas import get_all_columns
-
 PARAM_DIGEST_HASH = "sha256"
 
 
@@ -581,8 +579,7 @@ class ColumnGroupChoiceParam(ChoiceParam):
 
     def get_column_names(self, df):
         prefix = self.get_column_prefix()
-        column_names = get_all_columns(df).keys()
-        return [n for n in column_names if n.startswith(prefix)]
+        return [n for n in df.columns if n.startswith(prefix)]
 
     def get_column_suffixes(self, df):
         prefix = self.get_column_prefix()
