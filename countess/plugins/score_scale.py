@@ -53,23 +53,36 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         score_col_id = duckdb_escape_identifier(self.score_col.value)
-        group_col_id = duckdb_escape_identifier(self.group_col.value) if self.group_col.is_not_none() else "1"
-        join_using = f"using ({group_col_id})" if group_col_id else "on 1=1"
 
         all_columns = ",".join(duckdb_escape_identifier(c) for c in source.columns if c != self.score_col.value)
 
-        sql = f"""
-            select {all_columns}, ({score_col_id} - __c1) / (__c2 - __c1) as {score_col_id}
-            from {source.alias} join (
-                select {group_col_id}, median({score_col_id}) as __c1 from {source.alias}
-                where {self.classifiers[0].where_clause()}
-                group by {group_col_id}
-            ) {join_using} join (
-                select {group_col_id}, median({score_col_id}) as __c2 from {source.alias}
-                where {self.classifiers[1].where_clause()}
-                group by {group_col_id}
-            ) {join_using}
-        """
+        if self.group_col.is_not_none():
+            group_col_id = duckdb_escape_identifier(self.group_col.value)
+
+            sql = f"""
+                select {all_columns}, ({score_col_id} - __c1) / (__c2 - __c1) as {score_col_id}
+                from {source.alias} join (
+                    select {group_col_id}, median({score_col_id}) as __c1 from {source.alias}
+                    where {self.classifiers[0].where_clause()}
+                    group by {group_col_id}
+                ) using ({group_col_id}) join (
+                    select {group_col_id}, median({score_col_id}) as __c2 from {source.alias}
+                    where {self.classifiers[1].where_clause()}
+                    group by {group_col_id}
+                ) using ({group_col_id})
+            """
+        else:
+            sql = f"""
+                select {all_columns}, ({score_col_id} - __c1) / (__c2 - __c1) as {score_col_id}
+                from {source.alias} cross join (
+                    select median({score_col_id}) as __c1 from {source.alias}
+                    where {self.classifiers[0].where_clause()}
+                ) cross join (
+                    select median({score_col_id}) as __c2 from {source.alias}
+                    where {self.classifiers[1].where_clause()}
+                )
+            """
+
         logger.debug("ScoreScalingPlugin sql %s", sql)
 
         return ddbc.sql(sql)
