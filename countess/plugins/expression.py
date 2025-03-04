@@ -39,6 +39,11 @@ FUNCOPS = {
     "greatest",
     "floor",
     "ceil",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "lower",
+    "upper",
 }
 LISTOPS = {
     "sum": "list_sum",
@@ -79,7 +84,7 @@ def _transmogrify(ast_node):
         expr2 = _transmogrify(ast_node.body)
         expr3 = _transmogrify(ast_node.orelse)
         return f"CASE WHEN {expr1} THEN {expr2} ELSE {expr3} END"
-    elif type(ast_node) is ast.Call:
+    elif type(ast_node) is ast.Call and type(ast_node.func) is ast.Name:
         args = ",".join(_transmogrify(x) for x in ast_node.args)
         if ast_node.func.id in FUNCOPS:
             return f"{ast_node.func.id}({args})"
