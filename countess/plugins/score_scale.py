@@ -25,7 +25,7 @@ class ScaleClassParam(TabularMultiParam):
     st = StringParam("Value")
     score = FloatParam("Scaled Score")
 
-    def where_clause(self):
+    def filter(self):
         col = duckdb_escape_identifier(self.col.value)
         val = duckdb_escape_literal(self.st.value)
         if self.op.value == "Equals":
@@ -57,31 +57,20 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
         all_columns = ",".join(duckdb_escape_identifier(c) for c in source.columns if c != self.score_col.value)
 
         if self.group_col.is_not_none():
-            group_col_id = duckdb_escape_identifier(self.group_col.value)
-
-            sql = f"""
-                select {all_columns}, ({score_col_id} - __c1) / (__c2 - __c1) as {score_col_id}
-                from {source.alias} join (
-                    select {group_col_id}, median({score_col_id}) as __c1 from {source.alias}
-                    where {self.classifiers[0].where_clause()}
-                    group by {group_col_id}
-                ) using ({group_col_id}) join (
-                    select {group_col_id}, median({score_col_id}) as __c2 from {source.alias}
-                    where {self.classifiers[1].where_clause()}
-                    group by {group_col_id}
-                ) using ({group_col_id})
-            """
+            group_col_id = 'T0.' + duckdb_escape_identifier(self.group_col.value)
         else:
-            sql = f"""
-                select {all_columns}, ({score_col_id} - __c1) / (__c2 - __c1) as {score_col_id}
-                from {source.alias} cross join (
-                    select median({score_col_id}) as __c1 from {source.alias}
-                    where {self.classifiers[0].where_clause()}
-                ) cross join (
-                    select median({score_col_id}) as __c2 from {source.alias}
-                    where {self.classifiers[1].where_clause()}
-                )
-            """
+            group_col_id = '1'  # dummy value for one big group.
+
+        sql = f"""
+            select {all_columns}, ({score_col_id} - T1.y) / (T1.z - T1.y) as {score_col_id}
+            from {source.alias} T0 join (
+                select {group_col_id} as x,
+                    median({score_col_id}) filter ({self.classifiers[0].filter()}) as y,
+                    median({score_col_id}) filter ({self.classifiers[1].filter()}) as z
+                from {source.alias} T0
+                group by x
+            ) T1 on ({group_col_id} = T1.x)
+        """
 
         logger.debug("ScoreScalingPlugin sql %s", sql)
 
