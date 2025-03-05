@@ -1,11 +1,9 @@
 # TK based GUI for CountESS
-import math
 import tkinter as tk
 from functools import partial
 from tkinter import ttk
 from typing import Mapping, MutableMapping, Optional
-
-import numpy as np
+import logging
 
 from ..core.parameters import (
     ArrayParam,
@@ -33,9 +31,7 @@ from .widgets import (
     delete_button,
 )
 
-
-def is_nan(v):
-    return v is None or v is np.nan or (isinstance(v, float) and math.isnan(v))
+logger = logging.getLogger(__name__)
 
 
 class ParameterWrapper:
@@ -393,6 +389,8 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
+        # called from self.var.trace("w", self.value_changed_callback)
+
         if isinstance(self.parameter, (ChoiceParam, DictChoiceParam)):
             values = self.parameter.get_values()
             if 0 <= self.entry.current() < len(values):
@@ -403,7 +401,9 @@ class ParameterWrapper:
             else:
                 self.var.set(self.set_value(self.var.get()))
         else:
-            self.var.set(self.set_value(self.var.get()))
+            val = self.set_value(self.var.get())
+            if val is not None:
+                self.var.set(val)
 
     def widget_modified_callback(self, *_):
         # only gets called the *first* time a modification happens, unless
