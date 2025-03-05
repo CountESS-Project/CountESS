@@ -69,6 +69,7 @@ data_table = "countess.plugins.data_table:DataTablePlugin"
 correlation = "countess.plugins.correlation:CorrelationPlugin"
 score = "countess.plugins.score:ScoringPlugin"
 score_scaling = "countess.plugins.score_scale:ScoreScalingPlugin"
+vampseq_score = "countess.plugins.vampseq:VampSeqScorePlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
