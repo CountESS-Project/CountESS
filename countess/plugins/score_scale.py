@@ -46,7 +46,7 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
     version = VERSION
 
     score_col = ColumnChoiceParam("Score Column")
-    classifiers = ArrayParam("Variant Classifiers", ScaleClassParam("Class"), min_size=2, max_size=2)
+    classifiers = ArrayParam("Variant Classifiers", ScaleClassParam("Class"), min_size=2, max_size=2, read_only=True)
     group_col = ColumnOrNoneChoiceParam("Group By")
 
     def execute(

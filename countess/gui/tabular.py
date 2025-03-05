@@ -239,8 +239,7 @@ class TabularDataFrame(tk.Frame):
         # Include all column names for a stable sort order.
         column_name = self.table.columns[column_num]
         escaped_column_names = [
-            duckdb_escape_identifier(c)
-            for c in [ column_name ] + [ c for c in self.table.columns if c != column_name ]
+            duckdb_escape_identifier(c) for c in [column_name] + [c for c in self.table.columns if c != column_name]
         ]
 
         # We add an index for whatever column we're sorting by,
@@ -253,14 +252,15 @@ class TabularDataFrame(tk.Frame):
         # XXX workaround for https://github.com/duckdb/duckdb/issues/16086
         if not self.ddbc.sql(f"select 1 from duckdb_indexes() where index_name = {index_literal}"):
             sql = (
-                f"CREATE INDEX IF NOT EXISTS {index_identifier} ON {self.table.alias} (" +
-                ','.join(escaped_column_names) + ")"
+                f"CREATE INDEX IF NOT EXISTS {index_identifier} ON {self.table.alias} ("
+                + ",".join(escaped_column_names)
+                + ")"
             )
             logger.debug("TabularDataFrame set_sort_order index sql %s", sql)
             self.ddbc.sql(sql)
 
         direction = "ASC" if self.sort_ascending else "DESC"
-        self.table_order = ','.join(f"{c} {direction}" for c in escaped_column_names)
+        self.table_order = ",".join(f"{c} {direction}" for c in escaped_column_names)
 
         logger.debug("TabularDataFrame set_sort_order %s %s", column_name, self.table_order)
 
