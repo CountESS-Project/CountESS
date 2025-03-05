@@ -8,6 +8,7 @@ from countess.core.parameters import (
     ArrayParam,
     ChoiceParam,
     ColumnChoiceParam,
+    NumericColumnChoiceParam,
     ColumnOrNoneChoiceParam,
     FloatParam,
     StringParam,
@@ -45,7 +46,7 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
     description = "Scaled Scores using variant classification"
     version = VERSION
 
-    score_col = ColumnChoiceParam("Score Column")
+    score_col = NumericColumnChoiceParam("Score Column")
     classifiers = ArrayParam("Variant Classifiers", ScaleClassParam("Class"), min_size=2, max_size=2, read_only=True)
     group_col = ColumnOrNoneChoiceParam("Group By")
 

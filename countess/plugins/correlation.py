@@ -4,7 +4,7 @@ import pandas as pd
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import ColumnChoiceParam, ColumnOrNoneChoiceParam
+from countess.core.parameters import NumericColumnChoiceParam, ColumnOrNoneChoiceParam
 from countess.core.plugins import DuckdbSimplePlugin
 from countess.utils.duckdb import duckdb_escape_identifier
 
@@ -18,8 +18,8 @@ class CorrelationPlugin(DuckdbSimplePlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#correlation-tool"
 
     group = ColumnOrNoneChoiceParam("Group")
-    column1 = ColumnChoiceParam("Column X")
-    column2 = ColumnChoiceParam("Column Y")
+    column1 = NumericColumnChoiceParam("Column X")
+    column2 = NumericColumnChoiceParam("Column Y")
 
     columns: list[str] = []
     dataframes: list[pd.DataFrame] = []

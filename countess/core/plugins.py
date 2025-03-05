@@ -36,7 +36,7 @@ from countess.core.parameters import (
     HasSubParametersMixin,
     MultiParam,
 )
-from countess.utils.duckdb import duckdb_combine, duckdb_escape_literal
+from countess.utils.duckdb import duckdb_combine, duckdb_dtype_is_numeric, duckdb_escape_literal
 from countess.utils.files import clean_filename
 from countess.utils.pyarrow import python_type_to_arrow_dtype
 
@@ -137,7 +137,10 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         self.prepare(ddbc, duckdb_combine(ddbc, list(sources.values())))
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
-        self.set_column_choices([] if source is None else source.columns)
+        if source is None:
+            self.set_column_choices({})
+        else:
+            self.set_column_choices({c: duckdb_dtype_is_numeric(d) for c, d in zip(source.columns, source.dtypes)})
 
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None

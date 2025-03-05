@@ -11,7 +11,7 @@ def test_variant_ref_value():
     plugin.set_parameter("reference", "AGAAGTAGAGG")
     plugin.set_parameter("variant.seq_type", "g")
     plugin.set_parameter("variant.output", "out")
-    plugin.set_column_choices(["seq"])
+    plugin.set_column_choices({"seq": False})
 
     assert plugin.transform({"seq": "TGAAGTAGAGG"})["out"] == "g.1A>T"
     assert plugin.transform({"seq": "AGAAGTTGTGG"})["out"] == "g.[7A>T;9A>T]"
@@ -24,7 +24,7 @@ def test_variant_ref_column():
     plugin.set_parameter("reference", "— ref")
     plugin.set_parameter("variant.seq_type", "g")
     plugin.set_parameter("variant.output", "out")
-    plugin.set_column_choices(["seq", "ref"])
+    plugin.set_column_choices({"seq": False, "ref": False})
 
     assert plugin.transform({"ref": "TACACACAG", "seq": "TACAGACAG"})["out"] == "g.5C>G"
     assert plugin.transform({"ref": "ATGGTTGGTTC", "seq": "ATGGTTGGTGGTTCG"})["out"] == "g.[7_9dup;11_12insG]"
@@ -37,7 +37,7 @@ def test_variant_ref_offset():
     plugin.set_parameter("variant.offset", "— offs")
     plugin.set_parameter("variant.seq_type", "g")
     plugin.set_parameter("variant.output", "out")
-    plugin.set_column_choices(["seq", "offs"])
+    plugin.set_column_choices({"seq": False, "offs": True})
 
     assert plugin.transform({"seq": "TGAAGTAGAGG", "offs": "0"})["out"] == "g.1A>T"
     assert plugin.transform({"seq": "AGAAGTTGTGG", "offs": "10"})["out"] == "g.[17A>T;19A>T]"
@@ -65,7 +65,7 @@ def test_variant_ref_offset_minus():
     plugin.set_parameter("variant.seq_type", "g")
     plugin.set_parameter("variant.minus_strand", True)
     plugin.set_parameter("variant.output", "out")
-    plugin.set_column_choices(["seq", "offs"])
+    plugin.set_column_choices({"seq": False, "offs": True})
 
     assert plugin.transform({"seq": "TGAAGTAGAGG"})["out"] == "g.1011T>A"
     assert plugin.transform({"seq": "AGAAGTTGTGG"})["out"] == "g.[1003T>A;1005T>A]"
@@ -79,7 +79,7 @@ def test_variant_too_many():
     plugin.set_parameter("variant.seq_type", "g")
     plugin.set_parameter("variant.output", "out")
     plugin.set_parameter("variant.maxlen", 2)
-    plugin.set_column_choices(["seq", "offs"])
+    plugin.set_column_choices({"seq": False, "offs": True})
 
     assert plugin.transform({"seq": "TGAAGTAGAGG"})["out"] == "g.1A>T"
     assert plugin.transform({"seq": "AGAAGTTGTGG"})["out"] == "g.[7A>T;9A>T]"

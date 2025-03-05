@@ -226,7 +226,7 @@ def test_coindex():
 def test_columnorintegerparam():
     df = pd.DataFrame([[1, 2], [3, 4]], columns=["a", "b"])
     cp = ColumnOrIntegerParam("x")
-    cp.set_column_choices(["a", "b"])
+    cp.set_column_choices({"a": True, "b": True})
 
     assert cp.get_column_name() is None
 
@@ -240,7 +240,7 @@ def test_columnorintegerparam():
     assert cp.get_column_name() == "a"
     assert isinstance(cp.get_column_or_value(df, False), pd.Series)
 
-    cp.set_column_choices(["c", "d"])
+    cp.set_column_choices({"c": True, "d": True})
     assert cp.choice is None
 
     cp.value = "hello"
@@ -250,7 +250,7 @@ def test_columnorintegerparam():
 def test_columngroup():
     df = pd.DataFrame([], columns=["one_two", "one_three", "two_one", "two_two", "two_three", "three_four_five"])
     cp = ColumnGroupOrNoneChoiceParam("x")
-    cp.set_column_choices(df.columns)
+    cp.set_column_choices({c: True for c in df.columns})
     assert cp.is_none()
     assert "one_*" in cp.choices
     assert "two_*" in cp.choices
@@ -330,11 +330,11 @@ def test_pcap():
     pp = IntegerParam("x")
     ap = PerColumnArrayParam("y", param=pp)
 
-    ap.set_column_choices(["a", "b", "c"])
+    ap.set_column_choices({"a": True, "b": True, "c": True })
     assert len(ap) == 3
     apa, apb, apc = list(ap)
 
-    ap.set_column_choices(["c", "d", "b", "a"])
+    ap.set_column_choices({"c": True, "d": True, "b": True, "a": True})
     assert len(ap) == 4
     assert ap[0] is apc
     assert ap[2] is apb

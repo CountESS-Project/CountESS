@@ -14,7 +14,7 @@ PARAM_DIGEST_HASH = "sha256"
 logger = logging.getLogger(__name__)
 
 
-def make_prefix_groups(strings: List[str]) -> Dict[str, List[str]]:
+def make_prefix_groups(strings: Iterable[str]) -> Dict[str, List[str]]:
     groups: Dict[str, List[str]] = {}
     for s in strings:
         if m := re.match(r"(.*?_+)([^_]+)$", s):
@@ -50,7 +50,7 @@ class BaseParam:
     def get_hash_value(self):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.get_hash_value()")
 
-    def set_column_choices(self, choices: List[str]):
+    def set_column_choices(self, choices: Mapping[str, bool]):
         pass
 
 
@@ -546,11 +546,16 @@ class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
 
-    def set_column_choices(self, choices: List[str]):
-        self.set_choices(list(choices))
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        self.set_choices(list(choices.keys()))
 
     def get_column(self, df):
         return _dataframe_get_column(df, self.value)
+
+
+class NumericColumnChoiceParam(ColumnChoiceParam):
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        self.set_choices([c for c, n in choices.items() if n])
 
 
 class ColumnOrNoneChoiceParam(ColumnChoiceParam):
@@ -573,8 +578,8 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
 
 class ColumnGroupChoiceParam(ChoiceParam):
-    def set_column_choices(self, choices: List[str]):
-        self.set_choices([n + "*" for n in make_prefix_groups(choices).keys()])
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        self.set_choices([n + "*" for n in make_prefix_groups(choices.keys()).keys()])
 
     def get_column_prefix(self):
         return self.value.removesuffix("*")
@@ -634,7 +639,7 @@ class ColumnOrStringParam(ColumnChoiceParam):
     DEFAULT_VALUE: Any = ""
     PREFIX = "— "
 
-    def set_column_choices(self, choices: List[str]):
+    def set_column_choices(self, choices: Mapping[str, bool]):
         self.set_choices([self.PREFIX + c for c in choices])
 
     def get_column_name(self) -> Optional[str]:
@@ -677,6 +682,9 @@ class ColumnOrStringParam(ColumnChoiceParam):
 
 class ColumnOrIntegerParam(ColumnOrStringParam):
     DEFAULT_VALUE: int = 0
+
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        self.set_choices([self.PREFIX + c for c, n in choices.items() if n])
 
     def __init__(
         self,
@@ -755,7 +763,7 @@ class HasSubParametersMixin:
             elif isinstance(param, ScalarParam):
                 param.set_value(value)
 
-    def set_column_choices(self, choices: List[str]):
+    def set_column_choices(self, choices: Mapping[str, bool]):
         logger.debug("HasSubParametersMixin.set_column_choices %s", choices)
         for p in self.params.values():
             p.set_column_choices(choices)
@@ -856,7 +864,7 @@ class ArrayParam(BaseParam):
             digest.update(p.get_hash_value().encode("utf-8"))
         return digest.hexdigest()
 
-    def set_column_choices(self, choices: List[str]):
+    def set_column_choices(self, choices: Mapping[str, bool]):
         self.param.set_column_choices(choices)
         for p in self.params:
             p.set_column_choices(choices)
@@ -897,10 +905,10 @@ class PerColumnArrayParam(ArrayParam):
             yield f"{key}.{n}._label", p.label
             yield from p.get_parameters(f"{key}.{n}", base_dir)
 
-    def set_column_choices(self, choices: List[str]):
+    def set_column_choices(self, choices: Mapping[str, bool]):
         params_by_label = {p.label: p for p in self.params}
         self.params = []
-        for label in choices:
+        for label in choices.keys():
             if label in params_by_label:
                 self.params.append(params_by_label[label])
             else:
@@ -911,6 +919,11 @@ class PerColumnArrayParam(ArrayParam):
     def get_column_params(self):
         for p in self.params:
             yield p.label, p
+
+
+class PerNumericColumnArrayParam(PerColumnArrayParam):
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        super().set_column_choices({k: True for k, v in choices.items() if v})
 
 
 class FileArrayParam(ArrayParam):
