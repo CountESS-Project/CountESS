@@ -62,7 +62,7 @@ jobs:
       with:
         python-version: "3.x"
         cache: 'pip'
-    - run: sudo apt install xvfb libopenblas0 libopenblas-dev
+    - run: sudo apt install xvfb libopenblas0 libopenblas-dev librapidfuzz-cpp-dev
     - run: python3 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
     - run: /tmp/venv/bin/python -m pip install -e .[dev]

@@ -57,9 +57,9 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
         all_columns = ",".join(duckdb_escape_identifier(c) for c in source.columns if c != self.score_col.value)
 
         if self.group_col.is_not_none():
-            group_col_id = 'T0.' + duckdb_escape_identifier(self.group_col.value)
+            group_col_id = "T0." + duckdb_escape_identifier(self.group_col.value)
         else:
-            group_col_id = '1'  # dummy value for one big group.
+            group_col_id = "1"  # dummy value for one big group.
 
         sql = f"""
             select {all_columns}, ({score_col_id} - T1.y) / (T1.z - T1.y) as {score_col_id}

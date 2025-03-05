@@ -1,9 +1,9 @@
 # TK based GUI for CountESS
+import logging
 import tkinter as tk
 from functools import partial
 from tkinter import ttk
 from typing import Mapping, MutableMapping, Optional
-import logging
 
 from ..core.parameters import (
     ArrayParam,
