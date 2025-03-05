@@ -264,6 +264,7 @@ class ConfiguratorWrapper:
         self.node.plugin = plugin_class()
         # self.node.prerun()
         self.node.is_dirty = True
+        self.node.run(self.ddbc, preview_row_limit)
         self.show_config_subframe()
         self.change_callback(self.node)
 

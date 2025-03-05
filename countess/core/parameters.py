@@ -491,6 +491,8 @@ class DataTypeChoiceParam(ChoiceParam):
             return None
 
     def cast_value(self, value):
+        if self.value not in self.DATA_TYPES:
+            return None
         if value is not None:
             try:
                 return self.DATA_TYPES[self.value][0](value)
