@@ -47,6 +47,7 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
     version = VERSION
 
     score_col = NumericColumnChoiceParam("Score Column")
+    scaled_col = StringParam("Scaled Score Column", "scaled_score")
     classifiers = ArrayParam("Variant Classifiers", ScaleClassParam("Class"), min_size=2, max_size=2, read_only=True)
     group_col = ColumnOrNoneChoiceParam("Group By")
 
@@ -54,8 +55,9 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         score_col_id = duckdb_escape_identifier(self.score_col.value)
+        scaled_col_id = duckdb_escape_identifier(self.scaled_col.value)
 
-        all_columns = ",".join(duckdb_escape_identifier(c) for c in source.columns if c != self.score_col.value)
+        all_columns = ",".join("T0." + duckdb_escape_identifier(c) for c in source.columns if c != self.scaled_col.value)
 
         if self.group_col.is_not_none():
             group_col_id = "T0." + duckdb_escape_identifier(self.group_col.value)
@@ -63,7 +65,7 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
             group_col_id = "1"  # dummy value for one big group.
 
         sql = f"""
-            select {all_columns}, ({score_col_id} - T1.y) / (T1.z - T1.y) as {score_col_id}
+            select {all_columns}, ({score_col_id} - T1.y) / (T1.z - T1.y) as {scaled_col_id}
             from {source.alias} T0 join (
                 select {group_col_id} as x,
                     median({score_col_id}) filter ({self.classifiers[0].filter()}) as y,
