@@ -401,7 +401,7 @@ class ParameterWrapper:
             else:
                 self.var.set(self.set_value(self.var.get()))
         else:
-            val = self.set_value(self.var.get())
+            self.set_value(self.var.get())
 
     def widget_modified_callback(self, *_):
         # only gets called the *first* time a modification happens, unless

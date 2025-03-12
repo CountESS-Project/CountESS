@@ -166,10 +166,10 @@ class NumericParam(ScalarWithOperatorsParam):
     def set_value(self, value):
         try:
             if type(value) is str:
-                if m := re.match(r'(\d+(\.\d*)?)', value):
+                if m := re.match(r"(\d+(\.\d*)?)", value):
                     value = m.group(1)
             self._value = self.var_type(value)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             self.reset_value()
 
     # Operator methods which apply only to numerics

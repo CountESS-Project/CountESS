@@ -330,7 +330,7 @@ def test_pcap():
     pp = IntegerParam("x")
     ap = PerColumnArrayParam("y", param=pp)
 
-    ap.set_column_choices({"a": True, "b": True, "c": True })
+    ap.set_column_choices({"a": True, "b": True, "c": True})
     assert len(ap) == 3
     apa, apb, apc = list(ap)
 

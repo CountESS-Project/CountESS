@@ -8,9 +8,9 @@ from countess.core.parameters import (
     ArrayParam,
     ChoiceParam,
     ColumnChoiceParam,
-    NumericColumnChoiceParam,
     ColumnOrNoneChoiceParam,
     FloatParam,
+    NumericColumnChoiceParam,
     StringParam,
     TabularMultiParam,
 )

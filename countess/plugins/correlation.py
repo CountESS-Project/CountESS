@@ -4,7 +4,7 @@ import pandas as pd
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import NumericColumnChoiceParam, ColumnOrNoneChoiceParam
+from countess.core.parameters import ColumnOrNoneChoiceParam, NumericColumnChoiceParam
 from countess.core.plugins import DuckdbSimplePlugin
 from countess.utils.duckdb import duckdb_escape_identifier
 
