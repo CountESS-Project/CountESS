@@ -11,14 +11,6 @@ from countess.core.plugins import DuckdbLoadFilePlugin
 logger = logging.getLogger(__name__)
 
 
-# UDF for calculating average quality so it can be filtered.
-# XXX it would be great to do this as a native DuckDB function
-# as calling a Python UDF is quite slow.
-def _fastq_avg_quality(quality: str) -> float:
-    q_bytes = quality.encode("ascii")
-    return sum(q_bytes) / len(q_bytes) - 33
-
-
 class LoadFastqPlugin(DuckdbLoadFilePlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
     with count=1 and then grouping by sequence and summing counts.  It supports counting
@@ -46,16 +38,10 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
             rel = rel.limit(row_limit)
 
         if self.min_avg_quality > 0:
-            try:
-                cursor.create_function(
-                    "fastq_avg_quality",
-                    _fastq_avg_quality,
-                    exception_handling=duckdb.PythonExceptionHandling.RETURN_NULL,
-                    side_effects=False,
-                )
-            except duckdb.CatalogException as exc:
-                assert "fastq_avg_quality" in str(exc)
-            rel = rel.filter("fastq_avg_quality(quality_scores) >= %f" % self.min_avg_quality.value)
+            rel = rel.filter(
+                "list_aggregate(list_transform(string_split(quality_scores, ''), x -> ord(x)), 'avg') - 33 >= %f"
+                % self.min_avg_quality.value
+            )
 
         if self.group:
             rel = rel.aggregate("sequence, count(*) as count")
@@ -69,7 +55,9 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
     ) -> Optional[duckdb.DuckDBPyRelation]:
         combined_view = super().combine(ddbc, tables)
-        if self.filename_column or self.header_column or combined_view is None:
+        if combined_view is None:
+            return None
+        elif self.filename_column or self.header_column:
             return combined_view
         else:
             return combined_view.aggregate("sequence, sum(count) as count")
