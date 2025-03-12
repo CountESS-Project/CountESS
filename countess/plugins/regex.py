@@ -1,6 +1,7 @@
 import logging
-import re
-from typing import Any, Optional
+from typing import Optional
+
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -11,7 +12,8 @@ from countess.core.parameters import (
     MultiParam,
     StringParam,
 )
-from countess.core.plugins import DuckdbThreadedTransformPlugin
+from countess.core.plugins import DuckdbSimplePlugin
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class OutputColumnsMultiParam(MultiParam):
     datatype = DataTypeChoiceParam("Column Type", "STRING")
 
 
-class RegexToolPlugin(DuckdbThreadedTransformPlugin):
+class RegexToolPlugin(DuckdbSimplePlugin):
     name = "Regex Tool"
     description = "Apply regular expressions to a column to make new column(s)"
     link = "https://countess-project.github.io/CountESS/included-plugins/#regex-tool"
@@ -33,37 +35,34 @@ class RegexToolPlugin(DuckdbThreadedTransformPlugin):
     drop_column = BooleanParam("Drop Column", False)
     drop_unmatch = BooleanParam("Drop Unmatched Rows", False)
 
-    compiled_re = None
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
+        column_id = duckdb_escape_identifier(self.column.value)
+        regexp_value = duckdb_escape_literal(self.regex.value)
+        output_ids = [duckdb_escape_literal(o.name.value) for o in self.output if o.name.value]
+        output_types = [
+            duckdb_escape_identifier(o.name.value) + " " + o.datatype.value for o in self.output if o.name.value
+        ]
 
-    def prepare(self, *a) -> None:
-        super().prepare(*a)
-        self.compiled_re = re.compile(self.regex.value)
-
-    def add_fields(self):
-        return {op.name.value: op.datatype.get_selected_type() for op in self.output}
-
-    def remove_fields(self, field_names):
         if self.drop_column:
-            return [self.column.value]
+            proj = "".join(duckdb_escape_identifier(c) + ", " for c in source.columns if c != self.column.value)
         else:
-            return []
+            proj = "*, "
 
-    def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
-        assert self.compiled_re is not None
-        value = data[self.column.value]
-        if value is not None:
-            try:
-                if match := self.compiled_re.match(str(value)):
-                    data.update(
-                        {op.name.value: op.datatype.cast_value(val) for op, val in zip(self.output, match.groups())}
-                    )
-                    return data
-                else:
-                    logger.info("%s didn't match", repr(value))
-            except (TypeError, ValueError) as exc:
-                logger.warning("Exception", exc_info=exc)
+        proj += f"""
+            unnest(try_cast(
+                regexp_extract({column_id}, {regexp_value}, [{','.join(output_ids)}])
+                as struct({','.join(output_types)})
+            ))
+        """
+
+        logger.debug("VampseqScorePlugin proj %s", proj)
 
         if self.drop_unmatch:
-            return None
+            filt = f"regexp_matches({column_id}, {regexp_value})"
+            logger.debug("VampseqScorePlugin filt %s", filt)
+            return source.filter(filt).project(proj)
+
         else:
-            return data
+            return source.project(proj)

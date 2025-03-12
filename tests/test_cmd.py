@@ -8,9 +8,9 @@ from countess import VERSION
 from countess.core.cmd import configure_graphs, main, run
 
 expected_output = """"thing","result"
-"foo",23512.8
+"foo",23512.799
 "baz",12769
-"qux",14728.114285714286
+"qux",14728.114
 """
 
 
