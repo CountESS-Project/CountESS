@@ -12,7 +12,7 @@ from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_litera
 
 logger = logging.getLogger(__name__)
 
-UNOPS = {ast.UAdd: "+", ast.USub: "-"}
+UNOPS = {ast.UAdd: "+", ast.USub: "-", ast.Not: "not "}
 BINOPS = {
     ast.Add: "+",
     ast.Mult: "*",
@@ -55,6 +55,11 @@ LISTOPS = {
     "var_samp": "list_var_samp",
     "std_samp": "list_stddev_samp",
 }
+BOOLOPS = {
+    ast.And: "AND",
+    ast.Or: "OR",
+}
+
 COMPOPS = {ast.Eq: "=", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">="}
 
 
@@ -75,6 +80,9 @@ def _transmogrify(ast_node):
         left = _transmogrify(ast_node.left)
         right = _transmogrify(ast_node.right)
         return f"({left} {binop} {right})"
+    elif type(ast_node) is ast.BoolOp and type(ast_node.op) in BOOLOPS:
+        boolop = BOOLOPS[type(ast_node.op)]
+        return "(" + (f" {boolop} ".join(_transmogrify(v) for v in ast_node.values)) + ")"
     elif type(ast_node) is ast.Compare and all(type(op) in COMPOPS for op in ast_node.ops):
         args = [_transmogrify(x) for x in [ast_node.left] + ast_node.comparators]
         comps = [args[num] + COMPOPS[type(op)] + args[num + 1] for num, op in enumerate(ast_node.ops)]
@@ -106,7 +114,7 @@ class ExpressionPlugin(DuckdbSimplePlugin):
         use 'concat' function.  For selection use python-like "a if b else c".  To remove a column,
         set it to constant None.   Set a variable '__filter' to False to remove rows.
 
-        Available operators: + - * ** / //
+        Available operators: + - * ** / // and or not
         
         Available functions:
     """ + " ".join(
@@ -137,7 +145,6 @@ class ExpressionPlugin(DuckdbSimplePlugin):
                     tgt = re.sub(r"_+$", "", re.sub(r"\W+", "_", ast.unparse(ast_node)))
                     expr = _transmogrify(ast_node.value)
                     self.projection[tgt] = _transmogrify(ast_node.value)
-
             except (NotImplementedError, KeyError) as exc:
                 logger.debug("Bad AST Node: %s %s", ast_node, exc)
 
