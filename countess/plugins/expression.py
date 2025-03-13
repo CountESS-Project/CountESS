@@ -45,6 +45,12 @@ FUNCOPS = {
     "lower",
     "upper",
 }
+CASTOPS = {
+        "int": "integer",
+        "float": "float",
+        "str": "string",
+        "bool": "boolean",
+}
 LISTOPS = {
     "sum": "list_sum",
     "product": "list_product",
@@ -83,6 +89,15 @@ def _transmogrify(ast_node):
     elif type(ast_node) is ast.BoolOp and type(ast_node.op) in BOOLOPS:
         boolop = BOOLOPS[type(ast_node.op)]
         return "(" + (f" {boolop} ".join(_transmogrify(v) for v in ast_node.values)) + ")"
+    elif type(ast_node) is ast.Subscript:
+        value = _transmogrify(ast_node.value)
+        if type(ast_node.slice) is ast.Slice:
+            lower = _transmogrify(ast_node.slice.lower)
+            upper = _transmogrify(ast_node.slice.upper)
+            return f"({value}[{lower}:{upper}])"
+        else:
+            index = _transmogrify(ast_node.slice)
+            return f"({value}[{index}])"
     elif type(ast_node) is ast.Compare and all(type(op) in COMPOPS for op in ast_node.ops):
         args = [_transmogrify(x) for x in [ast_node.left] + ast_node.comparators]
         comps = [args[num] + COMPOPS[type(op)] + args[num + 1] for num, op in enumerate(ast_node.ops)]
@@ -99,6 +114,9 @@ def _transmogrify(ast_node):
         elif ast_node.func.id in LISTOPS:
             func = LISTOPS[ast_node.func.id]
             return f"{func}([{args}])"
+        elif ast_node.func.id in CASTOPS:
+            type_ = CASTOPS[ast_node.func.id]
+            return f"TRY_CAST({args} as {type_})"
         else:
             raise NotImplementedError(f"Unknown Function {ast_node.func.id}")
 
@@ -118,7 +136,7 @@ class ExpressionPlugin(DuckdbSimplePlugin):
         
         Available functions:
     """ + " ".join(
-        sorted(list(FUNCOPS) + list(LISTOPS.keys()))
+        sorted(list(FUNCOPS) + list(LISTOPS.keys()) + list(CASTOPS.keys()))
     )
 
     version = VERSION
@@ -133,6 +151,7 @@ class ExpressionPlugin(DuckdbSimplePlugin):
             ast_root = ast.parse(self.code.value or "")
         except SyntaxError as exc:
             logger.debug("Syntax Error %s", exc)
+            return
 
         for ast_node in ast_root.body:
             try:
@@ -151,7 +170,9 @@ class ExpressionPlugin(DuckdbSimplePlugin):
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        assert self.projection is not None
+        if not self.projection:
+            return source
+
         old_columns = [duckdb_escape_identifier(c) for c in source.columns if c not in self.projection]
         new_columns = [
             v + " AS " + duckdb_escape_identifier(k)
@@ -162,6 +183,8 @@ class ExpressionPlugin(DuckdbSimplePlugin):
 
         logger.debug("ExpressionPlugin.execute projection %s", projection)
         if "__filter" in self.projection:
-            return source.project(projection).filter(self.projection["__filter"])
+            filter_ = self.projection["__filter"]
+            logger.debug("ExpressionPlugin.execute filter %s", filter_)
+            return source.project(projection).filter(filter_)
         else:
             return source.project(projection)
