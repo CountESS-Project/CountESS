@@ -4,7 +4,7 @@ from typing import Optional
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import FloatParam, PerNumericColumnArrayParam, TabularMultiParam
+from countess.core.parameters import FloatParam, PerNumericColumnArrayParam, TabularMultiParam, ColumnOrNoneChoiceParam
 from countess.core.plugins import DuckdbSimplePlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -21,6 +21,16 @@ class VampSeqScorePlugin(DuckdbSimplePlugin):
     version = VERSION
 
     columns = PerNumericColumnArrayParam("Columns", CountColumnParam("Column"))
+    group_col = ColumnOrNoneChoiceParam("Group By")
+
+    def prepare(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> None:
+        super().prepare(ddbc, source)
+
+        # set default values for weights on "count" columns
+        if all(c.weight.value is None for c in self.columns):
+            count_cols = [ c for c in self.columns if c.label.startswith('count') ]
+            for n, c in enumerate(count_cols):
+                c.weight.value = (n+1)/len(count_cols)
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
@@ -34,10 +44,23 @@ class VampSeqScorePlugin(DuckdbSimplePlugin):
         if not weighted_columns:
             return source
 
-        weighted_counts = " + ".join(f"{k} * {v}" for k, v in weighted_columns.items())
-        total_counts = " + ".join(k for k in weighted_columns.keys())
+        if self.group_col.is_not_none():
+            group_col_id = "T0." + duckdb_escape_identifier(self.group_col.value)
+        else:
+            group_col_id = "1"
 
-        proj = f"*, ({weighted_counts}) / ({total_counts}) as score"
+        sums = ", ".join(f"sum(T0.{k}) as {k}" for k in weighted_columns.keys())
+        weighted_counts = " + ".join(f"T0.{k} * {v} / T1.{k}" for k, v in weighted_columns.items())
+        total_counts = " + ".join(f"T0.{k} / T1.{k}" for k in weighted_columns.keys())
 
-        logger.debug("VampseqScorePlugin proj %s", proj)
-        return source.project(proj)
+        sql = f"""
+            select T0.*, ({weighted_counts}) / ({total_counts}) as score
+            from {source.alias} T0 join (
+                select {group_col_id} as score_group, {sums}
+                from {source.alias} T0
+                group by score_group
+            ) T1 on ({group_col_id} = T1.score_group)
+        """
+
+        logger.debug("VampseqScorePlugin sql %s", sql)
+        return ddbc.sql(sql)
