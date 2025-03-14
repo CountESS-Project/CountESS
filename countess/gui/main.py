@@ -43,7 +43,7 @@ options:
     --preview LIMIT                set preview mode row limit (default: %d)
     --log LEVEL                    set log level to LEVEL
     INIFILE                        load configuration file
-"""
+""" % preview_row_limit
 
 
 # import faulthandler
@@ -652,9 +652,9 @@ def main() -> None:
             if opt_val.upper() == "NONE":
                 preview_row_limit = None
             elif re.match(r"\d+$", opt_val):
-                preview_row_limit = int(opt_val)
+                preview_row_limit = int(opt_val) or None
             else:
-                logger.warning("Bad --preview value: %s", opt_val)
+                logger.warning("Bad --preview value: %s, expected a positive integer or 'NONE'", opt_val)
         elif opt_key == "--log":
             try:
                 log_level: Union[int, str]
@@ -667,10 +667,13 @@ def main() -> None:
             except ValueError:
                 logger.error("Bad --log level: %s", opt_val)
 
+    logger.info("Preview Limit set to %d", preview_row_limit)
+
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.
     logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
     # logging.getLogger().addHandler(logging.StreamHandler())
+
 
     root = make_root()
     SplashScreen(root)
