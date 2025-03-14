@@ -67,18 +67,18 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
             group_col_id = "1"  # dummy value for one big group.
 
         c0, c1 = self.classifiers
-        s0 = duckdb_escape_literal(c0.score.value)
-        s1 = duckdb_escape_literal(c1.score.value)
+        scale_0 = duckdb_escape_literal(c0.score.value)
+        scale_1 = duckdb_escape_literal(c1.score.value)
 
         sql = f"""
-            select {all_columns}, ({s1} - {s0}) * ({score_col_id} - T1.y) / (T1.z - T1.y) + {s0} as {scaled_col_id}
+            select {all_columns}, T1.score_0, T1.score_1, ({scale_1} - {scale_0}) * ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) + {scale_0} as {scaled_col_id}
             from {source.alias} T0 join (
-                select {group_col_id} as x,
-                    median({score_col_id}) filter ({c0.filter()}) as y,
-                    median({score_col_id}) filter ({c1.filter()}) as z
+                select {group_col_id} as score_group,
+                    median({score_col_id}) filter ({c0.filter()}) as score_0,
+                    median({score_col_id}) filter ({c1.filter()}) as score_1
                 from {source.alias} T0
-                group by x
-            ) T1 on ({group_col_id} = T1.x)
+                group by score_group
+            ) T1 on ({group_col_id} = T1.score_group)
         """
 
         logger.debug("ScoreScalingPlugin sql %s", sql)
