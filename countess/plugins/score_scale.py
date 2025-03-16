@@ -9,7 +9,6 @@ from countess.core.parameters import (
     ChoiceParam,
     ColumnChoiceParam,
     ColumnOrNoneChoiceParam,
-    FloatParam,
     NumericColumnChoiceParam,
     StringParam,
     TabularMultiParam,
@@ -24,7 +23,6 @@ class ScaleClassParam(TabularMultiParam):
     col = ColumnChoiceParam("Column")
     op = ChoiceParam("Operation", "Equals", ["Equals", "Starts With", "Ends With", "Contains", "Matches"])
     st = StringParam("Value")
-    score = FloatParam("Scaled Score")
 
     def filter(self):
         col = duckdb_escape_identifier(self.col.value)
@@ -53,6 +51,13 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
     classifiers = ArrayParam("Variant Classifiers", ScaleClassParam("Class"), min_size=2, max_size=2, read_only=True)
     group_col = ColumnOrNoneChoiceParam("Group By")
 
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+
+        # override classifiers labels
+        self.classifiers[0].label = 'Scale to 0.0'
+        self.classifiers[1].label = 'Scale to 1.0'
+
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
@@ -67,11 +72,9 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
             group_col_id = "1"  # dummy value for one big group.
 
         c0, c1 = self.classifiers
-        scale_0 = duckdb_escape_literal(c0.score.value)
-        scale_1 = duckdb_escape_literal(c1.score.value)
 
         sql = f"""
-            select {all_columns}, T1.score_0, T1.score_1, ({scale_1} - {scale_0}) * ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) + {scale_0} as {scaled_col_id}
+            select {all_columns}, ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) as {scaled_col_id}
             from {source.alias} T0 join (
                 select {group_col_id} as score_group,
                     median({score_col_id}) filter ({c0.filter()}) as score_0,
