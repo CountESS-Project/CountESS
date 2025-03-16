@@ -55,8 +55,8 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
         super().__init__(*a, **k)
 
         # override classifiers labels
-        self.classifiers[0].label = 'Scale to 0.0'
-        self.classifiers[1].label = 'Scale to 1.0'
+        self.classifiers[0].label = "Scale to 0.0"
+        self.classifiers[1].label = "Scale to 1.0"
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None

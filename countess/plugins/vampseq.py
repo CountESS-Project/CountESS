@@ -4,7 +4,7 @@ from typing import Optional
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import FloatParam, PerNumericColumnArrayParam, TabularMultiParam, ColumnOrNoneChoiceParam
+from countess.core.parameters import ColumnOrNoneChoiceParam, FloatParam, PerNumericColumnArrayParam, TabularMultiParam
 from countess.core.plugins import DuckdbSimplePlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -23,14 +23,14 @@ class VampSeqScorePlugin(DuckdbSimplePlugin):
     columns = PerNumericColumnArrayParam("Columns", CountColumnParam("Column"))
     group_col = ColumnOrNoneChoiceParam("Group By")
 
-    def prepare(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation) -> None:
+    def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
         super().prepare(ddbc, source)
 
         # set default values for weights on "count" columns
         if all(c.weight.value is None for c in self.columns):
-            count_cols = [ c for c in self.columns if c.label.startswith('count') ]
+            count_cols = [c for c in self.columns if c.label.startswith("count")]
             for n, c in enumerate(count_cols):
-                c.weight.value = (n+1)/len(count_cols)
+                c.weight.value = (n + 1) / len(count_cols)
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None

@@ -33,6 +33,7 @@ class PivotPlugin(DuckdbSimplePlugin):
         pivot_cols = [p.label for p in self.columns if p.value == "Pivot" and p.label in source.columns]
         expand_cols = [p.label for p in self.columns if p.value == "Expand" and p.label in source.columns]
 
+        logger.debug("PivotPlugin.execute columns %s", source.columns)
         logger.debug("PivotPlugin.execute index_cols %s", index_cols)
         logger.debug("PivotPlugin.execute pivot_cols %s", pivot_cols)
         logger.debug("PivotPlugin.execute expand_cols %s", expand_cols)
@@ -66,6 +67,7 @@ class PivotPlugin(DuckdbSimplePlugin):
             query_str = f"{query_str} GROUP BY {group_str}"
 
         logger.debug("PivotPlugin.execute query_str %s", query_str)
+        rel = ddbc.sql(query_str)
 
         project_str = f"COLUMNS('(.*)_{pivot_char}(.*)')"
         if self.default_0:
@@ -80,5 +82,6 @@ class PivotPlugin(DuckdbSimplePlugin):
             project_str = (", ".join([duckdb_escape_identifier(ic) for ic in index_cols])) + ", " + project_str
 
         logger.debug("PivotPlugin.execute project_str %s", project_str)
+        logger.debug("PivotPlugin.execute project columns %s", rel.columns)
 
-        return ddbc.sql(query_str).project(project_str)
+        return rel.project(project_str)

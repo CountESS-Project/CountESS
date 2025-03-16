@@ -18,8 +18,8 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSimplePlugin
-from countess.utils.variant import TooManyVariationsException, find_variant_string
 from countess.utils.duckdb import duckdb_escape_identifier
+from countess.utils.variant import TooManyVariationsException, find_variant_string
 
 logger = logging.getLogger(__name__)
 

@@ -33,17 +33,20 @@ from countess.gui.widgets import (
 
 preview_row_limit: Optional[int] = 10000000
 
-usage = """usage: countess_gui [--log LEVEL] [INIFILE]
+usage = (
+    """usage: countess_gui [--log LEVEL] [INIFILE]
 
 Start the CountESS GUI.
 
 options:
     --help                         show this message & exit.
     --version                      show version
-    --preview LIMIT                set preview mode row limit (default: %d)
+    --preview LIMIT                set preview mode row limit (default: %s)
     --log LEVEL                    set log level to LEVEL
     INIFILE                        load configuration file
-""" % preview_row_limit
+"""
+    % preview_row_limit or "NONE"
+)
 
 
 # import faulthandler
@@ -237,13 +240,13 @@ class ConfiguratorWrapper:
 
     def config_change_callback(self, *_):
         """Called immediately if a change to config has occurred."""
-        logger.debug("config_change_callback")
+        # logger.debug("config_change_callback")
         self.node.mark_dirty()
 
         # Leave it a bit (2500ms) to see if the user is still typing, if so cancel
         # the previous task and make a new task for another 2.5 seconds away ...
         if self.config_change_task:
-            logger.debug("config_change_callback: cancelling task")
+            # logger.debug("config_change_callback: cancelling task")
             self.frame.after_cancel(self.config_change_task)
         self.config_change_task = self.frame.after(2500, self.config_change_task_callback)
 
@@ -673,7 +676,6 @@ def main() -> None:
     # messages back to the main process.
     logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
     # logging.getLogger().addHandler(logging.StreamHandler())
-
 
     root = make_root()
     SplashScreen(root)

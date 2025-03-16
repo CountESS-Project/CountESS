@@ -46,10 +46,10 @@ FUNCOPS = {
     "upper",
 }
 CASTOPS = {
-        "int": "integer",
-        "float": "float",
-        "str": "string",
-        "bool": "boolean",
+    "int": "integer",
+    "float": "float",
+    "str": "string",
+    "bool": "boolean",
 }
 LISTOPS = {
     "sum": "list_sum",
