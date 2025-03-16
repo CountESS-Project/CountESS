@@ -3,6 +3,8 @@ import string
 from functools import lru_cache
 from typing import Any, Optional
 
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
+
 from countess import VERSION
 from countess.core.parameters import (
     BooleanParam,
@@ -15,8 +17,9 @@ from countess.core.parameters import (
     StringCharacterSetParam,
     StringParam,
 )
-from countess.core.plugins import DuckdbParallelTransformPlugin
+from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSimplePlugin
 from countess.utils.variant import TooManyVariationsException, find_variant_string
+from countess.utils.duckdb import duckdb_escape_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -130,3 +133,44 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
                 logger.warning("Exception", exc_info=exc)
 
         return data
+
+
+class VariantClassifier(DuckdbSimplePlugin):
+    name = "Protein Variant Classifier"
+    description = "Classifies protein variants into simple types"
+    version = VERSION
+
+    variant_col = ColumnChoiceParam("Protein variant Column", "variant")
+
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
+        variant_col_id = duckdb_escape_identifier(self.variant_col.value)
+        output_col_id = duckdb_escape_identifier(self.variant_col + "_type")
+
+        # the nested query stops any of the pattern matching columns
+        # from colliding with source table columns, plus hopefully
+        # duckdb can use the 'group by z' to only match the regex
+        # once for each distinct variant string.  Then the cases
+        # in the outer select use the parts of the regex match to
+        # classify the variant.
+        sql = rf"""
+            select S.*, case when T.a != '' or T.c == '' and T.e == '=' then 'W'
+               when T.c != '' and (T.c = T.e or T.e = '=') then 'S'
+               when T.e = 'Ter' or T.e = '*' then 'N'
+               when T.c != '' and T.d != '' and T.e != '' then 'M'
+               else '?'
+            end as {output_col_id}
+            from {source.alias} S join (
+                select {variant_col_id} as z, unnest(regexp_extract(
+                    {variant_col_id},
+                    '(_?[Ww][Tt])|(p.)?([A-Z][a-z]*)?(\d+)?([A-Z][a-z]*|[=*])?',
+                    ['a','b','c','d','e']
+                ))
+                from {source.alias}
+                group by z
+            ) T on S.{variant_col_id} = T.z
+        """
+
+        logger.debug("VariantClassifier sql %s", sql)
+        return ddbc.sql(sql)

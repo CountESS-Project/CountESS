@@ -70,6 +70,7 @@ correlation = "countess.plugins.correlation:CorrelationPlugin"
 score = "countess.plugins.score:ScoringPlugin"
 score_scaling = "countess.plugins.score_scale:ScoreScalingPlugin"
 vampseq_score = "countess.plugins.vampseq:VampSeqScorePlugin"
+variant_classifier = "countess.plugins.variant:VariantClassifier"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
