@@ -33,8 +33,7 @@ from countess.gui.widgets import (
 
 preview_row_limit: Optional[int] = 10000000
 
-usage = (
-    """usage: countess_gui [--log LEVEL] [INIFILE]
+usage = """usage: countess_gui [--log LEVEL] [INIFILE]
 
 Start the CountESS GUI.
 
@@ -44,8 +43,8 @@ options:
     --preview LIMIT                set preview mode row limit (default: %s)
     --log LEVEL                    set log level to LEVEL
     INIFILE                        load configuration file
-"""
-    % preview_row_limit or "NONE"
+""" % (
+    preview_row_limit or "NONE"
 )
 
 

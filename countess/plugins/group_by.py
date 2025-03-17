@@ -1,8 +1,6 @@
 import logging
 from typing import Iterable, Optional
 
-from duckdb import DuckDBPyConnection, DuckDBPyRelation
-
 from countess import VERSION
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, TabularMultiParam
 from countess.core.plugins import DuckdbSqlPlugin

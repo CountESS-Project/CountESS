@@ -165,7 +165,7 @@ class DuckdbSqlPlugin(DuckdbSimplePlugin):
         if sql:
             try:
                 return ddbc.sql(sql)
-            except duckdb.duckdb.DatabaseError as exc:
+            except duckdb.ProgrammingError as exc:
                 logger.warning(exc)
         return None
 
