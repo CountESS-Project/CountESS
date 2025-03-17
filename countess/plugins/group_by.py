@@ -26,12 +26,8 @@ class ColumnMultiParam(TabularMultiParam):
 def _op(op_name, col_name):
     col_ident = duckdb_escape_identifier(col_name)
     col_output = duckdb_escape_identifier(col_name + "__" + op_name)
-    if op_name == "index":
-        return col_ident
-    elif op_name == "nunique":
-        return f"COUNT(DISTINCT {col_ident}) AS {col_output}"
-    else:
-        return f"{op_name.upper()}({col_ident}) AS {col_output}"
+    op_call = "COUNT(DISTINCT " if op_name == "nunique" else op_name.upper() + "("
+    return f"{op_call}{col_ident}) AS {col_output}"
 
 
 class GroupByPlugin(DuckdbSimplePlugin):
@@ -55,18 +51,19 @@ class GroupByPlugin(DuckdbSimplePlugin):
                 _op(op, col_name)
                 for col_name, col_param in column_params
                 for op, bp in col_param.params.items()
-                if bp.value
+                if bp.value and op != "index"
             )
-            or "count(*)"
+            or "count(*) as count"
         )
         group_by = ", ".join(
             duckdb_escape_identifier(col_name)
             for col_name, col_param in column_params
             if col_param.params["index"].value
         )
-        sql = f"SELECT {columns} FROM {source.alias}"
         if group_by:
-            sql += " GROUP BY " + group_by
+            sql = f"SELECT {group_by}, {columns} FROM {source.alias} GROUP BY {group_by}"
+        else:
+            sql = f"SELECT {columns} FROM {source.alias}"
 
         if self.join:
             if group_by:
