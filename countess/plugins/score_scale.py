@@ -1,7 +1,5 @@
 import logging
-from typing import Optional
-
-from duckdb import DuckDBPyConnection, DuckDBPyRelation
+from typing import Iterable, Optional
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -13,7 +11,7 @@ from countess.core.parameters import (
     StringParam,
     TabularMultiParam,
 )
-from countess.core.plugins import DuckdbSimplePlugin
+from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
 logger = logging.getLogger(__name__)
@@ -41,7 +39,7 @@ class ScaleClassParam(TabularMultiParam):
             raise NotImplementedError()
 
 
-class ScoreScalingPlugin(DuckdbSimplePlugin):
+class ScoreScalingPlugin(DuckdbSqlPlugin):
     name = "Score Scaling"
     description = "Scaled Scores using variant classification"
     version = VERSION
@@ -58,13 +56,11 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
         self.classifiers[0].label = "Scale to 0.0"
         self.classifiers[1].label = "Scale to 1.0"
 
-    def execute(
-        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
-    ) -> Optional[DuckDBPyRelation]:
+    def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
         score_col_id = duckdb_escape_identifier(self.score_col.value)
         scaled_col_id = duckdb_escape_identifier(self.scaled_col.value)
 
-        all_columns = ",".join("T0." + duckdb_escape_identifier(c) for c in source.columns if self.scaled_col != c)
+        all_columns = ",".join("T0." + duckdb_escape_identifier(c) for c in columns if self.scaled_col != c)
 
         if self.group_col.is_not_none():
             group_col_id = "T0." + duckdb_escape_identifier(self.group_col.value)
@@ -73,17 +69,13 @@ class ScoreScalingPlugin(DuckdbSimplePlugin):
 
         c0, c1 = self.classifiers
 
-        sql = f"""
+        return f"""
             select {all_columns}, ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) as {scaled_col_id}
-            from {source.alias} T0 join (
+            from {table_name} T0 join (
                 select {group_col_id} as score_group,
                     median({score_col_id}) filter ({c0.filter()}) as score_0,
                     median({score_col_id}) filter ({c1.filter()}) as score_1
-                from {source.alias} T0
+                from {table_name} T0
                 group by score_group
             ) T1 on ({group_col_id} = T1.score_group)
         """
-
-        logger.debug("ScoreScalingPlugin sql %s", sql)
-
-        return ddbc.sql(sql)

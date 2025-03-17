@@ -1,11 +1,11 @@
 import logging
-from typing import Optional
+from typing import Iterable, Optional
 
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, TabularMultiParam
-from countess.core.plugins import DuckdbSimplePlugin
+from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def _op(op_name, col_name):
     return f"{op_call}{col_ident}) AS {col_output}"
 
 
-class GroupByPlugin(DuckdbSimplePlugin):
+class GroupByPlugin(DuckdbSqlPlugin):
     """Groups by an arbitrary column and rolls up rows"""
 
     name = "Group By"
@@ -42,9 +42,7 @@ class GroupByPlugin(DuckdbSimplePlugin):
     columns = PerColumnArrayParam("Columns", ColumnMultiParam("Column"))
     join = BooleanParam("Join Back?")
 
-    def execute(
-        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
-    ) -> Optional[DuckDBPyRelation]:
+    def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
         column_params = list(self.columns.get_column_params())
         columns = (
             ", ".join(
@@ -60,16 +58,16 @@ class GroupByPlugin(DuckdbSimplePlugin):
             for col_name, col_param in column_params
             if col_param.params["index"].value
         )
-        if group_by:
-            sql = f"SELECT {group_by}, {columns} FROM {source.alias} GROUP BY {group_by}"
-        else:
-            sql = f"SELECT {columns} FROM {source.alias}"
-
         if self.join:
             if group_by:
-                sql = f"SELECT * FROM {source.alias} JOIN ({sql}) USING ({group_by})"
+                return (
+                    f"SELECT * FROM {table_name} JOIN (SELECT {group_by}, {columns} "
+                    "FROM {table_name} GROUP BY {group_by}) USING ({group_by})"
+                )
             else:
-                sql = f"SELECT * FROM {source.alias} CROSS JOIN ({sql})"
-
-        logger.debug("GroupByPlugin.execute sql %s", sql)
-        return ddbc.sql(sql)
+                return "SELECT * FROM {table_name} CROSS JOIN (SELECT {columns} " "FROM {table_name}"
+        else:
+            if group_by:
+                return f"SELECT {group_by}, {columns} FROM {table_name} GROUP BY {group_by}"
+            else:
+                return f"SELECT {columns} FROM {table_name}"

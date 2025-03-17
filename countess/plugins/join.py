@@ -85,10 +85,15 @@ class JoinPlugin(DuckdbPlugin):
             )
         if row_limit is not None:
             query += f" LIMIT {row_limit}"
-        logger.debug(query)
+
+        logger.debug("JoinPlugin.execute_multi tables[0] %s %d", tables[0].alias, len(tables[0]))
+        logger.debug("JoinPlugin.execute_multi tables[1] %s %d", tables[1].alias, len(tables[1]))
+        logger.debug("JoinPlugin.execute_multi query %s", query)
 
         try:
-            return ddbc.sql(query)
+            rel = ddbc.sql(query)
+            logger.debug("JoinPlugin.execute_multi output %d", len(rel))
+            return rel
         except duckdb.ConversionException as exc:
             logger.info(exc)
             return None

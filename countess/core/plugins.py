@@ -156,6 +156,23 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         raise NotImplementedError(f"{self.__class__}.execute")
 
 
+class DuckdbSqlPlugin(DuckdbSimplePlugin):
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
+        sql = self.sql(source.alias, source.columns)
+        logger.debug(f"{self.__class__}.execute sql %s", sql)
+        if sql:
+            try:
+                return ddbc.sql(sql)
+            except duckdb.duckdb.DatabaseError as exc:
+                logger.warning(exc)
+        return None
+
+    def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
+        raise NotImplementedError(f"{self.__class__}.sql")
+
+
 class DuckdbInputPlugin(DuckdbPlugin):
     num_inputs = 0
 
