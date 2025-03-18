@@ -16,13 +16,15 @@ from countess.core.parameters import (
     BaseParam,
     BooleanParam,
     ChoiceParam,
+    ColumnChoiceParam,
     DataTypeOrNoneChoiceParam,
     FileSaveParam,
     MultiParam,
     StringParam,
+    TabularMultiParam,
 )
 from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin
-from countess.utils.duckdb import duckdb_dtype_to_datatype_choice
+from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier
 from countess.utils.pyarrow import python_type_to_arrow_dtype
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
@@ -95,6 +97,10 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
         return combined
 
 
+class SaveCsvOrderParameter(TabularMultiParam):
+    order_by = ColumnChoiceParam("Order By")
+    descending = BooleanParam("Descending")
+
 class SaveCsvPlugin(DuckdbSaveFilePlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
@@ -105,6 +111,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     header = BooleanParam("CSV header row?", True)
     filename = FileSaveParam("Filename", file_types=file_types)
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
+    sorting = ArrayParam("Sorting", SaveCsvOrderParameter("sort"))
 
     filehandle: Optional[Union[BufferedWriter, BytesIO, gzip.GzipFile, bz2.BZ2File]] = None
     csv_columns = None
@@ -119,8 +126,18 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     ) -> None:
         filename = self.filename.value
 
+        if len(self.sorting):
+            order_by = ",".join(
+                duckdb_escape_identifier(sp.order_by.value) + (" desc" if sp.descending else "")
+                for sp in self.sorting
+            )
+            logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
+            table = source.order(order_by)
+        else:
+            table = source
+
         def _write(fh):
-            for num, record_batch in enumerate(source.record_batch()):
+            for num, record_batch in enumerate(table.record_batch()):
                 write_options = pyarrow.csv.WriteOptions(
                     include_header=self.header.value and num == 0,
                     delimiter=self.delimiter.value,
