@@ -48,8 +48,12 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
             group_col_id = "1"
 
         sums = ", ".join(f"sum(T0.{k}) as {k}" for k in weighted_columns.keys())
-        weighted_counts = " + ".join(f"T0.{k} * {v} / T1.{k}" for k, v in weighted_columns.items())
-        total_counts = " + ".join(f"T0.{k} / T1.{k}" for k in weighted_columns.keys())
+        weighted_counts = " + ".join(
+            f"CASE WHEN T1.{k} > 0 THEN T0.{k} * {v} / T1.{k} ELSE 0 END" for k, v in weighted_columns.items()
+        )
+        total_counts = " + ".join(
+            f"CASE WHEN T1.{k} > 0 THEN T0.{k} / T1.{k} ELSE 0 END" for k in weighted_columns.keys()
+        )
 
         return f"""
             select T0.*, ({weighted_counts}) / ({total_counts}) as score
