@@ -25,7 +25,7 @@ class FrequencyPlugin(DuckdbSqlPlugin):
         # set default values for converting "count" columns
         if not any(cp.value for cp in self.columns):
             for cp in self.columns:
-                if 'count' in cp.label:
+                if "count" in cp.label:
                     cp.value = True
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:

@@ -101,6 +101,7 @@ class SaveCsvOrderParameter(TabularMultiParam):
     order_by = ColumnChoiceParam("Order By")
     descending = BooleanParam("Descending")
 
+
 class SaveCsvPlugin(DuckdbSaveFilePlugin):
     name = "CSV Save"
     description = "Save data as CSV or similar delimited text files"
@@ -126,10 +127,11 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     ) -> None:
         filename = self.filename.value
 
-        if len(self.sorting):
+        if source is None:
+            return
+        elif len(self.sorting):
             order_by = ",".join(
-                duckdb_escape_identifier(sp.order_by.value) + (" desc" if sp.descending else "")
-                for sp in self.sorting
+                duckdb_escape_identifier(sp.order_by.value) + (" desc" if sp.descending else "") for sp in self.sorting
             )
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
             table = source.order(order_by)

@@ -231,6 +231,10 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         ]
         if len(tablenames_filenames_and_params) == 0:
             return None
+
+        for num, (tablename, filename, _) in enumerate(tablenames_filenames_and_params, 1):
+            logger.debug("DuckdbLoadFilePlugin.execute File #%d %s %s", num, tablename, repr(filename))
+
         row_limit_per_file = (row_limit // len(tablenames_filenames_and_params)) if row_limit else None
         logger.debug("row_limit_per_file %s", row_limit_per_file)
 
