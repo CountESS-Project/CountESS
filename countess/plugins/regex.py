@@ -46,22 +46,23 @@ class RegexToolPlugin(DuckdbSimplePlugin):
         ]
 
         if self.drop_column:
-            proj = "".join(duckdb_escape_identifier(c) + ", " for c in source.columns if c != self.column.value)
+            proj = ",".join(duckdb_escape_identifier(c) for c in source.columns if c != self.column.value)
         else:
-            proj = "*, "
+            proj = "*"
 
-        proj += f"""
-            unnest(try_cast(
-                regexp_extract({column_id}, {regexp_value}, [{','.join(output_ids)}])
-                as struct({','.join(output_types)})
-            ))
-        """
+        if output_ids:
+            proj += f"""
+                , unnest(try_cast(
+                    regexp_extract({column_id}, {regexp_value}, [{','.join(output_ids)}])
+                    as struct({','.join(output_types)})
+                ))
+            """
 
-        logger.debug("VampseqScorePlugin proj %s", proj)
+        logger.debug("RegexToolPlugin proj %s", proj)
 
         if self.drop_unmatch:
             filt = f"regexp_matches({column_id}, {regexp_value})"
-            logger.debug("VampseqScorePlugin filt %s", filt)
+            logger.debug("RegexToolPlugin filt %s", filt)
             return source.filter(filt).project(proj)
 
         else:
