@@ -767,7 +767,6 @@ class HasSubParametersMixin:
                 param.set_value(value)
 
     def set_column_choices(self, choices: Mapping[str, bool]):
-        logger.debug("HasSubParametersMixin.set_column_choices %s", choices)
         for p in self.params.values():
             p.set_column_choices(choices)
 

@@ -210,7 +210,6 @@ class LoadFileMultiParam(MultiParam):
 
 class DuckdbLoadFilePlugin(DuckdbInputPlugin):
     files = FileArrayParam("Files", LoadFileMultiParam("File"))
-    filename_column = BooleanParam("Filename Column?", False)
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
 
     def __init__(self, *a, **k):
@@ -219,50 +218,27 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
 
     def filenames_and_params(self):
         for file_param in self.files:
-            for filename in glob.iglob(file_param.filename.value):
-                yield filename, file_param
+            yield file_param.filename.value, file_param
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        tablenames_filenames_and_params = [
-            (f"t_{id(self)}_{num}", filename, file_param)
-            for num, (filename, file_param) in enumerate(self.filenames_and_params())
-        ]
-        if len(tablenames_filenames_and_params) == 0:
+
+        filenames_and_params = list(self.filenames_and_params())
+        if len(filenames_and_params) == 0:
             return None
 
-        for num, (tablename, filename, _) in enumerate(tablenames_filenames_and_params, 1):
-            logger.debug("DuckdbLoadFilePlugin.execute File #%d %s %s", num, tablename, repr(filename))
+        row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
 
-        row_limit_per_file = (row_limit // len(tablenames_filenames_and_params)) if row_limit else None
-        logger.debug("row_limit_per_file %s", row_limit_per_file)
+        return self.combine(ddbc, (
+            self.load_file(ddbc, filename, file_param, row_limit_per_file)
+            for filename, file_param in filenames_and_params)
+        )
 
-        def _load(tn_fn_fp):
-            # This may be run in a different thread, so it needs to create a cursor
-            # to be thread-safe, and it uses a table rather than
-            # a view to store the data once it has been filtered.
-
-            tablename, filename, file_param = tn_fn_fp
-            cursor = ddbc.cursor()
-            rel = self.load_file(cursor, filename, file_param, row_limit_per_file)
-            if self.filename_column:
-                filename_literal = duckdb_escape_literal(clean_filename(filename))
-                rel = rel.project(f"*, {filename_literal} as filename")
-            if row_limit_per_file is not None:
-                rel = rel.limit(row_limit_per_file)
-            cursor.sql(f"DROP TABLE IF EXISTS {tablename}")
-            logger.debug("DuckdbLoadFilePlugin.execute._load sql %s", rel.sql_query())
-            rel.create(tablename)
-            return tablename
-
-        if len(tablenames_filenames_and_params) > 1:
-            with multiprocessing.pool.ThreadPool() as pool:
-                tablenames = list(pool.imap_unordered(_load, tablenames_filenames_and_params))
-            return self.combine(ddbc, [ddbc.table(tn) for tn in tablenames])
-        else:
-            tablename = _load(tablenames_filenames_and_params[0])
-            return self.combine(ddbc, [ddbc.table(tablename)])
+    def load_file_wrapper(
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
+    ) -> duckdb.DuckDBPyRelation:
+        return self.load_file(cursor, filename, file_param, row_limit)
 
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
@@ -273,6 +249,92 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
     ) -> Optional[duckdb.DuckDBPyRelation]:
         return duckdb_combine(ddbc, tables)
+
+
+class LoadFileDeGlobMixin:
+    """A mixin for LoadFilePlugin subclasses which don't want to deal with
+    globs (wildcards) in filenames ... this does it for you."""
+
+    def filenames_and_params(self):
+        for file_param in self.files:
+            for filename in glob.iglob(file_param.filename.value):
+                yield filename, file_param
+
+
+class LoadFileWithFilenameMixin:
+    """A mixin for LoadFilePlugin subclasses which want to be able to offer
+    a filename column option but for which there isn't an easier way to support
+    this."""
+
+    filename_column = BooleanParam("Filename Column?", False)
+
+    def load_file_wrapper(
+          self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
+    ) -> duckdb.DuckDBPyRelation:
+        rel = self.load_file(cursor, filename, file_param, row_limit)
+        if self.filename_column.value:
+            return rel.project(f"*, {duckdb_escape_literal(filename)} as filename")
+        else:
+            return rel
+
+    def load_file(
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
+    ) -> duckdb.DuckDBPyRelation:
+        raise NotImplementedError(f"{self.__class__}.load_file")
+
+
+class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
+
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
+    ) -> Optional[DuckDBPyRelation]:
+        tablename_base = "t_{self.id()}_"
+
+        for tablename, in ddbc.sql(f"""
+            SELECT table_name from information_schema.tables
+            where table_name like '{tablename_base}%'
+        """).fetchall():
+            logger.debug("DuckdbParallelLoadFilePlugin.execute drop table %s", tablename)
+            ddbc.sql(f"DROP TABLE IF EXISTS {tablename}")
+
+        filenames_and_params = list(self.filenames_and_params())
+
+        if len(filenames_and_params) == 0:
+            return None
+        elif len(filenames_and_params) == 1:
+            filename, file_param = filenames_and_params[0]
+            return self.combine(
+                ddbc, [ self.load_file_wrapper(ddbc, filename, file_param, row_limit) ]
+            )
+        else:
+            row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
+
+            def _load(x):
+                num, (filename, file_param) = x
+                cursor = ddbc.cursor()
+                tablename = f"{tablename_base}{num}"
+                logger.debug("DuckdbParallelLoadFilePlugin.execute _load table %s", tablename)
+                self.load_file_wrapper(cursor, filename, file_param, row_limit_per_file).create(tablename)
+                return tablename
+
+            with multiprocessing.pool.ThreadPool() as pool:
+                tablenames = list(pool.imap_unordered(_load, enumerate(filenames_and_params)))
+            return self.combine(ddbc, [ ddbc.table(tn) for tn in tablenames])
+
+    def load_file(
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
+    ) -> duckdb.DuckDBPyRelation:
+        raise NotImplementedError(f"{self.__class__}.load_file")
+
+
+class DuckdbLoadFileWithTheLotPlugin(DuckdbParallelLoadFilePlugin, LoadFileDeGlobMixin, LoadFileWithFilenameMixin):
+    """This recombines the various parts which got broken out into mixins back into
+    the original one-with-the-lot load file plugin base"""
+
+    def load_file(
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
+    ) -> duckdb.DuckDBPyRelation:
+        raise NotImplementedError(f"{self.__class__}.load_file")
 
 
 class DuckdbSaveFilePlugin(DuckdbSimplePlugin):

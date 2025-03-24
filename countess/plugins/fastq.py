@@ -6,12 +6,12 @@ import duckdb
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
-from countess.core.plugins import DuckdbLoadFilePlugin
+from countess.core.plugins import DuckdbLoadFileWithTheLotPlugin
 
 logger = logging.getLogger(__name__)
 
 
-class LoadFastqPlugin(DuckdbLoadFilePlugin):
+class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     """Load counts from one or more FASTQ files, by first building a dask dataframe of raw sequences
     with count=1 and then grouping by sequence and summing counts.  It supports counting
     in multiple columns."""
@@ -63,7 +63,7 @@ class LoadFastqPlugin(DuckdbLoadFilePlugin):
             return combined_view.aggregate("sequence, sum(count) as count")
 
 
-class LoadFastaPlugin(DuckdbLoadFilePlugin):
+class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
     name = "FASTA Load"
     description = "Loads sequences from FASTA files"
     link = "https://countess-project.github.io/CountESS/included-plugins/#fasta-load"

@@ -4,6 +4,7 @@ import gzip
 import logging
 from io import BufferedWriter, BytesIO
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
+from itertools import zip_longest
 
 import duckdb
 import pyarrow  # type: ignore
@@ -24,8 +25,7 @@ from countess.core.parameters import (
     TabularMultiParam,
 )
 from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin
-from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier
-from countess.utils.pyarrow import python_type_to_arrow_dtype
+from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz"]),
@@ -53,6 +53,7 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
     version = VERSION
     file_types = CSV_FILE_TYPES
 
+    filename_column = BooleanParam("Filename Column?", False)
     delimiter = ChoiceParam("Delimiter", ",", choices=CSV_DELIMITER_CHOICES.keys())
     header = BooleanParam("CSV file has header row?", True)
     columns = ArrayParam("Columns", ColumnsMultiParam("Column"))
@@ -60,40 +61,71 @@ class LoadCsvPlugin(DuckdbLoadFilePlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
+
+        options = {
+            'sep': CSV_DELIMITER_CHOICES[self.delimiter.value],
+            'filename': self.filename_column.value,
+            'null_padding': True,
+            'strict_mode': False,
+        }
+
         if len(self.columns):
-            column_names = [c.name.value for c in self.columns]
-            read_options = pyarrow.csv.ReadOptions(column_names=column_names, skip_rows=1 if self.header else 0)
-            convert_options = pyarrow.csv.ConvertOptions(
-                column_types={
-                    c.name.value: python_type_to_arrow_dtype(c.type.get_selected_type()) for c in self.columns
-                }
-            )
+            options['all_varchar'] = True
+            options['skiprows'] = 1 if self.header else 0
+            options['header'] = False
         else:
-            read_options = None
-            convert_options = None
+            options['header'] = self.header.value
 
-        parse_options = pyarrow.csv.ParseOptions(delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value])
-
-        try:
-            t = pyarrow.csv.read_csv(filename, read_options, parse_options, convert_options)
-        except pyarrow.ArrowInvalid:
-            t = pyarrow.csv.read_csv(filename, None, parse_options, None)
-
-        rel = cursor.from_arrow(t)
-        if row_limit:
+        rel = cursor.read_csv(filename, **options)
+        if row_limit is not None:
             rel = rel.limit(row_limit)
-        return rel
+
+        if len(self.columns):
+            # If there's a bonus filename column ignore it for now
+            rel_columns = [ c for c in rel.columns if not (self.filename_column and c == 'filename') ]
+            # there's three cases here, either we've got both a column
+            # name or a column parameter or both, depending on the relative
+            # lengths of the column lists.
+            proj = ','.join(
+                duckdb_escape_identifier(cn) if cp is None else (
+                    (
+                        f"TRY_CAST(NULL as {cp.type.value})" if cn is None else
+                        f"TRY_CAST({duckdb_escape_identifier(cn)} as {cp.type.value})"
+                    ) + " AS " + (
+                        duckdb_escape_identifier(cp.name.value)
+                        if cp.name.value else "column%d" % num
+                    )
+                )
+                for num, (cn, cp) in enumerate(zip_longest(rel_columns, self.columns))
+                if cp is None or cp.type.is_not_none()
+            )
+
+            # If we have a filename column include that too.
+            if self.filename_column:
+                proj += ", filename"
+
+            logger.debug("LoadCsvPlugin.load_file proj %s", proj)
+            rel = rel.project(proj)
+
+        return duckdb_source_to_view(cursor, rel)
 
     def combine(
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
     ) -> Optional[duckdb.DuckDBPyRelation]:
         combined = super().combine(ddbc, tables)
-        if combined is not None:
-            for num, (column, dtype) in enumerate(zip(combined.columns, combined.dtypes)):
-                if num >= len(self.columns):
-                    new_param = self.columns.add_row()
-                    new_param.name.value = column
-                    new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
+        if combined is None:
+            return None
+
+        # filename is always last column if it exists.
+        combined_columns_and_dtypes = list(zip(combined.columns, combined.dtypes))
+        if self.filename_column:
+            combined_columns_and_dtypes.pop()
+
+        for num, (column, dtype) in enumerate(combined_columns_and_dtypes):
+            if num >= len(self.columns) and not (self.filename_column and column == 'filename'):
+                new_param = self.columns.add_row()
+                new_param.name.value = column
+                new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
         return combined
 
 
