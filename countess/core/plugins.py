@@ -37,7 +37,6 @@ from countess.core.parameters import (
     MultiParam,
 )
 from countess.utils.duckdb import duckdb_combine, duckdb_dtype_is_numeric, duckdb_escape_literal
-from countess.utils.files import clean_filename
 from countess.utils.pyarrow import python_type_to_arrow_dtype
 
 PRERUN_ROW_LIMIT: int = 100000
@@ -216,23 +215,26 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         super().__init__(*a, **k)
         self.files.file_types = self.file_types
 
-    def filenames_and_params(self):
+    def filenames_and_params(self) -> Iterable[tuple[str, BaseParam]]:
         for file_param in self.files:
-            yield file_param.filename.value, file_param
+            if file_param.filename.value:
+                yield file_param.filename.value, file_param
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-
         filenames_and_params = list(self.filenames_and_params())
         if len(filenames_and_params) == 0:
             return None
 
         row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
 
-        return self.combine(ddbc, (
-            self.load_file(ddbc, filename, file_param, row_limit_per_file)
-            for filename, file_param in filenames_and_params)
+        return self.combine(
+            ddbc,
+            (
+                self.load_file(ddbc, filename, file_param, row_limit_per_file)
+                for filename, file_param in filenames_and_params
+            ),
         )
 
     def load_file_wrapper(
@@ -258,6 +260,9 @@ class LoadFileDeGlobMixin:
     def filenames_and_params(self):
         for file_param in self.files:
             for filename in glob.iglob(file_param.filename.value):
+                logger.debug(
+                    "LoadFileDeGlobMixin filenames_and_params %s %s", repr(file_param.filename.value), repr(filename)
+                )
                 yield filename, file_param
 
 
@@ -269,7 +274,7 @@ class LoadFileWithFilenameMixin:
     filename_column = BooleanParam("Filename Column?", False)
 
     def load_file_wrapper(
-          self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
+        self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         rel = self.load_file(cursor, filename, file_param, row_limit)
         if self.filename_column.value:
@@ -284,16 +289,15 @@ class LoadFileWithFilenameMixin:
 
 
 class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
-
     def execute(
         self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        tablename_base = "t_{self.id()}_"
+        tablename_base = f"t_{id(self)}_"
 
-        for tablename, in ddbc.sql(f"""
-            SELECT table_name from information_schema.tables
-            where table_name like '{tablename_base}%'
-        """).fetchall():
+        # First, destroy any temporary tables which might have been used in the previous run.
+        for (tablename,) in ddbc.sql(
+            f"SELECT table_name from information_schema.tables where table_name like '{tablename_base}%'"
+        ).fetchall():
             logger.debug("DuckdbParallelLoadFilePlugin.execute drop table %s", tablename)
             ddbc.sql(f"DROP TABLE IF EXISTS {tablename}")
 
@@ -303,23 +307,27 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
             return None
         elif len(filenames_and_params) == 1:
             filename, file_param = filenames_and_params[0]
-            return self.combine(
-                ddbc, [ self.load_file_wrapper(ddbc, filename, file_param, row_limit) ]
-            )
+            return self.combine(ddbc, [self.load_file_wrapper(ddbc, filename, file_param, row_limit)])
         else:
             row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
 
             def _load(x):
+                # This is run in multiple threads, threads need their own cursors, views aren't shared across
+                # cursors (or at least not reliably?) so we save each loaded file as a table and return the
+                # table name so the main thread can join them.
                 num, (filename, file_param) = x
                 cursor = ddbc.cursor()
                 tablename = f"{tablename_base}{num}"
-                logger.debug("DuckdbParallelLoadFilePlugin.execute _load table %s", tablename)
+                logger.debug("DuckdbParallelLoadFilePlugin.execute _load table %s %s", tablename, repr(filename))
                 self.load_file_wrapper(cursor, filename, file_param, row_limit_per_file).create(tablename)
                 return tablename
 
+            # run a bunch of _loads in parallel threads, collecting them in whatever order they return.
+            # if there's more files than threads the ThreadPool takes care of queueing them up.
+            # we'll then join them back up back here in the main thread.
             with multiprocessing.pool.ThreadPool() as pool:
-                tablenames = list(pool.imap_unordered(_load, enumerate(filenames_and_params)))
-            return self.combine(ddbc, [ ddbc.table(tn) for tn in tablenames])
+                tablenames = sorted(pool.imap_unordered(_load, enumerate(filenames_and_params)))
+            return self.combine(ddbc, [ddbc.table(tn) for tn in tablenames])
 
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
@@ -327,7 +335,7 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
         raise NotImplementedError(f"{self.__class__}.load_file")
 
 
-class DuckdbLoadFileWithTheLotPlugin(DuckdbParallelLoadFilePlugin, LoadFileDeGlobMixin, LoadFileWithFilenameMixin):
+class DuckdbLoadFileWithTheLotPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbParallelLoadFilePlugin):
     """This recombines the various parts which got broken out into mixins back into
     the original one-with-the-lot load file plugin base"""
 
