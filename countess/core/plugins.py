@@ -21,6 +21,7 @@ import importlib.metadata
 import logging
 import multiprocessing
 import multiprocessing.pool
+import os.path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Type, Union
 
 import duckdb
@@ -36,7 +37,7 @@ from countess.core.parameters import (
     HasSubParametersMixin,
     MultiParam,
 )
-from countess.utils.duckdb import duckdb_combine, duckdb_dtype_is_numeric, duckdb_escape_literal
+from countess.utils.duckdb import duckdb_combine, duckdb_dtype_is_numeric, duckdb_escape_literal, duckdb_source_to_view
 from countess.utils.pyarrow import python_type_to_arrow_dtype
 
 PRERUN_ROW_LIMIT: int = 100000
@@ -218,7 +219,7 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
     def filenames_and_params(self) -> Iterable[tuple[str, BaseParam]]:
         for file_param in self.files:
             if file_param.filename.value:
-                yield file_param.filename.value, file_param
+                yield file_param.filename.get_file_path(), file_param
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
@@ -232,7 +233,7 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         return self.combine(
             ddbc,
             (
-                self.load_file(ddbc, filename, file_param, row_limit_per_file)
+                self.load_file_wrapper(ddbc, filename, file_param, row_limit_per_file)
                 for filename, file_param in filenames_and_params
             ),
         )
@@ -259,7 +260,7 @@ class LoadFileDeGlobMixin:
 
     def filenames_and_params(self):
         for file_param in self.files:
-            for filename in glob.iglob(file_param.filename.value):
+            for filename in glob.iglob(file_param.filename.get_file_path()):
                 logger.debug(
                     "LoadFileDeGlobMixin filenames_and_params %s %s", repr(file_param.filename.value), repr(filename)
                 )
@@ -278,7 +279,11 @@ class LoadFileWithFilenameMixin:
     ) -> duckdb.DuckDBPyRelation:
         rel = self.load_file(cursor, filename, file_param, row_limit)
         if self.filename_column.value:
-            return rel.project(f"*, {duckdb_escape_literal(filename)} as filename")
+            assert isinstance(file_param, LoadFileMultiParam)
+            filename_value = os.path.relpath(filename, file_param["filename"].base_dir)
+            proj = f"*, {duckdb_escape_literal(filename_value)} as filename"
+            logger.debug("LoadFileWithFilenameMixin load_file_wrapper proj %s", proj)
+            return duckdb_source_to_view(cursor, rel.project(proj))
         else:
             return rel
 
@@ -307,7 +312,9 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
             return None
         elif len(filenames_and_params) == 1:
             filename, file_param = filenames_and_params[0]
-            return self.combine(ddbc, [self.load_file_wrapper(ddbc, filename, file_param, row_limit)])
+            tablename = tablename_base + "X"
+            self.load_file_wrapper(ddbc, filename, file_param, row_limit).create(tablename)
+            return self.combine(ddbc, [ddbc.table(tablename)])
         else:
             row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
 

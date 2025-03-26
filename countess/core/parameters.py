@@ -282,23 +282,50 @@ class StringCharacterSetParam(StringParam):
         return self.__class__(self.label, self.value, character_set=self.character_set)
 
 
-class FileParam(StringParam):
-    """A StringParam for holding a filename."""
+class FileBaseParam(StringParam):
+    """A StringParam for holding a filename, either to be read or written."""
 
     file_types = [("Any", "*")]
 
-    _hash = None
-
-    def __init__(self, label: str, value=None, file_types=None):
+    def __init__(self, label: str, value=None, file_types=None, base_dir="."):
         super().__init__(label, value)
         if file_types is not None:
             self.file_types = file_types
+        self.base_dir = base_dir
+
+    def get_file_path(self):
+        return os.path.abspath(os.path.join(self.base_dir, self.value))
+
+    def set_base_dir(self, base_dir):
+        if self.value:
+            self.value = os.path.relpath(self.get_file_path(), base_dir)
+        self.base_dir = base_dir
+
+    def get_parameters(self, key, base_dir="."):
+        if self.value:
+            if base_dir:
+                path = os.path.relpath(self.get_file_path(), base_dir)
+            else:
+                path = os.path.abspath(self.get_file_path())
+        else:
+            path = None
+
+        return [(key, path)]
+
+    def copy(self) -> "FileBaseParam":
+        return self.__class__(self.label, self.value, file_types=self.file_types, base_dir=self.base_dir)
+
+
+class FileParam(FileBaseParam):
+    """A filename to be read as input."""
+
+    _hash = None
 
     def get_file_hash(self):
         if not self.value:
             return "0"
         try:
-            with open(self.value, "rb") as file:
+            with open(self.get_file_path(), "rb") as file:
                 try:
                     # Python 3.11
                     digest = hashlib.file_digest(file, PARAM_DIGEST_HASH)
@@ -313,20 +340,6 @@ class FileParam(StringParam):
         except IOError:
             return "0"
 
-    def get_parameters(self, key, base_dir="."):
-        if self.value:
-            if base_dir:
-                path = os.path.relpath(self.value, base_dir)
-            else:
-                path = os.path.abspath(self.value)
-        else:
-            path = None
-
-        return [(key, path)]
-
-    def copy(self) -> "FileParam":
-        return self.__class__(self.label, self.value, file_types=self.file_types)
-
     def get_hash_value(self) -> str:
         # For reproducability, we don't actually care about the filename, just
         # its hash.
@@ -335,13 +348,8 @@ class FileParam(StringParam):
         return self._hash
 
 
-class FileSaveParam(StringParam):
-    file_types = [("Any", "*")]
-
-    def __init__(self, label: str, value=None, file_types=None):
-        super().__init__(label, value)
-        if file_types is not None:
-            self.file_types = file_types
+class FileSaveParam(FileBaseParam):
+    """A filename to save output as."""
 
 
 class DictChoiceParam(ScalarWithOperatorsParam):
@@ -759,12 +767,12 @@ class HasSubParametersMixin:
                 param.set_parameter(subkey, value, base_dir)
         else:
             param = self.params[key]
-            if isinstance(param, (FileParam, FileSaveParam)) and value is not None:
-                # XXX this is a clumsy approach?
-                param.set_value(os.path.join(base_dir, str(value)))
+            assert isinstance(param, ScalarParam)
 
-            elif isinstance(param, ScalarParam):
-                param.set_value(value)
+            if isinstance(param, (FileParam, FileSaveParam)) and value is not None:
+                param.set_base_dir(base_dir)
+
+            param.set_value(value)
 
     def set_column_choices(self, choices: Mapping[str, bool]):
         for p in self.params.values():
