@@ -51,8 +51,10 @@ class RegexToolPlugin(DuckdbSimplePlugin):
             proj = "*"
 
         if output_ids:
+            if proj:
+                proj += ","
             proj += f"""
-                , unnest(try_cast(
+                unnest(try_cast(
                     regexp_extract({column_id}, {regexp_value}, [{','.join(output_ids)}])
                     as struct({','.join(output_types)})
                 ))
