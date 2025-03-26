@@ -45,7 +45,7 @@ corr({i2},{i1}) as correlation_coefficient,
 covar_pop({i2}, {i1}) as covariance_population,
 regr_r2({i2},{i1}) as pearsons_r2
 from {table_name} where {i1} is not null and {i2} is not null
-{("group by "+grp) if grp else ""}
+{("group by rollup("+grp+")") if grp else ""}
             """
             for l1, l2, i1, i2 in labels_and_identifiers
         )

@@ -71,6 +71,7 @@ score = "countess.plugins.score:ScoringPlugin"
 score_scaling = "countess.plugins.score_scale:ScoreScalingPlugin"
 vampseq_score = "countess.plugins.vampseq:VampSeqScorePlugin"
 variant_classifier = "countess.plugins.variant:VariantClassifier"
+variant_converter = "countess.plugins.variant:VariantConverter"
 frequency = "countess.plugins.frequency:FrequencyPlugin"
 
 [project.entry-points.gui_scripts]

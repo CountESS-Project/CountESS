@@ -3,6 +3,8 @@ import string
 from functools import lru_cache
 from typing import Any, Iterable, Optional
 
+from fqfa.constants.iupac.protein import AA_CODES
+
 from countess import VERSION
 from countess.core.parameters import (
     BooleanParam,
@@ -16,7 +18,7 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSqlPlugin
-from countess.utils.duckdb import duckdb_escape_identifier
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 from countess.utils.variant import TooManyVariationsException, find_variant_string
 
 logger = logging.getLogger(__name__)
@@ -110,7 +112,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
                     minus_strand=self.variant.minus_strand.value,
                 )
             except TooManyVariationsException:
-                pass
+                return None
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
@@ -126,7 +128,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
                     offset=int(self.protein.offset.get_value_from_dict(data) or 0),
                 )
             except TooManyVariationsException:
-                pass
+                return None
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
@@ -166,4 +168,39 @@ class VariantClassifier(DuckdbSqlPlugin):
                 from {table_name}
                 group by z
             ) T on S.{variant_col_id} = T.z
+        """
+
+
+def _translate_aa(expr: str, expr1: str = None) -> str:
+    # This looks ludicrous but it pushes all the work down into SQL so that
+    # duckdb can run it without translating rows into Python etc.
+    return (
+        "CASE " +
+        (f"WHEN {expr}={expr1} THEN '='" if expr1 else "") +
+        " ".join(
+            f"WHEN {expr}={duckdb_escape_literal(k)} THEN {duckdb_escape_literal(v)}"
+            for k, v in list(AA_CODES.items()) + [ ('X', 'Ter') ]
+        ) +
+        " ELSE NULL END"
+    )
+
+class VariantConverter(DuckdbSqlPlugin):
+    name = "Variant Converter"
+    description = "Convert various forms of variant strings to HGVS"
+    version = VERSION
+
+    variant_col = ColumnChoiceParam("Variant Column", "variant")
+
+    def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
+        variant_col_id = duckdb_escape_identifier(self.variant_col.value)
+        output_col_id = duckdb_escape_identifier(self.variant_col + "_hgvs")
+
+        # XXX handle other short forms like _synNNNX>Y or whatever
+        return rf"""
+            select *,
+            CASE WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
+            WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[A-Z]')
+                THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} || {variant_col_id}[2:-2] ||
+                    {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")} ELSE NULL END as {output_col_id}
+            from {table_name}
         """
