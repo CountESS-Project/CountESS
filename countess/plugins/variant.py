@@ -175,14 +175,15 @@ def _translate_aa(expr: str, expr1: str = None) -> str:
     # This looks ludicrous but it pushes all the work down into SQL so that
     # duckdb can run it without translating rows into Python etc.
     return (
-        "CASE " +
-        (f"WHEN {expr}={expr1} THEN '='" if expr1 else "") +
-        " ".join(
+        "CASE "
+        + (f"WHEN {expr}={expr1} THEN '='" if expr1 else "")
+        + " ".join(
             f"WHEN {expr}={duckdb_escape_literal(k)} THEN {duckdb_escape_literal(v)}"
-            for k, v in list(AA_CODES.items()) + [ ('X', 'Ter') ]
-        ) +
-        " ELSE NULL END"
+            for k, v in list(AA_CODES.items()) + [("X", "Ter")]
+        )
+        + " ELSE NULL END"
     )
+
 
 class VariantConverter(DuckdbSqlPlugin):
     name = "Variant Converter"
@@ -197,10 +198,14 @@ class VariantConverter(DuckdbSqlPlugin):
 
         # XXX handle other short forms like _synNNNX>Y or whatever
         return rf"""
-            select *,
-            CASE WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
-            WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[A-Z]')
-                THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} || {variant_col_id}[2:-2] ||
-                    {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")} ELSE NULL END as {output_col_id}
-            from {table_name}
+            SELECT *,
+            CASE
+                WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
+                WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[A-Z]')
+                    THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} || {variant_col_id}[2:-2] ||
+                        {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")}
+                WHEN regexp_matches({variant_col_id}, 'syn_\d+[A-Z]>[A-Z]')
+                    THEN 'c.' || {variant_col_id}[5:]
+                ELSE NULL
+            END AS {output_col_id} FROM {table_name}
         """
