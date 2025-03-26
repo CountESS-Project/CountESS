@@ -350,7 +350,9 @@ class TabularDataFrame(tk.Frame):
 
         # Dump TSV into a StringIO ...
         r1, r2 = self.select_rows
-        df = self.table.limit(r2 - r1, offset=self.offset + r1).to_df()
+        logger.debug("TabularDataFrame._column_copy r1 %d r2 %d limit %d offset %d", r1, r2, r2-r1, self.offset + r1)
+        table = self.table.order(self.table_order) if self.table_order else self.table
+        df = table.limit(r2 - r1 + 1, offset=self.offset + r1 - 1).to_df()
         buf = io.StringIO()
         df.to_csv(buf, sep="\t", index=False)
 
