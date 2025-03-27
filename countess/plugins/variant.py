@@ -201,7 +201,7 @@ class VariantConverter(DuckdbSqlPlugin):
             SELECT *,
             CASE
                 WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
-                WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[A-Z]')
+                WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[*A-Z]')
                     THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} || {variant_col_id}[2:-2] ||
                         {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")}
                 WHEN regexp_matches({variant_col_id}, 'syn_\d+[A-Z]>[A-Z]')
