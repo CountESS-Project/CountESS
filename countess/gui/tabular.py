@@ -348,13 +348,15 @@ class TabularDataFrame(tk.Frame):
         if not self.select_rows:
             return  # not multi-row, keep it.
 
-        # Dump TSV into a StringIO ...
-        r1, r2 = self.select_rows
-        logger.debug("TabularDataFrame._column_copy r1 %d r2 %d limit %d offset %d", r1, r2, r2-r1, self.offset + r1)
+        # pick the selected rows
         table = self.table.order(self.table_order) if self.table_order else self.table
-        df = table.limit(r2 - r1 + 1, offset=self.offset + r1 - 1).to_df()
-        buf = io.StringIO()
-        df.to_csv(buf, sep="\t", index=False)
+        r1, r2 = self.select_rows
+        limit = r2 - r1 + 1
+        offset = self.offset + r1 - 1
+        logger.debug("TabularDataFrame._column_copy r1 %d r2 %d limit %d offset %d", r1, r2, limit, offset)
+        table = table.limit(limit, offset=offset)
 
-        # ... and then push that onto the clipboard
+        # Dump TSV into a StringIO and push it onto the clipboard
+        buf = io.StringIO()
+        table.to_csv(buf, sep="\t", index=False)
         copy_to_clipboard(buf.getvalue())
