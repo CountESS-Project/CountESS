@@ -179,7 +179,7 @@ def _translate_aa(expr: str, expr1: str = None) -> str:
         + (f"WHEN {expr}={expr1} THEN '='" if expr1 else "")
         + " ".join(
             f"WHEN {expr}={duckdb_escape_literal(k)} THEN {duckdb_escape_literal(v)}"
-            for k, v in list(AA_CODES.items()) + [("X", "Ter")]
+            for k, v in list(AA_CODES.items()) + [("X", "Ter"), ("-", "del")]
         )
         + " ELSE NULL END"
     )
@@ -201,7 +201,7 @@ class VariantConverter(DuckdbSqlPlugin):
             SELECT *,
             CASE
                 WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
-                WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[*A-Z]')
+                WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[*A-Z-]')
                     THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} || {variant_col_id}[2:-2] ||
                         {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")}
                 WHEN regexp_matches({variant_col_id}, 'syn_\d+[A-Z]>[A-Z]')
