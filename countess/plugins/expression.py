@@ -44,6 +44,7 @@ FUNCOPS = {
     "ends_with",
     "lower",
     "upper",
+    "regexp_matches",
 }
 CASTOPS = {
     "int": "integer",
