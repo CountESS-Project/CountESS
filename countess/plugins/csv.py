@@ -24,7 +24,12 @@ from countess.core.parameters import (
     StringParam,
     TabularMultiParam,
 )
-from countess.core.plugins import DuckdbLoadFilePlugin, DuckdbSaveFilePlugin, LoadFileDeGlobMixin, LoadFileWithFilenameMixin
+from countess.core.plugins import (
+    DuckdbLoadFilePlugin,
+    DuckdbSaveFilePlugin,
+    LoadFileDeGlobMixin,
+    LoadFileWithFilenameMixin,
+)
 from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
@@ -66,14 +71,14 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
         # See 36de8150bf for a cleaner, duckdb-only version if that gets fixed.
 
         if len(self.columns):
-            skip_rows=1 if self.header else 0
+            skip_rows = 1 if self.header else 0
             read_options = pyarrow.csv.ReadOptions(column_names=[], autogenerate_column_names=True, skip_rows=skip_rows)
         elif self.header:
             read_options = pyarrow.csv.ReadOptions()
         else:
             read_options = pyarrow.csv.ReadOptions(column_names=[], autogenerate_column_names=True)
 
-        parse_options = pyarrow.csv.ParseOptions(delimiter = CSV_DELIMITER_CHOICES[self.delimiter.value])
+        parse_options = pyarrow.csv.ParseOptions(delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value])
 
         pyarrow_table = pyarrow.csv.read_csv(filename, read_options, parse_options, None)
         if row_limit is not None:

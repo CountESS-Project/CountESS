@@ -42,8 +42,7 @@ class CorrelationPlugin(DuckdbSqlPlugin):
             f"""
 select {(grp + ", ") if grp else ""} {l1} as column_x, {l2} as column_y,
 corr({i2},{i1}) as correlation_coefficient,
-covar_pop({i2}, {i1}) as covariance_population,
-regr_r2({i2},{i1}) as pearsons_r2
+covar_pop({i2}, {i1}) as covariance_population
 from {table_name} where {i1} is not null and {i2} is not null
 {("group by rollup("+grp+")") if grp else ""}
             """

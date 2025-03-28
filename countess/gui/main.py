@@ -31,7 +31,7 @@ from countess.gui.widgets import (
     info_button,
 )
 
-preview_row_limit: Optional[int] = 10000000
+preview_row_limit: Optional[int] = 1000000
 
 usage = """usage: countess_gui [--log LEVEL] [INIFILE]
 
