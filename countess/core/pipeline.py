@@ -1,8 +1,10 @@
+from enum import Enum
 import logging
 import re
 import secrets
 import time
 from typing import Any, Iterable, Optional
+import threading
 
 import duckdb
 
@@ -13,6 +15,12 @@ PRERUN_ROW_LIMIT = 100000
 
 logger = logging.getLogger(__name__)
 
+class PipelineNodeStatus(Enum):
+    INIT = 0
+    WAIT = 1
+    WORK = 2
+    DONE = 3
+    STOP = 4
 
 class PipelineNode:
     name: str
@@ -76,6 +84,93 @@ class PipelineNode:
                 except ValueError:
                     logger.warning("Parameter %s=%s Not Valid", key, val)
             self.config = None
+
+    cursor = None
+    thread = None
+    status : PipelineNodeStatus = PipelineNodeStatus.INIT
+    table_name = None
+
+    def start(self, ddbc, row_limit: Optional[int] = None):
+        """Start processing this operation, in its own thread"""
+        logger.debug("PipelineNode.start %s", self.name)
+
+        if self.table_name:
+            ddbc.sql(f"DROP TABLE IF EXISTS {self.table_name}")
+
+        # start off any parent nodes which aren't done
+        for pn in self.parent_nodes:
+            if pn.status != PipelineNodeStatus.DONE:
+                pn.start(ddbc, row_limit)
+
+        def _run():
+            logger.debug("PipelineNode.start _run wait %s", self.name)
+
+            # Poll waiting for all parent nodes to be done, or our status
+            # to get changed.
+            self.status = PipelineNodeStatus.WAIT
+            while not all(pn.status == PipelineNodeStatus.DONE for pn in self.parent_nodes):
+                time.sleep(0.1)
+                if self.status != PipelineNodeStatus.WAIT:
+                    return
+
+            self.status = PipelineNodeStatus.WORK
+            logger.debug("PipelineNode.start _run work %s", self.name)
+
+            # cursor is specific to this thread *for running queries* but is also used from
+            # outside this thread *for interrupting and monitoring the running query*.
+
+            self.cursor = ddbc.cursor()
+            sources = {pn.name: self.cursor.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
+            logger.debug("PipelineNode.start _run sources %s", sources.keys())
+            self.plugin.prepare_multi(ddbc, sources)
+            try:
+                result = self.plugin.execute_multi(self.cursor, sources, row_limit)
+                print(result)
+                if result is None:
+                    self.table_name = None
+                else:
+                    self.table_name = f"n_{self.uuid}"
+                    result.to_table(self.table_name)
+                self.status = PipelineNodeStatus.DONE
+                logger.debug("PipelineNode.start _run done %s %s", self.name, self.table_name)
+
+            except (duckdb.CatalogException, duckdb.InterruptException) as exc:
+                logger.warning(exc)
+                self.status = PipelineNodeStatus.STOP
+                logger.debug("PipelineNode.start _run stop %s", self.name)
+                self.table_name = None
+
+        # kick off a thread for this process
+        self.thread = threading.Thread(target=_run)
+        self.thread.start()
+
+    def stop(self):
+        """Stop any running operation."""
+
+        # interrupt the thread if it is waiting
+        self.status = PipelineNodeStatus.STOP
+
+        # interrupt any running duckdb query
+        if self.cursor:
+            self.cursor.interrupt()
+
+        # wait for the thread to finish
+        if self.thread:
+            self.thread.join()
+
+    def poll_percent(self):
+        """Check on the running operation"""
+
+        if self.status == PipelineNodeStatus.DONE:
+            return 100
+        elif self.status == PipelineNodeStatus.WORK:
+            try:
+                # this is still a PR, if it doesn't exist then guess 50%.
+                return int(self.cursor.query_progress())
+            except AttributeError:
+                return 50
+        else:
+            return 0
 
     def run(self, ddbc, row_limit: Optional[int] = None):
         if not self.plugin:

@@ -211,6 +211,7 @@ class ConfiguratorWrapper:
         if not self.node.plugin.show_preview:
             return
 
+
         if isinstance(self.node.result, DuckDBPyRelation):
             self.preview_subframe = TabularDataFrame(self.frame, cursor="arrow")
             self.preview_subframe.set_table(self.ddbc, self.node.result)
@@ -253,14 +254,39 @@ class ConfiguratorWrapper:
         """Called when the user makes a change and had paused for a bit"""
         self.config_change_task = None
         logger.debug("config_change_task_callback")
-        pos1, pos2 = self.config_scrollbar.get()
+        #pos1, pos2 = self.config_scrollbar.get()
 
-        self.node.run(self.ddbc, preview_row_limit)
+        self.node.stop()
+        self.node.start(self.ddbc, preview_row_limit)
+
+        #self.node.run(self.ddbc, preview_row_limit)
+
+        #self.show_preview_subframe()
+        #self.configurator.update()
+        #self.frame.update()
+        #self.config_canvas.yview_moveto(pos1)
+        #self.config_scrollbar.set(pos1, pos2)
+        self.config_change_poll_callback()
+
+    def config_change_poll_callback(self):
+        percent = self.node.poll_percent()
+        logger.info("%s: %d", self.node.name, percent)
+        if percent < 100:
+            self.frame.after(10, self.config_change_poll_callback)
+            return
+
+        if self.node.table_name:
+            self.node.result = self.ddbc.table(self.node.table_name)
+        else:
+            self.node.result = None
+
+        pos1, pos2 = self.config_scrollbar.get()
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
         self.config_canvas.yview_moveto(pos1)
         self.config_scrollbar.set(pos1, pos2)
+
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
