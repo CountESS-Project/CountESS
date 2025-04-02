@@ -1,10 +1,10 @@
-from enum import Enum
 import logging
 import re
 import secrets
-import time
-from typing import Any, Iterable, Optional
 import threading
+import time
+from enum import Enum
+from typing import Any, Iterable, Optional
 
 import duckdb
 
@@ -15,12 +15,14 @@ PRERUN_ROW_LIMIT = 100000
 
 logger = logging.getLogger(__name__)
 
+
 class PipelineNodeStatus(Enum):
     INIT = 0
     WAIT = 1
     WORK = 2
     DONE = 3
     STOP = 4
+
 
 class PipelineNode:
     name: str
@@ -87,7 +89,7 @@ class PipelineNode:
 
     cursor = None
     thread = None
-    status : PipelineNodeStatus = PipelineNodeStatus.INIT
+    status: PipelineNodeStatus = PipelineNodeStatus.INIT
     table_name = None
 
     def start(self, ddbc, row_limit: Optional[int] = None):
@@ -121,7 +123,6 @@ class PipelineNode:
 
             self.status = PipelineNodeStatus.WORK
             logger.debug("PipelineNode.start _run work %s", self.name)
-
 
             sources = {pn.name: self.cursor.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
             logger.debug("PipelineNode.start _run sources %s", sources.keys())

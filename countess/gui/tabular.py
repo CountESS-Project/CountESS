@@ -1,9 +1,9 @@
 import io
 import logging
+import threading
 import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
-import threading
 from tkinter import ttk
 from typing import Callable, Optional, Union
 
@@ -301,7 +301,6 @@ class TabularDataFrame(tk.Frame):
         else:
             _create_index_continue()
 
-
     def _label_button_1(self, num, event):
         """Click on column labels to set sort order"""
         self.set_sort_order(num)
@@ -390,5 +389,5 @@ class TabularDataFrame(tk.Frame):
 
         # Dump TSV into a StringIO and push it onto the clipboard
         buf = io.StringIO()
-        table.to_csv(buf, sep="\t", index=False)
+        table.to_df().to_csv(buf, sep="\t", index=False)
         copy_to_clipboard(buf.getvalue())

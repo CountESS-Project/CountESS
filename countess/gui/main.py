@@ -211,7 +211,6 @@ class ConfiguratorWrapper:
         if not self.node.plugin.show_preview:
             return
 
-
         if isinstance(self.node.result, DuckDBPyRelation):
             self.preview_subframe = TabularDataFrame(self.frame, cursor="arrow")
             self.preview_subframe.set_table(self.ddbc, self.node.result)
@@ -254,7 +253,6 @@ class ConfiguratorWrapper:
         """Called when the user makes a change and had paused for a bit"""
         self.config_change_task = None
         logger.debug("config_change_task_callback")
-        #pos1, pos2 = self.config_scrollbar.get()
 
         self.node.stop()
         self.node.start(self.ddbc, preview_row_limit)
@@ -286,7 +284,6 @@ class ConfiguratorWrapper:
         self.frame.update()
         self.config_canvas.yview_moveto(pos1)
         self.config_scrollbar.set(pos1, pos2)
-
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
@@ -662,6 +659,8 @@ def make_root():
 def main() -> None:
     args = sys.argv[1:]
     global preview_row_limit  # pylint: disable=global-statement
+
+    logging.getLogger().setLevel('INFO')
 
     try:
         options, args = getopt.getopt(args, "", ["help", "version", "preview=", "log="])

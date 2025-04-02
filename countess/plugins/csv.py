@@ -27,7 +27,6 @@ from countess.core.parameters import (
 from countess.core.plugins import (
     DuckdbLoadFilePlugin,
     DuckdbSaveFilePlugin,
-    DuckdbParallelLoadFilePlugin,
     LoadFileDeGlobMixin,
     LoadFileWithFilenameMixin,
 )

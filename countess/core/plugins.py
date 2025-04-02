@@ -219,7 +219,7 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
     files = FileArrayParam("Files", LoadFileMultiParam("File"))
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
 
-    progress : float = 0
+    progress: float = 0
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
@@ -307,8 +307,6 @@ class LoadFileWithFilenameMixin:
 
 
 class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
-
-
     def execute(
         self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
@@ -360,7 +358,6 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         raise NotImplementedError(f"{self.__class__}.load_file")
-
 
 
 class DuckdbLoadFileWithTheLotPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbParallelLoadFilePlugin):

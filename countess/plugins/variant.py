@@ -112,7 +112,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
                     minus_strand=self.variant.minus_strand.value,
                 )
             except TooManyVariationsException:
-                return None
+                pass
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
@@ -128,7 +128,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
                     offset=int(self.protein.offset.get_value_from_dict(data) or 0),
                 )
             except TooManyVariationsException:
-                return None
+                pass
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
@@ -171,7 +171,7 @@ class VariantClassifier(DuckdbSqlPlugin):
         """
 
 
-def _translate_aa(expr: str, expr1: str = None) -> str:
+def _translate_aa(expr: str, expr1: str = '') -> str:
     # This looks ludicrous but it pushes all the work down into SQL so that
     # duckdb can run it without translating rows into Python etc.
     return (

@@ -58,7 +58,7 @@ def test_filename_column():
     plugin.set_parameter("filename_column", True)
     output = plugin.execute(ddbc, None)
     assert "filename" in output.columns
-    assert output.df()["filename"].iloc[1] == "input1"
+    assert output.df()["filename"].iloc[1] == "tests/input1.csv"
 
 
 df = pd.DataFrame([[1, 2.01, "three"], [4, 5.5, "six"], [7, 8.8, "nine"]], columns=["a", "b", "c"])
