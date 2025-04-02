@@ -104,6 +104,8 @@ class PipelineNode:
             if pn.status != PipelineNodeStatus.DONE:
                 pn.start(ddbc, row_limit)
 
+        self.load_config()
+
         # cursor is specific to this thread *for running queries* but is also used from
         # outside this thread *for interrupting and monitoring the running query*.
         self.cursor = ddbc.cursor()
