@@ -131,6 +131,13 @@ class DuckdbPlugin(BasePlugin):
     ) -> Optional[DuckDBPyRelation]:
         raise NotImplementedError(f"{self.__class__}.execute_multi")
 
+    def query_progress(self, ddbc: DuckDBPyConnection):
+        try:
+            # this is still a PR, if it doesn't exist then guess 50%.
+            return ddbc.query_progress()
+        except AttributeError:
+            return 50
+
 
 class DuckdbSimplePlugin(DuckdbPlugin):
     def prepare_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> None:
@@ -212,6 +219,8 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
     files = FileArrayParam("Files", LoadFileMultiParam("File"))
     file_types: Sequence[tuple[str, Union[str, list[str]]]] = [("Any", "*")]
 
+    progress : float = 0
+
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.files.file_types = self.file_types
@@ -229,14 +238,15 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
             return None
 
         row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
+        progress_per_file = 100 / len(filenames_and_params)
+        self.progress = 0
 
-        return self.combine(
-            ddbc,
-            (
-                self.load_file_wrapper(ddbc, filename, file_param, row_limit_per_file)
-                for filename, file_param in filenames_and_params
-            ),
-        )
+        def _generator():
+            for filename, file_param in filenames_and_params:
+                yield self.load_file_wrapper(ddbc, filename, file_param, row_limit_per_file)
+                self.progress += progress_per_file
+
+        return self.combine(ddbc, _generator())
 
     def load_file_wrapper(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
@@ -252,6 +262,9 @@ class DuckdbLoadFilePlugin(DuckdbInputPlugin):
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
     ) -> Optional[duckdb.DuckDBPyRelation]:
         return duckdb_combine(ddbc, tables)
+
+    def query_progress(self, ddbc: duckdb.DuckDBPyConnection):
+        return self.progress
 
 
 class LoadFileDeGlobMixin:
@@ -294,10 +307,13 @@ class LoadFileWithFilenameMixin:
 
 
 class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
+
+
     def execute(
         self, ddbc: DuckDBPyConnection, source: None, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         tablename_base = f"t_{id(self)}_"
+        self.progress = 0
 
         # First, destroy any temporary tables which might have been used in the previous run.
         for (tablename,) in ddbc.sql(
@@ -314,19 +330,23 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
             filename, file_param = filenames_and_params[0]
             tablename = tablename_base + "X"
             self.load_file_wrapper(ddbc, filename, file_param, row_limit).create(tablename)
+            self.progress = 100
             return self.combine(ddbc, [ddbc.table(tablename)])
         else:
             row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
+            progress_per_file = 100 / len(filenames_and_params)
 
             def _load(x):
                 # This is run in multiple threads, threads need their own cursors, views aren't shared across
                 # cursors (or at least not reliably?) so we save each loaded file as a table and return the
                 # table name so the main thread can join them.
                 num, (filename, file_param) = x
+                self.progress += progress_per_file / 2
                 cursor = ddbc.cursor()
                 tablename = f"{tablename_base}{num}"
                 logger.debug("DuckdbParallelLoadFilePlugin.execute _load table %s %s", tablename, repr(filename))
                 self.load_file_wrapper(cursor, filename, file_param, row_limit_per_file).create(tablename)
+                self.progress += progress_per_file / 2
                 return tablename
 
             # run a bunch of _loads in parallel threads, collecting them in whatever order they return.
@@ -340,6 +360,7 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
         raise NotImplementedError(f"{self.__class__}.load_file")
+
 
 
 class DuckdbLoadFileWithTheLotPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbParallelLoadFilePlugin):

@@ -102,6 +102,12 @@ class PipelineNode:
             if pn.status != PipelineNodeStatus.DONE:
                 pn.start(ddbc, row_limit)
 
+        # cursor is specific to this thread *for running queries* but is also used from
+        # outside this thread *for interrupting and monitoring the running query*.
+        self.cursor = ddbc.cursor()
+        self.cursor.sql("set enable_progress_bar_print=false")
+        self.cursor.sql("set progress_bar_time=0")
+
         def _run():
             logger.debug("PipelineNode.start _run wait %s", self.name)
 
@@ -116,16 +122,12 @@ class PipelineNode:
             self.status = PipelineNodeStatus.WORK
             logger.debug("PipelineNode.start _run work %s", self.name)
 
-            # cursor is specific to this thread *for running queries* but is also used from
-            # outside this thread *for interrupting and monitoring the running query*.
 
-            self.cursor = ddbc.cursor()
             sources = {pn.name: self.cursor.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
             logger.debug("PipelineNode.start _run sources %s", sources.keys())
             self.plugin.prepare_multi(ddbc, sources)
             try:
                 result = self.plugin.execute_multi(self.cursor, sources, row_limit)
-                print(result)
                 if result is None:
                     self.table_name = None
                 else:
@@ -158,17 +160,17 @@ class PipelineNode:
         if self.thread:
             self.thread.join()
 
+    def wait(self):
+        if self.status == PipelineNodeStatus.WORK and self.thread:
+            self.thread.join()
+
     def poll_percent(self):
         """Check on the running operation"""
 
         if self.status == PipelineNodeStatus.DONE:
             return 100
         elif self.status == PipelineNodeStatus.WORK:
-            try:
-                # this is still a PR, if it doesn't exist then guess 50%.
-                return int(self.cursor.query_progress())
-            except AttributeError:
-                return 50
+            return self.plugin.query_progress(self.cursor)
         else:
             return 0
 

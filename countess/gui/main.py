@@ -258,23 +258,23 @@ class ConfiguratorWrapper:
 
         self.node.stop()
         self.node.start(self.ddbc, preview_row_limit)
-
-        #self.node.run(self.ddbc, preview_row_limit)
-
-        #self.show_preview_subframe()
-        #self.configurator.update()
-        #self.frame.update()
-        #self.config_canvas.yview_moveto(pos1)
-        #self.config_scrollbar.set(pos1, pos2)
         self.config_change_poll_callback()
 
     def config_change_poll_callback(self):
         percent = self.node.poll_percent()
-        logger.info("%s: %d", self.node.name, percent)
-        if percent < 100:
-            self.frame.after(10, self.config_change_poll_callback)
+        if percent < 0:
+            logger.info("%s: 0/0", self.node.name)
+        elif percent < 100:
+            logger.info("%s: %d%%", self.node.name, percent)
+        else:
+            logger.info("%s: 100%%", self.node.name)
+            self.config_change_poll_done()
             return
 
+        self.frame.after(50, self.config_change_poll_callback)
+
+    def config_change_poll_done(self):
+        self.node.wait()
         if self.node.table_name:
             self.node.result = self.ddbc.table(self.node.table_name)
         else:
@@ -407,13 +407,13 @@ class LoggerFrame(tk.Frame):
             for _ in range(0, 10):
                 rec = self.logging_handler.dequeue(block=False)
                 self.logging_callback(rec)
-            self.after(1000, self.logging_event)
+            self.after(100, self.logging_event)
         except queue.Empty:
             self.after(100, self.logging_event)
 
     def logging_callback(self, record: logging.LogRecord) -> None:
         message = record.getMessage()
-        if m := re.match(r"(.*): (\d+)(%|/\d+)", message):
+        if m := re.match(r"(.*): (\d+(?:\.\d+)?)(%|/\d+)", message):
             name, n1, n2 = m.groups()
             try:
                 pbar = self.progress_bars[name]
@@ -422,7 +422,7 @@ class LoggerFrame(tk.Frame):
                 self.progress_bars[name] = pbar
                 pbar.grid(sticky=tk.EW, row=len(self.progress_bars), column=0)
             if n2 == "%":
-                pbar.progress_update(message, int(n1))
+                pbar.progress_update(message, int(float((n1))))
             else:
                 pbar.progress_update(message)
         else:
