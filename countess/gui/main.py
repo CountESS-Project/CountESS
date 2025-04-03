@@ -660,7 +660,7 @@ def main() -> None:
     args = sys.argv[1:]
     global preview_row_limit  # pylint: disable=global-statement
 
-    logging.getLogger().setLevel('INFO')
+    logging.getLogger().setLevel("INFO")
 
     try:
         options, args = getopt.getopt(args, "", ["help", "version", "preview=", "log="])

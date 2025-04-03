@@ -43,7 +43,8 @@ def test_tabular_copy():
 
     x = root.selection_get(selection="CLIPBOARD")
     assert (
-        x == """x\ty\tz
+        x
+        == """x\ty\tz
 29\t687214525942812148\t13438185942843147596
 30\t6255274016445075936\t1382406602978853548
 31\t13285076694688170502\t14198994021025867918\n\n"""
