@@ -171,7 +171,7 @@ class VariantClassifier(DuckdbSqlPlugin):
         """
 
 
-def _translate_aa(expr: str, expr1: str = '') -> str:
+def _translate_aa(expr: str, expr1: str = "") -> str:
     # This looks ludicrous but it pushes all the work down into SQL so that
     # duckdb can run it without translating rows into Python etc.
     return (
@@ -191,10 +191,12 @@ class VariantConverter(DuckdbSqlPlugin):
     version = VERSION
 
     variant_col = ColumnChoiceParam("Variant Column", "variant")
+    offset = IntegerParam("Variant Location Offset", 0)
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
         variant_col_id = duckdb_escape_identifier(self.variant_col.value)
         output_col_id = duckdb_escape_identifier(self.variant_col + "_hgvs")
+        offset = duckdb_escape_literal(self.offset.value) if self.offset else 0
 
         # XXX handle other short forms like _synNNNX>Y or whatever
         return rf"""
@@ -202,7 +204,8 @@ class VariantConverter(DuckdbSqlPlugin):
             CASE
                 WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
                 WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[*A-Z-]')
-                    THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} || {variant_col_id}[2:-2] ||
+                    THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} ||
+                        ({variant_col_id}[2:-2]::INTEGER + {offset})::TEXT ||
                         {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")}
                 WHEN regexp_matches({variant_col_id}, 'syn_\d+[A-Z]>[A-Z]')
                     THEN 'c.' || {variant_col_id}[5:]
