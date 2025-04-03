@@ -288,7 +288,11 @@ class TabularDataFrame(tk.Frame):
 
             def _create_index_monitor():
                 if self._set_sort_order_thread.is_alive():
-                    qp = cursor.query_progress()
+                    try:
+                        qp = cursor.query_progress()
+                    except AttributeError:
+                        qp = 50
+
                     if qp >= 0:
                         logger.info("Indexing: %d%%", qp)
                     self.after(50, _create_index_monitor)
