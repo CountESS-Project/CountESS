@@ -299,6 +299,23 @@ class ConfiguratorWrapper:
         self.frame.destroy()
 
 
+class SplashWrapper:
+    def __init__(self, tk_parent):
+        self.frame = tk.Frame(tk_parent)
+        self.frame.configure(cursor = 'heart')
+
+        font = ("TkHeadingFont", 16, "bold")
+        subframe = tk.Frame(self.frame, highlightbackground='black', highlightthickness=1)
+        subframe.grid(padx=10,pady=10)
+        self.frame.columnconfigure(0,weight=1)
+        self.frame.rowconfigure(0,weight=1)
+        tk.Label(subframe, image=get_icon(tk_parent, "countess")).grid(padx=10, pady=10)
+        tk.Label(subframe, text=f"CountESS {VERSION}", font=font).grid(padx=10, pady=10)
+
+    def destroy(self):
+        self.frame.destroy()
+
+
 class ButtonMenu:  # pylint: disable=R0903
     def __init__(self, tk_parent, buttons):
         self.frame = tk.Frame(tk_parent)
@@ -493,6 +510,9 @@ class MainWindow:
         self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")
         self.main_subframe.add_child(self.tree_canvas)
 
+        self.config_wrapper = SplashWrapper(self.main_subframe)
+        self.main_subframe.add_child(self.config_wrapper.frame, weight=4)
+
         logger.debug("MainWindow.__init__(%s)", repr(config_filename))
         if config_filename:
             self.config_load(config_filename)
@@ -524,7 +544,7 @@ class MainWindow:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph()
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
-        self.graph_wrapper.add_new_node()
+        self.graph_wrapper.add_new_node(select=False)
 
     def config_load(self, filename=None):
         if not filename:
@@ -583,17 +603,14 @@ class MainWindow:
     def node_select(self, node):
         if node:
             new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.graph.ddbc, self.node_changed)
-            if self.config_wrapper:
-                self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
-                self.config_wrapper.destroy()
-            else:
-                self.main_subframe.add_child(new_config_wrapper.frame, weight=4)
+        else:
+            new_config_wrapper = SplashWrapper(self.main_subframe)
 
-            self.config_wrapper = new_config_wrapper
+        if self.config_wrapper:
+            self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
+            self.config_wrapper.destroy()
 
-        elif self.config_wrapper:
-            self.main_subframe.remove_child(self.config_wrapper.frame).destroy()
-            self.config_wrapper = None
+        self.config_wrapper = new_config_wrapper
 
     def node_changed(self, node):
         self.graph_wrapper.node_changed(node)
@@ -702,7 +719,6 @@ def main() -> None:
     # logging.getLogger().addHandler(logging.StreamHandler())
 
     root = make_root()
-    SplashScreen(root)
     MainWindow(root, args[0] if args else None)
 
     root.mainloop()
