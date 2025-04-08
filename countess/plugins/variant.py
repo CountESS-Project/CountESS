@@ -191,24 +191,31 @@ class VariantConverter(DuckdbSqlPlugin):
     version = VERSION
 
     variant_col = ColumnChoiceParam("Variant Column", "variant")
+    variant_out = StringParam("Variant Output Column", "variant")
+    prefix_aa = StringParam("Variant AA Prefix", "")
+    prefix_nt = StringParam("Variant NT Prefix", "")
     offset = IntegerParam("Variant Location Offset", 0)
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
         variant_col_id = duckdb_escape_identifier(self.variant_col.value)
-        output_col_id = duckdb_escape_identifier(self.variant_col + "_hgvs")
+        output_col_id = duckdb_escape_identifier(self.variant_out.value)
         offset = duckdb_escape_literal(self.offset.value) if self.offset else 0
+        prefix_aa = duckdb_escape_literal((self.prefix_aa.value + ":" if self.prefix_aa else "") + "p.")
+        prefix_nt = duckdb_escape_literal((self.prefix_nt.value + ":" if self.prefix_nt else "") + "c.")
+
+        columns = ' '.join(duckdb_escape_identifier(c) + "," for c in columns if c != self.variant_out.value)
 
         # XXX handle other short forms like _synNNNX>Y or whatever
         return rf"""
-            SELECT *,
+            SELECT {columns}
             CASE
-                WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN 'p.='
+                WHEN regexp_matches({variant_col_id}, 'wt', 'i') THEN {prefix_aa} || '='
                 WHEN regexp_matches({variant_col_id}, '[A-Z]\d+[*A-Z-]')
-                    THEN 'p.' || {_translate_aa(variant_col_id + "[1]")} ||
+                    THEN {prefix_aa} || {_translate_aa(variant_col_id + "[1]")} ||
                         ({variant_col_id}[2:-2]::INTEGER + {offset})::TEXT ||
                         {_translate_aa(variant_col_id + "[-1]", variant_col_id + "[1]")}
                 WHEN regexp_matches({variant_col_id}, 'syn_\d+[A-Z]>[A-Z]')
-                    THEN 'c.' || {variant_col_id}[5:]
+                    THEN {prefix_nt} || {variant_col_id}[5:]
                 ELSE NULL
             END AS {output_col_id} FROM {table_name}
         """
