@@ -1,6 +1,5 @@
 import io
 import logging
-import threading
 import tkinter as tk
 from functools import partial
 from math import ceil, floor, isinf, isnan
@@ -15,7 +14,6 @@ from countess.utils.duckdb import (
     duckdb_dtype_is_numeric,
     duckdb_dtype_to_datatype_choice,
     duckdb_escape_identifier,
-    duckdb_escape_literal,
 )
 
 logger = logging.getLogger(__name__)
@@ -239,71 +237,37 @@ class TabularDataFrame(tk.Frame):
             self.sort_ascending = not descending
         self.sort_by_col = column_num
 
-        # Include all column names for a stable sort order.
+        # Create an index for whatever column we're sorting by, followed by
+        # all other column names for a stable sort order.
+
         column_name = self.table.columns[column_num]
         escaped_column_names = [
             duckdb_escape_identifier(c) for c in [column_name] + [c for c in self.table.columns if c != column_name]
         ]
 
-        # We add an index for whatever column we're sorting by,
-        # if it doesn't already exist.
-        # XXX could do this in a thread?
-        index_name = f"{self.table.alias}__{column_name}__idx"
-        index_identifier = duckdb_escape_identifier(index_name)
-        index_literal = duckdb_escape_literal(index_name)
+        index_identifier = f"{self.table.alias}_{column_num}_idx"
 
-        def _create_index_continue():
-            direction = "ASC" if self.sort_ascending else "DESC"
-            self.table_order = ",".join(f"{c} {direction}" for c in escaped_column_names)
+        # XXX I did have some code here which built the index in a separate thread / cursor but it
+        # was mad with race conditions so I've scrapped it for now and the GUI will just have to
+        # awkwardly pause.
 
-            logger.debug("TabularDataFrame set_sort_order %s %s", column_name, self.table_order)
+        sql = (
+            f"CREATE INDEX IF NOT EXISTS {index_identifier} ON {self.table.alias} ("
+            + ",".join(escaped_column_names)
+            + ")"
+        )
+        self.ddbc.sql(sql)
 
-            for n, label in enumerate(self.labels):
-                icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
-                label.configure(image=get_icon(self, icon))
+        direction = "ASC" if self.sort_ascending else "DESC"
+        self.table_order = ",".join(f"{c} {direction}" for c in escaped_column_names)
 
-            self.refresh()
+        logger.debug("TabularDataFrame set_sort_order %s %s", column_name, self.table_order)
 
-        # XXX workaround for https://github.com/duckdb/duckdb/issues/16086
-        if not self.ddbc.sql(f"select 1 from duckdb_indexes() where index_name = {index_literal}"):
-            cursor = self.ddbc.cursor()
-            cursor.sql("set enable_progress_bar_print=false")
-            cursor.sql("set progress_bar_time=0")
+        for n, label in enumerate(self.labels):
+            icon = "sort_un" if n != column_num else "sort_up" if self.sort_ascending else "sort_dn"
+            label.configure(image=get_icon(self, icon))
 
-            if self._set_sort_order_thread and self._set_sort_order_thread.is_alive():
-                logger.debug("TabularDataFrame set_sort_order thread already running")
-                self._set_sort_order_thread.join()
-
-            def _create_index_thread():
-                sql = (
-                    f"CREATE INDEX IF NOT EXISTS {index_identifier} ON {self.table.alias} ("
-                    + ",".join(escaped_column_names)
-                    + ")"
-                )
-                logger.debug("TabularDataFrame set_sort_order index sql %s", sql)
-                cursor.sql(sql)
-
-            self._set_sort_order_thread = threading.Thread(target=_create_index_thread)
-            self._set_sort_order_thread.start()
-
-            def _create_index_monitor():
-                if self._set_sort_order_thread.is_alive():
-                    try:
-                        qp = cursor.query_progress()
-                    except AttributeError:
-                        qp = 50
-
-                    if qp >= 0:
-                        logger.info("Indexing: %d%%", qp)
-                    self.after(50, _create_index_monitor)
-                else:
-                    self._set_sort_order_thread.join()
-                    logger.info("Indexing: 100%")
-                    _create_index_continue()
-
-            self.after(50, _create_index_monitor)
-        else:
-            _create_index_continue()
+        self.refresh()
 
     def _label_button_1(self, num, event):
         """Click on column labels to set sort order"""

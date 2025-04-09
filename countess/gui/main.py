@@ -252,9 +252,15 @@ class ConfiguratorWrapper:
     def config_change_task_callback(self):
         """Called when the user makes a change and had paused for a bit"""
         self.config_change_task = None
-        logger.debug("config_change_task_callback")
-
         self.node.stop()
+        self.config_change_start()
+
+    def choose_plugin(self, plugin_class):
+        self.node.plugin = plugin_class()
+        self.config_change_start()
+
+    def config_change_start(self):
+        self.node.is_dirty = True
         self.node.start(self.ddbc, preview_row_limit)
         self.config_change_poll_callback()
 
@@ -262,14 +268,12 @@ class ConfiguratorWrapper:
         percent = self.node.poll_percent()
         if percent < 0:
             logger.info("%s: 0/0", self.node.name)
-        elif percent < 100:
+        elif 0 <= percent < 100:
             logger.info("%s: %d%%", self.node.name, percent)
-        else:
+            self.frame.after(50, self.config_change_poll_callback)
+        elif percent == 100:
             logger.info("%s: 100%%", self.node.name)
             self.config_change_poll_done()
-            return
-
-        self.frame.after(50, self.config_change_poll_callback)
 
     def config_change_poll_done(self):
         self.node.wait()
@@ -285,14 +289,6 @@ class ConfiguratorWrapper:
         self.config_canvas.yview_moveto(pos1)
         self.config_scrollbar.set(pos1, pos2)
 
-    def choose_plugin(self, plugin_class):
-        self.node.plugin = plugin_class()
-        # self.node.prerun()
-        self.node.is_dirty = True
-        self.node.run(self.ddbc, preview_row_limit)
-        self.show_config_subframe()
-        self.change_callback(self.node)
-
     def destroy(self):
         if self.config_change_task:
             self.frame.after_cancel(self.config_change_task)
@@ -302,13 +298,13 @@ class ConfiguratorWrapper:
 class SplashWrapper:
     def __init__(self, tk_parent):
         self.frame = tk.Frame(tk_parent)
-        self.frame.configure(cursor = 'heart')
+        self.frame.configure(cursor="heart")
 
         font = ("TkHeadingFont", 16, "bold")
-        subframe = tk.Frame(self.frame, highlightbackground='black', highlightthickness=1)
-        subframe.grid(padx=10,pady=10)
-        self.frame.columnconfigure(0,weight=1)
-        self.frame.rowconfigure(0,weight=1)
+        subframe = tk.Frame(self.frame, highlightbackground="black", highlightthickness=1)
+        subframe.grid(padx=10, pady=10)
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.rowconfigure(0, weight=1)
         tk.Label(subframe, image=get_icon(tk_parent, "countess")).grid(padx=10, pady=10)
         tk.Label(subframe, text=f"CountESS {VERSION}", font=font).grid(padx=10, pady=10)
 

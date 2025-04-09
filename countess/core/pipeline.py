@@ -173,9 +173,10 @@ class PipelineNode:
         if self.status == PipelineNodeStatus.DONE:
             return 100
         elif self.status == PipelineNodeStatus.WORK:
-            return self.plugin.query_progress(self.cursor)
+            qp = self.plugin.query_progress(self.cursor)
+            return qp if qp > 0 else 0
         else:
-            return 0
+            return -1
 
     def run(self, ddbc, row_limit: Optional[int] = None):
         if not self.plugin:

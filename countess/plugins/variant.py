@@ -203,7 +203,7 @@ class VariantConverter(DuckdbSqlPlugin):
         prefix_aa = duckdb_escape_literal((self.prefix_aa.value + ":" if self.prefix_aa else "") + "p.")
         prefix_nt = duckdb_escape_literal((self.prefix_nt.value + ":" if self.prefix_nt else "") + "c.")
 
-        columns = ' '.join(duckdb_escape_identifier(c) + "," for c in columns if c != self.variant_out.value)
+        columns = " ".join(duckdb_escape_identifier(c) + "," for c in columns if c != self.variant_out.value)
 
         # XXX handle other short forms like _synNNNX>Y or whatever
         return rf"""
