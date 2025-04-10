@@ -33,9 +33,14 @@ def test_open_new():
     mw = MainWindow(root)
     root.update()
 
+    node = mw.graph_wrapper.graph.nodes[0]
+    mw.graph_wrapper.highlight_node(node)
+    mw.graph_wrapper.node_select_callback(node)
+
     assert isinstance(mw.config_wrapper.config_subframe, PluginChooserFrame)
 
     button = _find_button(mw.config_wrapper.config_subframe, "CSV Load")
+    print(button)
     button.invoke()
     root.update()
 

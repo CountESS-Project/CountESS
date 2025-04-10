@@ -257,6 +257,7 @@ class ConfiguratorWrapper:
 
     def choose_plugin(self, plugin_class):
         self.node.plugin = plugin_class()
+        self.show_config_subframe()
         self.config_change_start()
 
     def config_change_start(self):
