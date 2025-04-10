@@ -149,6 +149,28 @@ class PipelineNode:
         self.thread = threading.Thread(target=_run)
         self.thread.start()
 
+    def poll(self):
+        for pn in self.parent_nodes:
+            pn.poll()
+
+        if self.status == PipelineNodeStatus.WAIT:
+            logger.info("%s: 0/0", self.name)
+            return True
+
+        if self.status == PipelineNodeStatus.WORK:
+            qp = self.plugin.query_progress(self.cursor)
+            if qp > 0:
+                logger.info("%s: %d%%", self.name, qp)
+            else:
+                logger.info("%s: 0/0", self.name)
+            return True
+
+        if self.status == PipelineNodeStatus.DONE:
+            logger.info("%s: 100%%", self.name)
+        else:
+            logger.info("%s: 0/0", self.name)
+        return False
+
     def stop(self):
         """Stop any running operation."""
 
@@ -166,17 +188,6 @@ class PipelineNode:
     def wait(self):
         if self.status == PipelineNodeStatus.WORK and self.thread:
             self.thread.join()
-
-    def poll_percent(self):
-        """Check on the running operation"""
-
-        if self.status == PipelineNodeStatus.DONE:
-            return 100
-        elif self.status == PipelineNodeStatus.WORK:
-            qp = self.plugin.query_progress(self.cursor)
-            return qp if qp > 0 else 0
-        else:
-            return -1
 
     def run(self, ddbc, row_limit: Optional[int] = None):
         if not self.plugin:
@@ -286,6 +297,14 @@ class PipelineGraph:
         return node.run(self.ddbc)
 
     def run(self):
+        # Unlike 'start', we kick all the nodes off in one thread so that
+        # their results can stay as views rather than tables.  There's a slight
+        # penalty to this as multiple inputs can't run in parallel but it
+        # should reduce memory usage since intermediate steps don't need to
+        # be saved.  If DuckDB decides to start sharing views across cursors
+        # we can improve on this a little.
+        # see https://github.com/duckdb/duckdb/issues/1848
+
         logger.info("Starting")
         start_time = time.time()
         for node in self.traverse_nodes():

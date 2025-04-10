@@ -265,14 +265,9 @@ class ConfiguratorWrapper:
         self.config_change_poll_callback()
 
     def config_change_poll_callback(self):
-        percent = self.node.poll_percent()
-        if percent < 0:
-            logger.info("%s: 0/0", self.node.name)
-        elif 0 <= percent < 100:
-            logger.info("%s: %d%%", self.node.name, percent)
+        if self.node.poll():
             self.frame.after(50, self.config_change_poll_callback)
-        elif percent == 100:
-            logger.info("%s: 100%%", self.node.name)
+        else:
             self.config_change_poll_done()
 
     def config_change_poll_done(self):
