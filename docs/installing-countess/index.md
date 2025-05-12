@@ -4,6 +4,9 @@ layout: default
 
 # Installing CountESS
 
+CountESS uses 'biobear', which is developed in Rust, so if you can't use a precompiled wheel
+for biobear you'll need to install rust first, eg: `apt install rust-all` on Ubuntu.
+
 ## ... using pip
 
 CountESS can be [installed from pypi](https://pypi.org/project/countess/):
@@ -48,10 +51,10 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
         echo 'export PATH=$HOME/homebrew/bin:$PATH' >> .bash_profile
         source .bash_profile
 
-2. Use homebrew to install a recent Tk library and Python 3.10 into your `$HOME/homebrew/bin`
-   directory.  This step is pretty slow:
+2. Use homebrew to install a recent Tk library, Python 3.10 and rust
+   into your `$HOME/homebrew/bin` directory.  This step is pretty slow:
 
-        brew install tcl-tk python@3.10 python-tk@3.10
+        brew install tcl-tk python@3.10 python-tk@3.10 rust
 
    Optionally, add symlinks to your upgraded software for `python` and `pip`:
 
