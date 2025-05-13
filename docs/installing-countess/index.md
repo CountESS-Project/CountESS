@@ -7,7 +7,9 @@ layout: default
 CountESS uses 'biobear', which is developed in Rust, so if you can't use a precompiled wheel
 for biobear you'll need to install rust first, eg: `apt install rust-all` on Ubuntu.
 
-## ... using pip
+## Linux
+
+### ... using pip
 
 CountESS can be [installed from pypi](https://pypi.org/project/countess/):
 
@@ -17,7 +19,7 @@ CountESS can be [installed from pypi](https://pypi.org/project/countess/):
 
     pip install git+https://github.com/CountESS-Project/CountESS.git
 
-## ... using git, for development
+### ... using git, for development
 
 Clone the repository and [install for development](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e):
 
@@ -27,14 +29,14 @@ Clone the repository and [install for development](https://pip.pypa.io/en/stable
 
 See [Contributing to CountESS](../contributing/) for more information on development.
 
-## ... using nix
+### ... using nix
 
 CountESS can be installed and run in one command with
 [nix](https://nixos.org/):
 
     nix run github:CountESS-Project/CountESS
 
-## ... under homebrew
+## MacOS, using Homebrew
 
 Even recent MacOS installs use a very old version of Python and Tk, so
 we use [homebrew](https://brew.sh/) to install more recent versions.
@@ -76,6 +78,31 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
         brew install hdf5
         pip3.10 install countess[hdf5]
 
+
+## Windows
+
+* Install Python 3 from python.org
+
+  https://docs.python.org/3/using/windows.html
+
+  Under "Optional Features" select "py launcher" to make it easier to start python from the command shell.
+  Under "Advanced Options" select "Add Python to environment variables"
+
+* Install rust;
+
+  * download `rustup-init.exe` from [rustup.rs](https://rustup.rs/)
+
+  * run `rustup-init.exe` and if you haven't alrady got 
+    VS Code installed, select 1 to install it.
+    It'll ask you to reboot.  Once it's rebooted run
+    `rustup-init.exe` again ...
+
+  * rust and cargo will be installed.
+
+  * now open `cmd.exe` and run `pip install countess`.
+
+  * this may take quite some time to install depending on
+    which packages are being built from source.
    
 # NEXT
 
