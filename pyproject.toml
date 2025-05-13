@@ -11,11 +11,9 @@ maintainers = [
 ]
 description = "CountESS"
 requires-python = ">=3.9"
-license = { text = "BSD-3-Clause" }
 classifiers = [
-    'Development Status :: 2 - Pre-Alpha',
+    'Development Status :: 3 - Alpha',
     'Intended Audience :: Science/Research',
-    'License :: OSI Approved :: BSD License',
     'Operating System :: OS Independent',
     'Topic :: Scientific/Engineering :: Bio-Informatics',
 ]
@@ -38,14 +36,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     'black<24',
-    'build==0.10.0',
+    'build==1.2.2',
     'coverage==7.3.2',
     'mypy~=1.0.1',
     'pylint~=3.2.3',
     'semver~=3.0.2',
     'types-psutil~=5.9.5',
     'types-ttkthemes~=3.2',
-    'twine~=4.0.2',
+    'twine~=6.1.0',
+    'packaging~=25.0',
     'pandas-stubs~=2.1.0',
     'pytest~=7.2',
     'pytest-socket~=0.6.0',
@@ -85,6 +84,7 @@ packages = [
     'countess',
     'countess.core',
     'countess.gui',
+    'countess.gui.icons',
     'countess.plugins',
     'countess.utils',
 ]
