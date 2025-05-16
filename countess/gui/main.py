@@ -318,12 +318,19 @@ class ButtonMenu:  # pylint: disable=R0903
         self.frame.grid(sticky=tk.NSEW)
 
 
+def runwindow_subprocess_target(config):
+    logger.debug("Subprocess started")
+    graph = config_to_graph(config)
+    graph.run()
+    logger.debug("Subprocess finished")
+
+
 class RunWindow:
     """Opens a separate window to run the pipeline in.  The actual pipeline is then run
     in a separate process as well, so that it can be stopped."""
 
     def __init__(self, graph: PipelineGraph):
-        self.config = graph_to_config(graph)
+        logger.debug("Running in a separate process")
 
         self.toplevel = tk.Toplevel()
         self.toplevel.columnconfigure(0, weight=1)
@@ -337,15 +344,11 @@ class RunWindow:
         self.button = tk.Button(self.toplevel, text="Stop", command=self.on_button)
         self.button.grid(row=2, column=0, sticky=tk.EW)
 
-        self.process = multiprocessing.Process(target=self.subproc)
+        config = graph_to_config(graph)
+        self.process = multiprocessing.Process(target=runwindow_subprocess_target, args=[ config ])
         self.process.start()
 
         self.poll()
-
-    def subproc(self):
-        self.config.write(sys.stdout)
-        graph = config_to_graph(self.config)
-        graph.run()
 
     def poll(self):
         if self.process:
