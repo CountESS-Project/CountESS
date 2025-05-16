@@ -15,7 +15,7 @@ import psutil
 from duckdb import DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.config import export_config_graphviz, read_config, write_config
+from countess.core.config import export_config_graphviz, read_config, write_config, config_to_graph, graph_to_config
 from countess.core.pipeline import PipelineGraph
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
@@ -322,8 +322,8 @@ class RunWindow:
     """Opens a separate window to run the pipeline in.  The actual pipeline is then run
     in a separate process as well, so that it can be stopped."""
 
-    def __init__(self, graph):
-        self.graph = graph
+    def __init__(self, graph: PipelineGraph):
+        self.config = graph_to_config(graph)
 
         self.toplevel = tk.Toplevel()
         self.toplevel.columnconfigure(0, weight=1)
@@ -343,7 +343,9 @@ class RunWindow:
         self.poll()
 
     def subproc(self):
-        self.graph.run()
+        self.config.write(sys.stdout)
+        graph = config_to_graph(self.config)
+        graph.run()
 
     def poll(self):
         if self.process:

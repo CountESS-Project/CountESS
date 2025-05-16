@@ -60,14 +60,15 @@ def read_config(
 
     cp = ConfigParser()
     for filename in filenames:
-        try:
-            with open(filename, "r", encoding="utf-8") as fh:
-                cp.read_file(fh)
-        except OSError as exc:
-            logger.error(str(exc))
-            sys.exit(2)
+        with open(filename, "r", encoding="utf-8") as fh:
+            cp.read_file(fh)
 
     base_dir = os.path.dirname(filenames[0])
+
+    return config_to_graph(cp, base_dir)
+
+
+def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
 
     pipeline_graph = PipelineGraph()
     nodes_by_name: dict[str, PipelineNode] = {}
@@ -86,16 +87,18 @@ def read_config(
     return pipeline_graph
 
 
-def write_config(pipeline_graph: PipelineGraph, filename: str):
-    """Write `pipeline_graph`'s configuration out to `filename`"""
-
+def graph_to_config(pipeline_graph: PipelineGraph, base_dir: str = ".") -> ConfigParser:
     pipeline_graph.reset_node_names()
-
     cp = ConfigParser()
-    base_dir = os.path.dirname(filename)
-
     for node in pipeline_graph.traverse_nodes():
         write_config_node(node, cp, base_dir)
+    return cp
+
+
+def write_config(pipeline_graph: PipelineGraph, filename: str):
+    """Write `pipeline_graph`'s configuration out to `filename`"""
+    base_dir = os.path.dirname(filename)
+    cp = graph_to_config(pipeline_graph, base_dir)
 
     with open(filename, "w", encoding="utf-8") as fh:
         cp.write(fh)
@@ -129,10 +132,8 @@ def write_config_node(node: PipelineNode, cp: ConfigParser, base_dir: str):
         cp[node.name]["_notes"] = node.notes
     for n, parent in enumerate(node.parent_nodes):
         cp[node.name][f"_parent.{n}"] = parent.name
-    if node.config:
-        for k, v, _ in node.config:
-            cp[node.name][k] = repr(v)
-    elif node.plugin:
+    if node.plugin:
+        node.load_config()
         for k, v in node.plugin.get_parameters("", base_dir):
             cp[node.name][k] = repr(v)
 
