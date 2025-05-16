@@ -36,7 +36,9 @@ CountESS can be installed and run in one command with
 
     nix run github:CountESS-Project/CountESS
 
-## MacOS, using Homebrew
+## MacOS
+
+### ... using Homebrew
 
 Even recent MacOS installs use a very old version of Python and Tk, so
 we use [homebrew](https://brew.sh/) to install more recent versions.
@@ -88,16 +90,16 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
   Under "Optional Features" select "py launcher" to make it easier to start python from the command shell.
   Under "Advanced Options" select "Add Python to environment variables"
 
-* Install rust;
+* Install rust:
 
   * download `rustup-init.exe` from [rustup.rs](https://rustup.rs/)
 
-  * run `rustup-init.exe` and if you haven't alrady got 
-    VS Code installed, select 1 to install it.
-    It'll ask you to reboot.  Once it's rebooted run
-    `rustup-init.exe` again ...
+  * Run `rustup-init.exe` to install rust and cargo.
 
-  * rust and cargo will be installed.
+  * If you haven't already got VS Code installed, select 1 to install it.
+    Once it is installed, rustup will ask you to reboot.
+    Once your machine has rebooted run `rustup-init.exe` again to finish
+    installation of rust and cargo.
 
   * now open `cmd.exe` and run `pip install countess`.
 
