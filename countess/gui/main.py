@@ -566,6 +566,8 @@ class MainWindow:
             )
         if not filename:
             return
+        if not filename.endswith(".ini"):
+            filename = filename + ".ini"
         write_config(self.graph, filename)
         self.config_filename = filename
         self.config_changed = False
