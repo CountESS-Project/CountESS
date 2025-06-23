@@ -2,10 +2,8 @@ import ast
 import getopt
 import logging
 import logging.handlers
-import multiprocessing
 import re
 import sys
-import time
 from typing import Iterable, Union
 
 from countess import VERSION
@@ -94,6 +92,7 @@ def main() -> None:
     root_logger.setLevel(logging.INFO)
 
     run(sys.argv[1:])
+
 
 if __name__ == "__main__":
     main()  # pragma: no cover

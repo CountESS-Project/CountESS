@@ -19,7 +19,7 @@ classifiers = [
 ]
 dependencies = [
     'biobear~=0.23.2',
-    'duckdb>=1.2.2',
+    'duckdb>=1.3.1',
     'fqfa~=1.3.1',
     'more_itertools~=9.1.0',
     'numpy~=1.26',

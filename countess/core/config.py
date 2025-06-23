@@ -3,7 +3,6 @@ import io
 import logging
 import os.path
 import re
-import sys
 from configparser import ConfigParser
 
 from countess.core.pipeline import PipelineGraph, PipelineNode
@@ -69,7 +68,6 @@ def read_config(
 
 
 def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
-
     pipeline_graph = PipelineGraph()
     nodes_by_name: dict[str, PipelineNode] = {}
 

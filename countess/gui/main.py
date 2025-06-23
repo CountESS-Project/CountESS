@@ -15,7 +15,7 @@ import psutil
 from duckdb import DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.config import export_config_graphviz, read_config, write_config, config_to_graph, graph_to_config
+from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config
 from countess.core.pipeline import PipelineGraph
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
@@ -345,7 +345,7 @@ class RunWindow:
         self.button.grid(row=2, column=0, sticky=tk.EW)
 
         config = graph_to_config(graph)
-        self.process = multiprocessing.Process(target=runwindow_subprocess_target, args=[ config ])
+        self.process = multiprocessing.Process(target=runwindow_subprocess_target, args=[config])
         self.process.start()
 
         self.poll()

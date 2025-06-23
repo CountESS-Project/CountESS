@@ -69,11 +69,15 @@ def get_plugin_classes() -> Iterable[Type["BasePlugin"]]:
     return plugin_classes
 
 
-def load_plugin(module_name: str, class_name: str, plugin_name: Optional[str] = None) -> "BasePlugin":
-    module = importlib.import_module(module_name)
-    plugin_class = getattr(module, class_name)
-    assert issubclass(plugin_class, BasePlugin)
-    return plugin_class(plugin_name)
+def load_plugin(module_name: str, class_name: str, plugin_name: Optional[str] = None) -> Optional["BasePlugin"]:
+    try:
+        module = importlib.import_module(module_name)
+        plugin_class = getattr(module, class_name)
+        assert issubclass(plugin_class, BasePlugin)
+        return plugin_class(plugin_name)
+    except ModuleNotFoundError:
+        logger.error("Module Not Found: %s", module_name)
+        return None
 
 
 class BasePlugin(HasSubParametersMixin):
