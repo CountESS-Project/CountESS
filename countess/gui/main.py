@@ -618,7 +618,11 @@ class MainWindow:
 
     def update_title(self):
         if self.config_filename:
-            title = "CountESS: " + os.path.relpath(self.config_filename)
+            try:
+                title = "CountESS: " + os.path.relpath(self.config_filename)
+            except ValueError:
+                # if relpath doesn't work, eg: on windows with multiple drive letters
+                title = "CountESS: " + self.config_filename
         else:
             title = "CountESS " + VERSION
 

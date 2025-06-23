@@ -293,7 +293,11 @@ class LoadFileWithFilenameMixin:
         rel = self.load_file(cursor, filename, file_param, row_limit)
         if self.filename_column.value:
             assert isinstance(file_param, LoadFileMultiParam)
-            filename_value = os.path.relpath(filename, file_param["filename"].base_dir)
+            try:
+                filename_value = os.path.relpath(filename, file_param["filename"].base_dir)
+            except ValueError:
+                # relpath can fail on windows
+                filename_value = filename
             proj = f"*, {duckdb_escape_literal(filename_value)} as filename"
             logger.debug("LoadFileWithFilenameMixin load_file_wrapper proj %s", proj)
             return duckdb_source_to_view(cursor, rel.project(proj))

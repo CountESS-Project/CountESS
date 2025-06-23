@@ -298,15 +298,23 @@ class FileBaseParam(StringParam):
 
     def set_base_dir(self, base_dir):
         if self.value:
-            self.value = os.path.relpath(self.get_file_path(), base_dir)
+            try:
+                self.value = os.path.relpath(self.get_file_path(), base_dir)
+            except ValueError:
+                # relpath can fail on Windows
+                self.value = self.get_file_path()
         self.base_dir = base_dir
 
     def get_parameters(self, key, base_dir="."):
         if self.value:
-            if base_dir:
-                path = os.path.relpath(self.get_file_path(), base_dir)
-            else:
-                path = os.path.abspath(self.get_file_path())
+            try:
+                if base_dir:
+                    path = os.path.relpath(self.get_file_path(), base_dir)
+                else:
+                    path = os.path.abspath(self.get_file_path())
+            except ValueError:
+                # relpath can fail on Windows
+                path = self.get_file_path()
         else:
             path = None
 
