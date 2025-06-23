@@ -27,7 +27,7 @@ def test_read_config_dict_no_plugin():
 
 def test_write_config():
     pn = PipelineNode("node", plugin=NothingPlugin("node"))
-    pn.set_config("foo", "bar", "baz")
+    pn.set_config("param", "107", "")
     pg = PipelineGraph([pn])
 
     buf = io.StringIO()
@@ -37,7 +37,7 @@ def test_write_config():
 
     s = buf.getvalue()
     assert s.startswith("[node]")
-    assert "foo = 'bar'" in s
+    assert "param = 107" in s
 
 
 def test_write_config_node_string():

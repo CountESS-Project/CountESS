@@ -67,8 +67,8 @@ def configure_graphs(args: list[str]) -> Iterable[PipelineGraph]:
         try:
             graph = read_config([filename])
         except IOError as exc:
-            logger.warning("Error reading %s: %s", filename, exc)
-            continue
+            logger.error("Error reading %s: %s", filename, exc)
+            sys.exit(2)
 
         for node_name, config_key, config_val in config:
             node = graph.find_node(node_name)
