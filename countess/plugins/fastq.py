@@ -1,8 +1,10 @@
+import itertools
 import logging
 from typing import Iterable, Optional
 
-import biobear
+import dnaio
 import duckdb
+import pyarrow
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
@@ -32,10 +34,20 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     ) -> duckdb.DuckDBPyRelation:
         # Open the file, convert it to a RecordBatchReader and then
         # wrap that up as a DuckDBPyRelation so we can filter it.
-        reader = biobear.connect().read_fastq_file(filename)
-        rel = cursor.from_arrow(reader.to_arrow_record_batch_reader())
+        fastq_iter = dnaio.open(filename, open_threads=1)
+        record_batch_iter = (
+            pyarrow.RecordBatch.from_pylist([{'sequence': z.sequence, 'quality_scores': z.qualities} for z in y])
+            for y in itertools.batched(fastq_iter, 5000)
+        )
+        rel = cursor.from_arrow(
+            pyarrow.RecordBatchReader.from_batches(
+                pyarrow.schema({'sequence': 'str', 'quality_scores': 'str'}),
+                record_batch_iter
+            )
+        )
         if row_limit is not None:
-            rel = rel.limit(row_limit)
+            pass
+        #rel = rel.limit(row_limit)
 
         if self.min_avg_quality > 0:
             rel = rel.filter(
@@ -77,8 +89,17 @@ class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        reader = biobear.connect().read_fasta_file(filename)
-        rel = cursor.from_arrow(reader.to_arrow_record_batch_reader())
+        fasta_iter = dnaio.open(filename, open_threads=1)
+        record_batch_iter = (
+            pyarrow.RecordBatch.from_pylist([{'seq': z.sequence, 'qual': z.qualities} for z in y])
+            for y in itertools.batched(fasta_iter, 5000)
+        )
+        rel = cursor.from_arrow(
+            pyarrow.RecordBatchReader.from_batches(
+                pyarrow.schema({'seq': 'str', 'qual': 'str'}),
+                record_batch_iter
+            )
+        )
         if row_limit is not None:
             rel = rel.limit(row_limit)
         return rel

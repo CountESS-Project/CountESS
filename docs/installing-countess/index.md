@@ -97,9 +97,10 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
   * Run `rustup-init.exe` to install rust and cargo.
 
   * If you haven't already got VS Code installed, select 1 to install it.
-    Once it is installed, rustup will ask you to reboot.
-    Once your machine has rebooted run `rustup-init.exe` again to finish
-    installation of rust and cargo.
+
+    * Ignore the prompt to log in to Visual Studio and just let rustup finish.
+    * Once it is installed, run `rustup-init.exe` and select 1 again.
+    * This time it should say "Rust is installed now. Great!" 
 
   * now open `cmd.exe` and run `pip install countess`.
 
