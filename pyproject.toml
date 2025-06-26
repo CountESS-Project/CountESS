@@ -28,7 +28,7 @@ dependencies = [
     'pyarrow~=20.0.0',
     'rapidfuzz~=3.13.0',
     'scipy~=1.16.0',
-    'tkinterweb~=4.3.1',
+    'tkinterweb~=3.23.5',
     'ttkthemes~=3.2.2',
     'typing_extensions~=4.14.0',
 ]
