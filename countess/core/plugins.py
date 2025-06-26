@@ -339,7 +339,7 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
             self.progress = 100
             return self.combine(ddbc, [ddbc.table(tablename)])
         else:
-            row_limit_per_file = (row_limit // len(filenames_and_params)) if row_limit else None
+            row_limit_per_file = int(row_limit // len(filenames_and_params)) if row_limit else None
             progress_per_file = 100 / len(filenames_and_params)
 
             def _load(x):
@@ -353,6 +353,7 @@ class DuckdbParallelLoadFilePlugin(DuckdbLoadFilePlugin):
                 logger.debug("DuckdbParallelLoadFilePlugin.execute _load table %s %s", tablename, repr(filename))
                 self.load_file_wrapper(cursor, filename, file_param, row_limit_per_file).create(tablename)
                 self.progress += progress_per_file / 2
+                logger.debug("DuckdbParallelLoadFilePlugin.execute _load table %s done", tablename)
                 return tablename
 
             # run a bunch of _loads in parallel threads, collecting them in whatever order they return.

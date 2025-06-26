@@ -34,33 +34,43 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     ) -> duckdb.DuckDBPyRelation:
         # Open the file, convert it to a RecordBatchReader and then
         # wrap that up as a DuckDBPyRelation so we can filter it.
-        fastq_iter = dnaio.open(filename, open_threads=1)
-        record_batch_iter = (
-            pyarrow.RecordBatch.from_pylist([{'sequence': z.sequence, 'quality_scores': z.qualities} for z in y])
-            for y in itertools.batched(fastq_iter, 5000)
-        )
-        rel = cursor.from_arrow(
-            pyarrow.RecordBatchReader.from_batches(
-                pyarrow.schema({'sequence': 'str', 'quality_scores': 'str'}),
-                record_batch_iter
-            )
-        )
-        if row_limit is not None:
-            pass
-        #rel = rel.limit(row_limit)
+        logger.debug("Loading file %s row_limit %s", filename, row_limit)
 
-        if self.min_avg_quality > 0:
-            rel = rel.filter(
-                "list_aggregate(list_transform(string_split(quality_scores, ''), x -> ord(x)), 'avg') - 33 >= %f"
-                % self.min_avg_quality.value
+        # Take up to row_limit records from this file
+        fastq_iter = itertools.islice(dnaio.open(filename, open_threads=1), row_limit)
+
+        def _record_to_dict(record):
+            d = {"sequence": record.sequence}
+            if self.header_column:
+                d["header"] = record.name
+            return d
+
+        def _avg_quality(record):
+            return sum(ord(c) for c in record.qualities) / len(record.qualities) - 33
+
+        pyarrow_schema = pyarrow.schema([pyarrow.field("sequence", pyarrow.string())])
+        if self.header_column:
+            pyarrow_schema.append(pyarrow.field("header", pyarrow.string()))
+
+        # Generator which batches records 5000 at a time into RecordBatches
+        record_batch_iter = (
+            pyarrow.RecordBatch.from_pylist(
+                [
+                    _record_to_dict(record)
+                    for record in batch
+                    if self.min_avg_quality <= 0 or self.min_avg_quality <= _avg_quality(record)
+                ]
             )
+            for batch in itertools.batched(fastq_iter, 5000)
+        )
+
+        # We can turn that generator of RecordBatches into a temporary table
+        rel = cursor.from_arrow(pyarrow.RecordBatchReader.from_batches(pyarrow_schema, record_batch_iter))
 
         if self.group:
             rel = rel.aggregate("sequence, count(*) as count")
-        elif self.header_column:
-            rel = rel.project("sequence, name || ' ' || description as header")
-        else:
-            rel = rel.project("sequence")
+
+        logger.debug("Loading file %s row_limit %s done", filename, row_limit)
         return rel
 
     def combine(
@@ -83,23 +93,17 @@ class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
 
     file_types = [("FASTA", [".fasta", ".fa", ".fasta.gz", ".fa.gz", ".fasta.bz2", ".fa.bz2"])]
 
-    sequence_column = StringParam("Sequence Column", "sequence")
-    header_column = StringParam("Header Column", "header")
-
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        fasta_iter = dnaio.open(filename, open_threads=1)
+        pyarrow_schema = pyarrow.schema(
+            [pyarrow.field("sequence", pyarrow.string()), pyarrow.field("header", pyarrow.string())]
+        )
+
+        fasta_iter = itertools.islice(dnaio.open(filename, open_threads=1), row_limit)
         record_batch_iter = (
-            pyarrow.RecordBatch.from_pylist([{'seq': z.sequence, 'qual': z.qualities} for z in y])
+            pyarrow.RecordBatch.from_pylist([{"sequence": z.sequence, "header": z.name} for z in y])
             for y in itertools.batched(fasta_iter, 5000)
         )
-        rel = cursor.from_arrow(
-            pyarrow.RecordBatchReader.from_batches(
-                pyarrow.schema({'seq': 'str', 'qual': 'str'}),
-                record_batch_iter
-            )
-        )
-        if row_limit is not None:
-            rel = rel.limit(row_limit)
+        rel = cursor.from_arrow(pyarrow.RecordBatchReader.from_batches(pyarrow_schema, record_batch_iter))
         return rel
