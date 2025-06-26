@@ -5,17 +5,18 @@ from countess.core.plugins import get_plugin_classes
 
 empty_entry_points = importlib.metadata.EntryPoints()
 
-invalid_entry_points = importlib.metadata.EntryPoints((
-    importlib.metadata.EntryPoint(name="test", value="mockplugin", group="countess_plugins"),
-))
+invalid_entry_points = importlib.metadata.EntryPoints(
+    (importlib.metadata.EntryPoint(name="test", value="mockplugin", group="countess_plugins"),)
+)
+
 
 class NoParentPlugin:
     pass
 
 
-noparent_entry_points = importlib.metadata.EntryPoints((
-    importlib.metadata.EntryPoint(name="test", value="NoParentPlugin", group="countess_plugins"),
-))
+noparent_entry_points = importlib.metadata.EntryPoints(
+    (importlib.metadata.EntryPoint(name="test", value="NoParentPlugin", group="countess_plugins"),)
+)
 
 
 def test_get_plugin_classes_invalid(caplog):

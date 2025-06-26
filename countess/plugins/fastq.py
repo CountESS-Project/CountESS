@@ -7,7 +7,7 @@ import duckdb
 import pyarrow
 
 from countess import VERSION
-from countess.core.parameters import BaseParam, BooleanParam, FloatParam, StringParam
+from countess.core.parameters import BaseParam, BooleanParam, FloatParam
 from countess.core.plugins import DuckdbLoadFileWithTheLotPlugin
 
 logger = logging.getLogger(__name__)
