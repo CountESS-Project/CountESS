@@ -4,9 +4,6 @@ layout: default
 
 # Installing CountESS
 
-CountESS uses 'biobear', which is developed in Rust, so if you can't use a precompiled wheel
-for biobear you'll need to install rust first, eg: `apt install rust-all` on Ubuntu.
-
 ## Linux
 
 ### ... using pip
@@ -55,10 +52,10 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
         echo 'export PATH=$HOME/homebrew/bin:$PATH' >> .bash_profile
         source .bash_profile
 
-2. Use homebrew to install a recent Tk library, Python 3.10 and rust
+2. Use homebrew to install a recent Tk library and Python 3.10
    into your `$HOME/homebrew/bin` directory.  This step is pretty slow:
 
-        brew install tcl-tk python@3.10 python-tk@3.10 rust
+        brew install tcl-tk python@3.10 python-tk@3.10
 
    Optionally, add symlinks to your upgraded software for `python` and `pip`:
 
@@ -83,30 +80,19 @@ we use [homebrew](https://brew.sh/) to install more recent versions.
 
 ## Windows
 
-* Install Python 3 from python.org
+1. Install Python 3 from python.org
 
-  https://docs.python.org/3/using/windows.html
+   https://docs.python.org/3/using/windows.html
 
-  Under "Optional Features" select "py launcher" to make it easier to start python from the command shell.
-  Under "Advanced Options" select "Add Python to environment variables"
+   Under "Optional Features" select "py launcher" to make it easier to start python from the command shell.
+   Under "Advanced Options" select "Add Python to environment variables"
 
-* Install rust:
-
-  * download `rustup-init.exe` from [rustup.rs](https://rustup.rs/)
-
-  * Run `rustup-init.exe` to install rust and cargo.
-
-  * If you haven't already got VS Code installed, select 1 to install it.
-
-    * Ignore the prompt to log in to Visual Studio and just let rustup finish.
-    * Once it is installed, run `rustup-init.exe` and select 1 again.
-    * This time it should say "Rust is installed now. Great!" 
-
-  * now open `cmd.exe` and run `pip install countess`.
-
-  * this may take quite some time to install depending on
-    which packages are being built from source.
+2. now open `cmd.exe` and run `pip install countess`.
+   this may take quite some time to install depending on
+   which packages are being built from source.
    
+3. The CountESS binaries `countess_gui` and `countess_cli` should now be available from your shell.
+
 # NEXT
 
 Now CountESS is installed, see [Running CountESS](../running-countess/)
