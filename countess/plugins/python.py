@@ -2,7 +2,7 @@ import builtins
 import logging
 import math
 import re
-from types import BuiltinFunctionType, FunctionType, ModuleType
+from types import BuiltinFunctionType, FunctionType, ModuleType, NoneType
 from typing import Any, Optional
 
 import numpy as np
@@ -12,9 +12,6 @@ from countess.core.parameters import BooleanParam, TextParam
 from countess.core.plugins import DuckdbThreadedTransformPlugin
 
 logger = logging.getLogger(__name__)
-
-# For 3.9 compatibility
-NoneType = type(None)
 
 # XXX pretty sure this is a job for ast.parse rather than just
 # running compile() and exec() but that can wait.

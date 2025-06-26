@@ -47,12 +47,7 @@ logger = logging.getLogger(__name__)
 
 def get_plugin_classes() -> Iterable[Type["BasePlugin"]]:
     plugin_classes = set()
-    try:
-        # Python >= 3.10
-        entry_points = importlib.metadata.entry_points().select(group="countess_plugins")
-    except AttributeError:
-        # Python < 3.10
-        entry_points = importlib.metadata.entry_points()["countess_plugins"]
+    entry_points = importlib.metadata.entry_points().select(group="countess_plugins")
 
     for ep in entry_points:
         try:

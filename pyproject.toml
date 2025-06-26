@@ -10,7 +10,7 @@ maintainers = [
     { name = "Nick Moore", email="nick@zoic.org" },
 ]
 description = "CountESS"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     'Development Status :: 3 - Alpha',
     'Intended Audience :: Science/Research',
@@ -19,37 +19,37 @@ classifiers = [
 ]
 dependencies = [
     'dnaio~=1.2.3',
-    'duckdb>=1.3.1',
+    'duckdb~=1.3.1',
     'fqfa~=1.3.1',
-    'more_itertools~=9.1.0',
-    'numpy~=1.26',
-    'pandas~=2.2.3',
-    'psutil~=5.9.5',
+    'more_itertools~=10.7.0',
+    'numpy~=2.3.1',
+    'pandas~=2.3.0',
+    'psutil~=7.0.0',
     'pyarrow~=20.0.0',
-    'rapidfuzz~=3.13',
-    'scipy~=1.15.3',
-    'tkinterweb~=3.23.5',
+    'rapidfuzz~=3.13.0',
+    'scipy~=1.16.0',
+    'tkinterweb~=4.3.1',
     'ttkthemes~=3.2.2',
-    'typing_extensions~=4.8.0',
+    'typing_extensions~=4.14.0',
 ]
 
 [project.optional-dependencies]
 dev = [
     'black<24',
-    'build==1.2.2',
-    'coverage==7.3.2',
-    'mypy~=1.0.1',
-    'pylint~=3.2.3',
+    'build~=1.2.2',
+    'coverage~=7.9.1',
+    'mypy~=1.16.1',
+    'pylint~=3.3.7',
     'semver~=3.0.2',
-    'types-psutil~=5.9.5',
-    'types-ttkthemes~=3.2',
+    'types-psutil~=7.0.0',
+    'types-ttkthemes~=3.2.4',
     'twine~=6.1.0',
     'packaging~=25.0',
-    'pandas-stubs~=2.1.0',
+    'pandas-stubs~=2.2.3',
     'pyarrow-stubs~=20.0.0',
-    'pytest~=7.2',
-    'pytest-socket~=0.6.0',
-    'requests-mock~=1.11.0',
+    'pytest~=8.4.1',
+    'pytest-socket~=0.7.0',
+    'requests-mock~=1.12.1',
 ]
 
 [project.entry-points.countess_plugins]
@@ -133,6 +133,6 @@ markers = [ "slow", "gui" ]
 
 [tool.mypy]
 plugins = [
-    "numpy.typing.mypy_plugin",
+#    "numpy.typing.mypy_plugin",
 ]
 mypy_path = "mypy_stubs"
