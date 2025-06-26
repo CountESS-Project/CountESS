@@ -22,6 +22,7 @@ jobs:
     name: Ubuntu 22.04, Python 3.11 from Apt
     steps:
     - uses: actions/checkout@v4
+    - run: sudo apt update -y
     - run: sudo apt install python3.11-full python3-pip xvfb
     - run: python3.11 -m pip install --upgrade pip
     - run: python3.11 -m pip install -e .[dev]
@@ -32,6 +33,8 @@ jobs:
     name: Ubuntu 24.04, Python 3.12 from Apt
     steps:
     - uses: actions/checkout@v4
+    - run: sudo apt update -y
+    - run: sudo apt-get -U upgrade -y
     - run: sudo apt install python3.12-full python3-pip xvfb
     - run: python3.12 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
@@ -42,6 +45,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: Ubuntu 24.04, Python 3.x
     steps:
+    - run: sudo apt update -y
     - run: sudo apt-get -U upgrade -y
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
