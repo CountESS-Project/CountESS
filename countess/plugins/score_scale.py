@@ -73,8 +73,8 @@ class ScoreScalingPlugin(DuckdbSqlPlugin):
             select {all_columns}, ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) as {scaled_col_id}
             from {table_name} T0 join (
                 select {group_col_id} as score_group,
-                    median({score_col_id}) filter ({c0.filter()}) as score_0,
-                    median({score_col_id}) filter ({c1.filter()}) as score_1
+                    coalesce(median({score_col_id}) filter ({c0.filter()}), 0) as score_0,
+                    coalesce(median({score_col_id}) filter ({c1.filter()}), 1) as score_1
                 from {table_name} T0
                 group by score_group
             ) T1 on ({group_col_id} = T1.score_group)
