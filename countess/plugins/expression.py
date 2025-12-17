@@ -45,6 +45,9 @@ FUNCOPS = {
     "lower",
     "upper",
     "regexp_matches",
+    "reverse",
+    "translate",
+    "trim",
 }
 CASTOPS = {
     "int": "integer",
