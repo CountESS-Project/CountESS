@@ -59,6 +59,9 @@ table {
     .sidebar {
 	 max-width: 16rem;
 	 position: fixed;
+	 overflow-y: auto;
+	 top: 0;
+	 bottom: 0;
     }
 }
 
@@ -70,6 +73,9 @@ table {
   .sidebar {
 	max-width: 20rem;
 	position: fixed;
-}
+	overflow-y: auto;
+	top: 0;
+	bottom: 0;
+  }
 }
 
