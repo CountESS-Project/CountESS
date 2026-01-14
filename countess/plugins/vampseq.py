@@ -4,7 +4,13 @@ from typing import Iterable, Optional
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import ColumnOrNoneChoiceParam, FloatParam, PerNumericColumnArrayParam, TabularMultiParam
+from countess.core.parameters import (
+        FloatParam,
+        PerNumericColumnArrayParam,
+        TabularMultiParam,
+        PerColumnArrayParam,
+        BooleanParam,
+)
 from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -21,7 +27,7 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
     version = VERSION
 
     columns = PerNumericColumnArrayParam("Columns", CountColumnParam("Column"))
-    group_col = ColumnOrNoneChoiceParam("Group By")
+    group_by = PerColumnArrayParam("Group By", BooleanParam("Column", False))
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
         super().prepare(ddbc, source)
@@ -32,7 +38,17 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
             for n, c in enumerate(count_cols):
                 c.weight.value = (n + 1) / len(count_cols)
 
+        weight_cols = set(n for n, p in self.columns.get_column_params() if p.weight.value is not None)
+        for n, p in self.group_by.get_column_params():
+            if n in weight_cols:
+                p.set_value(False)
+
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
+        group_cols = {
+            duckdb_escape_identifier(name)
+            for name, param in self.group_by.get_column_params()
+            if param
+        }
         weighted_columns = {
             duckdb_escape_identifier(name): duckdb_escape_literal(param.weight.value)
             for name, param in self.columns.get_column_params()
@@ -42,24 +58,24 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
         if not weighted_columns:
             return None
 
-        if self.group_col.is_not_none():
-            group_col_id = "T0." + duckdb_escape_identifier(self.group_col.value)
-        else:
-            group_col_id = "1"
-
-        sums = ", ".join(f"sum(T0.{k}) as {k}" for k in weighted_columns.keys())
+        inner_select = ", ".join(
+            [ f"T0.{k}" for k in group_cols ] +
+            [ f"sum(T0.{k}) as {k}" for k in weighted_columns.keys() ]
+        )
         weighted_counts = " + ".join(
-            f"CASE WHEN T1.{k} > 0 THEN T0.{k} * {v} / T1.{k} ELSE 0 END" for k, v in weighted_columns.items()
+            f"CASE WHEN T2.{k} > 0 THEN T1.{k} * {v} / T2.{k} ELSE 0 END" for k, v in weighted_columns.items()
         )
         total_counts = " + ".join(
-            f"CASE WHEN T1.{k} > 0 THEN T0.{k} / T1.{k} ELSE 0 END" for k in weighted_columns.keys()
+            f"CASE WHEN T2.{k} > 0 THEN T1.{k} / T2.{k} ELSE 0 END" for k in weighted_columns.keys()
         )
+        group_by = ("GROUP BY " + ", ".join("T0." + c for c in group_cols)) if group_cols else ""
+        join_on = (" AND ".join(f"T1.{c} = T2.{c}" for c in group_cols)) if group_cols else "1=1"
 
         return f"""
-            select T0.*, ({weighted_counts}) / ({total_counts}) as score
-            from {table_name} T0 join (
-                select {group_col_id} as score_group, {sums}
+            select T1.*, ({weighted_counts}) / ({total_counts}) as score
+            from {table_name} T1 join (
+                select {inner_select}
                 from {table_name} T0
-                group by score_group
-            ) T1 on ({group_col_id} = T1.score_group)
+                {group_by}
+            ) T2 on {join_on}
         """
