@@ -6,7 +6,7 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess import VERSION
 from countess.core.parameters import BooleanParam, ChoiceParam, PerColumnArrayParam
 from countess.core.plugins import DuckdbSimplePlugin
-from countess.utils.duckdb import duckdb_choose_special, duckdb_escape_identifier, duckdb_escape_literal
+from countess.utils.duckdb import duckdb_choose_special, duckdb_escape_identifier, duckdb_escape_literal, duckdb_dtype_is_numeric
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,12 @@ class PivotPlugin(DuckdbSimplePlugin):
         if not expand_cols or not pivot_cols:
             return source
 
+        column_is_numeric = {
+            name: duckdb_dtype_is_numeric(dt)
+            for name, dt in zip(source.columns, source.dtypes)
+            if name in expand_cols
+        }
+
         # Override the default pivoted column naming convention with
         # our own custom one ... this is what previous CountESS used
         # but it frankly could be better or customizable.
@@ -55,9 +61,15 @@ class PivotPlugin(DuckdbSimplePlugin):
         # definitively pick out the pivot output columns later ...
         pivot_char = duckdb_choose_special(index_cols + expand_cols)
 
+        # produces clauses like `SUM("foo") AS "~foo"` and the pivot will
+        # then make columns like "value_~foo" (short names) or "column_value__~foo"
+        # (long names)
         using_str = ", ".join(
-            "%s(%s) AS %s"
-            % (self.aggfunc.value, duckdb_escape_identifier(ec), duckdb_escape_identifier(pivot_char + ec))
+            "%s(%s) AS %s" % (
+                self.aggfunc.value if column_is_numeric[ec] else 'string_agg',
+                duckdb_escape_identifier(ec),
+                duckdb_escape_identifier(pivot_char + ec)
+            )
             for ec in expand_cols
         )
         group_str = ", ".join(duckdb_escape_identifier(ic) for ic in index_cols)
@@ -69,14 +81,15 @@ class PivotPlugin(DuckdbSimplePlugin):
         logger.debug("PivotPlugin.execute query_str %s", query_str)
         rel = ddbc.sql(query_str)
 
-        project_str = f"COLUMNS('(.*)_{pivot_char}(.*)')"
-        if self.default_0:
-            project_str = f"COALESCE({project_str}, 0)"
-
-        if self.short_names:
-            project_str += " AS '\\2_\\1'"
-        else:
-            project_str += " AS '\\2__\\1'"
+        # Rather than keep the duckdb columns we match them and switch them to our 
+        # preferred format.
+        project_str = ', '.join(
+            ("COALESCE(" if self.default_0 and column_is_numeric[ec] else "") +
+            "COLUMNS(" + duckdb_escape_literal('(.*)_'+pivot_char+ec) + ")" +
+            (", 0)" if self.default_0 and column_is_numeric[ec] else "") +
+            " AS " + duckdb_escape_literal(ec + ("_" if self.short_names else "__") + r"\1")
+            for ec in expand_cols
+        )
 
         if index_cols:
             project_str = (", ".join([duckdb_escape_identifier(ic) for ic in index_cols])) + ", " + project_str
