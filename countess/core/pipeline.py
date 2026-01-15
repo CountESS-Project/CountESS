@@ -305,9 +305,10 @@ class PipelineGraph:
         # we can improve on this a little.
         # see https://github.com/duckdb/duckdb/issues/1848
 
-        logger.info("Starting")
         start_time = time.time()
+        logger.info("Starting: %s", start_time)
         for node in self.traverse_nodes():
+            logger.info("... starting %s", node.name)
             node.load_config()
             sources = {pn.name: pn.result for pn in node.parent_nodes}
             node.plugin.prepare_multi(self.ddbc, sources)
@@ -316,8 +317,10 @@ class PipelineGraph:
                 node.result = duckdb_source_to_view(self.ddbc, result)
             else:
                 node.result = None
+            logger.info("... completed %s", node.name)
 
-        logger.info("Finished, elapsed time: %d", time.time() - start_time)
+        finish_time = time.time()
+        logger.info("Finished: %s, elapsed time: %d", finish_time, finish_time - start_time)
 
     def reset(self):
         for node in self.nodes:

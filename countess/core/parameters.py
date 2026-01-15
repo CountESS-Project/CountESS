@@ -3,6 +3,7 @@ import logging
 import math
 import os.path
 import re
+import string
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
@@ -280,6 +281,11 @@ class StringCharacterSetParam(StringParam):
 
     def copy(self) -> "StringCharacterSetParam":
         return self.__class__(self.label, self.value, character_set=self.character_set)
+
+
+class ColumnLabelParam(StringCharacterSetParam):
+
+    character_set: set[str] = set(string.ascii_letters + string.digits + ".-_:")
 
 
 class FileBaseParam(StringParam):

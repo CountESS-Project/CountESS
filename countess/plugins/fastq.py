@@ -1,10 +1,8 @@
-import itertools
 import logging
 from typing import Iterable, Optional
 
-import dnaio
 import duckdb
-import pyarrow
+import oxbow
 
 from countess import VERSION
 from countess.core.parameters import BaseParam, BooleanParam, FloatParam
@@ -32,45 +30,31 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        # Open the file, convert it to a RecordBatchReader and then
-        # wrap that up as a DuckDBPyRelation so we can filter it.
         logger.debug("Loading file %s row_limit %s", filename, row_limit)
 
-        # Take up to row_limit records from this file
-        fastq_iter = itertools.islice(dnaio.open(filename, open_threads=1), row_limit)
-
-        def _record_to_dict(record):
-            d = {"sequence": record.sequence}
-            if self.header_column:
-                d["header"] = record.name
-            return d
-
-        def _avg_quality(record):
-            return sum(ord(c) for c in record.qualities) / len(record.qualities) - 33
-
-        pyarrow_schema = pyarrow.schema([pyarrow.field("sequence", pyarrow.string())])
+        fields = ['sequence']
+        if self.min_avg_quality:
+            fields.append('quality')
         if self.header_column:
-            pyarrow_schema.append(pyarrow.field("header", pyarrow.string()))
+            fields.append('name')
 
-        # Generator which batches records 5000 at a time into RecordBatches
-        record_batch_iter = (
-            pyarrow.RecordBatch.from_pylist(
-                [
-                    _record_to_dict(record)
-                    for record in batch
-                    if self.min_avg_quality <= 0 or self.min_avg_quality <= _avg_quality(record)
-                ]
-            )
-            for batch in itertools.batched(fastq_iter, 5000)
-        )
+        rel = oxbow.from_fastq(filename, fields=fields).to_duckdb(cursor)
 
-        # We can turn that generator of RecordBatches into a temporary table
-        rel = cursor.from_arrow(pyarrow.RecordBatchReader.from_batches(pyarrow_schema, record_batch_iter))
+        if row_limit:
+            rel = rel.limit(row_limit)
+
+        if self.min_avg_quality:
+            filt = "list_avg(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_avg_quality+33)
+            rel = rel.filter(filt)
+
+        if self.header_column:
+            rel = rel.project("sequence, name as header")
+        else:
+            rel = rel.project("sequence")
 
         if self.group:
             rel = rel.aggregate("sequence, count(*) as count")
 
-        logger.debug("Loading file %s row_limit %s done", filename, row_limit)
         return rel
 
     def combine(
@@ -96,14 +80,5 @@ class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        pyarrow_schema = pyarrow.schema(
-            [pyarrow.field("sequence", pyarrow.string()), pyarrow.field("header", pyarrow.string())]
-        )
-
-        fasta_iter = itertools.islice(dnaio.open(filename, open_threads=1), row_limit)
-        record_batch_iter = (
-            pyarrow.RecordBatch.from_pylist([{"sequence": z.sequence, "header": z.name} for z in y])
-            for y in itertools.batched(fasta_iter, 5000)
-        )
-        rel = cursor.from_arrow(pyarrow.RecordBatchReader.from_batches(pyarrow_schema, record_batch_iter))
-        return rel
+        rel = oxbow.from_fasta(filename).to_duckdb(cursor)
+        return rel.limit(row_limit) if row_limit else rel
