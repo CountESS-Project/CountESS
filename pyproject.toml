@@ -75,6 +75,7 @@ variant_classifier = "countess.plugins.variant:VariantClassifier"
 variant_converter = "countess.plugins.variant:VariantConverter"
 frequency = "countess.plugins.frequency:FrequencyPlugin"
 columns = "countess.plugins.columns:ColumnsPlugin"
+ranking = "countess.plugins.ranking:RankingPlugin"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"
