@@ -91,6 +91,42 @@ class ScalarParam(BaseParam):
         return digest.hexdigest()
 
 
+class MultiValueParam(BaseParam):
+
+    _values: set[Any] = []
+
+    def __init__(self, label, default_values=[]):
+        super().__init__(label)
+        self._values = set(default_values or [])
+
+    def get_values(self) -> set[Any]:
+        return self._values
+
+    def set_values(self, values: set[Any]):
+        self._values = values
+
+    def set_value(self, value: Any):
+        self._values.add(value)
+
+    def reset_value(self, value: Any):
+        self._values.remove(value)
+
+    def copy(self):
+        return self.__class__(self.label, self._values)
+
+    def get_parameters(self, key, base_dir="."):
+        yield from ((f"{key}.{n}", v) for n, v in enumerate(self._values))
+
+    def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
+        self.set_value(value)
+
+    def get_hash_value(self):
+        digest = hashlib.new(PARAM_DIGEST_HASH)
+        for n, v in enumerate(self._values):
+            digest.update((str(n) + repr(v)).encode('utf-8'))
+        return digest.hexdigest()
+
+
 class ScalarWithOperatorsParam(ScalarParam):
     # Operator Methods which apply to both StringParams and
     # NumericParams (but not BooleanParam)
@@ -496,6 +532,37 @@ class ChoiceParam(ScalarWithOperatorsParam):
         return self.__class__(self.label, self.value, self.choices)
 
 
+class MultiChoiceParam(MultiValueParam):
+    def __init__(self, label: str, values: Optional[set[str]] = None, choices: Optional[List[str]] = None):
+        super().__init__(label, values)
+        self.choices = list(choices or [])
+
+    def set_choices(self, choices):
+        self.choices = list(choices)
+        self._values = [ v for v in self._values if v in self.choices ]
+
+    def get_choices(self):
+        return self.choices
+
+    def set_value(self, value):
+        if value in self.choices:
+            self._values.add(value)
+
+    def set_choice(self, choice):
+        if choice is not None and 0 <= choice < len(self.choices):
+            self.set_value(self.choices[choice])
+
+    def reset_choice(self, choice):
+        if choice is not None and 0 <= choice < len(self.choices):
+            self.reset_value(self.choices[choice])
+
+    def get_choice_numbers(self):
+        return [self.choices.index(v) for v in self._values]
+
+    def copy(self) -> "MultiChoiceParam":
+        return self.__class__(self.label, self._values, self.choices)
+
+
 class DataTypeChoiceParam(ChoiceParam):
     DATA_TYPES: Mapping[str, tuple[type, Any, Type[ScalarParam]]] = {
         "STRING": (str, "", StringParam),
@@ -600,6 +667,11 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
             return None
         else:
             return _dataframe_get_column(df, self.value)
+
+
+class MultiColumnChoiceParam(MultiChoiceParam):
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        self.set_choices(list(choices.keys()))
 
 
 class ColumnGroupChoiceParam(ChoiceParam):
@@ -777,16 +849,19 @@ class HasSubParametersMixin:
             if subkey == "_label":
                 param.label = str(value)
             else:
-                assert isinstance(param, (HasSubParametersMixin, ArrayParam))
+                assert isinstance(param, (HasSubParametersMixin, ArrayParam, MultiValueParam))
                 param.set_parameter(subkey, value, base_dir)
         else:
             param = self.params[key]
-            assert isinstance(param, ScalarParam)
-
-            if isinstance(param, (FileParam, FileSaveParam)) and value is not None:
+            if isinstance(param, MultiChoiceParam):
+                param.set_parameter(0, value, base_dir)
+            elif isinstance(param, (FileParam, FileSaveParam)) and value is not None:
                 param.set_base_dir(base_dir)
-
-            param.set_value(value)
+                param.set_value(value)
+            elif isinstance(param, ScalarParam):
+                param.set_value(value)
+            else:
+                logger.error("Unmatched Parameter Key %s", key)
 
     def set_column_choices(self, choices: Mapping[str, bool]):
         for p in self.params.values():

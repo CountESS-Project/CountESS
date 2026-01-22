@@ -16,6 +16,7 @@ from ..core.parameters import (
     FileParam,
     FileSaveParam,
     FramedMultiParam,
+    MultiChoiceParam,
     MultiParam,
     ScalarParam,
     TabularMultiParam,
@@ -78,6 +79,15 @@ class ParameterWrapper:
                 self.entry["state"] = "normal"
             else:
                 self.entry["state"] = "readonly"
+        elif isinstance(parameter, MultiChoiceParam):
+            self.var = tk.StringVar(tk_parent)
+            self.var.set(" ".join(parameter.choices))
+            self.entry = tk.Listbox(tk_parent, listvariable=self.var, selectmode=tk.MULTIPLE)
+            self.entry.configure(exportselection=False, height=len(parameter.choices))
+            for n in parameter.get_choice_numbers():
+                self.entry.selection_set(n)
+            self.listbox_modified_callback()
+            self.entry.bind("<<ListboxSelect>>", self.listbox_modified_callback)
         elif isinstance(parameter, BooleanParam):
             self.entry = BooleanCheckbox(tk_parent, command=self.toggle_checkbox_callback)
             self.set_checkbox_value()
@@ -203,6 +213,11 @@ class ParameterWrapper:
         elif isinstance(self.parameter, (ChoiceParam, DictChoiceParam)):
             self.entry["values"] = self.parameter.get_values() or [""]
             self.var.set(self.parameter.value)
+        elif isinstance(self.parameter, MultiChoiceParam):
+            self.var.set(" ".join(self.parameter.choices))
+            self.entry.configure(height=len(self.parameter.choices))
+            for v in self.parameter.get_values():
+                self.entry.selection_set(self.parameter.choices.index(v))
         elif isinstance(self.parameter, BooleanParam):
             self.set_checkbox_value()
         elif isinstance(self.parameter, TextParam):
@@ -409,6 +424,10 @@ class ParameterWrapper:
         value = self.entry.get(1.0, tk.END)
         self.entry.edit_modified(False)
         self.set_value(value)
+
+    def listbox_modified_callback(self, *_):
+        self.parameter.set_values([self.parameter.choices[n] for n in self.entry.curselection() ])
+        self.callback(self.parameter)
 
     def set_checkbox_value(self):
         if self.parameter.hide:
