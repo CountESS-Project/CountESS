@@ -7,6 +7,7 @@ from countess.core.parameters import (
     ChoiceParam,
     ColumnChoiceParam,
     ColumnOrNoneChoiceParam,
+    MultiColumnChoiceParam,
     NumericColumnChoiceParam,
     StringParam,
     TabularMultiParam,
@@ -53,7 +54,7 @@ class ScoreScalingPlugin(DuckdbSqlPlugin):
     score_col = NumericColumnChoiceParam("Score Column")
     scaled_col = StringParam("Scaled Score Column", "scaled_score")
     classifiers = ArrayParam("Variant Classifiers", ScaleClassParam("Class"), min_size=2, max_size=2, read_only=True)
-    group_col = ColumnOrNoneChoiceParam("Group By")
+    group_col = MultiColumnChoiceParam("Group By")
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
@@ -66,22 +67,31 @@ class ScoreScalingPlugin(DuckdbSqlPlugin):
         score_col_id = duckdb_escape_identifier(self.score_col.value)
         scaled_col_id = duckdb_escape_identifier(self.scaled_col.value)
 
-        all_columns = ",".join("T0." + duckdb_escape_identifier(c) for c in columns if self.scaled_col != c)
+        all_columns = ",".join("T1." + duckdb_escape_identifier(c) for c in columns if self.scaled_col != c)
 
-        if self.group_col.is_not_none():
-            group_col_id = "T0." + duckdb_escape_identifier(self.group_col.value)
+        if len(self.group_col.get_values()):
+            group_cols = ", ".join(
+                duckdb_escape_identifier(v)
+                for v in self.group_col.get_values()
+            )
+            group_by = f"GROUP BY {group_cols}"
+            join_method = f"USING ({group_cols})"
+            group_cols += ", "
         else:
-            group_col_id = "1"  # dummy value for one big group.
+            group_cols = ""
+            group_by = ""
+            join_method = "ON (1=1)"
 
         c0, c1 = self.classifiers
 
         return f"""
-            select {all_columns}, ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) as {scaled_col_id}
-            from {table_name} T0 join (
-                select {group_col_id} as score_group,
+            select {all_columns},
+                ({score_col_id} - T2.score_0) / (T2.score_1 - T2.score_0) as {scaled_col_id}
+            from {table_name} T1 join (
+                select {group_cols}
                     coalesce({c0.agg.value}({score_col_id}) filter ({c0.filter()}), 0) as score_0,
                     coalesce({c1.agg.value}({score_col_id}) filter ({c1.filter()}), 1) as score_1
-                from {table_name} T0
-                group by score_group
-            ) T1 on ({group_col_id} = T1.score_group)
+                FROM {table_name}
+                {group_by}
+            ) T2 {join_method}
         """
