@@ -426,7 +426,7 @@ class ParameterWrapper:
         self.set_value(value)
 
     def listbox_modified_callback(self, *_):
-        self.parameter.set_values([self.parameter.choices[n] for n in self.entry.curselection() ])
+        self.parameter.set_values([self.parameter.choices[n] for n in self.entry.curselection()])
         self.callback(self.parameter)
 
     def set_checkbox_value(self):

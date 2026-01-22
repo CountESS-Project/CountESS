@@ -5,11 +5,11 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import (
-        FloatParam,
-        PerNumericColumnArrayParam,
-        TabularMultiParam,
-        PerColumnArrayParam,
-        BooleanParam,
+    BooleanParam,
+    FloatParam,
+    PerColumnArrayParam,
+    PerNumericColumnArrayParam,
+    TabularMultiParam,
 )
 from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
@@ -44,11 +44,7 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
                 p.set_value(False)
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
-        group_cols = {
-            duckdb_escape_identifier(name)
-            for name, param in self.group_by.get_column_params()
-            if param
-        }
+        group_cols = {duckdb_escape_identifier(name) for name, param in self.group_by.get_column_params() if param}
         weighted_columns = {
             duckdb_escape_identifier(name): duckdb_escape_literal(param.weight.value)
             for name, param in self.columns.get_column_params()
@@ -59,8 +55,7 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
             return None
 
         inner_select = ", ".join(
-            [ f"T0.{k}" for k in group_cols ] +
-            [ f"sum(T0.{k}) as {k}" for k in weighted_columns.keys() ]
+            [f"T0.{k}" for k in group_cols] + [f"sum(T0.{k}) as {k}" for k in weighted_columns.keys()]
         )
         weighted_counts = " + ".join(
             f"CASE WHEN T2.{k} > 0 THEN T1.{k} * {v} / T2.{k} ELSE 0 END" for k, v in weighted_columns.items()

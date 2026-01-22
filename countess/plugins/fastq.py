@@ -32,11 +32,11 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     ) -> duckdb.DuckDBPyRelation:
         logger.debug("Loading file %s row_limit %s", filename, row_limit)
 
-        fields = ['sequence']
+        fields = ["sequence"]
         if self.min_avg_quality:
-            fields.append('quality')
+            fields.append("quality")
         if self.header_column:
-            fields.append('name')
+            fields.append("name")
 
         rel = oxbow.from_fastq(filename, fields=fields).to_duckdb(cursor)
 
@@ -44,7 +44,7 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
             rel = rel.limit(row_limit)
 
         if self.min_avg_quality:
-            filt = "list_avg(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_avg_quality+33)
+            filt = "list_avg(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_avg_quality + 33)
             rel = rel.filter(filt)
 
         if self.header_column:

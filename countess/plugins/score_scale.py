@@ -6,7 +6,6 @@ from countess.core.parameters import (
     ArrayParam,
     ChoiceParam,
     ColumnChoiceParam,
-    ColumnOrNoneChoiceParam,
     MultiColumnChoiceParam,
     NumericColumnChoiceParam,
     StringParam,
@@ -21,8 +20,11 @@ logger = logging.getLogger(__name__)
 class ScaleClassParam(TabularMultiParam):
     agg = ChoiceParam("Aggregation", "Median", ["Median", "Avg"])
     col = ColumnChoiceParam("Column")
-    op = ChoiceParam("Operation", "Equals", ["Equals", "Starts With", "Ends With",
-                                             "Contains", "Matches", "Greater Than", "Less Than"])
+    op = ChoiceParam(
+        "Operation",
+        "Equals",
+        ["Equals", "Starts With", "Ends With", "Contains", "Matches", "Greater Than", "Less Than"],
+    )
     st = StringParam("Value")
 
     def filter(self):
@@ -70,10 +72,7 @@ class ScoreScalingPlugin(DuckdbSqlPlugin):
         all_columns = ",".join("T1." + duckdb_escape_identifier(c) for c in columns if self.scaled_col != c)
 
         if len(self.group_col.get_values()):
-            group_cols = ", ".join(
-                duckdb_escape_identifier(v)
-                for v in self.group_col.get_values()
-            )
+            group_cols = ", ".join(duckdb_escape_identifier(v) for v in self.group_col.get_values())
             group_by = f"GROUP BY {group_cols}"
             join_method = f"USING ({group_cols})"
             group_cols += ", "

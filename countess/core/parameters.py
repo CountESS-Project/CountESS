@@ -92,10 +92,9 @@ class ScalarParam(BaseParam):
 
 
 class MultiValueParam(BaseParam):
+    _values: set[Any] = set()
 
-    _values: set[Any] = []
-
-    def __init__(self, label, default_values=[]):
+    def __init__(self, label, default_values=None):
         super().__init__(label)
         self._values = set(default_values or [])
 
@@ -123,7 +122,7 @@ class MultiValueParam(BaseParam):
     def get_hash_value(self):
         digest = hashlib.new(PARAM_DIGEST_HASH)
         for n, v in enumerate(self._values):
-            digest.update((str(n) + repr(v)).encode('utf-8'))
+            digest.update((str(n) + repr(v)).encode("utf-8"))
         return digest.hexdigest()
 
 
@@ -320,7 +319,6 @@ class StringCharacterSetParam(StringParam):
 
 
 class ColumnLabelParam(StringCharacterSetParam):
-
     character_set: set[str] = set(string.ascii_letters + string.digits + ".-_:")
 
 
@@ -539,7 +537,7 @@ class MultiChoiceParam(MultiValueParam):
 
     def set_choices(self, choices):
         self.choices = list(choices)
-        self._values = [ v for v in self._values if v in self.choices ]
+        self._values = [v for v in self._values if v in self.choices]
 
     def get_choices(self):
         return self.choices
@@ -854,7 +852,7 @@ class HasSubParametersMixin:
         else:
             param = self.params[key]
             if isinstance(param, MultiChoiceParam):
-                param.set_parameter(0, value, base_dir)
+                param.set_parameter("", value, base_dir)
             elif isinstance(param, (FileParam, FileSaveParam)) and value is not None:
                 param.set_base_dir(base_dir)
                 param.set_value(value)

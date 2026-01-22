@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Iterable
+from typing import Iterable, Optional
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, PerColumnArrayParam, StringParam
@@ -27,8 +27,8 @@ class UnpivotPlugin(DuckdbSqlPlugin):
         melt_cols = [p.label for p in self.columns if p.value and p.label in column_set]
         melt_str = ", ".join(duckdb_escape_identifier(c) for c in melt_cols)
 
-        name_str = duckdb_escape_identifier(self.name_column.value or 'name')
-        value_str = duckdb_escape_identifier(self.value_column.value or 'value')
+        name_str = duckdb_escape_identifier(self.name_column.value or "name")
+        value_str = duckdb_escape_identifier(self.value_column.value or "value")
 
         query_str = f"""UNPIVOT {table_name} ON {melt_str}
                         INTO NAME {name_str} VALUE {value_str}"""
