@@ -18,8 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class ScaleClassParam(TabularMultiParam):
+    agg = ChoiceParam("Aggregation", "Median", ["Median", "Avg"])
     col = ColumnChoiceParam("Column")
-    op = ChoiceParam("Operation", "Equals", ["Equals", "Starts With", "Ends With", "Contains", "Matches"])
+    op = ChoiceParam("Operation", "Equals", ["Equals", "Starts With", "Ends With",
+                                             "Contains", "Matches", "Greater Than", "Less Than"])
     st = StringParam("Value")
 
     def filter(self):
@@ -35,6 +37,10 @@ class ScaleClassParam(TabularMultiParam):
             return f"contains({col},{val})"
         elif self.op.value == "Matches":
             return f"regexp_full_match({col},{val})"
+        elif self.op.value == "Greater Than":
+            return f"({col} > {val})"
+        elif self.op.value == "Less Than":
+            return f"({col} < {val})"
         else:
             raise NotImplementedError()
 
@@ -73,8 +79,8 @@ class ScoreScalingPlugin(DuckdbSqlPlugin):
             select {all_columns}, ({score_col_id} - T1.score_0) / (T1.score_1 - T1.score_0) as {scaled_col_id}
             from {table_name} T0 join (
                 select {group_col_id} as score_group,
-                    coalesce(median({score_col_id}) filter ({c0.filter()}), 0) as score_0,
-                    coalesce(median({score_col_id}) filter ({c1.filter()}), 1) as score_1
+                    coalesce({c0.agg.value}({score_col_id}) filter ({c0.filter()}), 0) as score_0,
+                    coalesce({c1.agg.value}({score_col_id}) filter ({c1.filter()}), 1) as score_1
                 from {table_name} T0
                 group by score_group
             ) T1 on ({group_col_id} = T1.score_group)
