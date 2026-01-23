@@ -403,7 +403,7 @@ class GraphWrapper:
 
         for section_name in cp.sections():
             config_dict = cp[section_name]
-            config_dict["_uuid"] = None
+            config_dict.pop("_uuid", None)
 
             node = read_config_dict(section_name, "", config_dict)
             node.position = self.new_node_position(event.x, event.y)
