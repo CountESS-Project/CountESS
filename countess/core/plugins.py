@@ -125,6 +125,15 @@ class DuckdbPlugin(BasePlugin):
     def prepare_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> None:
         pass
 
+    def set_column_choices_from_duckdb(self, param: BasePlugin, source: DuckDBPyRelation):
+        if source is None:
+            param.set_column_choices({})
+        else:
+            param.set_column_choices({
+                name: duckdb_dtype_is_numeric(dt)
+                for name, dt in zip(source.columns, source.dtypes)
+            })
+
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
@@ -143,10 +152,7 @@ class DuckdbSimplePlugin(DuckdbPlugin):
         self.prepare(ddbc, duckdb_combine(ddbc, list(sources.values())))
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
-        if source is None:
-            self.set_column_choices({})
-        else:
-            self.set_column_choices({c: duckdb_dtype_is_numeric(d) for c, d in zip(source.columns, source.dtypes)})
+        self.set_column_choices_from_duckdb(self, source)
 
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
