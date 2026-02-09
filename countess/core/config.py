@@ -57,7 +57,7 @@ def read_config(
 ) -> PipelineGraph:
     """Reads `filenames` and returns a PipelineGraph"""
 
-    cp = ConfigParser()
+    cp = ConfigParser(interpolation=None)
     for filename in filenames:
         with open(filename, "r", encoding="utf-8") as fh:
             cp.read_file(fh)
@@ -87,7 +87,7 @@ def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
 
 def graph_to_config(pipeline_graph: PipelineGraph, base_dir: str = ".") -> ConfigParser:
     pipeline_graph.reset_node_names()
-    cp = ConfigParser()
+    cp = ConfigParser(interpolation=None)
     for node in pipeline_graph.traverse_nodes():
         write_config_node(node, cp, base_dir)
     return cp
@@ -103,7 +103,7 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
 
 
 def write_config_node_string(node: PipelineNode, base_dir: str = ""):
-    cp = ConfigParser()
+    cp = ConfigParser(interpolation=None)
     write_config_node(node, cp, base_dir)
     buf = io.StringIO()
     cp.write(buf)
