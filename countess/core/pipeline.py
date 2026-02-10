@@ -94,7 +94,12 @@ class PipelineNode:
 
     def start(self, ddbc, row_limit: Optional[int] = None):
         """Start processing this operation, in its own thread"""
-        logger.debug("PipelineNode.start %s", self.name)
+
+        if self.thread and self.thread.is_alive():
+            logger.debug("PipelineNode.start %s already running", self.name)
+            return
+
+        logger.debug("PipelineNode.start %s starting", self.name)
 
         if self.table_name:
             ddbc.sql(f"DROP TABLE IF EXISTS {self.table_name}")
