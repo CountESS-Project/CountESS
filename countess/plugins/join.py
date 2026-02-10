@@ -5,7 +5,7 @@ import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import ArrayParam, BooleanParam, ColumnChoiceParam, MultiParam, ColumnOrNoneChoiceParam
+from countess.core.parameters import ArrayParam, BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, MultiParam
 from countess.core.plugins import DuckdbPlugin
 from countess.utils.duckdb import duckdb_escape_identifier
 
@@ -62,7 +62,6 @@ class JoinPlugin(DuckdbPlugin):
         # do is join all the required tables to each other and
         # then join the non-required ones on on top.
         tables = list(sources.values())
-        identifiers = [duckdb_escape_identifier(input_.join_on.value) for input_ in self.inputs]
         required = [input_.required.value for input_ in self.inputs]
 
         select_str = ", ".join(
@@ -70,26 +69,45 @@ class JoinPlugin(DuckdbPlugin):
             for num, table in enumerate(tables)
             for cname in table.columns
             if not (
-                (self.inputs[num].drop and (
-                    cname == self.inputs[num].join_on or
-                    cname == self.inputs[num].join_2 or
-                    cname == self.inputs[num].join_3
-                )) or (
-                    num != 0 and not self.inputs[0].drop and (
-                 cname == self.inputs[num].join_on == self.inputs[0].join_on or
-                 cname == self.inputs[num].join_2 == self.inputs[0].join_2 or
-                 cname == self.inputs[num].join_3 == self.inputs[0].join_3
-            )))
+                (
+                    self.inputs[num].drop
+                    and (cname in (self.inputs[num].join_on, self.inputs[num].join_2, self.inputs[num].join_3))
+                )
+                or (
+                    num != 0
+                    and not self.inputs[0].drop
+                    and (
+                        cname == self.inputs[num].join_on == self.inputs[0].join_on
+                        or cname == self.inputs[num].join_2 == self.inputs[0].join_2
+                        or cname == self.inputs[num].join_3 == self.inputs[0].join_3
+                    )
+                )
+            )
         )
 
         query = f"SELECT {select_str} FROM {tables[0].alias} AS N_0"
         for num, table in enumerate(tables[1:], 1):
             join_how = _join_how(required[0], required[num])
-            join_on = "N_0." + duckdb_escape_identifier(self.inputs[0].join_on.value) + f" = N_{num}." + duckdb_escape_identifier(self.inputs[num].join_on.value)
+            join_on = (
+                "N_0."
+                + duckdb_escape_identifier(self.inputs[0].join_on.value)
+                + f" = N_{num}."
+                + duckdb_escape_identifier(self.inputs[num].join_on.value)
+            )
             if self.inputs[0].join_2.is_not_none() and self.inputs[num].join_2.is_not_none():
-                join_on += "AND N_0." + duckdb_escape_identifier(self.inputs[0].join_2.value) + f" = N_{num}." + duckdb_escape_identifier(self.inputs[num].join_2.value)
+                join_on += (
+                    "AND N_0."
+                    + duckdb_escape_identifier(self.inputs[0].join_2.value)
+                    + f" = N_{num}."
+                    + duckdb_escape_identifier(self.inputs[num].join_2.value)
+                )
             if self.inputs[0].join_3.is_not_none() and self.inputs[num].join_3.is_not_none():
-                join_on += "AND N_0." + duckdb_escape_identifier(self.inputs[0].join_3.value) + f" = N_{num}." + duckdb_escape_identifier(self.inputs[num].join_3.value)
+                join_on += (
+                    "AND N_0."
+                    + duckdb_escape_identifier(self.inputs[0].join_3.value)
+                    + f" = N_{num}."
+                    + duckdb_escape_identifier(self.inputs[num].join_3.value)
+                )
 
             query += f" {join_how} JOIN {table.alias} AS N_{num} ON {join_on}"
 
