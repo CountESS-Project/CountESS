@@ -3,6 +3,7 @@ import logging
 import re
 from typing import Dict, Optional
 
+import pypeg2
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
@@ -12,16 +13,6 @@ from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_litera
 
 logger = logging.getLogger(__name__)
 
-UNOPS = {ast.UAdd: "+", ast.USub: "-", ast.Not: "not "}
-BINOPS = {
-    ast.Add: "+",
-    ast.Mult: "*",
-    ast.Div: "/",
-    ast.Sub: "-",
-    ast.FloorDiv: "//",
-    ast.Mod: "%",
-    ast.Pow: "**",
-}
 FUNCOPS = {
     "abs",
     "len",
@@ -65,67 +56,6 @@ LISTOPS = {
     "var_samp": "list_var_samp",
     "std_samp": "list_stddev_samp",
 }
-BOOLOPS = {
-    ast.And: "AND",
-    ast.Or: "OR",
-}
-
-COMPOPS = {ast.Eq: "=", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">="}
-
-
-def _transmogrify(ast_node):
-    """Transform an AST node back into a string which can be parsed by DuckDB's expression
-    parser.  This is a pretty small subset of all the things you might write but on the
-    other hand it saved actually writing a parser."""
-    # XXX might have to write a parser anyway since the AST parser handles decimal
-    # literals badly.  Worry about that later.
-    if type(ast_node) is ast.Name:
-        return duckdb_escape_identifier(ast_node.id)
-    elif type(ast_node) is ast.Constant:
-        return duckdb_escape_literal(ast_node.value)
-    elif type(ast_node) is ast.UnaryOp and type(ast_node.op) in UNOPS:
-        return "(" + UNOPS[type(ast_node.op)] + _transmogrify(ast_node.operand) + ")"
-    elif type(ast_node) is ast.BinOp and type(ast_node.op) in BINOPS:
-        binop = BINOPS[type(ast_node.op)]
-        left = _transmogrify(ast_node.left)
-        right = _transmogrify(ast_node.right)
-        return f"({left} {binop} {right})"
-    elif type(ast_node) is ast.BoolOp and type(ast_node.op) in BOOLOPS:
-        boolop = BOOLOPS[type(ast_node.op)]
-        return "(" + (f" {boolop} ".join(_transmogrify(v) for v in ast_node.values)) + ")"
-    elif type(ast_node) is ast.Subscript:
-        value = _transmogrify(ast_node.value)
-        if type(ast_node.slice) is ast.Slice:
-            lower = _transmogrify(ast_node.slice.lower)
-            upper = _transmogrify(ast_node.slice.upper)
-            return f"({value}[{lower}:{upper}])"
-        else:
-            index = _transmogrify(ast_node.slice)
-            return f"({value}[{index}])"
-    elif type(ast_node) is ast.Compare and all(type(op) in COMPOPS for op in ast_node.ops):
-        args = [_transmogrify(x) for x in [ast_node.left] + ast_node.comparators]
-        comps = [args[num] + COMPOPS[type(op)] + args[num + 1] for num, op in enumerate(ast_node.ops)]
-        return "(" + (" AND ".join(comps)) + ")"
-    elif type(ast_node) is ast.IfExp:
-        expr1 = _transmogrify(ast_node.test)
-        expr2 = _transmogrify(ast_node.body)
-        expr3 = _transmogrify(ast_node.orelse)
-        return f"CASE WHEN {expr1} THEN {expr2} ELSE {expr3} END"
-    elif type(ast_node) is ast.Call and type(ast_node.func) is ast.Name:
-        args = ",".join(_transmogrify(x) for x in ast_node.args)
-        if ast_node.func.id in FUNCOPS:
-            return f"{ast_node.func.id}({args})"
-        elif ast_node.func.id in LISTOPS:
-            func = LISTOPS[ast_node.func.id]
-            return f"{func}([{args}])"
-        elif ast_node.func.id in CASTOPS:
-            type_ = CASTOPS[ast_node.func.id]
-            return f"TRY_CAST({args} as {type_})"
-        else:
-            raise NotImplementedError(f"Unknown Function {ast_node.func.id}")
-
-    else:
-        raise NotImplementedError(f"Unknown Node {ast_node}")
 
 
 class ExpressionPlugin(DuckdbSimplePlugin):
@@ -192,3 +122,137 @@ class ExpressionPlugin(DuckdbSimplePlugin):
             return source.project(projection).filter(filter_)
         else:
             return source.project(projection)
+
+
+
+### PyPEG2 parser & expression generator follows
+
+
+
+
+class SqlTemplatingSymbol(pypeg2.Symbol):
+    def sql(self):
+        return str(self.name)
+
+class IntegerLiteral(SqlTemplatingSymbol):
+    regex = re.compile(r'[0-9]+')
+
+class DecimalLiteral(SqlTemplatingSymbol):
+    regex = re.compile(r'[0-9]+\.[0-9]+')
+
+    def sql(self):
+        return "(%s::DECIMAL)" % self.name
+
+class SingleQuotedStringLiteral(SqlTemplatingSymbol):
+    regex = re.compile(r"'(?:\\.|[^'\n])*'")
+
+    def sql(self):
+        return duckdb_escape_literal(self.name[1:-1])
+
+class DoubleQuotedStringLiteral(SqlTemplatingSymbol):
+    regex = re.compile(r'"(?:\\.|[^"\n])*"')
+
+    def sql(self):
+        return duckdb_escape_literal(self.name[1:-1])
+
+class Label(SqlTemplatingSymbol):
+    regex = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
+
+    def sql(self):
+        return duckdb_escape_identifier(self.name)
+
+class SqlTemplatingList(pypeg2.List):
+    before = ''
+    between = ''
+    after = ''
+
+    def sql(self):
+        return self.before + self.between.join(s.sql() for s in self) + self.after
+
+class ParenExpr(SqlTemplatingList):
+    grammar = None  # filled in later
+    before = "("
+    after = ")"
+
+class FunctionName(SqlTemplatingSymbol):
+    regex = re.compile(r'[a-z]+')
+
+class FunctionCall(pypeg2.Concat):
+    grammar = None  # filled in later
+
+    def sql(self):
+        function_name, *function_params = self
+        if function_name in FUNCOPS:
+            return function_name + "(" + ','.join(fp.sql() for fp in function_params) + ")"
+        if function_name in LISTOPS:
+            return LISTOPS[function_name] + "(" + ','.join(fp.sql() for fp in function_params) + ")"
+        if function_name in CASTOPS:
+            return f"TRY_CAST({fp[0].sql()} AS {CASTOPS[function_name]})"
+
+        raise ValueError("Unknown function %s" % function_name)
+
+class Value(pypeg2.Concat):
+    grammar = [FunctionCall, Label, DecimalLiteral, IntegerLiteral, SingleQuotedStringLiteral, DoubleQuotedStringLiteral, ParenExpr]
+
+    def sql(self):
+        return self[0].sql()
+
+FunctionCall.grammar = FunctionName, "(", Value, ")"
+
+class UnaOp(SqlTemplatingSymbol):
+    regex = re.compile(r"[+-]")
+
+class UnaExpr(SqlTemplatingList):
+    grammar = pypeg2.optional(UnaOp), Value
+
+class PowOp(SqlTemplatingSymbol):
+    regex = re.compile(r"\*\*")
+
+class PowExpr(SqlTemplatingList):
+    grammar = UnaExpr, pypeg2.maybe_some((PowOp, UnaExpr))
+
+class MulOp(SqlTemplatingSymbol):
+    regex = re.compile(r"[*/]")
+
+class MulExpr(SqlTemplatingList):
+    grammar = PowExpr, pypeg2.maybe_some((MulOp, PowExpr))
+
+class AddOp(SqlTemplatingSymbol):
+    regex = re.compile(r"[+-]")
+
+class AddExpr(SqlTemplatingList):
+    grammar = MulExpr, pypeg2.maybe_some((AddOp, MulExpr))
+
+class NotOp(SqlTemplatingSymbol):
+    regex = re.compile(r"not")
+
+class NotExpr(SqlTemplatingList):
+    grammar = pypeg2.maybe_some(NotOp), AddExpr
+
+class AndExpr(SqlTemplatingList):
+    grammar = NotExpr, pypeg2.maybe_some("and", NotExpr)
+    between = ' AND '
+
+class OrExpr(SqlTemplatingList):
+    grammar = AndExpr, pypeg2.maybe_some("or", AndExpr)
+    between = ' OR '
+
+ParenExpr.grammar = "(", OrExpr, ")"
+
+class Statement(pypeg2.Concat):
+    grammar = pypeg2.optional(Label, "="), OrExpr
+
+    def sql_clause(self):
+        return self[-1].sql()
+
+    def sql_target(self):
+        return self[0].sql() if len(self) > 1 else None
+
+
+def parse_block(block: str):
+    for line in block.split('\n'):
+        if not line:
+            continue
+        pp = pypeg2.parse(line, Statement)
+        print (pp.sql_clause(), pp.sql_target())
+

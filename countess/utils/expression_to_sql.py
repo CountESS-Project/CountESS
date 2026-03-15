@@ -2,6 +2,8 @@ import re
 
 import pypeg2
 
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
+
 class SqlTemplatingSymbol(pypeg2.Symbol):
     def sql(self):
         return str(self.name)
@@ -13,16 +15,25 @@ class DecimalLiteral(SqlTemplatingSymbol):
     regex = re.compile(r'[0-9]+\.[0-9]+')
 
     def sql(self):
-        return str(self.name) + "::DECIMAL"
+        return "(%s::DECIMAL)" % self.name
 
 class SingleQuotedStringLiteral(SqlTemplatingSymbol):
     regex = re.compile(r"'(?:\\.|[^'\n])*'")
 
+    def sql(self):
+        return duckdb_escape_literal(self.name[1:-1])
+
 class DoubleQuotedStringLiteral(SqlTemplatingSymbol):
     regex = re.compile(r'"(?:\\.|[^"\n])*"')
 
+    def sql(self):
+        return duckdb_escape_literal(self.name[1:-1])
+
 class Label(SqlTemplatingSymbol):
     regex = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
+
+    def sql(self):
+        return duckdb_escape_identifier(self.name[1:-1])
 
 class SqlTemplatingList(pypeg2.List):
     before = ''
@@ -117,6 +128,8 @@ class Block(pypeg2.Concat):
     grammar = pypeg2.some([Filter, Assignment, OrExpr])
 
     def sql(self):
+        for s in self:
+            if isinstance(s, Assignment):
         selects = []
         wheres = []
         for s in self:
@@ -131,6 +144,9 @@ class Block(pypeg2.Concat):
         return sql
 
 
+def parse_block(expr: str):
+
+    pp = pypeg2.parse(block, Block)
 block = r"""
 hello = "world"
 foo = 107+42/3.001
