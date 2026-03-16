@@ -152,18 +152,30 @@ class VariantClassifier(DuckdbSqlPlugin):
         # once for each distinct variant string.  Then the cases
         # in the outer select use the parts of the regex match to
         # classify the variant.
+
+        hgvs_aa_re = "(?:" + "|".join(v for v in AA_CODES.values() if v != 'Ter') + ")"
+        short_aa_re = "[" + "".join(k for k in AA_CODES.keys() if k != '*') + "]"
+
         return rf"""
-            select S.*, case when T.a != '' or T.c == '' and T.e == '=' then 'W'
-               when T.c != '' and (T.c = T.e or T.e = '=') then 'S'
-               when T.e = 'Ter' or T.e = '*' then 'N'
-               when T.c != '' and T.d != '' and T.e != '' then 'M'
-               else '?'
-            end as {output_col_id}
+            select S.*, case
+               when T.is_wt != '' then 'W'
+               when T.is_hgvs != '' then case
+                  when T.is_hgvs_ins != '' then 'I'
+                  when T.hgvs_rhs = 'Ter' then 'N'
+                  when T.hgvs_rhs = 'del' then 'D'
+                  when T.hgvs_rhs = '=' then 'S'
+                  else 'M' end
+               when T.is_short != '' then case
+                  when T.short_rhs = '=' then 'S'
+                  when T.short_rhs = '*' or T.short_rhs = 'X' then 'N'
+                  when T.short_rhs = '-' then 'D'
+                  else 'M' end
+               else '?' end as {output_col_id}
             from {table_name} S join (
                 select {variant_col_id} as z, unnest(regexp_extract(
                     {variant_col_id},
-                    '(_?[Ww][Tt])|(p.)?([A-Z][a-z]*)?(\d+)?([A-Z][a-z]*|[=*])?',
-                    ['a','b','c','d','e']
+                    '^(_?[Ww][Tt]|p.=)$|^(p.{hgvs_aa_re}\d+(=|{hgvs_aa_re}|del|Ter|(_{hgvs_aa_re}\d+ins{hgvs_aa_re}+)))$|^({short_aa_re}\d+({short_aa_re}|[=*X-]))$',
+                    ['is_wt','is_hgvs','hgvs_rhs','is_hgvs_ins','is_short','short_rhs']
                 ))
                 from {table_name}
                 group by z
