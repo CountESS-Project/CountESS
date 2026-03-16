@@ -154,7 +154,7 @@ class VariantClassifier(DuckdbSqlPlugin):
         # classify the variant.
 
         hgvs_aa_re = "(?:" + "|".join(v for v in AA_CODES.values() if v != 'Ter') + ")"
-        short_aa_re = "[" + "".join(k for k in AA_CODES.keys() if k != '*') + "]"
+        short_aa_re = "[" + "".join(k for k in AA_CODES if k != '*') + "]"
 
         return rf"""
             select S.*, case
@@ -170,7 +170,7 @@ class VariantClassifier(DuckdbSqlPlugin):
                   when T.short_rhs = '*' or T.short_rhs = 'X' then 'N'
                   when T.short_rhs = '-' then 'D'
                   else 'M' end
-               else '?' end as {output_col_id}
+               else warning(concat('unclassifiable variant: "', z, '"'), '?') end as {output_col_id}
             from {table_name} S join (
                 select {variant_col_id} as z, unnest(regexp_extract(
                     {variant_col_id},
@@ -181,7 +181,6 @@ class VariantClassifier(DuckdbSqlPlugin):
                 group by z
             ) T on S.{variant_col_id} = T.z
         """
-
 
 def _translate_aa(expr: str, expr1: str = "") -> str:
     # This looks ludicrous but it pushes all the work down into SQL so that
