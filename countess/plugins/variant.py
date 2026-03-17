@@ -1,4 +1,5 @@
 import logging
+import re
 import string
 from functools import lru_cache
 from typing import Any, Iterable, Optional
@@ -154,38 +155,55 @@ class VariantClassifier(DuckdbSqlPlugin):
         # in the outer select use the parts of the regex match to
         # classify the variant.
 
-        hgvs_aa_re = "(?:" + "|".join(v for v in AA_CODES.values() if v != 'Ter') + ")"
-        short_aa_re = "[" + "".join(k for k in AA_CODES if k != '*') + "]"
+        hgvs_aa_re = "(?:" + "|".join(v for v in AA_CODES.values() if v != "Ter") + ")"
+        short_aa_re = "[" + "".join(k for k in AA_CODES if k != "*") + "]"
         plugin_label = duckdb_escape_literal(self.name + ": ")
+
+        classifier_re = duckdb_escape_literal(
+            re.sub(
+                r"\s+",
+                "",
+                rf"""
+            ^(_?[Ww][Tt]|p.=)$|
+            ^p.{hgvs_aa_re}\d+({hgvs_aa_re}|=|del|dup|Ter)$|
+            ^p.{hgvs_aa_re}\d+_{hgvs_aa_re}\d+(del|dup|ins{hgvs_aa_re}+)$|
+            ^({short_aa_re})\d+({short_aa_re}|[=*X-])$
+        """,
+            )
+        )
 
         return rf"""
             select S.*, case
-               when T.is_wt != '' then 'W'
-               when T.is_hgvs_mult != '' then case
-                  when T.hgvs_mult_rhs = 'del' then 'D'
-                  else 'I' end
-               when T.is_hgvs != '' then case
-                  when T.hgvs_rhs = 'Ter' then 'N'
-                  when T.hgvs_rhs = 'del' then 'D'
-                  when T.hgvs_rhs = 'dup' then 'I'
-                  when T.hgvs_rhs = '=' then 'S'
-                  else 'M' end
-               when T.is_short != '' then case
-                  when T.short_rhs = '=' then 'S'
-                  when T.short_rhs = '*' or T.short_rhs = 'X' then 'N'
-                  when T.short_rhs = '-' then 'D'
-                  else 'M' end
-               else warning(concat({plugin_label}, 'unclassifiable variant: "', z, '"'), '?') end as {output_col_id}
+               when T.wildtype != '' then 'W'
+               when T.hgvs_1 = '=' then 'S'
+               when T.hgvs_1 = 'del' then 'D'
+               when T.hgvs_1 = 'dup' then 'I'
+               when T.hgvs_1 = 'Ter' then 'N'
+               when T.hgvs_1 != '' then 'M'
+               when T.hgvs_2 = 'del' then 'D'
+               when T.hgvs_2 != '' then 'I'
+               when T.short_2 = '=' then 'S'
+               when T.short_2 = '*' then 'N'
+               when T.short_2 = 'X' then 'N'
+               when T.short_2 = '-' then 'D'
+               when T.short_2 != '' then case
+                   when T.short_1 = T.short_2 then 'S'
+                   else 'M'
+               end
+               else warning(concat({plugin_label},
+                   'unclassifiable variant: "', z, '"'), '?')
+               end as {output_col_id}
             from {table_name} S join (
                 select {variant_col_id} as z, unnest(regexp_extract(
                     {variant_col_id},
-                    '^(_?[Ww][Tt]|p.=)$|^(p.{hgvs_aa_re}\d+(=|{hgvs_aa_re}|dup|del|Ter|(_{hgvs_aa_re}\d+(del|dup|ins{hgvs_aa_re}+))))$|^({short_aa_re}\d+({short_aa_re}|[=*X-]))$',
-                    ['is_wt','is_hgvs','hgvs_rhs','is_hgvs_mult', 'hgvs_mult_rhs', 'is_short','short_rhs']
+                    {classifier_re},
+                    ['wildtype','hgvs_1','hgvs_2','short_1', 'short_2']
                 ))
                 from {table_name}
                 group by z
             ) T on S.{variant_col_id} = T.z
         """
+
 
 def _translate_aa(expr: str, expr1: str = "") -> str:
     # This looks ludicrous but it pushes all the work down into SQL so that
