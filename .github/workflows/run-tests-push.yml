@@ -41,7 +41,7 @@ jobs:
     - run: /tmp/venv/bin/python -m pip install -e .[dev]
     - run: xvfb-run /tmp/venv/bin/python -m pytest -v -rP --doctest-modules countess/ tests/
 
-  run-tests-ubuntu-24_04-python-3_x:
+  run-tests-ubuntu-24_04-python-3_13:
     runs-on: ubuntu-24.04
     name: Ubuntu 24.04, Python 3.x
     steps:
@@ -50,7 +50,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
-        python-version: "3.x"
+        python-version: "3.13"
         cache: 'pip'
     - run: sudo apt install xvfb libopenblas0 libopenblas-dev
     - run: python3 -m venv /tmp/venv
