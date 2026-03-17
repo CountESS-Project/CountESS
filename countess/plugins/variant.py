@@ -139,6 +139,7 @@ class VariantClassifier(DuckdbSqlPlugin):
     name = "Protein Variant Classifier"
     description = "Classifies protein variants into simple types"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#variant-classifier"
 
     variant_col = ColumnChoiceParam("Protein variant Column", "variant")
 
@@ -155,14 +156,18 @@ class VariantClassifier(DuckdbSqlPlugin):
 
         hgvs_aa_re = "(?:" + "|".join(v for v in AA_CODES.values() if v != 'Ter') + ")"
         short_aa_re = "[" + "".join(k for k in AA_CODES if k != '*') + "]"
+        plugin_label = duckdb_escape_literal(self.name + ": ")
 
         return rf"""
             select S.*, case
                when T.is_wt != '' then 'W'
+               when T.is_hgvs_mult != '' then case
+                  when T.hgvs_mult_rhs = 'del' then 'D'
+                  else 'I' end
                when T.is_hgvs != '' then case
-                  when T.is_hgvs_ins != '' then 'I'
                   when T.hgvs_rhs = 'Ter' then 'N'
                   when T.hgvs_rhs = 'del' then 'D'
+                  when T.hgvs_rhs = 'dup' then 'I'
                   when T.hgvs_rhs = '=' then 'S'
                   else 'M' end
                when T.is_short != '' then case
@@ -170,12 +175,12 @@ class VariantClassifier(DuckdbSqlPlugin):
                   when T.short_rhs = '*' or T.short_rhs = 'X' then 'N'
                   when T.short_rhs = '-' then 'D'
                   else 'M' end
-               else warning(concat('unclassifiable variant: "', z, '"'), '?') end as {output_col_id}
+               else warning(concat({plugin_label}, 'unclassifiable variant: "', z, '"'), '?') end as {output_col_id}
             from {table_name} S join (
                 select {variant_col_id} as z, unnest(regexp_extract(
                     {variant_col_id},
-                    '^(_?[Ww][Tt]|p.=)$|^(p.{hgvs_aa_re}\d+(=|{hgvs_aa_re}|del|Ter|(_{hgvs_aa_re}\d+ins{hgvs_aa_re}+)))$|^({short_aa_re}\d+({short_aa_re}|[=*X-]))$',
-                    ['is_wt','is_hgvs','hgvs_rhs','is_hgvs_ins','is_short','short_rhs']
+                    '^(_?[Ww][Tt]|p.=)$|^(p.{hgvs_aa_re}\d+(=|{hgvs_aa_re}|dup|del|Ter|(_{hgvs_aa_re}\d+(del|dup|ins{hgvs_aa_re}+))))$|^({short_aa_re}\d+({short_aa_re}|[=*X-]))$',
+                    ['is_wt','is_hgvs','hgvs_rhs','is_hgvs_mult', 'hgvs_mult_rhs', 'is_short','short_rhs']
                 ))
                 from {table_name}
                 group by z

@@ -271,6 +271,35 @@ The reference sequence can either be provided directly as a configuration parame
 
 *See also: [countess-minimap2 plugin](https://github.com/CountESS-Project/countess-minimap2), a variant caller which uses 'minimap2' to find sequences within a genome.*
 
+### Variant Classifier
+
+Takes a column of protein variants and classifies them into types:
+
+Short designations:
+
+|---|---|---|
+|format | type | explanation |
+|---|---|---|
+| `WT` <br/>`_WT` | `W` | Wild type |
+| `A107H` | `M` | Missense |
+| `A107A` <br/>`A107=` | `S` | Synonymous |
+| `A107*` <br/>`A107X` | `N` | Nonsense |
+| `A107-` | `D` | Deletion |
+
+HGVS Protein designations:
+
+|---|---|---|
+| format | type | explanation |
+| `p.=` | `W` | Wild type |
+| `p.Ala107His` | `M` | Missense |
+| `p.Ala107=` | `S` | Synonymous |
+| `p.Ala107Ter` | `N` | Nonsense |
+| `p.Ala107del` | `D` | Deletion |
+| `p.Ala107_Glu108insHis` <br/>`p.Ala107dup` <br/>`p.Ala107_Glu108dup` | `I` | Insertion / Duplication |
+
+Other variant formats or invalid amino acid codes will generate a warning and the type will be set to `?`.
+There is currently no support for insertions in short designations.
+
 #### Parameters
 
 Input Column
