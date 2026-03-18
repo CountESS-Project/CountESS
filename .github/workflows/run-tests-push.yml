@@ -7,8 +7,8 @@ jobs:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python 3.10
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
       with:
         python-version: "3.10"
         cache: 'pip'
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Ubuntu 22.04, Python 3.11 from Apt
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - run: sudo apt update -y
     - run: sudo apt install python3.11-full python3-pip xvfb
     - run: python3.11 -m pip install --upgrade pip
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: Ubuntu 24.04, Python 3.12 from Apt
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - run: sudo apt update -y
     - run: sudo apt-get -U upgrade -y
     - run: sudo apt install python3.12-full python3-pip xvfb
@@ -48,7 +48,7 @@ jobs:
     - run: sudo apt update -y
     - run: sudo apt-get -U upgrade -y
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: "3.13"
         cache: 'pip'
