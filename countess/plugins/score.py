@@ -3,7 +3,7 @@ from math import log
 from typing import Any, List, Optional, Union
 
 import numpy as np
-from scipy.optimize import curve_fit
+#from scipy.optimize import curve_fit
 
 from countess import VERSION
 from countess.core.parameters import (
@@ -34,7 +34,7 @@ def score(xs: list[float], ys: list[float]) -> Optional[tuple[float, float]]:
     if len(xs) < 2:
         return None
     try:
-        popt, pcov, *_ = curve_fit(func, xs, ys, bounds=(-5, 5))
+#        popt, pcov, *_ = curve_fit(func, xs, ys, bounds=(-5, 5))
         return popt[0], pcov[0][0]  # type: ignore  # mypy: ignore index
     except (ValueError, TypeError):
         return None

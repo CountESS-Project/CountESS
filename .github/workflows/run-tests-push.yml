@@ -59,3 +59,22 @@ jobs:
     - run: xvfb-run /tmp/venv/bin/coverage run --source countess -m pytest -v -rP --doctest-modules countess/ tests/
     - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
     - run: /tmp/venv/bin/coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY
+
+  run-tests-windows-11-arm:
+    runs-on: windows-11-arm
+    name: Windows 11
+    steps:
+    - uses: actions/checkout@v6
+    - run: python -m pip install --upgrade pip
+    - run: python -m pip install -e .[dev]
+    - run: python -m pytest -v -rP --doctest-modules countess/ tests/
+
+  run-tests-macos-m1:
+    runs-on: macos-latest
+    name: MacOS-M1
+    steps:
+    - uses: actions/checkout@v6
+    - run: python -m pip install --upgrade pip
+    - run: python -m pip install -e .[dev]
+    - run: python -m pytest -v -rP --doctest-modules countess/ tests/
+
