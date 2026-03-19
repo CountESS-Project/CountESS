@@ -70,6 +70,7 @@ jobs:
         python-version: "3.11"
         cache: 'pip'
     - run: python -m pip install --upgrade pip
+    - run: python -m pip install --only-binary pyarrow==23.0.1
     - run: python -m pip install --prefer-binary -e .[dev]
     - run: python -m pytest -v -rP --doctest-modules countess/ tests/
 
