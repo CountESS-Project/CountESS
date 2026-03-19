@@ -172,7 +172,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             table = source
 
         def _write(fh):
-            for num, record_batch in enumerate(table.record_batch()):
+            for num, record_batch in enumerate(table.to_arrow_reader()):
                 write_options = pyarrow.csv.WriteOptions(
                     include_header=self.header.value and num == 0,
                     delimiter=self.delimiter.value,

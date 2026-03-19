@@ -4,7 +4,7 @@ import secrets
 from typing import Iterable, Optional, Union
 
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
-from duckdb.typing import DuckDBPyType
+from duckdb.sqltypes import DuckDBPyType
 
 logger = logging.getLogger(__name__)
 
