@@ -45,6 +45,17 @@ class BaseParam:
         new.value = value
         return new
 
+    def copy_and_set_config(self, config, base_dir="."):
+        new = self.copy()
+        new.set_config(config, base_dir)
+        return new
+
+    def get_config(self, base_dir="."):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.get_config()")
+
+    def set_config(self, value, base_dir="."):
+        raise NotImplementedError(f"Implement {self.__class__.__name__}.set_config()")
+
     def get_parameters(self, key, base_dir="."):
         raise NotImplementedError(f"Implement {self.__class__.__name__}.get_parameters()")
 
@@ -82,6 +93,12 @@ class ScalarParam(BaseParam):
     def copy(self):
         return self.__class__(self.label, self._value)
 
+    def get_config(self, base_dir="."):
+        return self._value
+
+    def set_config(self, value, base_dir="."):
+        self._value = value
+
     def get_parameters(self, key, base_dir="."):
         return ((key, self.value),)
 
@@ -112,6 +129,12 @@ class MultiValueParam(BaseParam):
 
     def copy(self):
         return self.__class__(self.label, self._values)
+
+    def get_config(self, base_dir="."):
+        return self._values
+
+    def set_config(self, value, base_dir="."):
+        self._values = set(value)
 
     def get_parameters(self, key, base_dir="."):
         yield from ((f"{key}.{n}", v) for n, v in enumerate(self._values))
@@ -345,20 +368,24 @@ class FileBaseParam(StringParam):
                 self.value = self.get_file_path()
         self.base_dir = base_dir
 
-    def get_parameters(self, key, base_dir="."):
-        if self.value:
-            try:
-                if base_dir:
-                    path = os.path.relpath(self.get_file_path(), base_dir)
-                else:
-                    path = os.path.abspath(self.get_file_path())
-            except ValueError:
-                # relpath can fail on Windows
-                path = self.get_file_path()
-        else:
-            path = None
+    def get_config(self, base_dir="."):
+        if not self.value:
+            return None
+        try:
+            if base_dir:
+                return os.path.relpath(self.get_file_path(), base_dir)
+            else:
+                return os.path.abspath(self.get_file_path())
+        except ValueError:
+            # relpath can fail on Windows
+            return self.get_file_path()
 
-        return [(key, path)]
+    def set_config(self, value, base_dir="."):
+        self.value = value
+        self.set_base_dir(base_dir)
+
+    def get_parameters(self, key, base_dir="."):
+        return [(key, self.get_config(base_dir))]
 
     def copy(self) -> "FileBaseParam":
         return self.__class__(self.label, self.value, file_types=self.file_types, base_dir=self.base_dir)
@@ -836,6 +863,16 @@ class HasSubParametersMixin:
         else:
             super().__setattr__(name, value)
 
+    def get_config(self, base_dir="."):
+        return { k: v.get_config(base_dir) for k, v in self.params.items() }
+
+    def set_config(self, value, base_dir="."):
+        for k, v in value:
+            if k in self.params:
+                self.params[k].set_config(v, base_dir)
+            else:
+                logger.error("Unmatched Parameter Key %s", k)
+
     def get_parameters(self, key, base_dir=".") -> Iterable[Tuple[str, str]]:
         for subkey, param in self.params.items():
             yield from param.get_parameters(f"{key}.{subkey}" if key else subkey, base_dir)
@@ -950,6 +987,16 @@ class ArrayParam(BaseParam):
 
     def __iter__(self):
         return self.params.__iter__()
+
+    def get_config(self, base_dir="."):
+        return [ p.get_config(base_dir) for p in self.params ]
+
+    def set_config(self, value, base_dir="."):
+        self.params = [
+            self.copy_and_set_config(v, base_dir)
+            for v in value
+        ]
+        self.relabel()
 
     def get_parameters(self, key, base_dir="."):
         for n, p in enumerate(self.params):

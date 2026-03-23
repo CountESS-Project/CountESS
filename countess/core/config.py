@@ -5,13 +5,16 @@ import os.path
 import re
 from configparser import ConfigParser
 
+from tomllib import load as toml_load
+from tomli_w import dump as toml_dump
+
 from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import load_plugin
 
 logger = logging.getLogger(__name__)
 
 
-def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNode:
+def read_config_meta(name: str, config_dict: dict) -> PipelineNode:
     if "_module" in config_dict:
         module_name = config_dict["_module"]
         class_name = config_dict["_class"]
@@ -37,7 +40,7 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
 
     # XXX check version and hash_digest and emit warnings.
 
-    node = PipelineNode(
+    return PipelineNode(
         name=name,
         uuid=config_dict.get("_uuid"),
         plugin=plugin,
@@ -46,11 +49,33 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
         sort_column=int(sort[0]),
         sort_descending=bool(int(sort[1])),
     )
+
+
+def read_config_toml(filename: str) -> PipelineGraph:
+    base_dir = os.path.dirname(filename)
+    pipeline_graph  = PipelineGraph()
+    nodes_by_name : dict[str, PipelineNode] = {}
+    with open(filename, "rb") as fh:
+        doc = toml_load(fh)
+    for name, config_dict in doc.items():
+        node = read_config_meta(name, config_dict)
+        node.plugin.set_config({
+            k: v
+            for k, v in config_dict.items()
+            if not k.startswith("_")
+        }, base_dir)
+        for key, val in config_dict.items():
+            if key.startswith("_parent."):
+                node.add_parent(nodes_by_name[val])
+        pipeline_graph.nodes.append(node)
+        nodes_by_name[name] = node
+
+def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNode:
+    node = read_config_meta(name, config_dict)
     for key, val in config_dict.items():
         if not key.startswith("_"):
             node.set_config(key, ast.literal_eval(val), base_dir)
-    return node
-
+        return node
 
 def read_config(
     filenames: list[str],
@@ -110,31 +135,53 @@ def write_config_node_string(node: PipelineNode, base_dir: str = ""):
     return buf.getvalue()
 
 
+def get_config_meta(node: PipelineNode) -> dict[str, str]:
+    meta = { "_uuid": node.uuid }
+    if node.sort_column:
+        desc = 1 if node.sort_descending else 0
+        meta["_sort"] = "%d %d" % (node.sort_column, desc)
+    if node.plugin:
+        meta.update({
+            "_module": node.plugin.__module__,
+            "_class": node.plugin.__class__.__name__,
+            "_version": node.plugin.version,
+            "_hash": node.plugin.hash(),
+        })
+    if node.position:
+        xx, yy = node.position
+        meta["_position"] = "%d %d" % (xx * 1000, yy * 1000)
+    if node.notes:
+        meta["_notes"] = node.notes
+    for n, parent in enumerate(node.parent_nodes):
+        meta[f"_parent.{n}"] = parent.name
+    return meta
+
+
 def write_config_node(node: PipelineNode, cp: ConfigParser, base_dir: str):
     cp.add_section(node.name)
     if node.plugin:
-        cp[node.name].update(
-            {
-                "_uuid": node.uuid,
-                "_module": node.plugin.__module__,
-                "_class": node.plugin.__class__.__name__,
-                "_version": node.plugin.version,
-                "_hash": node.plugin.hash(),
-                "_sort": "%d %d" % (node.sort_column, 1 if node.sort_descending else 0),
-            }
-        )
-    if node.position:
-        xx, yy = node.position
-        cp[node.name]["_position"] = "%d %d" % (xx * 1000, yy * 1000)
-    if node.notes:
-        cp[node.name]["_notes"] = node.notes
-    for n, parent in enumerate(node.parent_nodes):
-        cp[node.name][f"_parent.{n}"] = parent.name
+        cp[node.name].update(get_config_meta(node))
     if node.plugin:
         node.load_config()
         for k, v in node.plugin.get_parameters("", base_dir):
             cp[node.name][k] = repr(v)
 
+def make_config_toml_node(node: PipelineNode, base_dir: str = ""):
+    tab = get_config_meta(node)
+    node.load_config()
+    tab.update(node.plugin.get_config(base_dir))
+    return tab
+
+def make_config_toml(pipeline_graph: PipelineGraph, base_dir: str = ""):
+    return {
+        node.name: make_config_toml_node(node, base_dir)
+        for node in pipeline_graph.traverse_nodes()
+    }
+
+def write_config_toml(pipeline_graph: PipelineGraph, filename: str):
+    base_dir = os.path.dirname(filename)
+    with open(filename, "wb") as fh:
+        toml_dump(make_config_toml(pipeline_graph, base_dir), fh)
 
 def export_config_graphviz(pipeline_graph: PipelineGraph, filename: str):
     with open(filename, "w", encoding="utf-8") as fh:

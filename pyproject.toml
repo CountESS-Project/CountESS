@@ -29,6 +29,7 @@ dependencies = [
     'rapidfuzz~=3.13.0',
     'scipy~=1.15.3',
     'tkinterweb~=3.23.5',
+    'tomli-w~=1.2.0',
     'ttkthemes~=3.2.2',
     'typing_extensions~=4.14.0',
 ]

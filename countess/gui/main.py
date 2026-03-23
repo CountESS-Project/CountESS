@@ -15,7 +15,7 @@ import psutil
 from duckdb import DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config
+from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config, write_config_toml
 from countess.core.pipeline import PipelineGraph
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
@@ -568,9 +568,12 @@ class MainWindow:
             )
         if not filename:
             return
-        if not filename.endswith(".ini"):
-            filename = filename + ".ini"
-        write_config(self.graph, filename)
+        if filename.endswith(".toml"):
+            write_config_toml(self.graph, filename)
+        else:
+            if not filename.endswith(".ini"):
+                filename = filename + ".ini"
+            write_config(self.graph, filename)
         self.config_filename = filename
         self.config_changed = False
         self.update_title()
