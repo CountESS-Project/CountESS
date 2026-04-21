@@ -1,4 +1,6 @@
+import bz2
 import logging
+import lzma
 from typing import Iterable, Optional
 
 import duckdb
@@ -21,7 +23,7 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#fastq-load"
     version = VERSION
 
-    file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2"])]
+    file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2", ".fastq.xz", ".fq", ".fq.gz", ".fq.bz2", ".fq.xz"])]
 
     min_avg_quality = FloatParam("Minimum Average Quality", 10)
     header_column = BooleanParam("Header Column?", False)
@@ -38,7 +40,14 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
         if self.header_column:
             fields.append("name")
 
-        rel = oxbow.from_fastq(filename, fields=fields).to_duckdb(cursor)
+        if filename.endswith(".xz"):
+            reader = oxbow.from_fastq(lambda: lzma.open(filename), None, fields=fields)
+        if filename.endswith(".bz2"):
+            reader = oxbow.from_fastq(lambda: bz2.open(filename), None, fields=fields)
+        else:
+            reader = oxbow.from_fastq(filename, fields=fields)
+
+        rel = reader.to_duckdb(cursor)
 
         if row_limit:
             rel = rel.limit(row_limit)
