@@ -713,7 +713,7 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
 
 class NumericColumnGroupChoiceParam(ColumnGroupChoiceParam):
     def set_column_choices(self, choices: Mapping[str, bool]):
-        numeric_columns = [ k for k, n in choices.items() if n ]
+        numeric_columns = [k for k, n in choices.items() if n]
         self.set_choices([n + "*" for n in make_prefix_groups(numeric_columns).keys()])
 
 
