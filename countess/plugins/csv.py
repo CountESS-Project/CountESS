@@ -33,9 +33,9 @@ from countess.core.plugins import (
 from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
-    ("CSV", [".csv", ".csv.gz"]),
-    ("TSV", [".tsv", ".tsv.gz"]),
-    ("TXT", [".txt", ".txt.gz"]),
+    ("CSV", [".csv", ".csv.gz", ".csv.bz2"]),
+    ("TSV", [".tsv", ".tsv.gz", ".tsv.bz2"]),
+    ("TXT", [".txt", ".text", ".txt.gz", ".text.gz", ".txt.bz2", ".text.bz2"]),
 ]
 
 logger = logging.getLogger(__name__)
