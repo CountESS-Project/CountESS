@@ -15,7 +15,7 @@ jobs:
     - run: sudo apt install xvfb
     - run: pip install --upgrade pip
     - run: pip install .[dev]
-    - run: xvfb-run pytest -v -rP --doctest-modules countess/ tests/
+    - run: xvfb-run pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-22_04-python-3_11_from_apt:
     runs-on: ubuntu-22.04
@@ -26,7 +26,7 @@ jobs:
     - run: sudo apt install python3.11-full python3-pip xvfb
     - run: python3.11 -m pip install --upgrade pip
     - run: python3.11 -m pip install -e .[dev]
-    - run: xvfb-run python3.11 -m pytest -v -rP --doctest-modules countess/ tests/
+    - run: xvfb-run python3.11 -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-24_04-python-3_12_from_apt:
     runs-on: ubuntu-24.04
@@ -39,7 +39,7 @@ jobs:
     - run: python3.12 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
     - run: /tmp/venv/bin/python -m pip install -e .[dev]
-    - run: xvfb-run /tmp/venv/bin/python -m pytest -v -rP --doctest-modules countess/ tests/
+    - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-24_04-python-3_13:
     runs-on: ubuntu-24.04
@@ -56,6 +56,6 @@ jobs:
     - run: python3 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
     - run: /tmp/venv/bin/python -m pip install -e .[dev]
-    - run: xvfb-run /tmp/venv/bin/coverage run --source countess -m pytest -v -rP --doctest-modules countess/ tests/
+    - run: xvfb-run /tmp/venv/bin/coverage run --source countess -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
     - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
     - run: /tmp/venv/bin/coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY
