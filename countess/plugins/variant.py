@@ -133,6 +133,12 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
+        if self.drop_columns:
+            del data[self.column.value]
+            reference_column_name = self.reference.get_column_name()
+            if reference_column_name:
+                del data[reference_column_name]
+
         return data
 
 

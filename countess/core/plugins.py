@@ -22,11 +22,10 @@ import logging
 import multiprocessing
 import multiprocessing.pool
 import os.path
+import secrets
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Type, Union
 
 import duckdb
-import psutil
-import pyarrow  # type: ignore
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess.core.parameters import (
@@ -38,7 +37,6 @@ from countess.core.parameters import (
     MultiParam,
 )
 from countess.utils.duckdb import duckdb_combine, duckdb_dtype_is_numeric, duckdb_escape_literal, duckdb_source_to_view
-from countess.utils.pyarrow import python_type_to_arrow_dtype
 
 PRERUN_ROW_LIMIT: int = 100000
 
@@ -388,42 +386,37 @@ class DuckdbSaveFilePlugin(DuckdbSimplePlugin):
 
 
 class DuckdbTransformPlugin(DuckdbSimplePlugin):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.view_name = f"v_{id(self)}"
-
-    def get_reader(self, source):
-        return source.to_arrow_table().to_reader(max_chunksize=2048)
-
     def remove_fields(self, field_names: list[str]) -> list[Optional[str]]:
         return []
 
     def add_fields(self) -> Mapping[Optional[str], Optional[type]]:
         return {}
 
-    def fix_schema(self, schema: pyarrow.Schema) -> pyarrow.Schema:
-        for field_name in self.remove_fields(schema.names):
-            if field_name in schema.names:
-                schema = schema.remove(schema.get_field_index(field_name))
-        for field_name, ttype in self.add_fields().items():
-            if field_name and ttype is not None:
-                schema = schema.append(pyarrow.field(field_name, python_type_to_arrow_dtype(ttype)))
-        return schema
-
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> DuckDBPyRelation:
         """Perform a query which calls `self.transform` for every row."""
 
-        reader = self.get_reader(source)
-        ddbc.register(self.view_name, pyarrow.Table.from_batches(self.transform_batch(batch) for batch in reader))
-        return ddbc.view(self.view_name)
+        schema = dict(zip(source.columns, source.dtypes))
+        for field in self.remove_fields(source.columns):
+            if field in schema:
+                del schema[field]
+        for field, ttype in self.add_fields().items():
+            if field:
+                schema[field] = duckdb.sqltypes.DuckDBPyType(ttype)
+        return_type = duckdb.struct_type(schema)
 
-    def transform_batch(self, batch: pyarrow.RecordBatch) -> pyarrow.RecordBatch:
-        schema = self.fix_schema(batch.schema)
-        return pyarrow.RecordBatch.from_pylist(
-            [t for t in (self.transform(row) for row in batch.to_pylist()) if t is not None], schema=schema
+        function_name = "f_" + secrets.token_hex(16)
+        ddbc.create_function(
+            function_name,
+            self.transform,
+            return_type=return_type,
+            null_handling="special",  # type: ignore[arg-type]
         )
+
+        view = duckdb_source_to_view(ddbc, source)
+
+        return ddbc.sql(f"SELECT UNNEST({function_name}(_ROW)) FROM (SELECT * FROM {view.alias}) AS _ROW")
 
     def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         """This will be called for each row. Return a tuple with the same
@@ -433,26 +426,14 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
 
 
 class DuckdbThreadedTransformPlugin(DuckdbTransformPlugin):
-    def execute(
-        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
-    ) -> DuckDBPyRelation:
-        with multiprocessing.pool.ThreadPool(processes=psutil.cpu_count()) as pool:
-            reader = self.get_reader(source)
-            ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
-        return ddbc.view(self.view_name)
+    """DuckDB should be handling the parallelization now?"""
 
     def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         raise NotImplementedError(f"{self.__class__}.transform")
 
 
 class DuckdbParallelTransformPlugin(DuckdbTransformPlugin):
-    def execute(
-        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
-    ) -> DuckDBPyRelation:
-        with multiprocessing.Pool(processes=psutil.cpu_count()) as pool:
-            reader = self.get_reader(source)
-            ddbc.register(self.view_name, pyarrow.Table.from_batches(pool.imap_unordered(self.transform_batch, reader)))
-        return ddbc.view(self.view_name)
+    """DuckDB should be handling the parallelization now?"""
 
     def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         raise NotImplementedError(f"{self.__class__}.transform")

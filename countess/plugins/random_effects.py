@@ -58,6 +58,9 @@ class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
         scores = [v for k, v in sorted(data.items()) if k.startswith(self.score_cols.get_column_prefix())]
         sigma2s = [v for k, v in sorted(data.items()) if k.startswith(self.stderr_cols.get_column_prefix())]
 
+        if not scores or None in scores or not sigma2s or None in sigma2s:
+            return None
+
         score, sigma2, epsilon = rml_estimate(scores, sigma2s)
 
         data[self.output_score_column()] = score

@@ -127,4 +127,12 @@ class ScoringPlugin(DuckdbParallelTransformPlugin):
         data[self.output.value] = score_var[0]
         if self.variance:
             data[self.variance.value] = score_var[1]
+
+        if self.drop_input:
+            for name in data:
+                if name.startswith(self.columns.get_column_prefix()) or (
+                    self.xaxis.is_not_none() and name.startswith(self.xaxis.get_column_prefix())
+                ):
+                    del data[name]
+
         return data
