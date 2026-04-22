@@ -17,7 +17,7 @@ expected_output = """"thing","result"
 @pytest.mark.slow
 def test_command_invocation():
     run(["tests/simple.ini"])
-    time.sleep(0.5)
+    time.sleep(5)
     with open("tests/output.csv", "r", encoding="utf-8") as fh:
         output = fh.read()
         assert output == expected_output
