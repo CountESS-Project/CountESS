@@ -406,10 +406,16 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
                 schema[field] = duckdb.sqltypes.DuckDBPyType(ttype)
         return_type = duckdb.struct_type(schema)
 
+        def wrapper(data: dict[str, Any]) -> Optional[Dict[str, Any]]:
+            try:
+                return self.transform(data)
+            except Exception as exc:
+                logger.warning(str(exc))
+
         function_name = "f_" + secrets.token_hex(16)
         ddbc.create_function(
             function_name,
-            self.transform,
+            wrapper,
             return_type=return_type,
             null_handling="special",  # type: ignore[arg-type]
         )
