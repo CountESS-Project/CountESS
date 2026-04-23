@@ -26,6 +26,7 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2", ".fastq.xz", ".fq", ".fq.gz", ".fq.bz2", ".fq.xz"])]
 
     min_avg_quality = FloatParam("Minimum Average Quality", 10)
+    min_low_quality = FloatParam("Minimum Lowest Quality", 0)
     header_column = BooleanParam("Header Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
@@ -54,6 +55,10 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
 
         if self.min_avg_quality:
             filt = "list_avg(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_avg_quality + 33)
+            rel = rel.filter(filt)
+
+        if self.min_low_quality:
+            filt = "list_min(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_low_quality + 33)
             rel = rel.filter(filt)
 
         if self.header_column:
