@@ -16,24 +16,31 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DuckdbSimplePlugin
-from countess.utils.duckdb import duckdb_escape_identifier, duckdb_source_to_view, duckdb_escape_literal
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_source_to_view, duckdb_escape_literal, duckdb_dtype_is_boolean, duckdb_dtype_is_numeric
 
 logger = logging.getLogger(__name__)
 
 
-def score(xs: list[float], ys: list[float], ws: Optional[list[float]|float] = 1.0) -> Optional[tuple[float, float]]:
+def score(times: list[float], counts: list[float], populations: list[float]) -> Optional[tuple[float, float]]:
     """
-    Apply a linear least squares regression to xs and ys with option weights ws 
+    Called with three equal-length lists of floats:
+    * `times` is the time points
+    * `counts` is the variant count at that point
+    * `populations` is the population count at that point
+
+    Apply the formulae from the Enrich2 paper and then perform
+    a linear least squares regression to xs and ys with option weights ws 
     and return the 'slope' and the stderr of slope.
     """
 
-    if None in xs or None in ys or None is ws:
+    if None in times or None in counts or None in populations:
         return None
 
     # add constant element (we later ignore this coefficient)
-    xs = [ [ x, 1.0 ] for x in xs ]
+    xs = [ [ t, 1.0 ] for t in times ]
+    ys = [ log((c + 0.5) / (p + 0.5)) for c, p in zip(counts, populations) ]
+    ws = [ 1 / ((1 / (c+0.5)) + (1 / (p + 0.5))) for c, p in zip(counts, populations) ]
 
-    # do weighted regression, if ws == 1 then this is same as unweighted.
     fit = statsmodels_api.WLS(ys, xs, ws).fit()
 
     logger.debug("scoring: %s %s %s => %f %f", xs, ys, ws, fit.params[0], fit.bse[0])
@@ -47,18 +54,11 @@ class ScoringPlugin(DuckdbSimplePlugin):
     description = "Score variants using counts or frequencies"
     version = VERSION
 
-    variant = ColumnChoiceParam("Variant Column")
     replicate = ColumnOrNoneChoiceParam("Replicate Column")
     columns = ColumnGroupChoiceParam("Input Columns")
-    variances = ColumnGroupOrNoneChoiceParam("Variance Columns")
     wildtype = ColumnOrNoneChoiceParam("Wildtype Indicator")
-
-    log = BooleanParam("Use log(y)")
-    normalize = BooleanParam("Normalize (scale X so max(x) = 1)")
-    xaxis = ColumnGroupOrNoneChoiceParam("X Axis Columns")
-    wildtype = ColumnOrNoneChoiceParam("Wildtype Indicator Column")
     output = StringParam("Score Column", "score")
-    variance = StringParam("Variance Column", "")
+    stddev = StringParam("Standard Deviation Column", "sigma")
     drop_input = BooleanParam("Drop Input Columns?", False)
 
     def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
@@ -67,64 +67,45 @@ class ScoringPlugin(DuckdbSimplePlugin):
 
         yaxis_prefix = self.columns.get_column_prefix()
         suffix_set = {k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)}
-
-        if self.xaxis.is_not_none():
-            xaxis_prefix = self.xaxis.get_column_prefix()
-            suffix_set.update([k.removeprefix(xaxis_prefix) for k in source.columns if k.startswith(xaxis_prefix)])
-
         suffixes = sorted(suffix_set)
 
-        variances_prefix = self.variances.get_column_prefix()
+        count_cols = [ duckdb_escape_identifier(yaxis_prefix+suffix) for suffix in suffixes ]
 
-        y_columns = [ duckdb_escape_identifier(yaxis_prefix+suffix) for suffix in suffixes ]
+        x_values = [ float(x) for x in suffixes ]
+        x_max = max(x_values)
+        x_cols = [ duckdb_escape_literal(x / x_max) for n, x in enumerate(x_values) ]
 
-        wildtype_clause = f"WHERE {duckdb_escape_identifier(self.wildtype.value)} IN ('W','p.=')" if self.wildtype.is_not_none() else ""
-
-        if self.xaxis.is_not_none():
-            x_columns = [ duckdb_escape_identifier(xaxis_prefix+suffix) for suffix in suffixes ]
-            if self.normalize:
-                x_fields = [ f"A.{x} / C.MAX" for n, x in enumerate(x_columns)]
-            else:
-                x_fields = [ f"A.{x}" for n, x in enumerate(x_columns)]
-        else:
-            x_values = [ float(x) for x in suffixes ]
-            x_max = max(x_values) if self.normalize else 1.0
-            x_fields = [ f"{duckdb_escape_literal(x / x_max)}" for n, x in enumerate(x_values) ]
-            x_columns = []
-
-        if self.variances.is_not_none():
-            v_columns = [ duckdb_escape_identifier(variances_prefix+suffix) for suffix in suffixes ]
-            w_fields = [ f"1 / A.{v}" for n, v in enumerate(v_columns) ]
-        else:
-            w_fields = [ "1" for _ in suffixes ]
-            v_columns = []
-
-        if self.log:
-            y_fields = [ f"log(A.{y} / B._{n})" for n, y in enumerate(y_columns) ]
-        else:
-            y_fields = [ f"A.{y} / B._{n}" for n, y in enumerate(y_columns)]
-
-        y_sum_fields = [ f"SUM({y}) AS _{n}" for n, y in enumerate(y_columns)]
-
-        if self.replicate.is_none():
-            sums_query = f"SELECT {', '.join(y_sum_fields)} FROM {view.alias} {wildtype_clause}"
-            join_on = "ON (1=1)"
-        else:
-            replicate_field = duckdb_escape_identifier(self.replicate.value)
-            sums_query = f"SELECT {replicate_field}, {', '.join(y_sum_fields)} FROM {view.alias} {wildtype_clause} GROUP BY {replicate_field}"
-            join_on = f"USING ({replicate_field})"
+        where_clause = ""
+        if self.wildtype.is_not_none():
+            wtcol = duckdb_escape_identifier(self.wildtype.value)
+            for col, dtype in zip(source.columns, source.dtypes):
+                if col == self.wildtype.value:
+                    if duckdb_dtype_is_boolean(dtype) or duckdb_dtype_is_numeric(dtype):
+                        where_clause = f"WHERE {wtcol}"
+                    else:
+                        where_clause = f"WHERE {wtcol} IN ('W', 'p.=')"
 
         if self.drop_input:
-            drop_fields = set(x_columns + y_columns + v_columns)
             keep_fields = ','.join([
-                f"A.{duckdb_escape_identifier(f)}" 
+                f"A.{duckdb_escape_identifier(f)}"
                 for f in view.columns
-                if duckdb_escape_identifier(f) not in drop_fields
+                if duckdb_escape_identifier(f) not in count_cols
             ])
         else:
             keep_fields = "A.*"
 
-        return_type = { 'score': 'float', 'variance': 'float' }
+        if self.replicate.is_none():
+            join_op = "CROSS JOIN"
+            repl_id = ""
+            group_clause = ""
+            join_using = ""
+        else:
+            join_op = "JOIN"
+            repl_id = duckdb_escape_identifier(self.replicate.value)
+            group_clause = f"GROUP BY {repl_id}"
+            join_using = f"USING ({repl_id})"
+
+        return_type = { self.output.value: 'float', self.stddev.value: 'float' }
         function_name = "f_" + secrets.token_hex(16)
         ddbc.create_function(
             function_name,
@@ -134,16 +115,16 @@ class ScoringPlugin(DuckdbSimplePlugin):
         )
         view = duckdb_source_to_view(ddbc, source)
 
-        query = f"SELECT {keep_fields}, UNNEST({function_name}([{', '.join(x_fields)}], [{', '.join(y_fields)}], [{', '.join(w_fields)}])) FROM {view.alias} AS A JOIN ({sums_query}) AS B {join_on}"
-
-        if self.xaxis.is_not_none() and self.normalize:
-            x_max_fields = [ f"X({x}) AS _{n}" for n, x in enumerate(x_columns) ]
-            if self.replicate.is_none():
-                query += f" CROSS JOIN (SELECT MAX(GREATEST({','.join(x_columns)})) AS MAX FROM {view.alias}) AS C"
-            else:
-                replicate_field = duckdb_escape_identifier(self.replicate.value)
-                query += f" JOIN (SELECT {replicate_field}, MAX(GREATEST({','.join(x_columns)})) AS MAX FROM {view.alias} GROUP BY {replicate_field}) AS C USING ({replicate_field})"
-
-        print(query)
+        query = f"""
+            SELECT {keep_fields}, UNNEST({function_name}(
+                [{', '.join(x_cols)}],
+                [{', '.join("A." + c for c in count_cols)}],
+                [{', '.join("B." + c for c in count_cols)}]
+            )) FROM {view.alias} AS A {join_op} (
+                SELECT {repl_id + ", " if repl_id else ""}
+                {', '.join(f"SUM({c}) AS {c}" for c in count_cols)}
+                FROM {view.alias} {where_clause} {group_clause}
+            ) AS B {join_using}
+        """
 
         return ddbc.sql(query)
