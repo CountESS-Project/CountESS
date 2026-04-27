@@ -573,3 +573,25 @@ def find_variant_string(
         return prefix + variations[0]
     else:
         return prefix + "[" + ";".join(variations) + "]"
+
+
+def classify_protein_variant(pv: str) -> str:
+    """Classify an HGVS protein variant as either wild type 'W',
+    synonymous 'S', deletion 'D', nonsense 'N', insertion 'I' or
+    missense 'M' or if none of the above '?'.  Not particularly
+    strict as it is just used to classify the output of the
+    protein variant caller."""
+
+    if pv == "p.=":
+        return "W"
+    if re.match(r"p.\w+\d+=$", pv):
+        return "S"
+    if re.match(r"p.\w+\d+(_\w+\d+)?del$", pv):
+        return "D"
+    if re.match(r"p.\w+\d+Ter$", pv):
+        return "N"
+    if re.match(r"p.\w+\d+(_\w+\d+)?(dup|ins\w+)$", pv):
+        return "I"
+    if re.match(r"p.\w+\d+\w+$", pv):
+        return "M"
+    return "?"

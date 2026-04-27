@@ -20,7 +20,7 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
-from countess.utils.variant import TooManyVariationsException, find_variant_string
+from countess.utils.variant import TooManyVariationsException, classify_protein_variant, find_variant_string
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
 
     variant = DnaVariantMultiParam("DNA Variant")
     protein = ProteinVariantMultiParam("Protein Variant")
+    classify = StringParam("Classification Output Column", "class")
 
     drop = BooleanParam("Drop unmatched rows", False)
     drop_columns = BooleanParam("Drop Sequence / Reference Columns", False)
@@ -85,6 +86,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
         return {
             self.variant.output.value: str,
             self.protein.output.value: str,
+            self.classify.value: str,
         }
 
     def remove_fields(self, field_names: list[str]) -> list[Optional[str]]:
@@ -117,17 +119,22 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
-        if self.protein.output:
-            data[self.protein.output.value] = None
+        if self.protein.output or self.classify:
             try:
-                prefix = self.protein.prefix + ":" if self.protein.prefix else ""
-                data[self.protein.output.value] = find_variant_string(
-                    f"{prefix}p.",
+                protein_variant = find_variant_string(
+                    "p.",
                     reference,
                     sequence,
                     max_mutations=self.protein.maxlen.value,
                     offset=int(self.protein.offset.get_value_from_dict(data) or 0),
                 )
+
+                if self.protein.output:
+                    prefix = self.protein.prefix + ":" if self.protein.prefix else ""
+                    data[self.protein.output.value] = prefix + protein_variant
+                if self.classify:
+                    data[self.classify.value] = classify_protein_variant(protein_variant)
+
             except TooManyVariationsException:
                 pass
             except (ValueError, TypeError, KeyError, IndexError) as exc:
