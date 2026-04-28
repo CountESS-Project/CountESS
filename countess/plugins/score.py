@@ -1,27 +1,26 @@
 import logging
-from math import log
 import secrets
-from typing import Any, List, Optional
+from math import log, sqrt
+from typing import Optional
 
 import statsmodels.api as statsmodels_api
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
+
 from countess import VERSION
-from countess.core.parameters import (
-    BooleanParam,
-    ChoiceParam,
-    ColumnChoiceParam,
-    ColumnOrNoneChoiceParam,
-    ColumnGroupChoiceParam,
-    ColumnGroupOrNoneChoiceParam,
-    StringParam,
-)
+from countess.core.parameters import BooleanParam, ColumnGroupChoiceParam, ColumnOrNoneChoiceParam, StringParam
 from countess.core.plugins import DuckdbSimplePlugin
-from countess.utils.duckdb import duckdb_escape_identifier, duckdb_source_to_view, duckdb_escape_literal, duckdb_dtype_is_boolean, duckdb_dtype_is_numeric
+from countess.utils.duckdb import (
+    duckdb_dtype_is_boolean,
+    duckdb_dtype_is_numeric,
+    duckdb_escape_identifier,
+    duckdb_escape_literal,
+    duckdb_source_to_view,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def score(times: list[float], counts: list[float], populations: list[float]) -> Optional[tuple[float, float]]:
+def score_function(times: list[float], counts: list[float], populations: list[float]) -> Optional[tuple[float, float]]:
     """
     Called with three equal-length lists of floats:
     * `times` is the time points
@@ -29,24 +28,32 @@ def score(times: list[float], counts: list[float], populations: list[float]) -> 
     * `populations` is the population count at that point
 
     Apply the formulae from the Enrich2 paper and then perform
-    a linear least squares regression to xs and ys with option weights ws 
+    a linear least squares regression to xs and ys with option weights ws
     and return the 'slope' and the stderr of slope.
     """
 
     if None in times or None in counts or None in populations:
         return None
+    assert len(times) == len(counts) == len(populations) > 1
 
-    # add constant element (we later ignore this coefficient)
-    xs = [ [ t, 1.0 ] for t in times ]
-    ys = [ log((c + 0.5) / (p + 0.5)) for c, p in zip(counts, populations) ]
-    ws = [ 1 / ((1 / (c+0.5)) + (1 / (p + 0.5))) for c, p in zip(counts, populations) ]
+    if len(times) == 2:
+        # 2 time point estimate
+        score = log((counts[1] + 0.5) / (populations[1] + 0.5)) - log((counts[0] + 0.5) / (populations[0] + 0.5))
+        sigma = sqrt(
+            (1 / (counts[0] + 0.5) + 1 / (counts[1] + 0.5) + 1 / (populations[0] + 0.5) + 1 / (populations[1] + 0.5))
+        )
+    else:
+        # multi time point least squares regression
+        xs = [[t, 1.0] for t in times]
+        ys = [log((c + 0.5) / (p + 0.5)) for c, p in zip(counts, populations)]
+        ws = [1 / ((1 / (c + 0.5)) + (1 / (p + 0.5))) for c, p in zip(counts, populations)]
+        fit = statsmodels_api.WLS(ys, xs, ws).fit()
+        # we only care about the slope, not the "intercept" of the line.
+        score = fit.params[0]
+        sigma = fit.bse[0]
 
-    fit = statsmodels_api.WLS(ys, xs, ws).fit()
-
-    logger.debug("scoring: %s %s %s => %f %f", xs, ys, ws, fit.params[0], fit.bse[0])
-
-    # return just the slope and stderr of slope.
-    return fit.params[0], fit.bse[0]
+    logger.debug("scoring: %s %s %s => %f %f", times, counts, populations, score, sigma)
+    return score, sigma
 
 
 class ScoringPlugin(DuckdbSimplePlugin):
@@ -61,7 +68,8 @@ class ScoringPlugin(DuckdbSimplePlugin):
     stddev = StringParam("Standard Deviation Column", "sigma")
     drop_input = BooleanParam("Drop Input Columns?", False)
 
-    def execute(self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
+    def execute(
+        self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
         view = duckdb_source_to_view(ddbc, source)
 
@@ -69,11 +77,11 @@ class ScoringPlugin(DuckdbSimplePlugin):
         suffix_set = {k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)}
         suffixes = sorted(suffix_set)
 
-        count_cols = [ duckdb_escape_identifier(yaxis_prefix+suffix) for suffix in suffixes ]
+        count_cols = [duckdb_escape_identifier(yaxis_prefix + suffix) for suffix in suffixes]
 
-        x_values = [ float(x) for x in suffixes ]
+        x_values = [float(x) for x in suffixes]
         x_max = max(x_values)
-        x_cols = [ duckdb_escape_literal(x / x_max) for n, x in enumerate(x_values) ]
+        x_cols = [duckdb_escape_literal(x / x_max) for n, x in enumerate(x_values)]
 
         where_clause = ""
         if self.wildtype.is_not_none():
@@ -86,11 +94,13 @@ class ScoringPlugin(DuckdbSimplePlugin):
                         where_clause = f"WHERE {wtcol} IN ('W', 'p.=')"
 
         if self.drop_input:
-            keep_fields = ','.join([
-                f"A.{duckdb_escape_identifier(f)}"
-                for f in view.columns
-                if duckdb_escape_identifier(f) not in count_cols
-            ])
+            keep_fields = ",".join(
+                [
+                    f"A.{duckdb_escape_identifier(f)}"
+                    for f in view.columns
+                    if duckdb_escape_identifier(f) not in count_cols
+                ]
+            )
         else:
             keep_fields = "A.*"
 
@@ -105,12 +115,14 @@ class ScoringPlugin(DuckdbSimplePlugin):
             group_clause = f"GROUP BY {repl_id}"
             join_using = f"USING ({repl_id})"
 
-        return_type = { self.output.value: 'float', self.stddev.value: 'float' }
+        # XXX currently we need to recreate this function in case the two output
+        # column names have changed, which seems a bit silly
+        return_type = {self.output.value: "float", self.stddev.value: "float"}
         function_name = "f_" + secrets.token_hex(16)
         ddbc.create_function(
             function_name,
-            score,
-            return_type=return_type,
+            score_function,
+            return_type=return_type,  # type: ignore[arg-type]
             null_handling="special",  # type: ignore[arg-type]
         )
         view = duckdb_source_to_view(ddbc, source)

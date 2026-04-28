@@ -8,7 +8,7 @@ from countess.core.plugins import DuckdbParallelTransformPlugin
 logger = logging.getLogger(__name__)
 
 
-def rml_estimate(scores: list[float], sigmas: list[float], iterations: int = 50) -> tuple[float, float, float]:
+def rml_estimate(scores: list[float], sigmas: list[float], iterations: int = 50) -> tuple[float, float]:
     weights = [1 / sigma**2 for sigma in sigmas]
     sum_of_weights = sum(weights)
     mean_score = sum(scores) / len(scores)
@@ -20,10 +20,7 @@ def rml_estimate(scores: list[float], sigmas: list[float], iterations: int = 50)
         sum_of_weights_2 = sum(w**2 for w in weights)
         beta = sum(score * weight for score, weight in zip(scores, weights)) / sum_of_weights
         scale = sum_of_weights - (sum_of_weights_2 / sum_of_weights)
-        adjust = sum(
-            (score - beta) ** 2 * (weight**2)
-            for score, weight in zip(scores, weights)
-        ) / scale
+        adjust = sum((score - beta) ** 2 * (weight**2) for score, weight in zip(scores, weights)) / scale
         variance *= adjust
 
     return beta, variance**0.5

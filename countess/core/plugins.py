@@ -409,8 +409,9 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         def wrapper(data: dict[str, Any]) -> Optional[Dict[str, Any]]:
             try:
                 return self.transform(data)
-            except Exception as exc:
+            except RuntimeError as exc:
                 logger.warning(str(exc))
+                return None
 
         function_name = "f_" + secrets.token_hex(16)
         ddbc.create_function(
