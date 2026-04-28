@@ -4,7 +4,7 @@ from math import log, sqrt
 from typing import Optional
 
 import statsmodels.api as statsmodels_api
-from duckdb import DuckDBPyConnection, DuckDBPyRelation
+from duckdb import DuckDBPyConnection, DuckDBPyRelation, NotImplementedException
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, ColumnGroupChoiceParam, ColumnOrNoneChoiceParam, StringParam
@@ -68,6 +68,22 @@ class ScoringPlugin(DuckdbSimplePlugin):
     stddev = StringParam("Standard Deviation Column", "sigma")
     drop_input = BooleanParam("Drop Input Columns?", False)
 
+    function_name = "f_" + secrets.token_hex(16)
+
+    def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
+        super().prepare(ddbc, source)
+
+        try:
+            ddbc.create_function(
+                self.function_name,
+                score_function,
+                return_type='DOUBLE[]',  # type: ignore[arg-type]
+                null_handling="special",  # type: ignore[arg-type]
+            )
+        except NotImplementedException:
+            # trying to create the function which already exists
+            pass
+
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
@@ -115,28 +131,24 @@ class ScoringPlugin(DuckdbSimplePlugin):
             group_clause = f"GROUP BY {repl_id}"
             join_using = f"USING ({repl_id})"
 
-        # XXX currently we need to recreate this function in case the two output
-        # column names have changed, which seems a bit silly
-        return_type = {self.output.value: "float", self.stddev.value: "float"}
-        function_name = "f_" + secrets.token_hex(16)
-        ddbc.create_function(
-            function_name,
-            score_function,
-            return_type=return_type,  # type: ignore[arg-type]
-            null_handling="special",  # type: ignore[arg-type]
-        )
+
         view = duckdb_source_to_view(ddbc, source)
 
         query = f"""
-            SELECT {keep_fields}, UNNEST({function_name}(
-                [{', '.join(x_cols)}],
-                [{', '.join("A." + c for c in count_cols)}],
-                [{', '.join("B." + c for c in count_cols)}]
-            )) FROM {view.alias} AS A {join_op} (
-                SELECT {repl_id + ", " if repl_id else ""}
-                {', '.join(f"SUM({c}) AS {c}" for c in count_cols)}
-                FROM {view.alias} {where_clause} {group_clause}
-            ) AS B {join_using}
+            SELECT * EXCLUDE _SCORE,
+                _SCORE[1] AS {duckdb_escape_identifier(self.output.value)},
+                _SCORE[2] AS {duckdb_escape_identifier(self.stddev.value)}
+            FROM (
+                SELECT {keep_fields}, {self.function_name}(
+                    [{', '.join(x_cols)}],
+                    [{', '.join("A." + c for c in count_cols)}],
+                    [{', '.join("B." + c for c in count_cols)}]
+                ) AS _SCORE FROM {view.alias} AS A {join_op} (
+                    SELECT {repl_id + ", " if repl_id else ""}
+                    {', '.join(f"SUM({c}) AS {c}" for c in count_cols)}
+                    FROM {view.alias} {where_clause} {group_clause}
+                ) AS B {join_using}
+            )
         """
 
         return ddbc.sql(query)
