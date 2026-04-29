@@ -6,6 +6,15 @@ layout: default
 
 ## Linux
 
+CountESS requires Python 3.10 or more recent, including the Tkinter graphical interface toolkit.
+To install this on Ubuntu or Debian, you should install the "python3-full" package:
+
+    sudo apt install python3-full
+
+On Fedora, install package "python3.11":
+
+    sudo dnf install python3.11
+
 ### ... using pip
 
 CountESS can be [installed from pypi](https://pypi.org/project/countess/):
