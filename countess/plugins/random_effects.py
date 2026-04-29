@@ -7,23 +7,42 @@ from countess.core.plugins import DuckdbParallelTransformPlugin
 
 logger = logging.getLogger(__name__)
 
+def rml_estimate(scores: list[float], sigmas: list[float], iterations: int = 50, epsilon: float = 1E-7) -> tuple[float, float]:
+    """Implementation of the robust maximum likelihood estimator.
 
-def rml_estimate(scores: list[float], sigmas: list[float], iterations: int = 50) -> tuple[float, float]:
-    weights = [1 / sigma**2 for sigma in sigmas]
-    sum_of_weights = sum(weights)
-    mean_score = sum(scores) / len(scores)
-    variance = sum((score - mean_score) ** 2 for score in scores) / (len(scores) - 1)
+        ::
 
+            @book{demidenko2013mixed,
+              title={Mixed models: theory and applications with R},
+              author={Demidenko, Eugene},
+              year={2013},
+              publisher={John Wiley & Sons}
+            }
+    """
+    # https://mathematics.foi.hr/Rprojekti/knjige/demidenko.pdf
+    # pages 246-
+
+    # "it is assumed that besides the variation within the study, there
+    # exists a variation between studies, and this variation is represented
+    # by the random effect `b_i` with an unknown variance `σ^2` [...]
+    # called the heterogeneity (variance) parameter."
+    # 
+    # this code iteratively estimates the value of that parameter.
+    # then the weighted average `\beta` and the variance of that
+    # average are returned.
+
+    variance = sum(sigma**2 for sigma in sigmas)
     for _ in range(0, iterations):
         weights = [1 / (sigma**2 + variance) for sigma in sigmas]
         sum_of_weights = sum(weights)
-        sum_of_weights_2 = sum(w**2 for w in weights)
         beta = sum(score * weight for score, weight in zip(scores, weights)) / sum_of_weights
+        sum_of_weights_2 = sum(w**2 for w in weights)
         scale = sum_of_weights - (sum_of_weights_2 / sum_of_weights)
         adjust = sum((score - beta) ** 2 * (weight**2) for score, weight in zip(scores, weights)) / scale
         variance *= adjust
+        print(beta, weights, variance, 1/sum_of_weights**0.5)
 
-    return beta, variance**0.5
+    return beta, 1/sum_of_weights**0.5
 
 
 class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
