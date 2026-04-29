@@ -45,9 +45,8 @@ def rml_estimate(
 
         estimate = sum(score * weight for score, weight in zip(scores, weights)) / sum_of_weights
 
-        adjustment = (
-            sum((score - estimate) ** 2 * (weight**2) for score, weight in zip(scores, weights))
-            / (sum_of_weights - (sum_of_weights_2 / sum_of_weights))
+        adjustment = sum((score - estimate) ** 2 * (weight**2) for score, weight in zip(scores, weights)) / (
+            sum_of_weights - (sum_of_weights_2 / sum_of_weights)
         )
         heterogeneity *= adjustment
         if 1 - epsilon < adjustment < 1 + epsilon:
@@ -76,6 +75,9 @@ class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
         sigmas = [v for k, v in sorted(data.items()) if k.startswith(self.sigma_cols.get_column_prefix())]
 
         if not scores or None in scores or not sigmas or None in sigmas:
+            return None
+
+        if any(sigma == 0 for sigma in sigmas):
             return None
 
         score, sigma = rml_estimate(scores, sigmas)

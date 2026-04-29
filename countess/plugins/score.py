@@ -77,7 +77,7 @@ class ScoringPlugin(DuckdbSimplePlugin):
             ddbc.create_function(
                 self.function_name,
                 score_function,
-                return_type='DOUBLE[]',  # type: ignore[arg-type]
+                return_type="DOUBLE[]",  # type: ignore[arg-type]
                 null_handling="special",  # type: ignore[arg-type]
             )
         except NotImplementedException:
@@ -107,7 +107,7 @@ class ScoringPlugin(DuckdbSimplePlugin):
                     if duckdb_dtype_is_boolean(dtype) or duckdb_dtype_is_numeric(dtype):
                         where_clause = f"WHERE {wtcol}"
                     else:
-                        where_clause = f"WHERE {wtcol} IN ('W', 'p.=')"
+                        where_clause = f"WHERE {wtcol} IN ('W', 'p.=', 'g.=')"
 
         if self.drop_input:
             keep_fields = ",".join(
@@ -130,7 +130,6 @@ class ScoringPlugin(DuckdbSimplePlugin):
             repl_id = duckdb_escape_identifier(self.replicate.value)
             group_clause = f"GROUP BY {repl_id}"
             join_using = f"USING ({repl_id})"
-
 
         view = duckdb_source_to_view(ddbc, source)
 
