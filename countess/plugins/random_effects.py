@@ -7,42 +7,54 @@ from countess.core.plugins import DuckdbParallelTransformPlugin
 
 logger = logging.getLogger(__name__)
 
-def rml_estimate(scores: list[float], sigmas: list[float], iterations: int = 50, epsilon: float = 1E-7) -> tuple[float, float]:
+
+def rml_estimate(
+    scores: list[float], sigmas: list[float], iterations: int = 50, epsilon: float = 1e-7
+) -> tuple[float, float]:
     """Implementation of the robust maximum likelihood estimator.
+    Iteratively estimates the heterogeneity between score estimates
+    and returns the weighted average score and the standard deviation
+    of that score."""
 
-        ::
-
-            @book{demidenko2013mixed,
-              title={Mixed models: theory and applications with R},
-              author={Demidenko, Eugene},
-              year={2013},
-              publisher={John Wiley & Sons}
-            }
-    """
-    # https://mathematics.foi.hr/Rprojekti/knjige/demidenko.pdf
-    # pages 246-
-
+    # Based on Eugene Demidenko "Mixed models: theory and applications with R"
+    # 2ed (2013), Wiley & Sons, pages 246-253.
+    #
     # "it is assumed that besides the variation within the study, there
     # exists a variation between studies, and this variation is represented
     # by the random effect `b_i` with an unknown variance `σ^2` [...]
     # called the heterogeneity (variance) parameter."
-    # 
-    # this code iteratively estimates the value of that parameter.
-    # then the weighted average `\beta` and the variance of that
-    # average are returned.
+    #
+    # This code is using the formulae on page 253 for "restricted maximum
+    # likelihood" rather than the R code on page 252.
+    #
+    # `y_i` -> scores[i]
+    # `\sigma^2_i -> variances[i]
+    # `\hat\beta_s` -> estimate
+    # `\hat{\sigma^2}_s -> heterogeneity
 
-    variance = sum(sigma**2 for sigma in sigmas)
+    variances = [sigma**2 for sigma in sigmas]
+    weights = [1 / variance for variance in variances]
+    sum_of_weights = sum(weights)
+    estimate = sum(score * weight for score, weight in zip(scores, weights)) / sum_of_weights
+    heterogeneity = sum((score - estimate) ** 2 for score in scores) / (len(scores) - 1)
+
     for _ in range(0, iterations):
-        weights = [1 / (sigma**2 + variance) for sigma in sigmas]
+        weights = [1 / (variance + heterogeneity) for variance in variances]
         sum_of_weights = sum(weights)
-        beta = sum(score * weight for score, weight in zip(scores, weights)) / sum_of_weights
         sum_of_weights_2 = sum(w**2 for w in weights)
-        scale = sum_of_weights - (sum_of_weights_2 / sum_of_weights)
-        adjust = sum((score - beta) ** 2 * (weight**2) for score, weight in zip(scores, weights)) / scale
-        variance *= adjust
-        print(beta, weights, variance, 1/sum_of_weights**0.5)
 
-    return beta, 1/sum_of_weights**0.5
+        estimate = sum(score * weight for score, weight in zip(scores, weights)) / sum_of_weights
+
+        adjustment = (
+            sum((score - estimate) ** 2 * (weight**2) for score, weight in zip(scores, weights))
+            / (sum_of_weights - (sum_of_weights_2 / sum_of_weights))
+        )
+        heterogeneity *= adjustment
+        if 1 - epsilon < adjustment < 1 + epsilon:
+            break
+
+    # make a final estimate of overall variance
+    return estimate, 1 / sum(weights) ** 0.5
 
 
 class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
