@@ -59,3 +59,17 @@ jobs:
     - run: xvfb-run /tmp/venv/bin/coverage run --source countess -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
     - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
     - run: /tmp/venv/bin/coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY
+
+  run-tests-ubuntu-26_04-python-3_from_apt:
+    runs-on: ubuntu-26.04
+    name: Ubuntu 26.04, Python 3 from Apt
+    steps:
+    - uses: actions/checkout@v6
+    - run: sudo apt update -y
+    - run: sudo apt-get -U upgrade -y
+    - run: sudo apt install python3-full python3-pip xvfb
+    - run: python3 -m venv /tmp/venv
+    - run: /tmp/venv/bin/python -m pip install --upgrade pip
+    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
+
