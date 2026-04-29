@@ -414,11 +414,11 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
                 return None
 
         function_name = "f_" + secrets.token_hex(16)
-        ddbc.create_function(
+        ddbc.create_function(  # type: ignore[call-overload]
             function_name,
             wrapper,
             return_type=return_type,
-            null_handling="special",  # type: ignore[arg-type]
+            null_handling="special",
         )
 
         view = duckdb_source_to_view(ddbc, source)

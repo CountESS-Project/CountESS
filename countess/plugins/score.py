@@ -5,6 +5,7 @@ from typing import Optional
 
 import statsmodels.api as statsmodels_api
 from duckdb import DuckDBPyConnection, DuckDBPyRelation, NotImplementedException
+from duckdb.sqltypes import DuckDBPyType
 
 from countess import VERSION
 from countess.core.parameters import BooleanParam, ColumnGroupChoiceParam, ColumnOrNoneChoiceParam, StringParam
@@ -74,11 +75,11 @@ class ScoringPlugin(DuckdbSimplePlugin):
         super().prepare(ddbc, source)
 
         try:
-            ddbc.create_function(
+            ddbc.create_function(  # type: ignore[call-overload]
                 self.function_name,
                 score_function,
-                return_type="DOUBLE[]",  # type: ignore[arg-type]
-                null_handling="special",  # type: ignore[arg-type]
+                return_type=DuckDBPyType("DOUBLE[]"),
+                null_handling="special",
             )
         except NotImplementedException:
             # trying to create the function which already exists
