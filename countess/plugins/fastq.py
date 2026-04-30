@@ -89,10 +89,18 @@ class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#fasta-load"
     version = VERSION
 
-    file_types = [("FASTA", [".fasta", ".fa", ".fasta.gz", ".fa.gz", ".fasta.bz2", ".fa.bz2"])]
+    file_types = [("FASTA", [".fasta", ".fa", ".fasta.gz", ".fa.gz", ".fasta.bz2", ".fa.bz2", ".fasta.xz", ".fa.xz"])]
 
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        rel = oxbow.from_fasta(filename).to_duckdb(cursor)
+
+        if filename.endswith(".xz"):
+            reader = oxbow.from_fasta(lambda: lzma.open(filename))
+        if filename.endswith(".bz2"):
+            reader = oxbow.from_fasta(lambda: bz2.open(filename))
+        else:
+            reader = oxbow.from_fasta(filename)
+
+        rel = reader.to_duckdb(cursor)
         return rel.limit(row_limit) if row_limit else rel
