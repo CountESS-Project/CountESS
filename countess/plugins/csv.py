@@ -4,6 +4,7 @@ import gzip
 import logging
 from io import BufferedWriter, BytesIO
 from itertools import zip_longest
+from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 import duckdb
@@ -178,6 +179,8 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
                     delimiter=self.delimiter.value,
                 )
                 pyarrow.csv.write_csv(record_batch, fh, write_options)
+
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
         if filename and row_limit is None:
             if filename.endswith(".gz"):
