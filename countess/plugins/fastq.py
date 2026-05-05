@@ -1,4 +1,6 @@
+import bz2
 import logging
+import lzma
 from typing import Iterable, Optional
 
 import duckdb
@@ -21,9 +23,10 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#fastq-load"
     version = VERSION
 
-    file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2"])]
+    file_types = [("FASTQ", [".fastq", ".fastq.gz", ".fastq.bz2", ".fastq.xz", ".fq", ".fq.gz", ".fq.bz2", ".fq.xz"])]
 
     min_avg_quality = FloatParam("Minimum Average Quality", 10)
+    min_low_quality = FloatParam("Minimum Lowest Quality", 0)
     header_column = BooleanParam("Header Column?", False)
     group = BooleanParam("Group by Sequence?", True)
 
@@ -38,13 +41,24 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
         if self.header_column:
             fields.append("name")
 
-        rel = oxbow.from_fastq(filename, fields=fields).to_duckdb(cursor)
+        if filename.endswith(".xz"):
+            reader = oxbow.from_fastq(lambda: lzma.open(filename), None, fields=fields)
+        if filename.endswith(".bz2"):
+            reader = oxbow.from_fastq(lambda: bz2.open(filename), None, fields=fields)
+        else:
+            reader = oxbow.from_fastq(filename, fields=fields)
+
+        rel = reader.to_duckdb(cursor)
 
         if row_limit:
             rel = rel.limit(row_limit)
 
         if self.min_avg_quality:
             filt = "list_avg(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_avg_quality + 33)
+            rel = rel.filter(filt)
+
+        if self.min_low_quality:
+            filt = "list_min(list_transform(split(quality,''), lambda x: ord(x))) >= %d" % (self.min_low_quality + 33)
             rel = rel.filter(filt)
 
         if self.header_column:
@@ -75,10 +89,18 @@ class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
     link = "https://countess-project.github.io/CountESS/included-plugins/#fasta-load"
     version = VERSION
 
-    file_types = [("FASTA", [".fasta", ".fa", ".fasta.gz", ".fa.gz", ".fasta.bz2", ".fa.bz2"])]
+    file_types = [("FASTA", [".fasta", ".fa", ".fasta.gz", ".fa.gz", ".fasta.bz2", ".fa.bz2", ".fasta.xz", ".fa.xz"])]
 
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        rel = oxbow.from_fasta(filename).to_duckdb(cursor)
+
+        if filename.endswith(".xz"):
+            reader = oxbow.from_fasta(lambda: lzma.open(filename))
+        if filename.endswith(".bz2"):
+            reader = oxbow.from_fasta(lambda: bz2.open(filename))
+        else:
+            reader = oxbow.from_fasta(filename)
+
+        rel = reader.to_duckdb(cursor)
         return rel.limit(row_limit) if row_limit else rel

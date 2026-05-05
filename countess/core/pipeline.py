@@ -254,6 +254,11 @@ class PipelineGraph:
         self.nodes = nodes or []
         self.ddbc = duckdb.connect()
         self.ddbc.sql("SET python_enable_replacements = false")
+        self.ddbc.create_function("warning", self.sql_warning)
+
+    def sql_warning(self, message: str, value: Optional[str]) -> Optional[str]:
+        logger.warning(message)
+        return value
 
     def reset_node_name(self, node: PipelineNode):
         node_names_seen = set(n.name for n in self.nodes if n != node)

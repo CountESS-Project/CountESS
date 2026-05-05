@@ -4,6 +4,7 @@ import gzip
 import logging
 from io import BufferedWriter, BytesIO
 from itertools import zip_longest
+from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 import duckdb
@@ -33,9 +34,9 @@ from countess.core.plugins import (
 from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
-    ("CSV", [".csv", ".csv.gz"]),
-    ("TSV", [".tsv", ".tsv.gz"]),
-    ("TXT", [".txt", ".txt.gz"]),
+    ("CSV", [".csv", ".csv.gz", ".csv.bz2"]),
+    ("TSV", [".tsv", ".tsv.gz", ".tsv.bz2"]),
+    ("TXT", [".txt", ".text", ".txt.gz", ".text.gz", ".txt.bz2", ".text.bz2"]),
 ]
 
 logger = logging.getLogger(__name__)
@@ -172,12 +173,14 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             table = source
 
         def _write(fh):
-            for num, record_batch in enumerate(table.record_batch()):
+            for num, record_batch in enumerate(table.to_arrow_reader()):
                 write_options = pyarrow.csv.WriteOptions(
                     include_header=self.header.value and num == 0,
                     delimiter=self.delimiter.value,
                 )
                 pyarrow.csv.write_csv(record_batch, fh, write_options)
+
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
         if filename and row_limit is None:
             if filename.endswith(".gz"):

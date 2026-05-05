@@ -1,8 +1,10 @@
 import duckdb
 import numpy as np
 import pandas as pd
+import pytest
 
-from countess.plugins.variant import VariantPlugin
+from countess.plugins.variant import VariantClassifier, VariantPlugin
+from countess.utils.duckdb import duckdb_escape_literal
 
 
 def test_variant_ref_value():
@@ -85,3 +87,47 @@ def test_variant_too_many():
     assert plugin.transform({"seq": "AGAAGTTGTGG"})["out"] == "g.[7A>T;9A>T]"
     assert plugin.transform({"seq": "ATAAGAAGACG"})["out"] is None
     assert plugin.transform({"seq": "AGAATTAGAGG"})["out"] == "g.5G>T"
+
+
+@pytest.mark.parametrize(
+    "variant,expected,warnings_expected",
+    [
+        ("WT", "W", 0),
+        ("_WT", "W", 0),
+        ("A107P", "M", 0),
+        ("A107A", "S", 0),
+        ("A107=", "S", 0),
+        ("A107X", "N", 0),
+        ("A107*", "N", 0),
+        ("A107Z", "?", 1),  # there's no such short AA code
+        ("A107AA", "?", 1),  # not a valid substitution
+        ("A107-", "D", 0),
+        ("p.=", "W", 0),
+        ("p.Ala107His", "M", 0),
+        ("p.Ala107=", "S", 0),
+        ("p.Ala107del", "D", 0),
+        ("p.Ala107insAla", "?", 1),  # not valid, need both ends
+        ("p.Ala107_His108insGluGln", "I", 0),
+        ("p.Ala107dup", "I", 0),
+        ("p.Ala107_His109del", "D", 0),
+        ("p.Ala3Foo", "?", 1),  # no such long AA code
+    ],
+)
+def test_classifier(variant, expected, warnings_expected):
+    warnings = []
+
+    def mock_warning(message: str, value: str) -> str:
+        warnings.append(message)
+        return value
+
+    plugin = VariantClassifier()
+    plugin.set_parameter("variant_col", "variant")
+    ddbc = duckdb.connect()
+    ddbc.create_function("warning", mock_warning)
+
+    variant_literal = duckdb_escape_literal(variant)
+    ddbc.sql(f"create table test as select {variant_literal} as variant")
+    plugin.execute(ddbc, ddbc.table("test"), None).to_view("test2")
+    value = ddbc.sql("select variant_type from test2").fetchone()[0]
+    assert value == expected
+    assert len(warnings) == warnings_expected

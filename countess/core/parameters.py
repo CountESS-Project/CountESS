@@ -711,6 +711,16 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
         return super().get_column_names(df)
 
 
+class NumericColumnGroupChoiceParam(ColumnGroupChoiceParam):
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        numeric_columns = [k for k, n in choices.items() if n]
+        self.set_choices([n + "*" for n in make_prefix_groups(numeric_columns).keys()])
+
+
+class NumericColumnGroupOrNoneChoiceParam(ColumnGroupOrNoneChoiceParam, NumericColumnGroupChoiceParam):
+    pass
+
+
 class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     DEFAULT_VALUE = "— INDEX —"
 

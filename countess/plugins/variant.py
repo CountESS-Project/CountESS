@@ -1,4 +1,5 @@
 import logging
+import re
 import string
 from functools import lru_cache
 from typing import Any, Iterable, Optional
@@ -19,7 +20,7 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
-from countess.utils.variant import TooManyVariationsException, find_variant_string
+from countess.utils.variant import TooManyVariationsException, classify_protein_variant, find_variant_string
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
 
     variant = DnaVariantMultiParam("DNA Variant")
     protein = ProteinVariantMultiParam("Protein Variant")
+    classify = StringParam("Classification Output Column", "class")
 
     drop = BooleanParam("Drop unmatched rows", False)
     drop_columns = BooleanParam("Drop Sequence / Reference Columns", False)
@@ -84,6 +86,7 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
         return {
             self.variant.output.value: str,
             self.protein.output.value: str,
+            self.classify.value: str,
         }
 
     def remove_fields(self, field_names: list[str]) -> list[Optional[str]]:
@@ -116,21 +119,32 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
 
-        if self.protein.output:
-            data[self.protein.output.value] = None
+        if self.protein.output or self.classify:
             try:
-                prefix = self.protein.prefix + ":" if self.protein.prefix else ""
-                data[self.protein.output.value] = find_variant_string(
-                    f"{prefix}p.",
+                protein_variant = find_variant_string(
+                    "p.",
                     reference,
                     sequence,
                     max_mutations=self.protein.maxlen.value,
                     offset=int(self.protein.offset.get_value_from_dict(data) or 0),
                 )
+
+                if self.protein.output:
+                    prefix = self.protein.prefix + ":" if self.protein.prefix else ""
+                    data[self.protein.output.value] = prefix + protein_variant
+                if self.classify:
+                    data[self.classify.value] = classify_protein_variant(protein_variant)
+
             except TooManyVariationsException:
                 pass
             except (ValueError, TypeError, KeyError, IndexError) as exc:
                 logger.warning("Exception", exc_info=exc)
+
+        if self.drop_columns:
+            del data[self.column.value]
+            reference_column_name = self.reference.get_column_name()
+            if reference_column_name:
+                del data[reference_column_name]
 
         return data
 
@@ -139,6 +153,7 @@ class VariantClassifier(DuckdbSqlPlugin):
     name = "Protein Variant Classifier"
     description = "Classifies protein variants into simple types"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#variant-classifier"
 
     variant_col = ColumnChoiceParam("Protein variant Column", "variant")
 
@@ -152,18 +167,50 @@ class VariantClassifier(DuckdbSqlPlugin):
         # once for each distinct variant string.  Then the cases
         # in the outer select use the parts of the regex match to
         # classify the variant.
+
+        hgvs_aa_re = "(?:" + "|".join(v for v in AA_CODES.values() if v != "Ter") + ")"
+        short_aa_re = "[" + "".join(k for k in AA_CODES if k != "*") + "]"
+        plugin_label = duckdb_escape_literal(self.name + ": ")
+
+        classifier_re = duckdb_escape_literal(
+            re.sub(
+                r"\s+",
+                "",
+                rf"""
+            ^(_?[Ww][Tt]|p.=)$|
+            ^p.{hgvs_aa_re}\d+({hgvs_aa_re}|=|del|dup|Ter)$|
+            ^p.{hgvs_aa_re}\d+_{hgvs_aa_re}\d+(del|dup|ins{hgvs_aa_re}+)$|
+            ^({short_aa_re})\d+({short_aa_re}|[=*X-])$
+        """,
+            )
+        )
+
         return rf"""
-            select S.*, case when T.a != '' or T.c == '' and T.e == '=' then 'W'
-               when T.c != '' and (T.c = T.e or T.e = '=') then 'S'
-               when T.e = 'Ter' or T.e = '*' then 'N'
-               when T.c != '' and T.d != '' and T.e != '' then 'M'
-               else '?'
-            end as {output_col_id}
+            select S.*, case
+               when T.wildtype != '' then 'W'
+               when T.hgvs_1 = '=' then 'S'
+               when T.hgvs_1 = 'del' then 'D'
+               when T.hgvs_1 = 'dup' then 'I'
+               when T.hgvs_1 = 'Ter' then 'N'
+               when T.hgvs_1 != '' then 'M'
+               when T.hgvs_2 = 'del' then 'D'
+               when T.hgvs_2 != '' then 'I'
+               when T.short_2 = '=' then 'S'
+               when T.short_2 = '*' then 'N'
+               when T.short_2 = 'X' then 'N'
+               when T.short_2 = '-' then 'D'
+               when T.short_2 != '' then case
+                   when T.short_1 = T.short_2 then 'S'
+                   else 'M'
+               end
+               else warning(concat({plugin_label},
+                   'unclassifiable variant: "', z, '"'), '?')
+               end as {output_col_id}
             from {table_name} S join (
                 select {variant_col_id} as z, unnest(regexp_extract(
                     {variant_col_id},
-                    '(_?[Ww][Tt])|(p.)?([A-Z][a-z]*)?(\d+)?([A-Z][a-z]*|[=*])?',
-                    ['a','b','c','d','e']
+                    {classifier_re},
+                    ['wildtype','hgvs_1','hgvs_2','short_1', 'short_2']
                 ))
                 from {table_name}
                 group by z

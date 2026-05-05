@@ -290,3 +290,41 @@ Max Mutations
 
 Drop
 : Drop rows which would have null values for output
+
+### Variant Classifier
+
+Takes a column of protein variants and classifies them into broad types.
+This is easier than writing the regular expression yourself.
+
+#### Short format:
+
+|---|---|---|
+|format | type | explanation |
+|---|---|---|
+| `WT` <br/>`_WT` | `W` | Wild type |
+| `A107H` | `M` | Missense |
+| `A107A` <br/>`A107=` | `S` | Synonymous |
+| `A107*` <br/>`A107X` | `N` | Nonsense |
+| `A107-` | `D` | Deletion |
+
+There is currently no support for insertions in short format.
+Invalid amino acid letters will generate a warning and the type will be set to `?`.
+
+#### HGVS format:
+
+|---|---|---|
+| format | type | explanation |
+| `p.=` | `W` | Wild type |
+| `p.Ala107His` | `M` | Missense |
+| `p.Ala107=` | `S` | Synonymous |
+| `p.Ala107Ter` | `N` | Nonsense |
+| `p.Ala107del` <br/>`p.Ala107_His109del` | `D` | Deletion |
+| `p.Ala107dup` <br/>`p.Ala107_Glu108dup` <br/>`p.Ala107_Glu108insHis` | `I` | Insertion / Duplication |
+
+Invalid amino acid codes will generate a warning and the type will be set to `?`.
+Other issues such as invalid locations will not necessarily be detected.
+More complicated scenarios, like `delins` and multiple changes, are not currently supported.
+
+#### Unrecognized Formats
+
+Other variant formats will generate a warning and the type will be set to `?`.
