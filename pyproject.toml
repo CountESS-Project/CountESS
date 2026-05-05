@@ -27,6 +27,7 @@ dependencies = [
     'patsy~=1.0.2',
     'psutil~=7.0.0',
     'pyarrow~=20.0.0',
+    'pyPEG2~=2.15.2',
     'rapidfuzz~=3.13.0',
     'statsmodels~=0.14.6',
     'tkinterweb~=3.23.5',

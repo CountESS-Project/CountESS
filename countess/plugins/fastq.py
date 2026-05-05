@@ -94,7 +94,6 @@ class LoadFastaPlugin(DuckdbLoadFileWithTheLotPlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-
         if filename.endswith(".xz"):
             reader = oxbow.from_fasta(lambda: lzma.open(filename))
         if filename.endswith(".bz2"):
