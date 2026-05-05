@@ -89,7 +89,7 @@ class SingleQuotedStringLiteral(SqlTemplatingSymbol):
 
 
 class DoubleQuotedStringLiteral(SqlTemplatingSymbol):
-    regex = re.compile(r'"(?:\\.|[^"\n])*"')
+    regex = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"')
 
     def sql(self):
         return duckdb_escape_literal(self.name[1:-1])
@@ -100,6 +100,13 @@ class Label(SqlTemplatingSymbol):
 
     def sql(self):
         return duckdb_escape_identifier(self.name)
+
+
+class BacktickQuotedLabel(SqlTemplatingSymbol):
+    regex = re.compile(r"`(?:\\.|[^`\n])*`")
+
+    def sql(self):
+        return duckdb_escape_identifier(self.name[1:-1])
 
 
 class SqlTemplatingList(pypeg2.List):
@@ -122,7 +129,7 @@ class FunctionCall(pypeg2.Concat):
 
     def sql(self):
         func_name = str(self[0].name).upper()
-        func_params = ", ".join(s.sql() for s in self[1:])
+        func_params = ",".join(s.sql() for s in self[1:])
 
         if func_name in LIST_OPS:
             return f"LIST_{func_name}([{func_params}])"
@@ -136,6 +143,7 @@ class Value(pypeg2.Concat):
         BooleanLiteral,
         NullLiteral,
         Label,
+        BacktickQuotedLabel,
         DecimalLiteral,
         IntegerLiteral,
         SingleQuotedStringLiteral,

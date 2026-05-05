@@ -23,7 +23,7 @@ code_1 = "qux = bar + baz\n\nquux = bar * baz\n"
 
 code_2 = "__filter = bar + baz != 11"
 
-code_3 = "qux = foo + bar + baz\n\nfoo = None\n\nbar = None if qux else 0"
+code_3 = "qux = foo + bar + baz\n\nfoo = None\n\nbar = 1 if qux else 0"
 
 
 def test_expr_1():
