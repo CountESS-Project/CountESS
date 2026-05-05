@@ -7,8 +7,6 @@ import string
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
-import pandas as pd
-
 PARAM_DIGEST_HASH = "sha256"
 
 
@@ -621,26 +619,12 @@ class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
         return self.value != self.DEFAULT_VALUE
 
 
-def _dataframe_get_column(df: pd.DataFrame, col: str):
-    if col in df.columns:
-        return df[col]
-    elif col == df.index.name:
-        return df.index.to_series()
-    elif hasattr(df.index, "names") and col in df.index.names:
-        return df.index.to_frame()[col]
-    else:
-        raise ValueError(f"Column {col} not found")
-
-
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
     it should automatically update with a list of columns"""
 
     def set_column_choices(self, choices: Mapping[str, bool]):
         self.set_choices(list(choices.keys()))
-
-    def get_column(self, df):
-        return _dataframe_get_column(df, self.value)
 
 
 class NumericColumnChoiceParam(ColumnChoiceParam):
@@ -660,12 +644,6 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
     def is_not_none(self):
         return self.value != self.DEFAULT_VALUE
 
-    def get_column(self, df):
-        if self.value == self.DEFAULT_VALUE:
-            return None
-        else:
-            return _dataframe_get_column(df, self.value)
-
 
 class MultiColumnChoiceParam(MultiChoiceParam):
     def set_column_choices(self, choices: Mapping[str, bool]):
@@ -678,14 +656,6 @@ class ColumnGroupChoiceParam(ChoiceParam):
 
     def get_column_prefix(self):
         return self.value.removesuffix("*")
-
-    def get_column_names(self, df):
-        prefix = self.get_column_prefix()
-        return [n for n in df.columns if n.startswith(prefix)]
-
-    def get_column_suffixes(self, df):
-        prefix = self.get_column_prefix()
-        return [n.removeprefix(prefix) for n in self.get_column_names(df)]
 
 
 class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
@@ -704,11 +674,6 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
         if self.is_none():
             return None
         return super().get_column_prefix()
-
-    def get_column_names(self, df):
-        if self.is_none():
-            return []
-        return super().get_column_names(df)
 
 
 class NumericColumnGroupChoiceParam(ColumnGroupChoiceParam):
@@ -733,12 +698,6 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
     def is_not_index(self):
         return self.value != self.DEFAULT_VALUE
 
-    def get_column(self, df):
-        if self.value == self.DEFAULT_VALUE:
-            return df.index.to_series()
-        else:
-            return _dataframe_get_column(df, self.value)
-
 
 class ColumnOrStringParam(ColumnChoiceParam):
     DEFAULT_VALUE: Any = ""
@@ -762,16 +721,6 @@ class ColumnOrStringParam(ColumnChoiceParam):
             return data[self.value[len(self.PREFIX) :]]
         else:
             return self.value
-
-    def get_column_or_value(self, df: pd.DataFrame, numeric: bool) -> Union[float, str, pd.Series, None]:
-        try:
-            if type(self.value) is str and self.value.startswith(self.PREFIX):
-                col = df[self.value[len(self.PREFIX) :]]
-                return col.astype(float if numeric else str)
-            else:
-                return float(self.value) if numeric else str(self.value)
-        except ValueError:
-            return None
 
     def set_choices(self, choices: Iterable[str]):
         self.choices = list(choices)

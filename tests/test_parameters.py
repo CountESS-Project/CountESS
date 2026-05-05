@@ -1,7 +1,6 @@
 import io
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
 from countess.core.parameters import (
@@ -183,74 +182,16 @@ def test_dtcp2():
     assert not cp.is_none()
 
 
-def test_ccp1():
-    cp = ColumnChoiceParam("x", "a")
-    df = pd.DataFrame([])
-    with pytest.raises(ValueError):
-        cp.get_column(df)
-
-
-def test_ccp2():
-    df = pd.DataFrame([[1, 2], [3, 4]], columns=["a", "b"])
-    cp = ColumnOrNoneChoiceParam("x")
-    cp.set_choices(["a", "b"])
-    assert cp.is_none()
-    assert cp.get_column(df) is None
-
-    cp.value = "a"
-    assert cp.is_not_none()
-    assert isinstance(cp.get_column(df), pd.Series)
-
-    df = df.set_index("a")
-    assert isinstance(cp.get_column(df), pd.Series)
-
-    df = df.reset_index().set_index(["a", "b"])
-    assert isinstance(cp.get_column(df), pd.Series)
-
-    df = pd.DataFrame([], columns=["x", "y"])
-    with pytest.raises(ValueError):
-        cp.get_column(df)
-
-
-def test_coindex():
-    cp = ColumnOrIndexChoiceParam("x", choices=["a", "b"])
-    df = pd.DataFrame(columns=["a", "b"]).set_index("a")
-    assert cp.is_index()
-    assert isinstance(cp.get_column(df), pd.Series)
-
-    cp.choice = 1
-    assert cp.is_not_index()
-    assert isinstance(cp.get_column(df), pd.Series)
-
-
-def test_columnorintegerparam():
-    df = pd.DataFrame([[1, 2], [3, 4]], columns=["a", "b"])
-    cp = ColumnOrIntegerParam("x")
-    cp.set_column_choices({"a": True, "b": True})
-
-    assert cp.get_column_name() is None
-
-    cp.value = "7"
-    assert cp.choice is None
-    assert cp.get_column_name() is None
-    assert cp.get_column_or_value(df, False) == "7"
-    assert cp.get_column_or_value(df, True) == 7
-
-    cp.choice = 0
-    assert cp.get_column_name() == "a"
-    assert isinstance(cp.get_column_or_value(df, False), pd.Series)
-
-    cp.set_column_choices({"c": True, "d": True})
-    assert cp.choice is None
-
-    cp.value = "hello"
-    assert cp.value == 0
-
-
 def test_columngroup():
-    df = pd.DataFrame([], columns=["one_two", "one_three", "two_one", "two_two", "two_three", "three_four_five"])
     cp = ColumnGroupOrNoneChoiceParam("x")
-    cp.set_column_choices({c: True for c in df.columns})
+    cp.set_column_choices({
+        "one_two": True,
+        "one_three": True,
+        "two_one": True,
+        "two_two": True,
+        "two_three": True,
+        "three_four_five": True,
+    })
     assert cp.is_none()
     assert "one_*" in cp.choices
     assert "two_*" in cp.choices
@@ -259,8 +200,6 @@ def test_columngroup():
     cp.choice = 2
     assert cp.is_not_none()
     assert cp.get_column_prefix() == "two_"
-    assert cp.get_column_suffixes(df) == ["one", "two", "three"]
-    assert cp.get_column_names(df) == ["two_one", "two_two", "two_three"]
 
 
 def test_fileparam():
