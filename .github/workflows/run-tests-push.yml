@@ -3,31 +3,6 @@ on:
   push:
 
 jobs:
-  run-tests-ubuntu-22_04-python-3_10:
-    runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.10
-    steps:
-    - uses: actions/checkout@v6
-    - uses: actions/setup-python@v6
-      with:
-        python-version: "3.10"
-        cache: 'pip'
-    - run: sudo apt install xvfb
-    - run: pip install --upgrade pip
-    - run: pip install .[dev]
-    - run: xvfb-run pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
-
-  run-tests-ubuntu-22_04-python-3_11_from_apt:
-    runs-on: ubuntu-22.04
-    name: Ubuntu 22.04, Python 3.11 from Apt
-    steps:
-    - uses: actions/checkout@v6
-    - run: sudo apt update -y
-    - run: sudo apt install python3.11-full python3-pip xvfb
-    - run: python3.11 -m pip install --upgrade pip
-    - run: python3.11 -m pip install -e .[dev]
-    - run: xvfb-run python3.11 -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
-
   run-tests-ubuntu-24_04-python-3_12_from_apt:
     runs-on: ubuntu-24.04
     name: Ubuntu 24.04, Python 3.12 from Apt
@@ -47,7 +22,7 @@ jobs:
     steps:
     - run: sudo apt update -y
     - run: sudo apt-get -U upgrade -y
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: actions/setup-python@v6
       with:
         python-version: "3.13"
@@ -60,9 +35,9 @@ jobs:
     - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
     - run: /tmp/venv/bin/coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY
 
-  run-tests-ubuntu-26_04-python-3_from_apt:
-    runs-on: ubuntu-26.04
-    name: Ubuntu 26.04, Python 3 from Apt
+  run-tests-ubuntu-latest-python-3_from_apt:
+    runs-on: ubuntu-latest
+    name: Ubuntu (Latest), Python 3 from Apt
     steps:
     - uses: actions/checkout@v6
     - run: sudo apt update -y
@@ -73,3 +48,19 @@ jobs:
     - run: /tmp/venv/bin/python -m pip install -e .[dev]
     - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
+  run-tests-ubuntu-latest-python-latest:
+    runs-on: ubuntu-latest
+    name: Ubuntu (Latest), Python (Latest)
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: ">3.13"
+        cache: 'pip'
+    - run: sudo apt update -y
+    - run: sudo apt-get -U upgrade -y
+    - run: sudo apt install xvfb libopenblas0 libopenblas-dev
+    - run: python3 -m venv /tmp/venv
+    - run: /tmp/venv/bin/python -m pip install --upgrade pip
+    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
