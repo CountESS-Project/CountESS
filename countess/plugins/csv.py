@@ -54,6 +54,19 @@ class ColumnsMultiParam(MultiParam):
 CSV_DELIMITER_CHOICES = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " "}
 
 
+def _openfile(filename, mode):
+    if filename.endswith(".gz"):
+        return gzip.open(filename, mode)
+    elif filename.endswith(".bz2"):
+        return bz2.open(filename, mode)
+    elif filename.endswith(".xz"):
+        return lzma.open(filename, mode)
+    elif "b" in mode:
+        return open(filename, mode)  # pylint: disable=unspecified-encoding
+    else:
+        return open(filename, mode, encoding="utf-8")
+
+
 class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFilePlugin):
     """Load CSV files"""
 
@@ -70,29 +83,19 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        options = {
-            "sep": CSV_DELIMITER_CHOICES[self.delimiter.value],
-            "null_padding": True,
-            "strict_mode": False,
-        }
-
-        if len(self.columns):
-            options["all_varchar"] = True
-            options["skiprows"] = 1 if self.header else 0
-            options["header"] = False
-        else:
-            options["header"] = self.header.value
-
-        if filename.endswith(".xz"):
-            logger.debug("Reading file %s with LZMA", filename)
-            with lzma.open(filename) as fh:
-                rel = duckdb_source_to_table(cursor, cursor.read_csv(fh, **options))
-        if filename.endswith(".bz2"):
-            logger.debug("Reading file %s with BZ2", filename)
-            with bz2.open(filename) as fh:
-                rel = duckdb_source_to_table(cursor, cursor.read_csv(fh, **options))
-        else:
-            rel = duckdb_source_to_view(cursor, cursor.read_csv(filename, **options))
+        with _openfile(filename, "rb") as fh:
+            rel = duckdb_source_to_table(
+                cursor,
+                cursor.read_csv(
+                    fh,
+                    sep=CSV_DELIMITER_CHOICES[self.delimiter.value],
+                    null_padding=True,
+                    strict_mode=False,
+                    all_varchar=len(self.columns) > 0,
+                    skiprows=1 if self.header and len(self.columns) > 0 else 0,
+                    header=self.header.value and len(self.columns) == 0,
+                ),
+            )
 
         if row_limit is not None:
             rel = rel.limit(row_limit)
@@ -118,7 +121,6 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
                 for num, (cn, cp) in enumerate(zip_longest(rel_columns, self.columns))
                 if cp is None or cp.type.is_not_none()
             )
-
 
             logger.debug("LoadCsvPlugin.load_file proj %s", proj)
             rel = rel.project(proj)
@@ -174,7 +176,6 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     def execute(
         self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> None:
-
         if source is None or row_limit is not None or not self.filename:
             return
 
@@ -185,7 +186,6 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
             source = source.order(order_by)
 
-
         options = {
             "index": False,
             "sep": self.SEPARATORS[self.delimiter.value],
@@ -195,20 +195,12 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
         filename = self.filename.get_file_path()
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
-        def _openfile(filename):
-            if filename.endswith(".gz"):
-                return gzip.open(filename, "wb")
-            elif filename.endswith(".bz2"):
-                return bz2.open(filename, "wb")
-            else:
-                return open(filename, "wb")
-
         # the type check supression is because the first parameter to
         # to_csv is called path_or_buf and takes either a filename path
         # or a file-like buffer, but is declared as str|None.
 
         logger.debug("writing file %s", filename)
-        with _openfile(filename) as fh:
+        with _openfile(filename, "wb") as fh:
             chunk = source.fetch_df_chunk()
             chunk.to_csv(fh, header=True, **options)  # type: ignore
             while len(chunk) > 0:

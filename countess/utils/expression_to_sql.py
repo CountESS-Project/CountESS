@@ -194,6 +194,7 @@ class AddExpr(SqlTemplatingList):
 class CompOp(SqlTemplatingSymbol):
     regex = re.compile(r"<=?|>=?|[!=]=")
 
+
 class CompExpr(pypeg2.List):
     grammar = AddExpr, pypeg2.maybe_some((CompOp, [NullLiteral, AddExpr]))
 
@@ -208,10 +209,7 @@ class CompExpr(pypeg2.List):
             return left.sql() + comp_op + right.sql()
 
         if len(self) >= 3:
-            return " AND ".join(
-                _subcomp(self[n], self[n+1], self[n+2])
-                for n in range(0, len(self)-1, 2)
-            )
+            return " AND ".join(_subcomp(self[n], self[n + 1], self[n + 2]) for n in range(0, len(self) - 1, 2))
         else:
             return self[0].sql()
 
@@ -256,10 +254,7 @@ class Assignment(pypeg2.Concat):
         return [s.name for s in self[0:-1]]
 
     def sql(self):
-        return ','.join(
-            self[-1].sql() + " AS " + s.sql()
-            for s in self[0:-1]
-        )
+        return ",".join(self[-1].sql() + " AS " + s.sql() for s in self[0:-1])
 
 
 class Filter(pypeg2.Concat):
