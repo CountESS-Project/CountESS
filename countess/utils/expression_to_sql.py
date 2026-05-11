@@ -1,10 +1,13 @@
 import ast
+import logging
 import re
 from typing import Any, Optional
 
 import pypeg2  # type: ignore[import-untyped]
 
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
+
+logger = logging.getLogger(__name__)
 
 FUNC_OPS = {
     "ABS",
@@ -249,6 +252,9 @@ FunctionCall.grammar = Label, "(", pypeg2.optional(OrExpr, pypeg2.maybe_some(","
 class Assignment(pypeg2.Concat):
     grammar = pypeg2.some(Label, "="), [NullLiteral, TernExpr]
 
+    def names(self):
+        return [s.name for s in self[0:-1]]
+
     def sql(self):
         return ','.join(
             self[-1].sql() + " AS " + s.sql()
@@ -287,10 +293,13 @@ class Block(pypeg2.Concat):
     def project_and_filter(self, source):
         for s in self:
             if isinstance(s, Assignment):
-                projection = [c for c in source.columns if c != s[0].name]
-                if not isinstance(s[1], NullLiteral):
+                projection = [c for c in source.columns if c not in s.names()]
+                if not isinstance(s[-1], NullLiteral):
                     projection.append(s.sql())
+                logger.debug("PROJECTION: %s", projection)
                 source = source.project(",".join(projection))
             else:
-                source = source.filter(s.sql())
+                ffilter = s.sql()
+                logger.debug("FILTER: %s", ffilter)
+                source = source.filter(ffilter)
         return source

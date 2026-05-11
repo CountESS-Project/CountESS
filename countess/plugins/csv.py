@@ -174,16 +174,17 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     def execute(
         self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> None:
-        filename = self.filename.value
 
-        if source is None or row_limit is not None or not filename:
+        if source is None or row_limit is not None or not self.filename:
             return
-        elif len(self.sorting):
+
+        if len(self.sorting):
             order_by = ",".join(
                 duckdb_escape_identifier(sp.order_by.value) + (" desc" if sp.descending else "") for sp in self.sorting
             )
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
             source = source.order(order_by)
+
 
         options = {
             "index": False,
@@ -191,6 +192,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             "quoting": self.QUOTING[self.quoting.value],
         }
 
+        filename = self.filename.get_file_path()
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
         def _openfile(filename):
@@ -205,9 +207,11 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
         # to_csv is called path_or_buf and takes either a filename path
         # or a file-like buffer, but is declared as str|None.
 
+        logger.debug("writing file %s", filename)
         with _openfile(filename) as fh:
             chunk = source.fetch_df_chunk()
             chunk.to_csv(fh, header=True, **options)  # type: ignore
             while len(chunk) > 0:
                 chunk = source.fetch_df_chunk()
                 chunk.to_csv(fh, header=False, **options)  # type: ignore
+            logger.debug("written %d bytes", fh.tell())

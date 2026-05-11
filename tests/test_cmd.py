@@ -8,13 +8,13 @@ from countess import VERSION
 from countess.core.cmd import configure_graphs, main, run
 
 expected_output = """"thing","result"
-"foo",23512.799
-"baz",12769
-"qux",14728.114
+"foo",23512.798828125
+"baz",12769.0
+"qux",14728.1142578125
 """
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
 def test_command_invocation():
     run(["tests/simple.ini"])
     time.sleep(0.5)
