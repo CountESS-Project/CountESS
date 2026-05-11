@@ -1,12 +1,11 @@
 import bz2
-import lzma
 import csv
 import gzip
 import logging
+import lzma
 from io import BufferedWriter, BytesIO
 from itertools import zip_longest
 from pathlib import Path
-
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 import duckdb
@@ -31,7 +30,12 @@ from countess.core.plugins import (
     LoadFileDeGlobMixin,
     LoadFileWithFilenameMixin,
 )
-from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view, duckdb_source_to_table
+from countess.utils.duckdb import (
+    duckdb_dtype_to_datatype_choice,
+    duckdb_escape_identifier,
+    duckdb_source_to_table,
+    duckdb_source_to_view,
+)
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz", ".csv.bz2"]),
@@ -66,20 +70,19 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-
         options = {
-            'sep': CSV_DELIMITER_CHOICES[self.delimiter.value],
-            'filename': self.filename_column.value,
-            'null_padding': True,
-            'strict_mode': False,
+            "sep": CSV_DELIMITER_CHOICES[self.delimiter.value],
+            "filename": self.filename_column.value,
+            "null_padding": True,
+            "strict_mode": False,
         }
 
         if len(self.columns):
-            options['all_varchar'] = True
-            options['skiprows'] = 1 if self.header else 0
-            options['header'] = False
+            options["all_varchar"] = True
+            options["skiprows"] = 1 if self.header else 0
+            options["header"] = False
         else:
-            options['header'] = self.header.value
+            options["header"] = self.header.value
 
         if filename.endswith(".xz"):
             logger.debug("Reading file %s with LZMA", filename)
@@ -97,19 +100,21 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
 
         if len(self.columns):
             # If there's a bonus filename column ignore it for now
-            rel_columns = [ c for c in rel.columns if not (self.filename_column and c == 'filename') ]
+            rel_columns = [c for c in rel.columns if not (self.filename_column and c == "filename")]
             # there's three cases here, either we've got both a column
             # name or a column parameter or both, depending on the relative
             # lengths of the column lists.
-            proj = ','.join(
-                duckdb_escape_identifier(cn) if cp is None else (
+            proj = ",".join(
+                duckdb_escape_identifier(cn)
+                if cp is None
+                else (
                     (
-                        f"TRY_CAST(NULL as {cp.type.value})" if cn is None else
-                        f"TRY_CAST({duckdb_escape_identifier(cn)} as {cp.type.value})"
-                    ) + " AS " + (
-                        duckdb_escape_identifier(cp.name.value)
-                        if cp.name.value else "column%d" % num
+                        f"TRY_CAST(NULL as {cp.type.value})"
+                        if cn is None
+                        else f"TRY_CAST({duckdb_escape_identifier(cn)} as {cp.type.value})"
                     )
+                    + " AS "
+                    + (duckdb_escape_identifier(cp.name.value) if cp.name.value else "column%d" % num)
                 )
                 for num, (cn, cp) in enumerate(zip_longest(rel_columns, self.columns))
                 if cp is None or cp.type.is_not_none()
@@ -133,7 +138,7 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
             combined_columns_and_dtypes.pop()
 
         for num, (column, dtype) in enumerate(combined_columns_and_dtypes):
-            if num >= len(self.columns) and not (self.filename_column and column == 'filename'):
+            if num >= len(self.columns) and not (self.filename_column and column == "filename"):
                 new_param = self.columns.add_row()
                 new_param.name.value = column
                 new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
@@ -181,9 +186,9 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             source = source.order(order_by)
 
         options = {
-            'index': False,
-            'sep': self.SEPARATORS[self.delimiter.value],
-            'quoting': self.QUOTING[self.quoting.value],
+            "index": False,
+            "sep": self.SEPARATORS[self.delimiter.value],
+            "quoting": self.QUOTING[self.quoting.value],
         }
 
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
@@ -196,9 +201,13 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             else:
                 return open(filename, "wb")
 
+        # the type check supression is because the first parameter to
+        # to_csv is called path_or_buf and takes either a filename path
+        # or a file-like buffer, but is declared as str|None.
+
         with _openfile(filename) as fh:
             chunk = source.fetch_df_chunk()
-            chunk.to_csv(fh, header=True, **options)
+            chunk.to_csv(fh, header=True, **options)  # type: ignore
             while len(chunk) > 0:
                 chunk = source.fetch_df_chunk()
-                chunk.to_csv(fh, header=False, **options)
+                chunk.to_csv(fh, header=False, **options)  # type: ignore

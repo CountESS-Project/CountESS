@@ -1,6 +1,5 @@
-import pytest
-
 import duckdb
+import pytest
 
 from countess.utils.expression_to_sql import Block
 
@@ -33,5 +32,5 @@ def test_project_and_filter():
     blk = Block.from_string("c = a+b\nb<5\nd = a + c")
     out = blk.project_and_filter(rel)
 
-    assert out.columns == ['a', 'b', 'c', 'd']
-    assert out.fetchall() == [(1,2,3,4), (3,4,7,10)]
+    assert out.columns == ["a", "b", "c", "d"]
+    assert out.fetchall() == [(1, 2, 3, 4), (3, 4, 7, 10)]
