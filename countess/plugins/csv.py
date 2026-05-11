@@ -1,15 +1,15 @@
 import bz2
+import lzma
 import csv
 import gzip
 import logging
 from io import BufferedWriter, BytesIO
 from itertools import zip_longest
 from pathlib import Path
+
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 import duckdb
-import pyarrow  # type: ignore
-import pyarrow.csv  # type: ignore
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
@@ -31,7 +31,7 @@ from countess.core.plugins import (
     LoadFileDeGlobMixin,
     LoadFileWithFilenameMixin,
 )
-from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view
+from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_view, duckdb_source_to_table
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz", ".csv.bz2"]),
@@ -66,43 +66,52 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        # DuckDB currently can only read .gz compressed CSV files, which is frustrating:
-        # https://github.com/duckdb/duckdb/discussions/12232
-        # For now, we use pyarrow as an intermediary.
-        # See 36de8150bf for a cleaner, duckdb-only version if that gets fixed.
+
+        options = {
+            'sep': CSV_DELIMITER_CHOICES[self.delimiter.value],
+            'filename': self.filename_column.value,
+            'null_padding': True,
+            'strict_mode': False,
+        }
 
         if len(self.columns):
-            skip_rows = 1 if self.header else 0
-            read_options = pyarrow.csv.ReadOptions(column_names=[], autogenerate_column_names=True, skip_rows=skip_rows)
-        elif self.header:
-            read_options = pyarrow.csv.ReadOptions()
+            options['all_varchar'] = True
+            options['skiprows'] = 1 if self.header else 0
+            options['header'] = False
         else:
-            read_options = pyarrow.csv.ReadOptions(column_names=[], autogenerate_column_names=True)
+            options['header'] = self.header.value
 
-        parse_options = pyarrow.csv.ParseOptions(delimiter=CSV_DELIMITER_CHOICES[self.delimiter.value])
+        if filename.endswith(".xz"):
+            logger.debug("Reading file %s with LZMA", filename)
+            with lzma.open(filename) as fh:
+                rel = duckdb_source_to_table(cursor, cursor.read_csv(fh, **options))
+        if filename.endswith(".bz2"):
+            logger.debug("Reading file %s with BZ2", filename)
+            with bz2.open(filename) as fh:
+                rel = duckdb_source_to_table(cursor, cursor.read_csv(fh, **options))
+        else:
+            rel = duckdb_source_to_view(cursor, cursor.read_csv(filename, **options))
 
-        pyarrow_table = pyarrow.csv.read_csv(filename, read_options, parse_options, None)
         if row_limit is not None:
-            pyarrow_table = pyarrow_table.slice(length=row_limit)
-        rel = cursor.from_arrow(pyarrow_table)
+            rel = rel.limit(row_limit)
 
         if len(self.columns):
+            # If there's a bonus filename column ignore it for now
+            rel_columns = [ c for c in rel.columns if not (self.filename_column and c == 'filename') ]
             # there's three cases here, either we've got both a column
             # name or a column parameter or both, depending on the relative
             # lengths of the column lists.
-            proj = ",".join(
-                duckdb_escape_identifier(cn)
-                if cp is None
-                else (
+            proj = ','.join(
+                duckdb_escape_identifier(cn) if cp is None else (
                     (
-                        f"TRY_CAST(NULL as {cp.type.value})"
-                        if cn is None
-                        else f"TRY_CAST({duckdb_escape_identifier(cn)} as {cp.type.value})"
+                        f"TRY_CAST(NULL as {cp.type.value})" if cn is None else
+                        f"TRY_CAST({duckdb_escape_identifier(cn)} as {cp.type.value})"
+                    ) + " AS " + (
+                        duckdb_escape_identifier(cp.name.value)
+                        if cp.name.value else "column%d" % num
                     )
-                    + " AS "
-                    + (duckdb_escape_identifier(cp.name.value) if cp.name.value else "column%d" % num)
                 )
-                for num, (cn, cp) in enumerate(zip_longest(rel.columns, self.columns))
+                for num, (cn, cp) in enumerate(zip_longest(rel_columns, self.columns))
                 if cp is None or cp.type.is_not_none()
             )
 
@@ -124,7 +133,7 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
             combined_columns_and_dtypes.pop()
 
         for num, (column, dtype) in enumerate(combined_columns_and_dtypes):
-            if num >= len(self.columns) and not (self.filename_column and column == "filename"):
+            if num >= len(self.columns) and not (self.filename_column and column == 'filename'):
                 new_param = self.columns.add_row()
                 new_param.name.value = column
                 new_param.type.value = duckdb_dtype_to_datatype_choice(dtype)
@@ -146,6 +155,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     header = BooleanParam("CSV header row?", True)
     filename = FileSaveParam("Filename", file_types=file_types)
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
+    quoting = BooleanParam("Quote Non-numerics?", True)
     sorting = ArrayParam("Sorting", SaveCsvOrderParameter("sort"))
 
     filehandle: Optional[Union[BufferedWriter, BytesIO, gzip.GzipFile, bz2.BZ2File]] = None
@@ -168,27 +178,27 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
                 duckdb_escape_identifier(sp.order_by.value) + (" desc" if sp.descending else "") for sp in self.sorting
             )
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
-            table = source.order(order_by)
-        else:
-            table = source
+            source = source.order(order_by)
 
-        def _write(fh):
-            for num, record_batch in enumerate(table.to_arrow_reader()):
-                write_options = pyarrow.csv.WriteOptions(
-                    include_header=self.header.value and num == 0,
-                    delimiter=self.delimiter.value,
-                )
-                pyarrow.csv.write_csv(record_batch, fh, write_options)
+        options = {
+            'index': False,
+            'sep': self.SEPARATORS[self.delimiter.value],
+            'quoting': self.QUOTING[self.quoting.value],
+        }
 
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
-        if filename and row_limit is None:
+        def _openfile(filename):
             if filename.endswith(".gz"):
-                with gzip.open(filename, "wb") as fh:
-                    _write(fh)
+                return gzip.open(filename, "wb")
             elif filename.endswith(".bz2"):
-                with bz2.open(filename, "wb") as fh:
-                    _write(fh)
+                return bz2.open(filename, "wb")
             else:
-                with open(filename, "wb") as fh:
-                    _write(fh)
+                return open(filename, "wb")
+
+        with _openfile(filename) as fh:
+            chunk = source.fetch_df_chunk()
+            chunk.to_csv(fh, header=True, **options)
+            while len(chunk) > 0:
+                chunk = source.fetch_df_chunk()
+                chunk.to_csv(fh, header=False, **options)
