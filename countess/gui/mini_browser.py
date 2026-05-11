@@ -1,11 +1,11 @@
-from typing import Optional
 import tkinter as tk
 import webbrowser
+from typing import Optional
 from urllib.parse import urlparse
-
 
 try:
     from tkinterweb import HtmlFrame  # type: ignore
+
     no_tkinterweb = False
 except ImportError:
     no_tkinterweb = True
@@ -53,22 +53,24 @@ class MiniBrowserFrame(tk.Frame):
         else:
             webbrowser.open_new_tab(link_url)
 
-toplevel : Optional[tk.Toplevel] = None
-info_frame: Optional[tk.Frame] = None
+
+info_frame: Optional[MiniBrowserFrame] = None
+
 
 def mini_browser_close():
-    global toplevel  # pylint: disable=global-statement
-    if toplevel is not None:
-        toplevel.destroy()
-        toplevel = None
+    global info_frame  # pylint: disable=global-statement
+    if info_frame is not None:
+        info_frame.master.destroy()
+        info_frame = None
+
 
 def mini_browser_open(url: str):
     if no_tkinterweb:
         webbrowser.open_new_tab(url)
         return
 
-    global toplevel, info_frame  # pylint: disable=global-statement
-    if toplevel is None:
+    global info_frame  # pylint: disable=global-statement
+    if info_frame is None:
         toplevel = tk.Toplevel()
         toplevel.protocol("WM_DELETE_WINDOW", mini_browser_close)
         info_frame = MiniBrowserFrame(toplevel, url)

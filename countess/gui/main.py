@@ -655,7 +655,9 @@ def make_root():
                 root.set_theme(t)
                 break
     except ImportError:
-        print("ttkthemes library not found.\nFor better GUI support, `pip install countess[gui]`.")  # pylint: disable=bad-builtin
+        print(  # pylint: disable=bad-builtin
+            "ttkthemes library not found.\nFor better GUI support, `pip install countess[gui]`."
+        )
 
         root = tk.Tk()
         # XXX some kind of ttk style setup goes here as a fallback
