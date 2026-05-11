@@ -1,3 +1,4 @@
+import ast
 import re
 from typing import Any, Optional
 
@@ -82,17 +83,17 @@ class DecimalLiteral(SqlTemplatingSymbol):
 
 
 class SingleQuotedStringLiteral(SqlTemplatingSymbol):
-    regex = re.compile(r"'(?:\\.|[^'\n])*'")
+    regex = re.compile(r"'[^'\\]*(?:\\.[^'\\]*)*'")
 
     def sql(self):
-        return duckdb_escape_literal(self.name[1:-1])
+        return duckdb_escape_literal(ast.literal_eval(self.name))
 
 
 class DoubleQuotedStringLiteral(SqlTemplatingSymbol):
     regex = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"')
 
     def sql(self):
-        return duckdb_escape_literal(self.name[1:-1])
+        return duckdb_escape_literal(ast.literal_eval(self.name))
 
 
 class Label(SqlTemplatingSymbol):
@@ -103,7 +104,7 @@ class Label(SqlTemplatingSymbol):
 
 
 class BacktickQuotedLabel(SqlTemplatingSymbol):
-    regex = re.compile(r"`(?:\\.|[^`\n])*`")
+    regex = re.compile(r"`[^`\n]*`")
 
     def sql(self):
         return duckdb_escape_identifier(self.name[1:-1])
