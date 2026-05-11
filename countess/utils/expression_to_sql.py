@@ -189,22 +189,28 @@ class AddExpr(SqlTemplatingList):
 
 
 class CompOp(SqlTemplatingSymbol):
-    regex = re.compile(r"<|>|<=|>=|==|!=")
+    regex = re.compile(r"<=?|>=?|[!=]=")
 
-
-class CompExpr(SqlTemplatingList):
+class CompExpr(pypeg2.List):
     grammar = AddExpr, pypeg2.maybe_some((CompOp, [NullLiteral, AddExpr]))
 
     def sql(self):
-        try:
-            if isinstance(self[2], NullLiteral):
-                if self[1].name == "==":
-                    return self[0].sql() + " IS NULL"
-                if self[1].name == "!=":
-                    return self[0].sql() + " IS NOT NULL"
-        except IndexError:
-            pass
-        return super().sql()
+        def _subcomp(left, comp, right):
+            comp_op = comp.sql()
+            if isinstance(right, NullLiteral):
+                if comp_op == "==":
+                    return left.sql() + " IS NULL"
+                if comp_op == "!=":
+                    return left.sql() + " IS NOT NULL"
+            return left.sql() + comp_op + right.sql()
+
+        if len(self) >= 3:
+            return " AND ".join(
+                _subcomp(self[n], self[n+1], self[n+2])
+                for n in range(0, len(self)-1, 2)
+            )
+        else:
+            return self[0].sql()
 
 
 class NotOp(SqlTemplatingSymbol):
@@ -241,10 +247,13 @@ FunctionCall.grammar = Label, "(", pypeg2.optional(OrExpr, pypeg2.maybe_some(","
 
 
 class Assignment(pypeg2.Concat):
-    grammar = Label, "=", [NullLiteral, TernExpr]
+    grammar = pypeg2.some(Label, "="), [NullLiteral, TernExpr]
 
     def sql(self):
-        return self[1].sql() + " AS " + self[0].sql()
+        return ','.join(
+            self[-1].sql() + " AS " + s.sql()
+            for s in self[0:-1]
+        )
 
 
 class Filter(pypeg2.Concat):

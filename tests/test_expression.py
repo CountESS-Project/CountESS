@@ -3,7 +3,7 @@ import pytest
 
 from countess.utils.expression_to_sql import Block
 
-tests = [
+expr_tests = [
     ("a == b", '"a"=="b"'),
     ("a != b", '"a"!="b"'),
     ("4 * 3 + 2 * 6", "4*3+2*6"),
@@ -22,10 +22,30 @@ tests = [
 ]
 
 
-@pytest.mark.parametrize("expr,sql", tests)
+@pytest.mark.parametrize("expr,sql", expr_tests)
 def test_expressions(expr, sql):
     assert Block.from_string(expr)[0].sql() == sql
 
+assign_tests = [
+    ("a = 1", '1 AS "a"'),
+    ("a = b = c = 2", '2 AS "a",2 AS "b",2 AS "c"'),
+    ("d = None", 'NULL AS "d"'),
+]
+
+@pytest.mark.parametrize("expr,sql", assign_tests)
+def test_assignments(expr, sql):
+    assert Block.from_string(expr).sql_selects()[0] == sql
+
+filter_tests = [
+    ("a < b", '"a"<"b"'),
+    ("b <= c", '"b"<="c"'),
+    ("a < b <= c", '"a"<"b" AND "b"<="c"'),
+    ("__filter = a < b", '"a"<"b"'),
+]
+
+@pytest.mark.parametrize("expr,sql", filter_tests)
+def test_filters(expr, sql):
+    assert Block.from_string(expr).sql_wheres()[0] == sql
 
 def test_project_and_filter():
     rel = duckdb.sql("select * from (values (1,2), (3,4), (5,6)) t(a,b)")

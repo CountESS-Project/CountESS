@@ -72,7 +72,6 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
     ) -> duckdb.DuckDBPyRelation:
         options = {
             "sep": CSV_DELIMITER_CHOICES[self.delimiter.value],
-            "filename": self.filename_column.value,
             "null_padding": True,
             "strict_mode": False,
         }
@@ -119,6 +118,7 @@ class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFi
                 for num, (cn, cp) in enumerate(zip_longest(rel_columns, self.columns))
                 if cp is None or cp.type.is_not_none()
             )
+
 
             logger.debug("LoadCsvPlugin.load_file proj %s", proj)
             rel = rel.project(proj)
@@ -176,7 +176,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     ) -> None:
         filename = self.filename.value
 
-        if source is None:
+        if source is None or row_limit is not None or not filename:
             return
         elif len(self.sorting):
             order_by = ",".join(
