@@ -184,14 +184,16 @@ def test_dtcp2():
 
 def test_columngroup():
     cp = ColumnGroupOrNoneChoiceParam("x")
-    cp.set_column_choices({
-        "one_two": True,
-        "one_three": True,
-        "two_one": True,
-        "two_two": True,
-        "two_three": True,
-        "three_four_five": True,
-    })
+    cp.set_column_choices(
+        {
+            "one_two": True,
+            "one_three": True,
+            "two_one": True,
+            "two_two": True,
+            "two_three": True,
+            "three_four_five": True,
+        }
+    )
     assert cp.is_none()
     assert "one_*" in cp.choices
     assert "two_*" in cp.choices
