@@ -201,27 +201,69 @@ when pivoted with index on Variant, pivot on Replicate and expanding Count becom
 | `2` | `3` | `9` |
 | `3` | `0` | `6` |
 
-### Python Code
+### Expression
 
-This lets you embed simple Python expressions into your data processing.
+This lets you embed simple Python-like expressions into your data processing.
 
-Add one or more Python expressions to the "Python Code".
-Each row is processed separately, with column values appearing as local variables.
+Each line of the "Expressions" block is a separate expression.  Expressions
+can either be statements, like:
 
-Functions available:
-```
-abs acos acosh all any ascii asin asinh atan atan2 atanh
-bin bool cbrt ceil chr comb compile copysign cos cosh
-degrees dist erf erfc escape exp exp2 expm1
-fabs factorial findall finditer float floor fmod
-format frexp frozenset fsum fullmatch gamma gcd
-hash hex hypot inf int isclose isfinite isinf isinf
-isnan isnan isqrt lcm ldexp len lgamma log log10 log1p log2
-match max mean median min modf nan nextafter ord
-perm pow prod purge radians range remainder round
-search sin sinh sorted split sqrt std str sub subn
-sum sumprod tan tanh template trunc type ulp var zip
-```
+`new_column = old_column * 2`
+
+or filters, like:
+
+`variant_class == 'M'`
+
+Basic arithmetic operations are available, as well as many useful functions:
+
+#### Operators
+
+`+`, `-`, `*`, `**`, `/`, `and`, `or`, `not`, `<`, `<=`, `>`, `>=`, `!=`, `==`
+
+#### Constants
+
+`True`, `False`
+: Boolean values (displayed as `—T` and `—F` in table views)
+
+`None`, `NULL`
+: Represent a missing value (displayed as `—` in table views)
+
+#### Math Functions
+
+`ABS`
+: Absolute value
+
+`COS`, `SIN`, `TAN`, `ACOS`, `ASIN`, `ATAN`, `ATAN2`
+: Trigonometric functions and their inverses
+
+`EXP`, `LOG`, `LOG2`, `LOG10`
+: Exponentials and Logarithms
+
+`AVG(...)`, `MEDIAN(...)`, `MIN(...)`, `MAX(...)`
+: Average, Median, Min and Max of multiple values
+
+`STD_POP(...)`, `STD_SAMP(...)`, `VAR_POP(...)`, `VAR_SAMP(...)`
+: Population or Sample Standard Deviation / Variance of multiple values
+
+`CEIL`, `FLOOR`
+: Round up or down to nearest integer
+
+#### String Functions
+
+`CONCAT`
+: Concatenate two strings
+
+`CONTAINS(string1, string2)`
+: True if string1 contains string2
+
+`ENDS_WITH(string1, string2)`
+: True if string1 ends with string2
+
+`STARTS_WITH(string1, string2)`
+: True if string1 starts with string2
+
+`LEN(string)`
+: Length of the string
 
 ## Bioinformatics
 
@@ -276,14 +318,17 @@ The reference sequence can either be provided directly as a configuration parame
 Input Column
 : the input column with the variant sequence
 
-Reference
-: (optional) select column which contains the reference sequence ...
+Reference Sequence
+: Select column which contains the reference sequence, or enter a reference sequence as a string.
 
-Sequence
-: (optional) ... or supply a reference sequence as a value
+DNA Variant
+: Column name for HGVS string of the nucleotide variant
 
-Output Column
-: Column name for HGVS string
+Protein Variant
+: Column name for HGVS string of the protein variant
+
+Classification Output Column
+: Column name for a classification of the variant (see [Variant Classifier](#variant-classifier) for details)
 
 Max Mutations
 : Maximum number of mutations, if no variant with this number or less mutations is found then return a null value for the output
@@ -328,3 +373,27 @@ More complicated scenarios, like `delins` and multiple changes, are not currentl
 #### Unrecognized Formats
 
 Other variant formats will generate a warning and the type will be set to `?`.
+
+### Scoring
+
+The scoring plugin implements the same scoring algorithms as used in 
+[Enrich2](https://github.com/FowlerLab/Enrich2) and described in 
+[A statistical framework for analyzing deep mutational scanning data](https://doi.org/10.1186/s13059-017-1272-5).
+
+Replicate Column
+: Used to split the results into multiple replicates, each replicate will have its frequencies counted separately.
+
+Input Columns
+: Select a group of columns which provide the counts for each variant at each time point.
+
+Wildtype
+: Choose either a boolean or string column to identify wild types for use in the scoring equation.  If it's a string column, the values `W`, `p.=` or `g.=` are regarded as marking wild types.  If no column is chosen, the sum of all variants is used in the scoring equation instead.
+
+Score Column
+: A name for the column to output the score in.
+
+Standard Deviation Column
+: A name for the column to output the standard deviation of the score in.
+
+Drop Input Columns?
+: If selected, drop all the input count columns from the output.

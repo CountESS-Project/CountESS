@@ -20,6 +20,7 @@ CountESS "portrait" logo &copy; 2024 Sayeh Gorjifard, used with permission.
 * [Installing CountESS](installing-countess/)
 * [Running CountESS](running-countess/)
 * [Getting Started with CountESS](getting-started/)
+* [Further Examples](further-examples)
 * [Included Plugins](included-plugins/)
 * [Other Plugins](other-plugins/)
 * [Writing Plugins](writing-plugins/)
