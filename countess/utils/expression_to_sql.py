@@ -47,9 +47,9 @@ LIST_OPS = {
     "AVG",
     "MEDIAN",
     "VAR_POP",
-    "STD_POP",
+    "STDDEV_POP",
     "VAR_SAMP",
-    "STD_SAMP",
+    "STDDEV_SAMP",
     "MAX",
     "MIN",
 }
