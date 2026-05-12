@@ -152,8 +152,14 @@ as per Enrich2.
 sorts cells into bins and uses a weighted sum of the frequencies of 
 variants in each bin to calculate a score for each variant.
 
+CountESS includes a specialized [VAMPseq Plugin](../included-plugins/#vampseq)
+to make it easy to construct VAMPseq experiments.
+
+### Loading Files
+
 In this example we have three replicates each of which has counts in
-four bins.
+four bins.  The sequences are in twelve files, with the filenames containing
+metadata on the replicate number and bin number.
 
 The first step is to load and collate these files just like in
 [Example 3](../getting-started/#example-3):
@@ -165,8 +171,10 @@ for each variant:
 
 [![Screenshot 2](img/s6_2.jpg)](img/s6_2.png)
 
+### Combining Replicates
+
 Once that's done, pivot on replicate and use a simple formula to combine scores
 into an average score and an estimated standard deviation:
 
-[![Screenshot 3](img/s6_3.jpg)](img/s6_3.png)
+<!--[![Screenshot 3](img/s6_3.jpg)](img/s6_3.png)-->
 [![Screenshot 4](img/s6_4.jpg)](img/s6_4.png)
