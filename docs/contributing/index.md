@@ -58,6 +58,14 @@ python environment.
     cd countess
     echo "layout python3" > .envrc
     direnv allow
+
+### Running your fork
+
+Once you've cloned the code and established a development environment, you can 
+install the package into your development environment and run it:
+
+    pip install -e .[gui,dev]
+    countess_gui
     
 ## Testing Locally
 

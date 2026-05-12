@@ -19,11 +19,11 @@ On Fedora, install package "python3.11":
 
 CountESS can be [installed from pypi](https://pypi.org/project/countess/):
 
-    pip install countess
+    pip install countess[gui]
 
 ... or install the latest development version directly from [github](https://github.com/):
 
-    pip install git+https://github.com/CountESS-Project/CountESS.git
+    pip install countess[gui]@git+https://github.com/CountESS-Project/CountESS.git
 
 ### ... using git, for development
 
@@ -31,7 +31,7 @@ Clone the repository and [install for development](https://pip.pypa.io/en/stable
 
     git clone https://github.com/CountESS-Project/CountESS.git
     cd CountESS
-    pip install -e .[dev]
+    pip install -e .[gui,dev]
 
 See [Contributing to CountESS](../contributing/) for more information on development.
 
