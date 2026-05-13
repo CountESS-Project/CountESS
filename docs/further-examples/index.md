@@ -5,7 +5,7 @@ layout: default
 # Further Examples
 
 Continuing on from the examples in [Getting Started with CountESS](../getting-started/)
-let's look at a more realistic experiment.
+let's look at some more realistic experiments:
 
 ## Example 5: Deep Mutational Scan of BRCA1
 
@@ -107,28 +107,74 @@ before calculating scores as above:
 
 [![Screenshot 12](img/s5_12.jpg)](img/s5_12.png)
 
-[![Screenshot 13](img/s5_13.jpg)](img/s5_13.png)
+<!--[![Screenshot 13](img/s5_13.jpg)](img/s5_13.png)-->
+
+This will let us calculate scores and sigmas per
+DNA variant instead of per barcode:
 
 [![Screenshot 14](img/s5_14.jpg)](img/s5_14.png)
 
-[![Screenshot 16](img/s5_16.jpg)](img/s5_16.png)
+Scores can then be combined just like the "per barcode" 
+example:
+<!--[![Screenshot 16](img/s5_16.jpg)](img/s5_16.png)-->
 
 [![Screenshot 17](img/s5_17.jpg)](img/s5_17.png)
 
 ### Scoring by Protein
 
-... Or to collate by protein variant:
+... Or we can collate by protein variant:
 
 [![Screenshot 21](img/s5_21.jpg)](img/s5_21.png)
 
-[![Screenshot 22](img/s5_22.jpg)](img/s5_22.png)
+<!--[![Screenshot 22](img/s5_22.jpg)](img/s5_22.png)
 
 [![Screenshot 15](img/s5_15.jpg)](img/s5_15.png)
 
-[![Screenshot 18](img/s5_18.jpg)](img/s5_18.png)
+[![Screenshot 18](img/s5_18.jpg)](img/s5_18.png)-->
 
 [![Screenshot 19](img/s5_19.jpg)](img/s5_19.png)
 
 
+### Other Options
 
+The above example uses two replicates and three time points.
+If only two timepoints are available, the scoring plugin falls
+back on the "log ratio" version of the scoring formula, also
+as per Enrich2.
 
+If there's no suitable "wild type indicator" column, the 
+scoring plugin can use the total of all variants instead, also
+as per Enrich2.
+
+## Example 6: VAMPseq
+
+[VAMP-seq](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5980760/)
+sorts cells into bins and uses a weighted sum of the frequencies of 
+variants in each bin to calculate a score for each variant.
+
+CountESS includes a specialized [VAMPseq Plugin](../included-plugins/#vampseq)
+to make it easy to construct VAMPseq experiments.
+
+### Loading Files
+
+In this example we have three replicates each of which has counts in
+four bins.  The sequences are in twelve files, with the filenames containing
+metadata on the replicate number and bin number.
+
+The first step is to load and collate these files just like in
+[Example 3](../getting-started/#example-3):
+
+[![Screenshot 1](img/s6_1.jpg)](img/s6_1.png)
+
+Then we can use the [VAMPseq Plugin](../included-plugins/#vampseq) to calculate scores
+for each variant:
+
+[![Screenshot 2](img/s6_2.jpg)](img/s6_2.png)
+
+### Combining Replicates
+
+Once that's done, pivot on replicate and use a simple formula to combine scores
+into an average score and an estimated standard deviation:
+
+<!--[![Screenshot 3](img/s6_3.jpg)](img/s6_3.png)-->
+[![Screenshot 4](img/s6_4.jpg)](img/s6_4.png)

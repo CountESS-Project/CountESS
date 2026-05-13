@@ -25,6 +25,10 @@ or clone the repository using:
 git clone https://github.com/CountESS-Project/countess-demo/
 ```
 
+This page includes some simple "toy" examples to illustrate the basic
+techniques of developing workflows with CountESS.  For examples of 
+more realistic experiments, see [Further Examples](../further-examples)
+
 ## Example 1: Reading & Counting Sequences
 
 For this simplified example, we'll load up two CSV files with 
@@ -228,7 +232,7 @@ pivot, score and write to CSV steps as before, but duplicated for both DNA and P
 [![Example 2 Image 8](img/example_2_8.png)](img/example_2_8.png)
 [![Example 2 Image 11](img/example_2_11.png)](img/example_2_11.png)
 
-## Example 3: FASTQ and VAMP-seq
+## Example 3: FASTQ
 
 Load this example with `countess_gui example_3.ini`.
 
@@ -271,20 +275,6 @@ on `bin`, giving us columns `count__bin_1`, `count__bin_2`, `count__bin_3` and `
 
 [![Example 3 Image 6](img/example_3_6.png)](img/example_3_6.png)
 
-### VAMP-seq
-
-[VAMP-seq](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5980760/)
-uses a weighted sum of the bins to calculate a score for each variant,
-which is easily implemented in [Python Code](../included-pluyins/#python):
-
-[![Example 3 Image 7](img/example_3_7.png)](img/example_3_7.png)
-
-Files are then written out as before.
-<!--
-[![Example 3 Image 8](img/example_3_8.png)](img/example_3_8.png)
-[![Example 3 Image 9](img/example_3_9.png)](img/example_3_9.png)
--->
-
 ## Example 4: External Metadata
 
 Load this example with `countess_gui example_4.ini`.
@@ -324,3 +314,9 @@ Then we can join the two together using the `filename` column
 in each:
 
 [![Example 4 Image 3](img/example_4_3.png)](img/example_4_3.png)
+
+# Further Examples
+
+This page includes some simple "toy" examples to illustrate the basic
+techniques of developing workflows with CountESS.  For examples of 
+more realistic experiments, see [Further Examples](../further-examples)

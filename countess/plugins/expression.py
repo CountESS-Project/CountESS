@@ -28,6 +28,7 @@ class ExpressionPlugin(DuckdbSimplePlugin):
     )
 
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#expression"
 
     code = TextParam("Expressions")
     projection: Optional[Dict[str, str]] = None

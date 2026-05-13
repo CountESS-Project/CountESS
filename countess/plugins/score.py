@@ -61,6 +61,7 @@ class ScoringPlugin(DuckdbSimplePlugin):
     name = "Scoring"
     description = "Score variants using counts or frequencies"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#scoring"
 
     replicate = ColumnOrNoneChoiceParam("Replicate Column")
     columns = ColumnGroupChoiceParam("Input Columns")
