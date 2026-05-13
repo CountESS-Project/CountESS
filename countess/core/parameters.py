@@ -200,9 +200,9 @@ class NumericParam(ScalarWithOperatorsParam):
     def set_value(self, value):
         try:
             if type(value) is str:
-                if m := re.match(r"(\d+(\.\d*)?)", value):
+                if m := re.match(r"([+-]?\d*(\.\d*)?([Ee][+-]?\d+)?)", value):
                     value = m.group(1)
-            self._value = self.var_type(value)
+            self._value = self.var_type(value or 0)
         except (TypeError, ValueError):
             self.reset_value()
 
