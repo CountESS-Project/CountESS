@@ -35,13 +35,6 @@ Clone the repository and [install for development](https://pip.pypa.io/en/stable
 
 See [Contributing to CountESS](../contributing/) for more information on development.
 
-### ... using nix
-
-CountESS can be installed and run in one command with
-[nix](https://nixos.org/):
-
-    nix run github:CountESS-Project/CountESS
-
 ## MacOS
 
 ### ... using Homebrew
