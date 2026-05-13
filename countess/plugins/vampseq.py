@@ -28,6 +28,7 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
 
     columns = PerNumericColumnArrayParam("Columns", CountColumnParam("Column"))
     group_by = PerColumnArrayParam("Group By", BooleanParam("Column", False))
+    threshold = FloatParam("Total Frequency Threshold", 1.78e-5)
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
         super().prepare(ddbc, source)
@@ -57,20 +58,27 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
         inner_select = ", ".join(
             [f"T0.{k}" for k in group_cols] + [f"sum(T0.{k}) as {k}" for k in weighted_columns.keys()]
         )
-        weighted_counts = " + ".join(
-            f"CASE WHEN T2.{k} > 0 THEN T1.{k} * {v} / T2.{k} ELSE 0 END" for k, v in weighted_columns.items()
+
+        total_counts = "+".join( f"Var.{k}" for k in weighted_columns.keys() )
+        total_sum_counts = " + ".join( f"Tot.{k}"for k in weighted_columns.keys() )
+        total_freq = f"({total_counts})/({total_sum_counts})"
+
+        weighted_freqs = " + ".join(
+            f"CASE WHEN Tot.{k} > 0 THEN Var.{k} * {v} / Tot.{k} ELSE 0 END" for k, v in weighted_columns.items()
         )
-        total_counts = " + ".join(
-            f"CASE WHEN T2.{k} > 0 THEN T1.{k} / T2.{k} ELSE 0 END" for k in weighted_columns.keys()
+        unweighted_freqs = " + ".join(
+            f"CASE WHEN Tot.{k} > 0 THEN Var.{k} / Tot.{k} ELSE 0 END" for k in weighted_columns.keys()
         )
-        group_by = ("GROUP BY " + ", ".join("T0." + c for c in group_cols)) if group_cols else ""
-        join_on = (" AND ".join(f"T1.{c} = T2.{c}" for c in group_cols)) if group_cols else "1=1"
+        group_by = ("GROUP BY " + ",".join(group_cols)) if group_cols else ""
+        join_on = (" AND ".join(f"Var.{c} = Tot.{c}" for c in group_cols)) if group_cols else "1=1"
 
         return f"""
-            select T1.*, ({weighted_counts}) / ({total_counts}) as score
-            from {table_name} T1 join (
-                select {inner_select}
-                from {table_name} T0
+            SELECT Var.*, ({weighted_freqs}) / ({unweighted_freqs}) as score,
+                {total_freq} AS total_freq
+            FROM {table_name} Var JOIN (
+                SELECT {inner_select}
+                FROM {table_name} T0
                 {group_by}
-            ) T2 on {join_on}
+            ) Tot ON {join_on}
+            WHERE total_freq > {duckdb_escape_literal(self.threshold.value)}
         """
