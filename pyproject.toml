@@ -29,8 +29,6 @@ dependencies = [
     'pyPEG2~=2.15.2',
     'rapidfuzz~=3.13.0',
     'statsmodels~=0.14.6',
-    'tkinterweb~=3.23.5',
-    'ttkthemes~=3.2.2',
     'typing_extensions~=4.14.0',
 ]
 
@@ -50,6 +48,11 @@ dev = [
     'pytest~=8.4.1',
     'pytest-socket~=0.7.0',
     'requests-mock~=1.12.1',
+]
+
+gui = [
+    "tkinterweb~=3.23.5",
+    "ttkthemes~=3.2.2",
 ]
 
 [project.entry-points.countess_plugins]

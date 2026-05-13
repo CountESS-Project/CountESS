@@ -1,8 +1,15 @@
 import tkinter as tk
 import webbrowser
+from typing import Optional
 from urllib.parse import urlparse
 
-from tkinterweb import HtmlFrame  # type: ignore
+try:
+    from tkinterweb import HtmlFrame  # type: ignore
+
+    no_tkinterweb = False
+except ImportError:
+    no_tkinterweb = True
+
 
 MINI_CSS = """
     * { padding: 10px; line-height: 150% }
@@ -47,8 +54,26 @@ class MiniBrowserFrame(tk.Frame):
             webbrowser.open_new_tab(link_url)
 
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    url = "https://countess-project.github.io/CountESS/"
-    MiniBrowserFrame(root, url).pack(fill="both", expand=True)
-    root.mainloop()
+info_frame: Optional[MiniBrowserFrame] = None
+
+
+def mini_browser_close():
+    global info_frame  # pylint: disable=global-statement
+    if info_frame is not None:
+        info_frame.master.destroy()
+        info_frame = None
+
+
+def mini_browser_open(url: str):
+    if no_tkinterweb:
+        webbrowser.open_new_tab(url)
+        return
+
+    global info_frame  # pylint: disable=global-statement
+    if info_frame is None:
+        toplevel = tk.Toplevel()
+        toplevel.protocol("WM_DELETE_WINDOW", mini_browser_close)
+        info_frame = MiniBrowserFrame(toplevel, url)
+        info_frame.pack(fill="both", expand=True)
+    else:
+        info_frame.load_url(url)
