@@ -10,7 +10,6 @@ example_url = "http://example.com/"
 
 @pytest.mark.gui
 def test_mini_browser():
-
     # this package is optional so just skip this test
     # if it isn't installed.
 

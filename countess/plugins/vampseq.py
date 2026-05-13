@@ -59,8 +59,8 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
             [f"T0.{k}" for k in group_cols] + [f"sum(T0.{k}) as {k}" for k in weighted_columns.keys()]
         )
 
-        total_counts = "+".join( f"Var.{k}" for k in weighted_columns.keys() )
-        total_sum_counts = " + ".join( f"Tot.{k}"for k in weighted_columns.keys() )
+        total_counts = "+".join(f"Var.{k}" for k in weighted_columns.keys())
+        total_sum_counts = " + ".join(f"Tot.{k}" for k in weighted_columns.keys())
         total_freq = f"({total_counts})/({total_sum_counts})"
 
         weighted_freqs = " + ".join(
