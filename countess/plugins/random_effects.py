@@ -58,8 +58,9 @@ def rml_estimate(
 
 class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
     name = "Random Effects"
-    description = "Calculate frequencies from counts"
+    description = "Combine scores using a Random Effects Model"
     version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#random-effects-model"
 
     score_cols = NumericColumnGroupChoiceParam("Score Columns")
     sigma_cols = NumericColumnGroupChoiceParam("Stddev Columns")

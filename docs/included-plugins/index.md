@@ -397,3 +397,15 @@ Standard Deviation Column
 
 Drop Input Columns?
 : If selected, drop all the input count columns from the output.
+
+### Random Effects Model
+
+The Random Effects Model plugin combines scores using their score values and standard deviations, as 
+implemented in [Enrich2](https://github.com/FowlerLab/Enrich2) and described in
+[A statistical framework for analyzing deep mutational scanning data](https://doi.org/10.1186/s13059-017-1272-5).
+
+Score Columns
+: Columns containing scores
+
+Stddev Columns
+: Columns containing corresponding standard deviations
