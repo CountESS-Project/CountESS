@@ -7,7 +7,7 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess import VERSION
 from countess.core.parameters import ArrayParam, BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, MultiParam
 from countess.core.plugins import DuckdbPlugin
-from countess.utils.duckdb import duckdb_escape_identifier
+from countess.utils.duckdb import duckdb_escape_identifier, duckdb_dtype_is_numeric
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,13 @@ class JoinPlugin(DuckdbPlugin):
         while len(self.inputs) < len(sources):
             self.inputs.add_row()
 
-        for num, (label, table) in enumerate(sources.items()):
-            logger.debug("JoinPlugin.execute_multi %d %s %s", num + 1, repr(label), table.alias)
-            self.inputs[num].label = f"Input {num+1}: {label}"
-            self.inputs[num].set_column_choices_from_duckdb(table)
+        for num, (label, source) in enumerate(sources.items()):
+            if source:
+                logger.debug("JoinPlugin.execute_multi %d %s %s", num + 1, repr(label), source.alias)
+                self.inputs[num].label = f"Input {num+1}: {label}"
+                self.inputs[num].set_column_choices(
+                    {name: duckdb_dtype_is_numeric(dt) for name, dt in zip(source.columns, source.dtypes)}
+                )
 
         # XXX this isn't quite right for >2 tables where some
         # are required and some aren't.  I think what I need to
