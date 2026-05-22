@@ -7,7 +7,7 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from countess import VERSION
 from countess.core.parameters import ArrayParam, BooleanParam, ColumnChoiceParam, ColumnOrNoneChoiceParam, MultiParam
 from countess.core.plugins import DuckdbPlugin
-from countess.utils.duckdb import duckdb_escape_identifier, duckdb_dtype_is_numeric
+from countess.utils.duckdb import duckdb_dtype_is_numeric, duckdb_escape_identifier
 
 logger = logging.getLogger(__name__)
 

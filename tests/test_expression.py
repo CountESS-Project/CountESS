@@ -28,19 +28,21 @@ expr_tests = [
 def test_expressions(expr, sql):
     assert Block.from_string(expr)[0].sql() == sql
 
+
 bad_expr_tests = [
     "pi(7)",
     "exp()",
     "atan2(1.234)",
     "concat()",
     "contains('foo')",
-
 ]
+
 
 @pytest.mark.parametrize("expr", bad_expr_tests)
 def test_bad_expressions(expr):
     with pytest.raises(ValueError):
         Block.from_string(expr)[0].sql()
+
 
 assign_tests = [
     ("a = 1", '1 AS "a"'),

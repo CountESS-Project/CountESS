@@ -1,7 +1,7 @@
 import ast
-from decimal import Decimal
 import logging
 import re
+from decimal import Decimal
 from typing import Any, Optional
 
 import pypeg2  # type: ignore[import-untyped]
@@ -42,10 +42,10 @@ BINARY_FUNC_OPS = {
 }
 
 SPECIAL_OPS = {
-    "LOG": ( "LN", 1, 1 ),
-    "TRIM": ( "TRIM", 1, 2 ),
-    "PI": ( "PI", 0, 0 ),
-    "CONCAT": ( "CONCAT", 1, None ),
+    "LOG": ("LN", 1, 1),
+    "TRIM": ("TRIM", 1, 2),
+    "PI": ("PI", 0, 0),
+    "CONCAT": ("CONCAT", 1, None),
 }
 
 LIST_OPS = {
@@ -61,12 +61,8 @@ LIST_OPS = {
     "MIN",
 }
 
-ALL_OPS = sorted(
-    list(UNARY_FUNC_OPS) +
-    list(BINARY_FUNC_OPS) +
-    list(SPECIAL_OPS.keys()) +
-    list(LIST_OPS)
-)
+ALL_OPS = sorted(list(UNARY_FUNC_OPS) + list(BINARY_FUNC_OPS) + list(SPECIAL_OPS.keys()) + list(LIST_OPS))
+
 
 class SqlTemplatingSymbol(pypeg2.Symbol):
     def sql(self):
@@ -155,8 +151,7 @@ class FunctionCall(pypeg2.Concat):
                 return f"{sql_func_name}({func_params})"
         if func_name in LIST_OPS:
             return f"LIST_{func_name}([{func_params}])"
-        if func_name in UNARY_FUNC_OPS and num_params == 1 or \
-                func_name in BINARY_FUNC_OPS and num_params == 2:
+        if func_name in UNARY_FUNC_OPS and num_params == 1 or func_name in BINARY_FUNC_OPS and num_params == 2:
             return f"{func_name}({func_params})"
 
         raise ValueError(f"unknown function {func_name} with {num_params} parameters")

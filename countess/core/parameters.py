@@ -660,13 +660,14 @@ class MultiColumnChoiceParam(MultiChoiceParam):
     def set_column_choices(self, choices: Mapping[str, bool]):
         self.set_choices(list(choices.keys()))
 
+
 class NumericMultiColumnChoiceParam(MultiColumnChoiceParam):
     def set_column_choices(self, choices: Mapping[str, bool]):
         self.set_choices([c for c, n in choices.items() if n])
 
-class ColumnGroupChoiceParam(ChoiceParam):
 
-    all_columns : list[str] = []
+class ColumnGroupChoiceParam(ChoiceParam):
+    all_columns: list[str] = []
 
     def set_column_choices(self, choices: Mapping[str, bool]):
         self.all_columns = sorted(choices.keys())
@@ -678,15 +679,14 @@ class ColumnGroupChoiceParam(ChoiceParam):
     def get_matching_columns(self) -> list[str]:
         if not self.value:
             return []
-        return [ c for c in self.all_columns if c.startswith(self.get_column_prefix()) ]
+        return [c for c in self.all_columns if c.startswith(self.get_column_prefix())]
 
     def get_suffixes(self) -> list[str]:
         prefix_len = len(self.get_column_prefix())
-        return [ c[prefix_len:] for c in self.get_matching_columns() ]
+        return [c[prefix_len:] for c in self.get_matching_columns()]
 
     def get_output_columns(self, prefix: str) -> list[str]:
-        return [ prefix + s for s in self.get_suffixes() ]
-
+        return [prefix + s for s in self.get_suffixes()]
 
 
 class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
@@ -711,7 +711,6 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
             return []
         else:
             return super().get_matching_columns()
-
 
 
 class NumericColumnGroupChoiceParam(ColumnGroupChoiceParam):
