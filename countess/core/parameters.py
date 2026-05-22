@@ -99,14 +99,20 @@ class MultiValueParam(BaseParam):
     def get_values(self) -> set[Any]:
         return self._values
 
-    def set_values(self, values: set[Any]):
-        self._values = values
+    def set_values(self, values: Iterable[Any]):
+        self._values = set(values)
+
+    def reset_values(self, values: set[Any]):
+        self._values -= values
 
     def set_value(self, value: Any):
         self._values.add(value)
 
-    def reset_value(self, value: Any):
-        self._values.remove(value)
+    def reset_value(self, value: Optional[Any] = None):
+        if value:
+            self._values.discard(value)
+        else:
+            self._values = set()
 
     def copy(self):
         return self.__class__(self.label, self._values)
@@ -540,7 +546,7 @@ class MultiChoiceParam(MultiValueParam):
 
     def set_choices(self, choices):
         self.choices = list(choices)
-        self._values = [v for v in self._values if v in self.choices]
+        self._values = set(v for v in self._values if v in self.choices)
 
     def get_choices(self):
         return self.choices
@@ -654,6 +660,9 @@ class MultiColumnChoiceParam(MultiChoiceParam):
     def set_column_choices(self, choices: Mapping[str, bool]):
         self.set_choices(list(choices.keys()))
 
+class NumericMultiColumnChoiceParam(MultiColumnChoiceParam):
+    def set_column_choices(self, choices: Mapping[str, bool]):
+        self.set_choices([c for c, n in choices.items() if n])
 
 class ColumnGroupChoiceParam(ChoiceParam):
 
@@ -667,6 +676,8 @@ class ColumnGroupChoiceParam(ChoiceParam):
         return self.value.removesuffix("*")
 
     def get_matching_columns(self) -> list[str]:
+        if not self.value:
+            return []
         return [ c for c in self.all_columns if c.startswith(self.get_column_prefix()) ]
 
     def get_suffixes(self) -> list[str]:
