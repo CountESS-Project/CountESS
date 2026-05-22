@@ -55,7 +55,7 @@ class JoinPlugin(DuckdbPlugin):
         for num, (label, table) in enumerate(sources.items()):
             logger.debug("JoinPlugin.execute_multi %d %s %s", num + 1, repr(label), table.alias)
             self.inputs[num].label = f"Input {num+1}: {label}"
-            self.set_column_choices_from_duckdb(self.inputs[num], table)
+            self.inputs[num].set_column_choices_from_duckdb(table)
 
         # XXX this isn't quite right for >2 tables where some
         # are required and some aren't.  I think what I need to

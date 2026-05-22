@@ -123,11 +123,11 @@ class DuckdbPlugin(BasePlugin):
     def prepare_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> None:
         pass
 
-    def set_column_choices_from_duckdb(self, param: BasePlugin, source: DuckDBPyRelation):
+    def set_column_choices_from_duckdb(self, source: DuckDBPyRelation):
         if source is None:
-            param.set_column_choices({})
+            self.set_column_choices({})
         else:
-            param.set_column_choices(
+            self.set_column_choices(
                 {name: duckdb_dtype_is_numeric(dt) for name, dt in zip(source.columns, source.dtypes)}
             )
 
@@ -150,7 +150,7 @@ class DuckdbSimplePlugin(DuckdbPlugin):
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
         if source:
-            self.set_column_choices_from_duckdb(self, source)
+            self.set_column_choices_from_duckdb(source)
 
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
@@ -422,8 +422,13 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
         )
 
         view = duckdb_source_to_view(ddbc, source)
+        subquery = self.subquery(view.alias, view.columns)
+        sql = f"SELECT UNNEST({function_name}(_ROW)) FROM ({subquery}) AS _ROW"
+        logger.debug(sql)
+        return ddbc.sql(sql)
 
-        return ddbc.sql(f"SELECT UNNEST({function_name}(_ROW)) FROM (SELECT * FROM {view.alias}) AS _ROW")
+    def subquery(self, table_name: str, columns: list[str]) -> str:
+        return f"SELECT * FROM {table_name}"
 
     def transform(self, data: dict[str, Any]) -> Optional[Dict[str, Any]]:
         """This will be called for each row. Return a tuple with the same
