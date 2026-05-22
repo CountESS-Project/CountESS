@@ -65,7 +65,13 @@ def duckdb_escape_literal(literal: Union[str, int, float, list, None]) -> str:
     elif type(literal) is float:
         return str(literal) + "::DOUBLE"
     elif type(literal) is decimal.Decimal:
-        return str(literal) + "::DECIMAL"
+        _sign, digits, exponent = literal.as_tuple()
+        if exponent >= 0:
+            return f"{literal}::DECIMAL({len(digits)+exponent},0)"
+        elif -exponent > len(digits):
+            return f"{literal}::DECIMAL({-exponent},{-exponent})"
+        else:
+            return f"{literal}::DECIMAL({len(digits)},{-exponent})"
     elif type(literal) is bool:
         return "TRUE" if literal else "FALSE"
     elif type(literal) is list:
