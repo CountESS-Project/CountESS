@@ -1,4 +1,5 @@
 import ast
+from decimal import Decimal
 import logging
 import re
 from typing import Any, Optional
@@ -9,7 +10,7 @@ from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_litera
 
 logger = logging.getLogger(__name__)
 
-FUNC_OPS = {
+UNARY_FUNC_OPS = {
     "ABS",
     "LEN",
     "SIN",
@@ -18,27 +19,33 @@ FUNC_OPS = {
     "ACOS",
     "TAN",
     "ATAN",
-    "ATAN2",
     "SQRT",
-    "LOG",
     "LOG2",
     "LOG10",
     "POW",
     "EXP",
-    "CONCAT",
     "FLOOR",
     "CEIL",
+    "LOWER",
+    "UPPER",
+    "REVERSE",
+    "SIGN",
+}
+
+BINARY_FUNC_OPS = {
+    "ATAN2",
     "CONTAINS",
     "STARTS_WITH",
     "ENDS_WITH",
-    "LOWER",
-    "UPPER",
     "REGEXP_MATCHES",
-    "REVERSE",
     "TRANSLATE",
-    "TRIM",
-    "SIGN",
-    "PI",
+}
+
+SPECIAL_OPS = {
+    "LOG": ( "LN", 1, 1 ),
+    "TRIM": ( "TRIM", 1, 2 ),
+    "PI": ( "PI", 0, 0 ),
+    "CONCAT": ( "CONCAT", 1, None ),
 }
 
 LIST_OPS = {
@@ -54,6 +61,12 @@ LIST_OPS = {
     "MIN",
 }
 
+ALL_OPS = sorted(
+    list(UNARY_FUNC_OPS) +
+    list(BINARY_FUNC_OPS) +
+    list(SPECIAL_OPS.keys()) +
+    list(LIST_OPS)
+)
 
 class SqlTemplatingSymbol(pypeg2.Symbol):
     def sql(self):
@@ -82,7 +95,7 @@ class DecimalLiteral(SqlTemplatingSymbol):
     regex = re.compile(r"[0-9]+\.[0-9]+")
 
     def sql(self):
-        return "(%s::DECIMAL)" % self.name
+        return duckdb_escape_literal(Decimal(self.name))
 
 
 class SingleQuotedStringLiteral(SqlTemplatingSymbol):
@@ -134,11 +147,19 @@ class FunctionCall(pypeg2.Concat):
     def sql(self):
         func_name = str(self[0].name).upper()
         func_params = ",".join(s.sql() for s in self[1:])
+        num_params = len(self) - 1
 
+        if func_name in SPECIAL_OPS:
+            sql_func_name, min_params, max_params = SPECIAL_OPS[func_name]
+            if min_params <= num_params and (max_params is None or max_params >= num_params):
+                return f"{sql_func_name}({func_params})"
         if func_name in LIST_OPS:
             return f"LIST_{func_name}([{func_params}])"
-        else:
+        if func_name in UNARY_FUNC_OPS and num_params == 1 or \
+                func_name in BINARY_FUNC_OPS and num_params == 2:
             return f"{func_name}({func_params})"
+
+        raise ValueError(f"unknown function {func_name} with {num_params} parameters")
 
 
 class Value(pypeg2.Concat):

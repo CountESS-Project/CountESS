@@ -8,7 +8,7 @@ expr_tests = [
     ("a != b", '"a"!="b"'),
     ("4 * 3 + 2 * 6", "4*3+2*6"),
     ("4 * (3 + 2) * 6", "4*(3+2)*6"),
-    ("log(0.7)", "LOG((0.7::DECIMAL))"),
+    ("log(0.7)", "LN(0.7::DECIMAL(1,1))"),
     ("1 if foo else 3", 'CASE WHEN "foo" THEN 1 ELSE 3 END'),
     ("foo == None", '"foo" IS NULL'),
     ("foo != None", '"foo" IS NOT NULL'),
@@ -19,6 +19,8 @@ expr_tests = [
     (r'"hello\"world"', "'hello\"world'"),
     (r"'hello\'world'", r"'hello''world'"),
     (r"`hello world`", r'"hello world"'),
+    (r"concat('foo', bar, 'baz')", "CONCAT('foo',\"bar\",'baz')"),
+    (r"pi()", "PI()"),
 ]
 
 
@@ -26,6 +28,19 @@ expr_tests = [
 def test_expressions(expr, sql):
     assert Block.from_string(expr)[0].sql() == sql
 
+bad_expr_tests = [
+    "pi(7)",
+    "exp()",
+    "atan2(1.234)",
+    "concat()",
+    "contains('foo')",
+
+]
+
+@pytest.mark.parametrize("expr", bad_expr_tests)
+def test_bad_expressions(expr):
+    with pytest.raises(ValueError):
+        Block.from_string(expr)[0].sql()
 
 assign_tests = [
     ("a = 1", '1 AS "a"'),
