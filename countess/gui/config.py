@@ -216,6 +216,7 @@ class ParameterWrapper:
         elif isinstance(self.parameter, MultiChoiceParam):
             self.var.set(" ".join(self.parameter.choices))
             self.entry.configure(height=len(self.parameter.choices))
+            self.entry.selection_clear(0, tk.END)
             for v in self.parameter.get_values():
                 self.entry.selection_set(self.parameter.choices.index(v))
         elif isinstance(self.parameter, BooleanParam):
