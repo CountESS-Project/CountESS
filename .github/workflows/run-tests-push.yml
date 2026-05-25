@@ -64,3 +64,16 @@ jobs:
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
     - run: /tmp/venv/bin/python -m pip install -e .[dev]
     - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
+
+  run-tests-ubuntu-latest-python-latest-no-gui:
+    runs-on: ubuntu-latest
+    name: Ubuntu (Latest), Python (python3-minimal from apt)
+    steps:
+    - uses: actions/checkout@v6
+    - run: sudo apt update -y
+    - run: sudo apt-get -U upgrade -y
+    - run: sudo apt install python3-minimal libopenblas0 libopenblas-dev
+    - run: python3 -m venv /tmp/venv
+    - run: /tmp/venv/bin/python -m pip install --upgrade pip
+    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: /tmp/venv/bin/python -m pytest -m "not gui" -m "not slow" -v -rP --ignore=tests/gui/ --ignore=tests/test_gui.py tests/
