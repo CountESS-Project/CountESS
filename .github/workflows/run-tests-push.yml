@@ -9,11 +9,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - run: sudo apt update -y
-    - run: sudo apt-get -U upgrade -y
     - run: sudo apt install python3.12-full python3-pip xvfb
     - run: python3.12 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
-    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: /tmp/venv/bin/python -m pip install -e .[dev,gui]
     - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-24_04-python-3_13:
@@ -21,7 +20,6 @@ jobs:
     name: Ubuntu 24.04, Python 3.x
     steps:
     - run: sudo apt update -y
-    - run: sudo apt-get -U upgrade -y
     - uses: actions/checkout@v6
     - uses: actions/setup-python@v6
       with:
@@ -30,7 +28,7 @@ jobs:
     - run: sudo apt install xvfb libopenblas0 libopenblas-dev
     - run: python3 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
-    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: /tmp/venv/bin/python -m pip install -e .[dev,gui]
     - run: xvfb-run /tmp/venv/bin/coverage run --source countess -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
     - run: echo '### Coverage Report' >> $GITHUB_STEP_SUMMARY
     - run: /tmp/venv/bin/coverage report --format=markdown --skip-empty --sort=-cover >> $GITHUB_STEP_SUMMARY
@@ -41,11 +39,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - run: sudo apt update -y
-    - run: sudo apt-get -U upgrade -y
     - run: sudo apt install python3-full python3-pip xvfb
     - run: python3 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
-    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: /tmp/venv/bin/python -m pip install -e .[dev,gui]
     - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-latest-python-latest:
@@ -58,11 +55,10 @@ jobs:
         python-version: ">3.13"
         cache: 'pip'
     - run: sudo apt update -y
-    - run: sudo apt-get -U upgrade -y
     - run: sudo apt install xvfb libopenblas0 libopenblas-dev
     - run: python3 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
-    - run: /tmp/venv/bin/python -m pip install -e .[dev]
+    - run: /tmp/venv/bin/python -m pip install -e .[dev,gui]
     - run: xvfb-run /tmp/venv/bin/python -m pytest -m "not slow" -v -rP --doctest-modules countess/ tests/
 
   run-tests-ubuntu-latest-python-latest-no-gui:
@@ -71,7 +67,6 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - run: sudo apt update -y
-    - run: sudo apt-get -U upgrade -y
     - run: sudo apt install python3-minimal libopenblas0 libopenblas-dev
     - run: python3 -m venv /tmp/venv
     - run: /tmp/venv/bin/python -m pip install --upgrade pip
