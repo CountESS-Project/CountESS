@@ -79,6 +79,7 @@ frequency = "countess.plugins.frequency:FrequencyPlugin"
 columns = "countess.plugins.columns:ColumnsPlugin"
 ranking = "countess.plugins.ranking:RankingPlugin"
 random_effects = "countess.plugins.random_effects:RandomEffectsPlugin"
+random_effects2 = "countess.plugins.random_effects:RandomEffectsPlugin2"
 
 [project.entry-points.gui_scripts]
 countess_gui = "countess.gui.main:main"

@@ -81,6 +81,7 @@ class PipelineNode:
             for key, val, base_dir in self.config:
                 try:
                     self.plugin.set_parameter(key, val, base_dir)
+                    logger.debug("Parameter %s=%s", key, val)
                 except KeyError:
                     logger.warning("Parameter %s=%s Not Found", key, val)
                 except ValueError:

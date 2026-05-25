@@ -552,8 +552,9 @@ class MultiChoiceParam(MultiValueParam):
         return self.choices
 
     def set_value(self, value):
-        if value in self.choices:
-            self._values.add(value)
+        if value not in self.choices:
+            self.choices.append(value)
+        self._values.add(value)
 
     def set_choice(self, choice):
         if choice is not None and 0 <= choice < len(self.choices):

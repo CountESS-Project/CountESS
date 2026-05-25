@@ -1,15 +1,19 @@
 import logging
-from typing import Any, Mapping, Optional
+import secrets
+from typing import Any, Iterable, Mapping, Optional
+
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import NumericColumnGroupChoiceParam
-from countess.core.plugins import DuckdbParallelTransformPlugin
+from countess.core.parameters import ColumnChoiceParam, MultiColumnChoiceParam, NumericColumnGroupChoiceParam
+from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSqlPlugin
+from countess.utils.duckdb import duckdb_escape_identifier
 
 logger = logging.getLogger(__name__)
 
 
 def rml_estimate(
-    scores: list[float], sigmas: list[float], iterations: int = 50, epsilon: float = 1e-7
+    scores: list[float], sigmas: list[float], iterations: Optional[int] = 50, epsilon: Optional[float] = 1e-7
 ) -> tuple[float, float]:
     """Implementation of the robust maximum likelihood estimator.
     Iteratively estimates the heterogeneity between score estimates
@@ -31,6 +35,11 @@ def rml_estimate(
     # `\sigma^2_i -> variances[i]
     # `\hat\beta_s` -> estimate
     # `\hat{\sigma^2}_s -> heterogeneity
+
+    assert len(scores) == len(sigmas)
+
+    if len(scores) == 1:
+        return scores[0], sigmas[0]
 
     variances = [sigma**2 for sigma in sigmas]
     weights = [1 / variance for variance in variances]
@@ -62,7 +71,7 @@ class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
     version = VERSION
     link = "https://countess-project.github.io/CountESS/included-plugins/#random-effects-model"
 
-    score_cols = NumericColumnGroupChoiceParam("Score Columns")
+    score_cols = NumericColumnGroupChoiceParam("Score Colums")
     sigma_cols = NumericColumnGroupChoiceParam("Stddev Columns")
 
     def add_fields(self) -> Mapping[Optional[str], Optional[type]]:
@@ -87,3 +96,54 @@ class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
         data["sigma"] = sigma
 
         return data
+
+
+class RandomEffectsPlugin2(DuckdbSqlPlugin):
+    name = "Random Effects (Group)"
+    description = "Combine scores in a group using a Random Effects Model"
+    version = VERSION
+    link = "https://countess-project.github.io/CountESS/included-plugins/#random-effects-model"
+
+    score_col = ColumnChoiceParam("Score Column")
+    sigma_col = ColumnChoiceParam("Sigma Column")
+    group_cols = MultiColumnChoiceParam("Group By")
+    function_name = None
+
+    def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
+        super().prepare(ddbc, source)
+        if not self.function_name:
+            self.function_name = "f_" + secrets.token_hex(16)
+            ddbc.create_function(  # type: ignore[call-overload]
+                self.function_name,
+                lambda scores, sigmas: rml_estimate(scores, sigmas),  # pylint: disable=unnecessary-lambda
+                return_type="DOUBLE[]",
+                null_handling="special",
+            )
+
+    def set_column_choices(self, choices):
+        super().set_column_choices(choices)
+
+    def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
+        if not (self.score_col.value and self.sigma_col.value):
+            return f"select * from {table_name}"
+
+        score_col = duckdb_escape_identifier(self.score_col.value)
+        sigma_col = duckdb_escape_identifier(self.sigma_col.value)
+
+        if self.group_cols.get_values():
+            group_cols = ",".join(duckdb_escape_identifier(c) for c in self.group_cols.get_values())
+            return f"""
+                SELECT {group_cols}, _ROW[1] AS score, _ROW[2] AS sigma
+                FROM (
+                    SELECT {group_cols}, {self.function_name}(LIST({score_col}), LIST({sigma_col})) as _ROW
+                    FROM {table_name} GROUP BY {group_cols}
+                ) X
+            """
+        else:
+            return f"""
+                 SELECT _ROW[1] AS score, _ROW[2] AS sigma
+                 FROM (
+                     SELECT {self.function_name}(LIST({score_col}), LIST({sigma_col})) AS _ROW
+                     FROM {table_name}
+                 )
+            """
