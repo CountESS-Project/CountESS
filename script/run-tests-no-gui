@@ -1,0 +1,3 @@
+#!/bin/bash
+
+pytest -v -rP -m "not gui" --ignore=tests/gui/ --ignore=tests/test_gui.py tests/

@@ -6,7 +6,15 @@ import os
 import queue
 import re
 import sys
-import tkinter as tk
+
+try:
+    import tkinter as tk
+except ImportError:
+    msg = """countess_gui uses python's "tkinter" library.
+This is generally supplied by a system package called "python3-full" or something similar."""
+    print(msg)  # pylint: disable=bad-builtin
+    sys.exit(1)
+
 from collections.abc import Callable
 from tkinter import messagebox, ttk
 from typing import Optional, Union

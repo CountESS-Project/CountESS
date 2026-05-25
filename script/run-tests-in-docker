@@ -1,5 +1,8 @@
 #!/bin/bash
 set -eu
 
-docker build -t testing . 
-docker run -it testing
+docker build -f etc/Dockerfile.nogui -t test-no-gui .
+docker run -it test-no-gui
+
+docker build -f etc/Dockerfile.gui -t test-gui . 
+docker run -it test-gui
