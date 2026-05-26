@@ -27,7 +27,7 @@ class BaseParam:
     label: str = ""
     hide: bool = False
     read_only: bool = False  # XXX deprecated
-    value: Any = None  # XXX deprecated
+    # value: Any = None  # XXX deprecated
 
     def __init__(self, label):
         self.label = label

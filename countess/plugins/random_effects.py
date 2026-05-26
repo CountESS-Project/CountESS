@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def rml_estimate(
-    scores: list[float], sigmas: list[float], iterations: Optional[int] = 50, epsilon: Optional[float] = 1e-7
+    scores: list[float], sigmas: list[float], iterations: int = 50, epsilon: float = 1e-7
 ) -> tuple[float, float]:
     """Implementation of the robust maximum likelihood estimator.
     Iteratively estimates the heterogeneity between score estimates
@@ -119,9 +119,6 @@ class RandomEffectsPlugin2(DuckdbSqlPlugin):
                 return_type="DOUBLE[]",
                 null_handling="special",
             )
-
-    def set_column_choices(self, choices):
-        super().set_column_choices(choices)
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
         if not (self.score_col.value and self.sigma_col.value):

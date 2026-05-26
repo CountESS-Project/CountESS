@@ -2,7 +2,7 @@ import logging
 from typing import Iterable, Optional
 
 from countess import VERSION
-from countess.core.parameters import ArrayParam, ColumnChoiceParam, NumericColumnChoiceParam
+from countess.core.parameters import ArrayParam, ColumnChoiceParam, NumericColumnChoiceParam, ScalarParam
 from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier
 
@@ -18,11 +18,15 @@ class RankingPlugin(DuckdbSqlPlugin):
     partition = ArrayParam("Partition By", ColumnChoiceParam("Column"))
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
-        order_by = ", ".join(duckdb_escape_identifier(p.value) for p in self.order_by.params)
+        order_by = ", ".join(
+            duckdb_escape_identifier(p.value) for p in self.order_by.params if isinstance(p, ScalarParam)
+        )
         if order_by:
             order_by = f"ORDER BY {order_by}"
 
-        partition = ", ".join(duckdb_escape_identifier(p.value) for p in self.partition.params)
+        partition = ", ".join(
+            duckdb_escape_identifier(p.value) for p in self.partition.params if isinstance(p, ScalarParam)
+        )
         if partition:
             partition = f"PARTITION BY {partition}"
 

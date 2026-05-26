@@ -2,7 +2,7 @@ import logging
 from typing import Iterable, Optional
 
 from countess import VERSION
-from countess.core.parameters import BooleanParam, ColumnOrNoneChoiceParam, PerNumericColumnArrayParam
+from countess.core.parameters import BooleanParam, ColumnOrNoneChoiceParam, PerNumericColumnArrayParam, ScalarParam
 from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -21,9 +21,10 @@ class CorrelationPlugin(DuckdbSqlPlugin):
     group = ColumnOrNoneChoiceParam("Group")
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
+        columns_params = [cp for cp in self.columns.params if isinstance(cp, ScalarParam)]
         grp = duckdb_escape_identifier(self.group.value) if self.group.is_not_none() else None
 
-        if sum(1 for c in self.columns.params if c.value) < 2:
+        if sum(1 for cp in columns_params if cp.value) < 2:
             return None
 
         labels_and_identifiers = [
@@ -33,8 +34,8 @@ class CorrelationPlugin(DuckdbSqlPlugin):
                 duckdb_escape_identifier(c1.label),
                 duckdb_escape_identifier(c2.label),
             )
-            for c1 in self.columns.params
-            for c2 in self.columns.params
+            for c1 in columns_params
+            for c2 in columns_params
             if c1.value and c2.value and c1.label < c2.label
         ]
 

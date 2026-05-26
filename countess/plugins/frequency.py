@@ -31,7 +31,7 @@ class FrequencyPlugin(DuckdbSqlPlugin):
         if not self.columns.get_values():
             return None
 
-        columns = self.columns.get_values()
+        columns = sorted(self.columns.get_values())
         # whatever -> freq_whatever; count -> freq_count; count_N -> freq_N; etc
         suffixes = [cc.removeprefix("count_") for cc in columns]
         count_cols = [duckdb_escape_identifier(cc) for cc in columns]
