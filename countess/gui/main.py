@@ -108,6 +108,7 @@ class ConfiguratorWrapper:
     info_frame = None
 
     def __init__(self, tk_parent, node, ddbc, change_callback):
+        logger.debug("ConfiguratorWrapper %s %s", node.name, node.uuid)
         self.node = node
         self.ddbc = ddbc
         self.change_callback = change_callback
@@ -129,11 +130,8 @@ class ConfiguratorWrapper:
 
         self.show_config_subframe()
 
-        if self.node.plugin:
-            if self.node.is_dirty:
-                self.config_change_callback()
-            else:
-                self.show_preview_subframe()
+        if self.node.result:
+            self.show_preview_subframe()
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -206,11 +204,11 @@ class ConfiguratorWrapper:
         self.notes_widget.grid(row=2, columnspan=2, sticky=tk.EW, padx=10, pady=5)
 
     def show_preview_subframe(self):
-        logger.debug("ConfiguratorWrapper.show_preview_subframe")
+        logger.debug("ConfiguratorWrapper.show_preview_subframe %s %s", self.node.name, self.node.uuid)
         if self.preview_subframe:
             self.frame.remove_child(self.preview_subframe).destroy()
 
-        if not self.node.plugin.show_preview:
+        if not self.node.plugin or not self.node.plugin.show_preview:
             return
 
         if isinstance(self.node.result, DuckDBPyRelation):
@@ -241,20 +239,18 @@ class ConfiguratorWrapper:
 
     def config_change_callback(self, *_):
         """Called immediately if a change to config has occurred."""
-        # logger.debug("config_change_callback")
-        self.node.mark_dirty()
+        logger.debug("config_change_callback %s", self.node.name)
 
         # Leave it a bit (2500ms) to see if the user is still typing, if so cancel
         # the previous task and make a new task for another 2.5 seconds away ...
         if self.config_change_task:
-            # logger.debug("config_change_callback: cancelling task")
             self.frame.after_cancel(self.config_change_task)
         self.config_change_task = self.frame.after(2500, self.config_change_task_callback)
 
     def config_change_task_callback(self):
         """Called when the user makes a change and had paused for a bit"""
+        logger.debug("config_change_task_callback %s", self.node.name)
         self.config_change_task = None
-        self.node.stop()
         self.config_change_start()
 
     def choose_plugin(self, plugin_class):
@@ -265,24 +261,18 @@ class ConfiguratorWrapper:
         self.config_change_start()
 
     def config_change_start(self):
-        self.node.is_dirty = True
-        self.node.start(self.ddbc, preview_row_limit)
+        self.node.mark_dirty()
         self.config_change_poll_callback()
 
     def config_change_poll_callback(self):
-        if self.node.poll():
+        if self.node.is_dirty:
             self.frame.after(50, self.config_change_poll_callback)
         else:
             self.config_change_poll_done()
 
     def config_change_poll_done(self):
-        self.node.wait()
-        if self.node.table_name:
-            self.node.result = self.ddbc.table(self.node.table_name)
-        else:
-            self.node.result = None
-
         pos1, pos2 = self.config_scrollbar.get()
+        logger.debug("config_change_poll_done %f %f", pos1, pos2)
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
@@ -543,7 +533,7 @@ class MainWindow:
         self.update_title()
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
-        self.graph = PipelineGraph()
+        self.graph = PipelineGraph(preview_row_limit=preview_row_limit)
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.graph_wrapper.add_new_node(select=False)
 
@@ -559,6 +549,7 @@ class MainWindow:
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = read_config([filename])
+        self.graph.preview_row_limit = preview_row_limit
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.node_select(None)
 
