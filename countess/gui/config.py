@@ -3,7 +3,7 @@ import logging
 import tkinter as tk
 from functools import partial
 from tkinter import ttk
-from typing import Mapping, MutableMapping, Optional
+from typing import Callable, Mapping, MutableMapping, Optional
 
 from ..core.parameters import (
     ArrayParam,
@@ -46,13 +46,13 @@ class ParameterWrapper:
         self,
         tk_parent: tk.Widget,
         parameter: BaseParam,
-        callback=None,
+        callback: Optional[Callable[[BaseParam], None]] = None,
         delete_callback=None,
         level=0,
     ):
         self.tk_parent = tk_parent
         self.parameter = parameter
-        self.callback = callback
+        self._callback = callback
         self.button = None
         self.level = level
         self.subwrapper_buttons: list[tk.Button] = []
@@ -86,7 +86,6 @@ class ParameterWrapper:
             self.entry.configure(exportselection=False, height=len(parameter.choices))
             for n in parameter.get_choice_numbers():
                 self.entry.selection_set(n)
-            self.listbox_modified_callback()
             self.entry.bind("<<ListboxSelect>>", self.listbox_modified_callback)
         elif isinstance(parameter, BooleanParam):
             self.entry = BooleanCheckbox(tk_parent, command=self.toggle_checkbox_callback)
@@ -179,6 +178,10 @@ class ParameterWrapper:
 
         if not isinstance(parameter, BooleanParam):
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
+
+    def callback(self, parameter: BaseParam) -> None:
+        if self._callback:
+            self._callback(parameter)
 
     def update(self):
         if self.parameter.hide:
@@ -364,8 +367,7 @@ class ParameterWrapper:
         else:
             self.parameter.add_row()
 
-        if self.callback is not None:
-            self.callback(self.parameter)
+        self.callback(self.parameter)
 
         self.update()
 
@@ -378,8 +380,7 @@ class ParameterWrapper:
             self.parameter.del_subparam(parameter_wrapper.parameter)
 
         self.update()
-        if self.callback is not None:
-            self.callback(self.parameter)
+        self.callback(self.parameter)
 
     def change_file_callback(self, *_):
         file_types = self.parameter.file_types
@@ -407,6 +408,10 @@ class ParameterWrapper:
     def value_changed_callback(self, *_):
         # called from self.var.trace("w", self.value_changed_callback)
 
+        if isinstance(self.parameter, MultiChoiceParam):
+            # this is handled by listbox_modified_callback, below
+            return
+
         if isinstance(self.parameter, (ChoiceParam, DictChoiceParam)):
             values = self.parameter.get_values()
             if 0 <= self.entry.current() < len(values):
@@ -427,7 +432,9 @@ class ParameterWrapper:
         self.set_value(value)
 
     def listbox_modified_callback(self, *_):
-        self.parameter.set_values([self.parameter.choices[n] for n in self.entry.curselection()])
+        values = [self.parameter.choices[n] for n in self.entry.curselection()]
+        logger.debug("listbox_modified_callback %s %s", self.parameter, values)
+        self.parameter.set_values(values)
         self.callback(self.parameter)
 
     def set_checkbox_value(self):
@@ -445,8 +452,7 @@ class ParameterWrapper:
         value = not self.parameter.value
         self.parameter.value = value
         self.set_checkbox_value()
-        if self.callback is not None:
-            self.callback(self.parameter)
+        self.callback(self.parameter)
 
     def clear_value_callback(self, *_):
         self.set_value("")
@@ -480,6 +486,7 @@ class PluginConfigurator:
 
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
+        logger.debug("PluginConfigurator %s %s", self.plugin, parameter)
         # if self.plugin.update():
         #    self.update()
         if self.change_callback:
