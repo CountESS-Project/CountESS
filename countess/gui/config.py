@@ -180,6 +180,7 @@ class ParameterWrapper:
             self.entry.grid(sticky=tk.EW, padx=10, pady=5)
 
     def callback(self, parameter: BaseParam) -> None:
+        logger.debug("ParameterWrapper.callback(%s)", parameter)
         if self._callback:
             self._callback(parameter)
 

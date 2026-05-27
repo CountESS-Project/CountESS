@@ -129,9 +129,7 @@ class ConfiguratorWrapper:
         self.label.bind("<Configure>", self.on_label_configure)
 
         self.show_config_subframe()
-
-        if self.node.result:
-            self.show_preview_subframe()
+        self.show_preview_subframe()
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -211,17 +209,21 @@ class ConfiguratorWrapper:
         if not self.node.plugin or not self.node.plugin.show_preview:
             return
 
-        if isinstance(self.node.result, DuckDBPyRelation):
+        if self.node.message:
+            logger.debug("ConfiguratorWrapper.show_preview_subframe %s", self.node.message)
+            self.preview_subframe = tk.Frame(self.frame)
+            text = tk.Text(self.preview_subframe)
+            text.insert("1.0", self.node.message)
+            text["state"] = "disabled"
+            text.grid(sticky=tk.NSEW)
+        elif self.node.table_name:
+            logger.debug("ConfiguratorWrapper.show_preview_subframe %s", self.node.table_name)
             self.preview_subframe = TabularDataFrame(self.frame, cursor="arrow")
-            self.preview_subframe.set_table(self.ddbc, self.node.result)
+            self.preview_subframe.set_table(self.ddbc, self.ddbc.table(self.node.table_name))
             self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
             self.preview_subframe.set_callback(self.preview_changed_callback)
         else:
-            self.preview_subframe = tk.Frame(self.frame)
-            text = tk.Text(self.preview_subframe)
-            text.insert("1.0", str(self.node.result))
-            text["state"] = "disabled"
-            text.grid(sticky=tk.NSEW)
+            return
         self.frame.add_child(self.preview_subframe)
 
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
@@ -249,7 +251,7 @@ class ConfiguratorWrapper:
 
     def config_change_task_callback(self):
         """Called when the user makes a change and had paused for a bit"""
-        logger.debug("config_change_task_callback %s", self.node.name)
+        logger.debug("ConfiguratorWrapper.config_change_task_callback %s", self.node.name)
         self.config_change_task = None
         self.config_change_start()
 
@@ -262,6 +264,7 @@ class ConfiguratorWrapper:
 
     def config_change_start(self):
         self.node.mark_dirty()
+        self.change_callback(self.node)
         self.config_change_poll_callback()
 
     def config_change_poll_callback(self):
@@ -272,7 +275,7 @@ class ConfiguratorWrapper:
 
     def config_change_poll_done(self):
         pos1, pos2 = self.config_scrollbar.get()
-        logger.debug("config_change_poll_done %f %f", pos1, pos2)
+        logger.debug("ConfiguratorWrapper.config_change_poll_done")
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
@@ -554,6 +557,7 @@ class MainWindow:
             self.graph_wrapper.destroy()
         self.graph = read_config([filename])
         self.graph.preview_row_limit = preview_row_limit
+        self.graph.reset()
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.node_select(None)
 
@@ -611,6 +615,7 @@ class MainWindow:
         self.config_wrapper = new_config_wrapper
 
     def node_changed(self, node):
+        logger.debug("MainWindow.node_changed(%s)", node)
         self.graph_wrapper.node_changed(node)
         self.config_changed = True
         self.update_title()

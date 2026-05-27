@@ -5,6 +5,7 @@ tree diagram in a canvas."""
 # https://github.com/CountESS-Project/CountESS/issues/19
 # for more discussion etc.
 
+import logging
 import math
 import random
 import re
@@ -14,9 +15,10 @@ from enum import Enum, IntFlag
 from functools import partial
 
 from countess.core.config import read_config_dict, write_config_node_string
-from countess.core.pipeline import PipelineNode
+from countess.core.pipeline import PipelineNode, PipelineGraph
 from countess.gui.widgets import copy_to_clipboard, get_icon
 
+logger = logging.getLogger(__name__)
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -277,9 +279,9 @@ class GraphWrapper:
     selected_node = None
     highlight_rectangle = None
 
-    def __init__(self, canvas, graph, node_select_callback):
+    def __init__(self, canvas, graph : PipelineGraph, node_select_callback):
         self.canvas = canvas
-        self.graph = graph
+        self.graph : PipelineGraph = graph
         self.node_select_callback = node_select_callback
 
         self.labels = dict((node, self.label_for_node(node)) for node in graph.nodes)
@@ -567,16 +569,20 @@ class GraphWrapper:
                 child_node,
                 parent_node,
             )
+            self.graph.update()
 
     def del_parent(self, parent_node, child_node):
         connecting_line = self.lines[child_node].pop(parent_node)
         del self.lines_lookup[connecting_line.line]
         connecting_line.destroy()
         child_node.del_parent(parent_node)
+        self.graph.update()
 
     def node_changed(self, node):
         """Called when something external updates the node's name, status
         or configuration."""
+        logger.debug("GraphWrapper.node_changed(%s)", node)
+
         flipped = self.canvas.winfo_width() >= self.canvas.winfo_height()
 
         if node.plugin and node.name.startswith("NEW"):
@@ -584,6 +590,7 @@ class GraphWrapper:
             self.graph.reset_node_name(node)
 
         self.labels[node].update_node(node, not flipped)
+        self.graph.update()
 
     def destroy(self):
         for node_lines in self.lines.values():
