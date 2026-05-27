@@ -5,9 +5,8 @@ from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.parameters import (
-    BooleanParam,
     FloatParam,
-    PerColumnArrayParam,
+    MultiColumnChoiceParam,
     PerNumericColumnArrayParam,
     TabularMultiParam,
 )
@@ -27,7 +26,7 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
     version = VERSION
 
     columns = PerNumericColumnArrayParam("Columns", CountColumnParam("Column"))
-    group_by = PerColumnArrayParam("Group By", BooleanParam("Column", False))
+    group_by = MultiColumnChoiceParam("Group By")
     threshold = FloatParam("Total Frequency Threshold", 1.78e-5)
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
@@ -40,12 +39,13 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
                 c.weight.value = (n + 1) / len(count_cols)
 
         weight_cols = set(n for n, p in self.columns.get_column_params() if p.weight.value is not None)
-        for n, p in self.group_by.get_column_params():
-            if n in weight_cols:
-                p.set_value(False)
+        self.group_by.set_choices([c for c in source.columns if c not in weight_cols])
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
-        group_cols = {duckdb_escape_identifier(name) for name, param in self.group_by.get_column_params() if param}
+        group_cols = {
+            duckdb_escape_identifier(name)
+            for name in self.group_by.get_values()
+        }
         weighted_columns = {
             duckdb_escape_identifier(name): duckdb_escape_literal(param.weight.value)
             for name, param in self.columns.get_column_params()
