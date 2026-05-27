@@ -4,7 +4,7 @@ from math import log, sqrt
 from typing import Optional
 
 import statsmodels.api as statsmodels_api
-from duckdb import DuckDBPyConnection, DuckDBPyRelation, NotImplementedException
+from duckdb import CatalogException, DuckDBPyConnection, DuckDBPyRelation, NotImplementedException
 from duckdb.sqltypes import DuckDBPyType
 
 from countess import VERSION
@@ -53,7 +53,6 @@ def score_function(times: list[float], counts: list[float], populations: list[fl
         score = fit.params[0]
         sigma = fit.bse[0]
 
-    logger.debug("scoring: %s %s %s => %f %f", times, counts, populations, score, sigma)
     return score, sigma
 
 
@@ -82,8 +81,9 @@ class ScoringPlugin(DuckdbSimplePlugin):
                 return_type=DuckDBPyType("DOUBLE[]"),
                 null_handling="special",
             )
-        except NotImplementedException:
-            # trying to create the function which already exists
+        except (NotImplementedException, CatalogException):
+            # trying to create the function which already exists.
+            # which exception gets thrown seems to depend on duckdb.
             pass
 
     def execute(

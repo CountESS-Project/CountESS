@@ -145,8 +145,17 @@ class DuckdbPlugin(BasePlugin):
 
 
 class DuckdbSimplePlugin(DuckdbPlugin):
+    def combined_source(
+        self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]
+    ) -> Optional[DuckDBPyRelation]:
+        if len(sources) == 1:
+            return list(sources.values())[0]
+        if len(sources) > 1:
+            return duckdb_combine(ddbc, sources.values())
+        return None
+
     def prepare_multi(self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation]) -> None:
-        self.prepare(ddbc, duckdb_combine(ddbc, list(sources.values())))
+        self.prepare(ddbc, self.combined_source(ddbc, sources))
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
         if source:
@@ -155,10 +164,11 @@ class DuckdbSimplePlugin(DuckdbPlugin):
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        combined_source = duckdb_combine(ddbc, sources.values())
-        if combined_source is None:
+        sc = self.combined_source(ddbc, sources)
+        if sc:
+            return self.execute(ddbc, sc, row_limit)
+        else:
             return None
-        return self.execute(ddbc, combined_source, row_limit)
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
@@ -421,8 +431,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
             null_handling="special",
         )
 
-        view = duckdb_source_to_view(ddbc, source)
-        subquery = self.subquery(view.alias, view.columns)
+        subquery = self.subquery(source.alias, source.columns)
         sql = f"SELECT UNNEST({function_name}(_ROW)) FROM ({subquery}) AS _ROW"
         logger.debug(sql)
         return ddbc.sql(sql)

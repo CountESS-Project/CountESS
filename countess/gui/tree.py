@@ -15,10 +15,11 @@ from enum import Enum, IntFlag
 from functools import partial
 
 from countess.core.config import read_config_dict, write_config_node_string
-from countess.core.pipeline import PipelineNode, PipelineGraph
+from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.gui.widgets import copy_to_clipboard, get_icon
 
 logger = logging.getLogger(__name__)
+
 
 def _limit(value, min_value, max_value):
     return max(min_value, min(max_value, value))
@@ -279,9 +280,9 @@ class GraphWrapper:
     selected_node = None
     highlight_rectangle = None
 
-    def __init__(self, canvas, graph : PipelineGraph, node_select_callback):
+    def __init__(self, canvas, graph: PipelineGraph, node_select_callback):
         self.canvas = canvas
-        self.graph : PipelineGraph = graph
+        self.graph: PipelineGraph = graph
         self.node_select_callback = node_select_callback
 
         self.labels = dict((node, self.label_for_node(node)) for node in graph.nodes)
@@ -591,6 +592,11 @@ class GraphWrapper:
 
         self.labels[node].update_node(node, not flipped)
         self.graph.update()
+        # self.poll_progress()
+
+    def poll_progress(self):
+        if self.graph.progress():
+            self.canvas.after(250, self.poll_progress)
 
     def destroy(self):
         for node_lines in self.lines.values():

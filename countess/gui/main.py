@@ -20,11 +20,10 @@ from tkinter import messagebox, ttk
 from typing import Optional, Union
 
 import psutil
-from duckdb import DuckDBPyRelation
 
 from countess import VERSION
 from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config
-from countess.core.pipeline import PipelineGraph
+from countess.core.pipeline import PipelineGraph, PipelineNodeStatus
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
 from countess.gui.mini_browser import mini_browser_open
@@ -130,6 +129,7 @@ class ConfiguratorWrapper:
 
         self.show_config_subframe()
         self.show_preview_subframe()
+        self.config_change_poll_callback()
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -268,14 +268,15 @@ class ConfiguratorWrapper:
         self.config_change_poll_callback()
 
     def config_change_poll_callback(self):
-        if self.node.is_dirty:
-            self.frame.after(50, self.config_change_poll_callback)
+        logger.debug("ConfiguratorWrapper.config_change_poll_callback")
+        if self.node.status in (PipelineNodeStatus.DIRTY, PipelineNodeStatus.WORKING):
+            self.frame.after(500, self.config_change_poll_callback)
         else:
             self.config_change_poll_done()
 
     def config_change_poll_done(self):
-        pos1, pos2 = self.config_scrollbar.get()
         logger.debug("ConfiguratorWrapper.config_change_poll_done")
+        pos1, pos2 = self.config_scrollbar.get()
         self.show_preview_subframe()
         self.configurator.update()
         self.frame.update()
@@ -389,8 +390,8 @@ class LoggerFrame(tk.Frame):
         super().__init__(*a, **k)
         self.count = 0
         self.text = tk.Text(self)
-        self.scrollbar = ttk.Scrollbar(self, orient='vertical', command=self.text.yview)
-        self.text['yscrollcommand'] = self.scrollbar.set
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.text.yview)
+        self.text["yscrollcommand"] = self.scrollbar.set
         self.text.grid(sticky=tk.NSEW)
         self.scrollbar.grid(row=0, column=1, sticky=tk.NS)
         self.progress_bars: dict[str, LabeledProgressbar] = {}

@@ -3,7 +3,8 @@ import re
 import secrets
 import threading
 import time
-from typing import Any, Iterable, Optional
+from enum import Enum
+from typing import Iterable, Optional
 
 import duckdb
 
@@ -11,6 +12,13 @@ from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
 from countess.utils.duckdb import duckdb_source_to_view
 
 logger = logging.getLogger(__name__)
+
+
+class PipelineNodeStatus(Enum):
+    DIRTY = 0
+    WORKING = 1
+    RESULT = 2
+    ERROR = 3
 
 
 class PipelineNode:
@@ -23,7 +31,7 @@ class PipelineNode:
     notes: Optional[str] = None
     parent_nodes: set["PipelineNode"]
     child_nodes: set["PipelineNode"]
-    is_dirty: bool = True
+    status: PipelineNodeStatus = PipelineNodeStatus.DIRTY
 
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
@@ -50,8 +58,8 @@ class PipelineNode:
         self.parent_nodes = set()
         self.child_nodes = set()
         self.config: list[tuple[str, str, str]] = []
-        self.table_name : Optional[str] = None
-        self.message : Optional[str] = None
+        self.table_name: Optional[str] = None
+        self.message: Optional[str] = None
 
     def set_config(self, key, value, base_dir):
         self.config.append((key, value, base_dir))
@@ -84,35 +92,34 @@ class PipelineNode:
             return
         self.load_config()
 
-        # set the node to clean now, so that any changes which happen
-        # while we're recalculating will set it dirty again and thus
+        # set the node to WORKING now, so that any changes which happen
+        # while we're recalculating will set it DIRTY again and thus
         # get detected on the next sweep
-        self.is_dirty = False
+        self.status = PipelineNodeStatus.WORKING
 
         if self.table_name:
             ddbc.sql(f"DROP TABLE IF EXISTS {self.table_name}")
 
         try:
-            sources = {pn.name: ddbc.table(pn.table_name) for pn in self.parent_nodes}
+            sources = {pn.name: ddbc.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
             self.plugin.prepare_multi(ddbc, sources)
             result = self.plugin.execute_multi(ddbc, sources, row_limit)
             if result:
                 self.table_name = f"n_{self.uuid}"
-                self.message = None
                 result.to_table(self.table_name)
+                self.status = PipelineNodeStatus.RESULT
             else:
-                self.table_name = None
-                self.message = "None"
+                self.message = "Unknown Error"
+                self.status = PipelineNodeStatus.ERROR
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("PipelineNode.run %s exception %s", self.uuid, exc)
-            self.table_name = None
             self.message = str(exc)
+            self.status = PipelineNodeStatus.ERROR
 
     def mark_dirty(self):
-        self.is_dirty = True
+        self.status = PipelineNodeStatus.DIRTY
         for child_node in self.child_nodes:
-            if not child_node.is_dirty:
-                child_node.mark_dirty()
+            child_node.mark_dirty()
 
     def add_parent(self, parent):
         if (not self.plugin or self.plugin.num_inputs) and (not parent.plugin or parent.plugin.num_outputs):
@@ -146,12 +153,12 @@ class PipelineGraph:
         self.ddbc.create_function("warning", self.sql_warning)
         self.preview_row_limit = preview_row_limit
 
-        self.thread : Optional[threading.Thread] = None
-        self.thread_cursor : Optional[duckdb.DuckDBPyConnection] = None
+        self.thread: Optional[threading.Thread] = None
+        self.thread_cursor: Optional[duckdb.DuckDBPyConnection] = None
 
     def reset(self):
         for node in self.nodes:
-            node.is_dirty = True
+            node.status = PipelineNodeStatus.DIRTY
         self.start_thread()
 
     def __del__(self):
@@ -224,6 +231,31 @@ class PipelineGraph:
         self.stop_thread()
         self.start_thread()
 
+    def progress(self) -> bool:
+        assert self.thread_cursor
+        still_working = False
+        for node in self.traverse_nodes():
+            if self.thread and self.thread.is_alive():
+                if node.status == PipelineNodeStatus.DIRTY:
+                    logger.info("%s: 0%%", node.name)
+                    still_working = True
+                elif node.status == PipelineNodeStatus.WORKING:
+                    if isinstance(node.plugin, DuckdbPlugin):
+                        qp = node.plugin.query_progress(self.thread_cursor)
+                        if qp > 0:
+                            logger.info("%s: %d%%", node.name, qp)
+                        else:
+                            logger.info("%s: 0/0", node.name)
+                    else:
+                        logger.info("%s: 0/0", node.name)
+                    still_working = True
+                else:
+                    logger.info("%s: 100%%", node.name)
+            else:
+                logger.info("%s: 100%%", node.name)
+
+        return still_working
+
     def _thread_target(self):
         """Check for dirty nodes and update their results."""
         logger.debug("Pipelinegraph._thread_target starting")
@@ -234,7 +266,7 @@ class PipelineGraph:
         self.thread_cursor = self.ddbc.cursor()
         try:
             for node in self.traverse_nodes():
-                if node.is_dirty:
+                if node.status == PipelineNodeStatus.DIRTY:
                     logger.debug("Pipelinegraph._thread_target recalculating %s", node.uuid)
                     node.run(self.thread_cursor, self.preview_row_limit)
                 else:
@@ -245,7 +277,6 @@ class PipelineGraph:
             logger.debug("Pipelinegraph._thread_target interrupted")
         finally:
             self.thread_cursor.close()
-
 
     def run(self):
         # Unlike 'start', we kick all the nodes off in one thread so that
