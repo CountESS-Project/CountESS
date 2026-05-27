@@ -386,7 +386,10 @@ class LoggerFrame(tk.Frame):
         super().__init__(*a, **k)
         self.count = 0
         self.text = tk.Text(self)
+        self.scrollbar = ttk.Scrollbar(self, orient='vertical', command=self.text.yview)
+        self.text['yscrollcommand'] = self.scrollbar.set
         self.text.grid(sticky=tk.NSEW)
+        self.scrollbar.grid(row=0, column=1, sticky=tk.NS)
         self.progress_bars: dict[str, LabeledProgressbar] = {}
 
         # Start a QueueListener in its own thread,
@@ -432,6 +435,7 @@ class LoggerFrame(tk.Frame):
                 pbar.progress_update(message)
         else:
             self.text.insert(tk.END, message + "\n")
+            self.text.after(10, self.text.see, tk.END)
             self.count += 1
 
     def hide_event(self):
