@@ -1,7 +1,8 @@
+from typing import Optional
 import pytest
 
 from countess.core.parameters import IntegerParam
-from countess.core.pipeline import PipelineGraph, PipelineNode
+from countess.core.pipeline import PipelineGraph, PipelineNode, PipelineNodeStatus
 from countess.core.plugins import DuckdbSimplePlugin
 
 
@@ -87,16 +88,15 @@ def test_pipeline_graph_reset_node_names(pg):
 def test_pg_reset(pg):
     pg.reset()
 
-    assert all(pn.result is None for pn in pg.traverse_nodes())
-    assert all(pn.is_dirty for pn in pg.traverse_nodes())
+    assert all(pn.status == PipelineNodeStatus.DIRTY for pn in pg.traverse_nodes())
 
 
 class DoesNothingPlugin(DuckdbSimplePlugin):
     version = "0"
     param = IntegerParam("param", 0)
 
-    def execute(self, ddbc, source):
-        return None
+    def execute(self, ddbc, source, row_limit: Optional[int] = None):
+        return 1/0
 
 
 def test_plugin_config(caplog):
@@ -122,12 +122,15 @@ def test_mark_dirty():
     pn2 = PipelineNode("node2", plugin=DoesNothingPlugin())
     pn2.add_parent(pn1)
 
-    pn2.run(None)
+    assert pn1.status == PipelineNodeStatus.DIRTY
+    assert pn2.status == PipelineNodeStatus.DIRTY
 
-    assert not pn1.is_dirty
-    assert not pn2.is_dirty
+    pn1.run(None)
+
+    assert pn1.status == PipelineNodeStatus.ERROR
+    assert pn2.status == PipelineNodeStatus.DIRTY
 
     pn1.configure_plugin("param", 2)
 
-    assert pn1.is_dirty
-    assert pn2.is_dirty
+    assert pn1.status == PipelineNodeStatus.DIRTY
+    assert pn2.status == PipelineNodeStatus.DIRTY
