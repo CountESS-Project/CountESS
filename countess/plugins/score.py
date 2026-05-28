@@ -15,7 +15,6 @@ from countess.utils.duckdb import (
     duckdb_dtype_is_numeric,
     duckdb_escape_identifier,
     duckdb_escape_literal,
-    duckdb_source_to_view,
 )
 
 logger = logging.getLogger(__name__)

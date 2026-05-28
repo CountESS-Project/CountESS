@@ -1,4 +1,5 @@
 from typing import Optional
+
 import pytest
 
 from countess.core.parameters import IntegerParam
@@ -96,7 +97,7 @@ class DoesNothingPlugin(DuckdbSimplePlugin):
     param = IntegerParam("param", 0)
 
     def execute(self, ddbc, source, row_limit: Optional[int] = None):
-        return 1/0
+        return 1 / 0
 
 
 def test_plugin_config(caplog):

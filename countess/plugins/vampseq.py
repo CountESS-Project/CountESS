@@ -4,12 +4,7 @@ from typing import Iterable, Optional
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import (
-    FloatParam,
-    MultiColumnChoiceParam,
-    PerNumericColumnArrayParam,
-    TabularMultiParam,
-)
+from countess.core.parameters import FloatParam, MultiColumnChoiceParam, PerNumericColumnArrayParam, TabularMultiParam
 from countess.core.plugins import DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
 
@@ -39,13 +34,11 @@ class VampSeqScorePlugin(DuckdbSqlPlugin):
                 c.weight.value = (n + 1) / len(count_cols)
 
         weight_cols = set(n for n, p in self.columns.get_column_params() if p.weight.value is not None)
-        self.group_by.set_choices([c for c in source.columns if c not in weight_cols])
+        if source:
+            self.group_by.set_choices([c for c in source.columns if c not in weight_cols])
 
     def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
-        group_cols = {
-            duckdb_escape_identifier(name)
-            for name in self.group_by.get_values()
-        }
+        group_cols = {duckdb_escape_identifier(name) for name in self.group_by.get_values()}
         weighted_columns = {
             duckdb_escape_identifier(name): duckdb_escape_literal(param.weight.value)
             for name, param in self.columns.get_column_params()

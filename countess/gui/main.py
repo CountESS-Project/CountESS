@@ -96,15 +96,15 @@ class ConfiguratorWrapper:
     """Wraps up the PluginConfigurator or PluginChooserFrame, plus a
     DataFramePreview, to make up the larger part of the main window"""
 
-    config_canvas = None
-    config_subframe = None
+    config_canvas: Optional[tk.Canvas] = None
+    config_scrollbar: Optional[tk.Scrollbar] = None
+    config_subframe: Optional[tk.Frame] = None
     config_subframe_id = None
-    preview_subframe = None
-    config_change_task = None
-    notes_widget = None
-    node_update_thread = None
-    info_toplevel = None
-    info_frame = None
+    preview_subframe: Optional[tk.Frame] = None
+    notes_widget: Optional[tk.Widget] = None
+    info_toplevel: Optional[tk.Toplevel] = None
+    info_frame: Optional[tk.Frame] = None
+    configurator: Optional[PluginConfigurator] = None
 
     def __init__(self, tk_parent, node, ddbc, change_callback):
         logger.debug("ConfiguratorWrapper %s %s", node.name, node.uuid)
@@ -168,7 +168,6 @@ class ConfiguratorWrapper:
             self.config_subframe = PluginChooserFrame(
                 self.config_canvas, "Choose Plugin", self.choose_plugin, has_parents, has_children
             )
-
 
     def show_configurator(self):
         self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
@@ -271,8 +270,6 @@ class ConfiguratorWrapper:
         self.config_scrollbar.set(pos1, pos2)
 
     def destroy(self):
-        if self.config_change_task:
-            self.frame.after_cancel(self.config_change_task)
         self.frame.destroy()
 
 
