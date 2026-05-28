@@ -195,6 +195,13 @@ class ConfiguratorWrapper:
         self.notes_widget.destroy()
         self.show_notes_widget()
 
+    def choose_plugin(self, plugin_class):
+        self.node.plugin = plugin_class()
+        self.change_callback(self.node)
+        self.name_var.set(self.node.name)
+        self.show_config_subframe()
+        self.config_change_start()
+
     def show_notes_widget(self, notes=""):
         self.notes_widget = tk.Text(self.subframe, height=5)
         self.notes_widget.insert("1.0", notes)
@@ -242,35 +249,13 @@ class ConfiguratorWrapper:
     def config_change_callback(self, *_):
         """Called immediately if a change to config has occurred."""
         logger.debug("config_change_callback %s", self.node.name)
-
-        # Leave it a bit (2500ms) to see if the user is still typing, if so cancel
-        # the previous task and make a new task for another 2.5 seconds away ...
-        if self.config_change_task:
-            self.frame.after_cancel(self.config_change_task)
-        self.config_change_task = self.frame.after(2500, self.config_change_task_callback)
-
-    def config_change_task_callback(self):
-        """Called when the user makes a change and had paused for a bit"""
-        logger.debug("ConfiguratorWrapper.config_change_task_callback %s", self.node.name)
-        self.config_change_task = None
-        self.config_change_start()
-
-    def choose_plugin(self, plugin_class):
-        self.node.plugin = plugin_class()
-        self.change_callback(self.node)
-        self.name_var.set(self.node.name)
-        self.show_config_subframe()
-        self.config_change_start()
-
-    def config_change_start(self):
-        self.node.mark_dirty()
-        self.change_callback(self.node)
-        self.config_change_poll_callback()
+        self.frame.after(10, self.change_callback, self.node)
+        self.frame.after(250, self.config_change_poll_callback)
 
     def config_change_poll_callback(self):
         logger.debug("ConfiguratorWrapper.config_change_poll_callback")
         if self.node.status in (PipelineNodeStatus.DIRTY, PipelineNodeStatus.WORKING):
-            self.frame.after(500, self.config_change_poll_callback)
+            self.frame.after(250, self.config_change_poll_callback)
         else:
             self.config_change_poll_done()
 

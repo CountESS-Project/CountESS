@@ -112,7 +112,7 @@ class PipelineNode:
                 self.message = "Unknown Error"
                 self.status = PipelineNodeStatus.ERROR
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning("PipelineNode.run %s exception %s", self.uuid, exc)
+            logger.warning("PipelineNode.run %s exception %s", self.uuid, repr(exc))
             self.message = str(exc)
             self.status = PipelineNodeStatus.ERROR
 

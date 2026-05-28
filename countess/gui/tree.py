@@ -591,6 +591,8 @@ class GraphWrapper:
             self.graph.reset_node_name(node)
 
         self.labels[node].update_node(node, not flipped)
+
+        node.mark_dirty()
         self.graph.update()
         # self.poll_progress()
 
