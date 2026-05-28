@@ -23,7 +23,7 @@ import psutil
 
 from countess import VERSION
 from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config
-from countess.core.pipeline import PipelineGraph, PipelineNodeStatus
+from countess.core.pipeline import PipelineGraph, PipelineNode, PipelineNodeStatus
 from countess.core.plugins import get_plugin_classes
 from countess.gui.config import PluginConfigurator
 from countess.gui.mini_browser import mini_browser_open
@@ -127,9 +127,8 @@ class ConfiguratorWrapper:
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
         self.label.bind("<Configure>", self.on_label_configure)
 
-        self.show_config_subframe()
-        self.show_preview_subframe()
-        self.config_change_poll_callback()
+        self.frame.after(50, self.show_config_subframe)
+        self.frame.after(500, self.show_preview_subframe)
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -161,8 +160,7 @@ class ConfiguratorWrapper:
             )
             if self.node.plugin.link:
                 info_button(self.frame, command=self.on_info_button_press).place(anchor=tk.NE, relx=1, y=50)
-            self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
-            self.config_subframe = self.configurator.frame
+            self.frame.after(100, self.show_configurator)
 
         else:
             has_parents = len(self.node.parent_nodes) > 0
@@ -171,6 +169,10 @@ class ConfiguratorWrapper:
                 self.config_canvas, "Choose Plugin", self.choose_plugin, has_parents, has_children
             )
 
+
+    def show_configurator(self):
+        self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
+        self.config_subframe = self.configurator.frame
         self.config_subframe_id = self.config_canvas.create_window((0, 0), window=self.config_subframe, anchor=tk.NW)
         self.config_subframe.bind(
             "<Configure>",
@@ -200,7 +202,7 @@ class ConfiguratorWrapper:
         self.change_callback(self.node)
         self.name_var.set(self.node.name)
         self.show_config_subframe()
-        self.config_change_start()
+        self.config_change_callback()
 
     def show_notes_widget(self, notes=""):
         self.notes_widget = tk.Text(self.subframe, height=5)
@@ -494,6 +496,7 @@ class MainWindow:
         self.tree_canvas = FlippyCanvas(self.main_subframe, bg="skyblue")
         self.main_subframe.add_child(self.tree_canvas)
 
+        self.config_wrapper_cache: dict[PipelineNode, ConfiguratorWrapper] = {}
         self.config_wrapper = SplashWrapper(self.main_subframe)
         self.main_subframe.add_child(self.config_wrapper.frame, weight=4)
 
@@ -589,15 +592,17 @@ class MainWindow:
             self.tk_parent.quit()
 
     def node_select(self, node):
-        if node:
-            new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.graph.ddbc, self.node_changed)
-        else:
+        if not node:
             new_config_wrapper = SplashWrapper(self.main_subframe)
+        else:
+            try:
+                new_config_wrapper = self.config_wrapper_cache[node]
+            except KeyError:
+                new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.graph.ddbc, self.node_changed)
+                self.config_wrapper_cache[node] = new_config_wrapper
 
         if self.config_wrapper:
             self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
-            self.config_wrapper.destroy()
-
         self.config_wrapper = new_config_wrapper
 
     def node_changed(self, node):

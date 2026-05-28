@@ -256,6 +256,7 @@ class ResizingFrame(tk.Frame):
 
     def remove_child(self, widget: tk.Widget) -> tk.Widget:
         self._children = [c for c in self._children if c.widget != widget]
+        widget.place_forget()
         self._resize()
         return widget
 
@@ -267,6 +268,7 @@ class ResizingFrame(tk.Frame):
             )
             for c in self._children
         ]
+        old_widget.place_forget()
         self._resize()
 
 
