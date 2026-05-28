@@ -218,7 +218,10 @@ class PipelineGraph:
         logger.debug("PipelineGraph.stop_thread")
         if self.thread and self.thread.is_alive():
             if self.thread_cursor:
-                self.thread_cursor.interrupt()
+                try:
+                    self.thread_cursor.interrupt()
+                except duckdb.ConnectionException:
+                    pass
             self.thread.join()
 
     def start_thread(self):
