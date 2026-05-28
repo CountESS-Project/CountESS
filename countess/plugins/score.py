@@ -89,8 +89,6 @@ class ScoringPlugin(DuckdbSimplePlugin):
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        view = duckdb_source_to_view(ddbc, source)
-
         yaxis_prefix = self.columns.get_column_prefix()
         suffix_set = {k.removeprefix(yaxis_prefix) for k in source.columns if k.startswith(yaxis_prefix)}
         suffixes = sorted(suffix_set)
@@ -115,7 +113,7 @@ class ScoringPlugin(DuckdbSimplePlugin):
             keep_fields = ",".join(
                 [
                     f"A.{duckdb_escape_identifier(f)}"
-                    for f in view.columns
+                    for f in source.columns
                     if duckdb_escape_identifier(f) not in count_cols
                 ]
             )
@@ -133,8 +131,6 @@ class ScoringPlugin(DuckdbSimplePlugin):
             group_clause = f"GROUP BY {repl_id}"
             join_using = f"USING ({repl_id})"
 
-        view = duckdb_source_to_view(ddbc, source)
-
         query = f"""
             SELECT * EXCLUDE _SCORE,
                 _SCORE[1] AS {duckdb_escape_identifier(self.output.value)},
@@ -144,10 +140,10 @@ class ScoringPlugin(DuckdbSimplePlugin):
                     [{', '.join(x_cols)}],
                     [{', '.join("A." + c for c in count_cols)}],
                     [{', '.join("B." + c for c in count_cols)}]
-                ) AS _SCORE FROM {view.alias} AS A {join_op} (
+                ) AS _SCORE FROM {source.alias} AS A {join_op} (
                     SELECT {repl_id + ", " if repl_id else ""}
                     {', '.join(f"SUM({c}) AS {c}" for c in count_cols)}
-                    FROM {view.alias} {where_clause} {group_clause}
+                    FROM {source.alias} {where_clause} {group_clause}
                 ) AS B {join_using}
             )
         """
