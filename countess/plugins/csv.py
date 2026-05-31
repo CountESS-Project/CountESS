@@ -25,10 +25,8 @@ from countess.core.parameters import (
     TabularMultiParam,
 )
 from countess.core.plugins import (
-    DuckdbLoadFilePlugin,
+    DuckdbLoadFileWithTheLotPlugin,
     DuckdbSaveFilePlugin,
-    LoadFileDeGlobMixin,
-    LoadFileWithFilenameMixin,
 )
 from countess.utils.duckdb import (
     duckdb_dtype_to_datatype_choice,
@@ -67,7 +65,7 @@ def _openfile(filename, mode):
         return open(filename, mode, encoding="utf-8")
 
 
-class LoadCsvPlugin(LoadFileDeGlobMixin, LoadFileWithFilenameMixin, DuckdbLoadFilePlugin):
+class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
     """Load CSV files"""
 
     name = "CSV Load"
