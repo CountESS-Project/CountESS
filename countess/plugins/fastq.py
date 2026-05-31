@@ -77,7 +77,7 @@ class LoadFastqPlugin(DuckdbLoadFileWithTheLotPlugin):
         combined_view = super().combine(ddbc, tables)
         if combined_view is None:
             return None
-        elif self.filename_column or self.header_column:
+        elif not self.group or self.filename_column or self.header_column:
             return combined_view
         else:
             return combined_view.aggregate("sequence, sum(count) as count")
