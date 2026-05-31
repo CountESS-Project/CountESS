@@ -168,6 +168,7 @@ class ConfiguratorWrapper:
             self.config_subframe = PluginChooserFrame(
                 self.config_canvas, "Choose Plugin", self.choose_plugin, has_parents, has_children
             )
+            self.config_subframe.grid(sticky=tk.NSEW)
 
     def show_configurator(self):
         self.configurator = PluginConfigurator(self.config_canvas, self.node.plugin, self.config_change_callback)
