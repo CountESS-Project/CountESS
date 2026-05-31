@@ -37,7 +37,6 @@ BINARY_FUNC_OPS = {
     "CONTAINS",
     "STARTS_WITH",
     "ENDS_WITH",
-    "REGEXP_MATCHES",
     "TRANSLATE",
 }
 
@@ -46,6 +45,11 @@ SPECIAL_OPS = {
     "TRIM": ("TRIM", 1, 2),
     "PI": ("PI", 0, 0),
     "CONCAT": ("CONCAT", 1, None),
+    "REPLACE": ("REPLACE", 3, 3),
+    "SUBSTRING": ("SUBSTRING", 2, 3),
+    "REGEXP_EXTRACT": ("REGEXP_EXTRACT", 2, 4),
+    "REGEXP_MATCHES": ("REGEXP_MATCHES", 2, 3),
+    "REGEXP_REPLACE": ("REGEXP_REPLACE", 3, 4),
 }
 
 LIST_OPS = {
