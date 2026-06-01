@@ -6,7 +6,7 @@ import lzma
 from io import BufferedWriter, BytesIO
 from itertools import zip_longest
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Iterable, List, Optional, Sequence, Tuple, TypedDict, Union
 
 import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
@@ -25,12 +25,7 @@ from countess.core.parameters import (
     TabularMultiParam,
 )
 from countess.core.plugins import DuckdbLoadFileWithTheLotPlugin, DuckdbSaveFilePlugin
-from countess.utils.duckdb import (
-    duckdb_dtype_to_datatype_choice,
-    duckdb_escape_identifier,
-    duckdb_source_to_table,
-    duckdb_source_to_view,
-)
+from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_table
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
     ("CSV", [".csv", ".csv.gz", ".csv.bz2"]),
@@ -46,7 +41,16 @@ class ColumnsMultiParam(MultiParam):
     type = DataTypeOrNoneChoiceParam("Column Type")
 
 
-CSV_DELIMITER_CHOICES = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " "}
+CSV_DELIMITER_CHOICES: dict[str, str] = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " "}
+
+
+class ReadCsvOptions(TypedDict):
+    sep: str
+    null_padding: bool
+    strict_mode: bool
+    all_varchar: bool
+    skiprows: int
+    header: bool
 
 
 class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
@@ -65,7 +69,7 @@ class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        options = {
+        options: ReadCsvOptions = {
             "sep": CSV_DELIMITER_CHOICES[self.delimiter.value],
             "null_padding": True,
             "strict_mode": False,
@@ -75,12 +79,12 @@ class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
         }
         if filename.endswith(".bz2"):
             with bz2.open(filename) as fh:
-                rel = cursor.read_csv(fh, **options)
+                rel = cursor.read_csv(fh, **options)  # typing: disable=arg-type
         elif filename.endswith(".xz"):
             with lzma.open(filename) as fh:
-                rel = cursor.read_csv(fh, **options)
+                rel = cursor.read_csv(fh, **options)  # typing: disable=arg-type
         else:
-            rel = cursor.read_csv(filename, **options)
+            rel = cursor.read_csv(filename, **options)  # typing: disable=arg-type
 
         if row_limit is not None:
             rel = rel.limit(row_limit)
@@ -147,6 +151,19 @@ class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
 class SaveCsvOrderParameter(TabularMultiParam):
     order_by = ColumnChoiceParam("Order By")
     descending = BooleanParam("Descending")
+
+
+def _openfile(filename, mode):
+    if filename.endswith(".gz"):
+        return gzip.open(filename, mode)
+    elif filename.endswith(".bz2"):
+        return bz2.open(filename, mode)
+    elif filename.endswith(".xz"):
+        return lzma.open(filename, mode)
+    elif "b" in mode:
+        return open(filename, mode)  # pylint: disable=unspecified-encoding
+    else:
+        return open(filename, mode, encoding="utf-8")
 
 
 class SaveCsvPlugin(DuckdbSaveFilePlugin):
