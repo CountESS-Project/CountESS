@@ -3,6 +3,7 @@ import re
 import secrets
 import threading
 import time
+import traceback
 from enum import Enum
 from typing import Iterable, Optional
 
@@ -109,11 +110,11 @@ class PipelineNode:
                 result.to_table(self.table_name)
                 self.status = PipelineNodeStatus.RESULT
             else:
-                self.message = "Unknown Error"
+                self.message = ""
                 self.status = PipelineNodeStatus.ERROR
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("PipelineNode.run %s exception %s", self.uuid, repr(exc))
-            self.message = str(exc)
+            self.message = "\n".join(traceback.format_exception(exc))
             self.status = PipelineNodeStatus.ERROR
 
     def mark_dirty(self):

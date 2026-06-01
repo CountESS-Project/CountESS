@@ -19,8 +19,6 @@ import hashlib
 import importlib
 import importlib.metadata
 import logging
-import multiprocessing
-import multiprocessing.pool
 import os.path
 import secrets
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Type, Union

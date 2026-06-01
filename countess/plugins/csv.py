@@ -24,10 +24,7 @@ from countess.core.parameters import (
     StringParam,
     TabularMultiParam,
 )
-from countess.core.plugins import (
-    DuckdbLoadFileWithTheLotPlugin,
-    DuckdbSaveFilePlugin,
-)
+from countess.core.plugins import DuckdbLoadFileWithTheLotPlugin, DuckdbSaveFilePlugin
 from countess.utils.duckdb import (
     duckdb_dtype_to_datatype_choice,
     duckdb_escape_identifier,
