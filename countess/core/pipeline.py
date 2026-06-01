@@ -105,6 +105,7 @@ class PipelineNode:
             sources = {pn.name: ddbc.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
             self.plugin.prepare_multi(ddbc, sources)
             result = self.plugin.execute_multi(ddbc, sources, row_limit)
+            self.message = ""
             if result:
                 self.table_name = f"n_{self.uuid}"
                 result.to_table(self.table_name)
@@ -112,6 +113,10 @@ class PipelineNode:
             else:
                 self.message = ""
                 self.status = PipelineNodeStatus.ERROR
+        except duckdb.InterruptException:
+            logger.debug("Query interrupted: retrying")
+            self.table_name = None
+            self.message = None
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("PipelineNode.run %s exception %s", self.uuid, repr(exc))
             self.message = "\n".join(traceback.format_exception(exc))

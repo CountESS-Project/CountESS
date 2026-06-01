@@ -49,19 +49,6 @@ class ColumnsMultiParam(MultiParam):
 CSV_DELIMITER_CHOICES = {",": ",", ";": ";", "|": "|", "TAB": "\t", "SPACE": " "}
 
 
-def _openfile(filename, mode):
-    if filename.endswith(".gz"):
-        return gzip.open(filename, mode)
-    elif filename.endswith(".bz2"):
-        return bz2.open(filename, mode)
-    elif filename.endswith(".xz"):
-        return lzma.open(filename, mode)
-    elif "b" in mode:
-        return open(filename, mode)  # pylint: disable=unspecified-encoding
-    else:
-        return open(filename, mode, encoding="utf-8")
-
-
 class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
     """Load CSV files"""
 
@@ -78,19 +65,22 @@ class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
     def load_file(
         self, cursor: duckdb.DuckDBPyConnection, filename: str, file_param: BaseParam, row_limit: Optional[int] = None
     ) -> duckdb.DuckDBPyRelation:
-        with _openfile(filename, "rb") as fh:
-            rel = duckdb_source_to_table(
-                cursor,
-                cursor.read_csv(
-                    fh,
-                    sep=CSV_DELIMITER_CHOICES[self.delimiter.value],
-                    null_padding=True,
-                    strict_mode=False,
-                    all_varchar=len(self.columns) > 0,
-                    skiprows=1 if self.header and len(self.columns) > 0 else 0,
-                    header=self.header.value and len(self.columns) == 0,
-                ),
-            )
+        options = {
+            "sep": CSV_DELIMITER_CHOICES[self.delimiter.value],
+            "null_padding": True,
+            "strict_mode": False,
+            "all_varchar": len(self.columns) > 0,
+            "skiprows": 1 if self.header and len(self.columns) > 0 else 0,
+            "header": self.header.value and len(self.columns) == 0,
+        }
+        if filename.endswith(".bz2"):
+            with bz2.open(filename) as fh:
+                rel = cursor.read_csv(fh, **options)
+        elif filename.endswith(".xz"):
+            with lzma.open(filename) as fh:
+                rel = cursor.read_csv(fh, **options)
+        else:
+            rel = cursor.read_csv(filename, **options)
 
         if row_limit is not None:
             rel = rel.limit(row_limit)
@@ -120,7 +110,19 @@ class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
             logger.debug("LoadCsvPlugin.load_file proj %s", proj)
             rel = rel.project(proj)
 
-        return duckdb_source_to_view(cursor, rel)
+        # `rel = cursor.read_csv(fh)` returns a `DuckDBPyRelation`
+        # with `rel.alias` starting `DUCKDB_INTERNAL_OBJECTSTORE:`
+        # but limits / projections / views of that relation stop
+        # working once `rel` falls out of scope.
+        #
+        # `rel = cursor.read_csv(filename)` returns a `DuckDBPyRelation`
+        # with `rel.alias` starting `unnamed_relation_` and those
+        # seem to work fine to limit / project / view.
+
+        if rel.alias.startswith("DUCKDB_INTERNAL_OBJECTSTORE:"):
+            rel = duckdb_source_to_table(cursor, rel)
+
+        return rel
 
     def combine(
         self, ddbc: duckdb.DuckDBPyConnection, tables: Iterable[duckdb.DuckDBPyRelation]
