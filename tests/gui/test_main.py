@@ -40,6 +40,8 @@ def test_main():
     callback = MagicMock()
 
     wrap = ConfiguratorWrapper(root, node, None, callback)
+    time.sleep(0.1)
+    root.update()
     wrap.on_add_notes()
 
     root.update()

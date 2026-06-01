@@ -1,0 +1,100 @@
+[CSV Load 2]
+_uuid = 5fc89c32c6a99e142978914ad72ba385
+_module = countess.plugins.csv
+_class = LoadCsvPlugin
+_version = 0.1.22
+_hash = 88d50223e9d605c2b31bb07221e9f27443464947ba9b54275fd1a2ff7a30d982
+_sort = 0 0
+_position = 100 500
+files.0.filename = 'input2.txt'
+filename_column = False
+delimiter = 'SPACE'
+header = False
+columns.0.name = 'thing'
+columns.0.type = 'STRING'
+columns.1.name = 'foo_bar_baz'
+columns.1.type = 'STRING'
+
+[CSV Load 1]
+_uuid = 6cd3f5c1144152db536a2caf0f555eae
+_module = countess.plugins.csv
+_class = LoadCsvPlugin
+_version = 0.1.22
+_hash = 7ab1b1d4cca8c10afa7f492907ad831b5aed7d9cebfaf51fc8530970cc4eede2
+_sort = 0 0
+_position = 300 250
+files.0.filename = 'input1.csv'
+filename_column = False
+delimiter = ','
+header = True
+columns.0.name = 'thing'
+columns.0.type = 'STRING'
+columns.1.name = 'number'
+columns.1.type = 'INTEGER'
+
+[Regex Tool]
+_uuid = d04772b658ffe85db327bc4808f66fd7
+_module = countess.plugins.regex
+_class = RegexToolPlugin
+_version = 0.1.22
+_hash = adea5d211e9f8c84ec49312173e5b44496495ea89441a98ecf8b827c85578c1d
+_sort = 0 0
+_position = 300 750
+_parent.0 = CSV Load 2
+column = 'foo_bar_baz'
+regex = '([\\d\\.]+)-(\\d+)_(\\d+)'
+output.0.name = 'foo'
+output.0.datatype = 'FLOAT'
+output.1.name = 'bar'
+output.1.datatype = 'INTEGER'
+output.2.name = 'baz'
+output.2.datatype = 'INTEGER'
+drop_column = False
+drop_unmatch = False
+
+[Join 3]
+_uuid = 23453d97a689489ffc472ce50f094354
+_module = countess.plugins.join
+_class = JoinPlugin
+_version = 0.1.22
+_hash = 889da84c0f9b1a3b6a0c9fe1eda09d5875fb6d8887a89cf92cfaa7ed85ef74ad
+_sort = 0 0
+_position = 500 500
+_parent.0 = Regex Tool
+_parent.1 = CSV Load 1
+inputs.0.join_on = 'thing'
+inputs.0.join_2 = '— NONE —'
+inputs.0.join_3 = '— NONE —'
+inputs.0.required = False
+inputs.0.drop = False
+inputs.1.join_on = 'thing'
+inputs.1.join_2 = '— NONE —'
+inputs.1.join_3 = '— NONE —'
+inputs.1.required = False
+inputs.1.drop = True
+
+[Expression]
+_uuid = 95f3c454511103a2a359754ae7167419
+_module = countess.plugins.expression
+_class = ExpressionPlugin
+_version = 0.1.22
+_hash = 5b336e7e9a24fb22a1877b307e5a4964e47bc21018a7a138fbbaee88402abb63
+_sort = 0 0
+_position = 679 524
+_parent.0 = Join 3
+code = 'result = number * foo * bar / baz\n\n__filter = result > 10000\n\nfoo_bar_baz = number = foo = bar = baz = None\n\n'
+
+[CSV Save 5]
+_uuid = e0b42578bf16e85ca7cd486060208111
+_module = countess.plugins.csv
+_class = SaveCsvPlugin
+_version = 0.1.22
+_hash = 82f4137a36fdab518bde0a809e91ff7f34e61115e1ddfda2143bb4a83fc34504
+_sort = 0 0
+_position = 900 500
+_parent.0 = Expression
+header = True
+filename = 'output.csv'
+delimiter = ','
+quoting = True
+
