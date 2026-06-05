@@ -37,7 +37,7 @@ class PipelineNode:
     # XXX config is a cache for config loaded from the file
     # at config load time, if it is present it is loaded the
     # first time the plugin is prerun.
-    config: Optional[list[tuple[str, str, str]]] = None
+    config: list[tuple[str, str, str]] = []
 
     def __init__(
         self,
@@ -85,7 +85,7 @@ class PipelineNode:
                     logger.warning("Parameter %s=%s Not Found", key, val)
                 except ValueError:
                     logger.warning("Parameter %s=%s Not Valid", key, val)
-            self.config = None
+            self.config = []
 
     def run(self, ddbc, row_limit: Optional[int] = None) -> None:
         logger.debug("PipelineNode.run %s", self.uuid)
