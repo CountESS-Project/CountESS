@@ -359,6 +359,7 @@ class DuckdbTransformPlugin(DuckdbSimplePlugin):
                 return None
 
         function_name = "f_" + secrets.token_hex(16)
+        logger.debug("DuckbTransformPlugin creating function %s for plugin %s", function_name, self.name)
         ddbc.create_function(  # type: ignore[call-overload]
             function_name,
             wrapper,

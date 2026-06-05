@@ -235,6 +235,15 @@ class ConfiguratorWrapper:
             return
         self.frame.add_child(self.preview_subframe)
 
+    def hide_preview_subframe(self):
+        logger.debug("ConfiguratorWrapper.hide_preview_subframe %s %s", self.node.name, self.node.uuid)
+        if self.preview_subframe:
+            self.frame.remove_child(self.preview_subframe).destroy()
+
+    def notify(self):
+        #self.hide_preview_subframe()
+        self.config_change_poll_callback()
+
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
         self.node.sort_column = sort_col
         self.node.sort_descending = sort_desc
@@ -263,12 +272,17 @@ class ConfiguratorWrapper:
 
     def config_change_poll_done(self):
         logger.debug("ConfiguratorWrapper.config_change_poll_done")
-        pos1, pos2 = self.config_scrollbar.get()
-        self.show_preview_subframe()
-        self.configurator.update()
-        self.frame.update()
-        self.config_canvas.yview_moveto(pos1)
-        self.config_scrollbar.set(pos1, pos2)
+        if self.config_scrollbar:
+            pos1, pos2 = self.config_scrollbar.get()
+            self.show_preview_subframe()
+            self.configurator.update()
+            self.frame.update()
+            self.config_canvas.yview_moveto(pos1)
+            self.config_scrollbar.set(pos1, pos2)
+        else:
+            self.show_preview_subframe()
+            self.frame.update()
+
 
     def destroy(self):
         self.frame.destroy()
@@ -286,6 +300,9 @@ class SplashWrapper:
         self.frame.rowconfigure(0, weight=1)
         tk.Label(subframe, image=get_icon(tk_parent, "countess")).grid(padx=10, pady=10)
         tk.Label(subframe, text=f"CountESS {VERSION}", font=font).grid(padx=10, pady=10)
+
+    def notify(self):
+        pass
 
     def destroy(self):
         self.frame.destroy()
@@ -602,6 +619,7 @@ class MainWindow:
         if self.config_wrapper:
             self.main_subframe.replace_child(self.config_wrapper.frame, new_config_wrapper.frame)
         self.config_wrapper = new_config_wrapper
+        new_config_wrapper.notify()
 
     def node_changed(self, node):
         logger.debug("MainWindow.node_changed(%s)", node)

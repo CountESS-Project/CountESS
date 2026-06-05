@@ -107,10 +107,12 @@ class PipelineNode:
             result = self.plugin.execute_multi(ddbc, sources, row_limit)
             self.message = ""
             if result:
+                logger.debug("PipelineNode.run got result %d rows", len(result))
                 self.table_name = f"n_{self.uuid}"
                 result.to_table(self.table_name)
                 self.status = PipelineNodeStatus.RESULT
             else:
+                logger.debug("PipelineNode.run got no result")
                 self.message = ""
                 self.status = PipelineNodeStatus.ERROR
         except duckdb.InterruptException:
@@ -161,6 +163,7 @@ class PipelineGraph:
 
         self.thread: Optional[threading.Thread] = None
         self.thread_cursor: Optional[duckdb.DuckDBPyConnection] = None
+        self.thread_stop: bool = False
 
     def reset(self):
         for node in self.nodes:
@@ -222,6 +225,7 @@ class PipelineGraph:
 
     def stop_thread(self):
         logger.debug("PipelineGraph.stop_thread")
+        self.thread_stop = True
         if self.thread and self.thread.is_alive():
             if self.thread_cursor:
                 try:
@@ -232,6 +236,7 @@ class PipelineGraph:
 
     def start_thread(self):
         logger.debug("PipelineGraph.start_thread")
+        self.thread_stop = False
         self.thread = threading.Thread(target=self._thread_target)
         self.thread.start()
 
@@ -275,12 +280,13 @@ class PipelineGraph:
         self.thread_cursor = self.ddbc.cursor()
         try:
             for node in self.traverse_nodes():
+                if self.thread_stop:
+                    logger.debug("Pipelinegraph._thread_target stopped")
                 if node.status == PipelineNodeStatus.DIRTY:
                     logger.debug("Pipelinegraph._thread_target recalculating %s", node.uuid)
                     node.run(self.thread_cursor, self.preview_row_limit)
                 else:
                     logger.debug("Pipelinegraph._thread_target %s is clean", node.uuid)
-
             logger.debug("Pipelinegraph._thread_target finished")
         except duckdb.InterruptException:
             logger.debug("Pipelinegraph._thread_target interrupted")
