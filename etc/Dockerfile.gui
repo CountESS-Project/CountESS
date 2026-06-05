@@ -9,4 +9,4 @@ COPY countess/ ./countess/
 RUN python3.11 -m pip install -e .[dev]
 COPY tests/ ./tests/
 COPY script/ ./script/
-CMD script/run-tests-gui
+CMD ["script/run-tests-gui"]
