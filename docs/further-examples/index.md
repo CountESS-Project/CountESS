@@ -178,3 +178,58 @@ into an average score and an estimated standard deviation:
 
 <!--[![Screenshot 3](img/s6_3.jpg)](img/s6_3.png)-->
 [![Screenshot 4](img/s6_4.jpg)](img/s6_4.png)
+
+## Example 7: Random Effects Model
+
+The Random Effects Model as described in [A statistical framework for analysing deep mutational
+scannin data (Rubin et. al. 2017](https://doi.org/10.1186/s13059-017-1272-5) can 
+be used to combine multiple values and their standard error into a single value
+and standard error, weighting the values according to their standard error.
+
+We'll start with some synthetic test data in `example_7.csv.gz`, which represents 4 replicates
+of a 6 timepoint experiment, each of which has counts per barcode and the barcodes already mapped
+to their corresponding sequences:
+
+[![Screenshot 1](img/s7_1.jpg)](img/s7_1.png)
+
+We then call the sequences to variants and protein variants as per previous examples.
+In this test data, all substitutions are single nucleotide variants, for the sake of simplicity:
+
+[![Screenshot 2](img/s7_2.jpg)](img/s7_2.png)
+
+We'll look at two possible ways of processing this data as a way of demonstrating how
+the [Pivot](../included-plugins/#pivot-tool) and [Random Effects](../included-plugins/#random-effects-model)
+plugins work together:
+
+### Pivoting by Barcode, Combining by Protein
+
+We first calculate scores for each barcode, by pivoting on the timepoint
+so that each row represents all the timepoints for a given replicate and barcode,
+and then using our multi timepoint scoring:
+
+[![Screenshot 3](img/s7_3.jpg)](img/s7_3.png)
+[![Screenshot 4](img/s7_4.jpg)](img/s7_4.png)
+
+There are multiple barcodes for each DNA variant, and multiple DNA variants
+for each protein variant.  We can combine the together using the Random Effects 
+Model as follows:
+
+[![Screenshot 5](img/s7_5.jpg)](img/s7_5.png)
+
+### Pivoting by Protein, Combining Replicates
+
+In this approach, we instead sum all the counts for all barcodes which
+result in the same protein, then calculate a score based on these combined
+counts:
+
+[![Screenshot 6](img/s7_6.jpg)](img/s7_6.png)
+[![Screenshot 7](img/s7_7.jpg)](img/s7_7.png)
+
+### Combining results between replicates
+
+Since we now have multiple replicate scores, and each of these has a
+standard error, we can combine them using the Random Effects Model to get 
+a combined score and standard error:
+
+[![Screenshot 8](img/s7_8.jpg)](img/s7_8.png)
+[![Screenshot 9](img/s7_9.jpg)](img/s7_9.png)
