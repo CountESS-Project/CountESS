@@ -4,7 +4,7 @@ from math import log, sqrt
 from typing import Optional
 
 import statsmodels.api as statsmodels_api
-from duckdb import CatalogException, DuckDBPyConnection, DuckDBPyRelation, NotImplementedException
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 from duckdb.sqltypes import DuckDBPyType
 
 from countess import VERSION
@@ -35,6 +35,7 @@ def score_function(times: list[float], counts: list[float], populations: list[fl
     if None in times or None in counts or None in populations:
         return None
     assert len(times) == len(counts) == len(populations) > 1
+    assert all(0 <= c <= p for c, p in zip(counts, populations))
 
     if len(times) == 2:
         # 2 time point estimate
@@ -68,22 +69,20 @@ class ScoringPlugin(DuckdbSimplePlugin):
     stddev = StringParam("Standard Deviation Column", "sigma")
     drop_input = BooleanParam("Drop Input Columns?", False)
 
-    function_name = "f_" + secrets.token_hex(16)
+    function_name = None
 
     def prepare(self, ddbc: DuckDBPyConnection, source: Optional[DuckDBPyRelation]) -> None:
         super().prepare(ddbc, source)
 
-        try:
+        if not self.function_name:
+            self.function_name = "f_" + secrets.token_hex(16)
+            logger.debug("Creating function %s for plugin %s", self.function_name, self.name)
             ddbc.create_function(  # type: ignore[call-overload]
                 self.function_name,
                 score_function,
                 return_type=DuckDBPyType("DOUBLE[]"),
                 null_handling="special",
             )
-        except (NotImplementedException, CatalogException):
-            # trying to create the function which already exists.
-            # which exception gets thrown seems to depend on duckdb.
-            pass
 
     def execute(
         self, ddbc: DuckDBPyConnection, source: DuckDBPyRelation, row_limit: Optional[int] = None
@@ -94,9 +93,17 @@ class ScoringPlugin(DuckdbSimplePlugin):
 
         count_cols = [duckdb_escape_identifier(yaxis_prefix + suffix) for suffix in suffixes]
 
-        x_values = [float(x) for x in suffixes]
+        logger.debug("ScoringPlugin.execute count_cols %s", count_cols)
+
+        try:
+            x_values = [float(x) for x in suffixes]
+        except ValueError:
+            x_values = list(range(0, len(suffixes)))
         x_max = max(x_values)
+
         x_cols = [duckdb_escape_literal(x / x_max) for n, x in enumerate(x_values)]
+
+        logger.debug("ScoringPlugin.execute x_cols %s", x_cols)
 
         where_clause = ""
         if self.wildtype.is_not_none():
@@ -147,4 +154,5 @@ class ScoringPlugin(DuckdbSimplePlugin):
             )
         """
 
+        logger.debug("ScoringPlugin.execute query %s", query)
         return ddbc.sql(query)

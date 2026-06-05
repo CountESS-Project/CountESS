@@ -5,7 +5,12 @@ from typing import Any, Iterable, Mapping, Optional
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
-from countess.core.parameters import ColumnChoiceParam, MultiColumnChoiceParam, NumericColumnGroupChoiceParam
+from countess.core.parameters import (
+    BooleanParam,
+    ColumnChoiceParam,
+    MultiColumnChoiceParam,
+    NumericColumnGroupChoiceParam,
+)
 from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier
 
@@ -36,7 +41,8 @@ def rml_estimate(
     # `\hat\beta_s` -> estimate
     # `\hat{\sigma^2}_s -> heterogeneity
 
-    assert len(scores) == len(sigmas)
+    assert len(scores) == len(sigmas), "Mismatched Scores/Sigmas"
+    assert not any(sigma <= 0 for sigma in sigmas), "All sigmas must be > 0"
 
     if len(scores) == 1:
         return scores[0], sigmas[0]
@@ -65,6 +71,14 @@ def rml_estimate(
     return estimate, 1 / sum(weights) ** 0.5
 
 
+def rml_estimate_wrapper(scores: list[float], sigmas: list[float]) -> tuple[float | None, float | None]:
+    try:
+        return rml_estimate(scores, sigmas)
+    except (RuntimeError, AssertionError) as exc:
+        logger.info(exc)
+        return None, None
+
+
 class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
     name = "Random Effects"
     description = "Combine scores using a Random Effects Model"
@@ -73,12 +87,19 @@ class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
 
     score_cols = NumericColumnGroupChoiceParam("Score Colums")
     sigma_cols = NumericColumnGroupChoiceParam("Stddev Columns")
+    drop_cols = BooleanParam("Drop Input Columns?")
 
     def add_fields(self) -> Mapping[Optional[str], Optional[type]]:
         return {
             "score": float,
             "sigma": float,
         }
+
+    def remove_fields(self, *_):
+        if self.drop_cols:
+            return self.score_cols.get_matching_columns() + self.sigma_cols.get_matching_columns()
+        else:
+            return []
 
     def transform(self, data: dict[str, Any]) -> Optional[dict[str, Any]]:
         scores = [v for k, v in sorted(data.items()) if k.startswith(self.score_cols.get_column_prefix())]
@@ -91,6 +112,12 @@ class RandomEffectsPlugin(DuckdbParallelTransformPlugin):
             return None
 
         score, sigma = rml_estimate(scores, sigmas)
+
+        if self.drop_cols:
+            for c in self.score_cols.get_matching_columns():
+                del data[c]
+            for c in self.sigma_cols.get_matching_columns():
+                del data[c]
 
         data["score"] = score
         data["sigma"] = sigma
@@ -113,9 +140,10 @@ class RandomEffectsPlugin2(DuckdbSqlPlugin):
         super().prepare(ddbc, source)
         if not self.function_name:
             self.function_name = "f_" + secrets.token_hex(16)
+            logger.debug("RandomEffectsPlugin2.prepare created function %s", self.function_name)
             ddbc.create_function(  # type: ignore[call-overload]
                 self.function_name,
-                lambda scores, sigmas: rml_estimate(scores, sigmas),  # pylint: disable=unnecessary-lambda
+                rml_estimate_wrapper,
                 return_type="DOUBLE[]",
                 null_handling="special",
             )
@@ -130,17 +158,19 @@ class RandomEffectsPlugin2(DuckdbSqlPlugin):
         if self.group_cols.get_values():
             group_cols = ",".join(duckdb_escape_identifier(c) for c in self.group_cols.get_values())
             return f"""
-                SELECT {group_cols}, _ROW[1] AS score, _ROW[2] AS sigma
+                SELECT {group_cols}, _ROW[1] AS score, _ROW[2] AS sigma, _COUNT AS count
                 FROM (
-                    SELECT {group_cols}, {self.function_name}(LIST({score_col}), LIST({sigma_col})) as _ROW
+                    SELECT {group_cols},
+                      {self.function_name}(LIST({score_col}), LIST({sigma_col})) as _ROW,
+                      COUNT(*) AS _COUNT
                     FROM {table_name} GROUP BY {group_cols}
                 ) X
             """
         else:
             return f"""
-                 SELECT _ROW[1] AS score, _ROW[2] AS sigma
+                 SELECT _ROW[1] AS score, _ROW[2] AS sigma, _COUNT AS count
                  FROM (
-                     SELECT {self.function_name}(LIST({score_col}), LIST({sigma_col})) AS _ROW
+                     SELECT {self.function_name}(LIST({score_col}), LIST({sigma_col})) AS _ROW, COUNT(*) AS _COUNT
                      FROM {table_name}
                  )
             """
