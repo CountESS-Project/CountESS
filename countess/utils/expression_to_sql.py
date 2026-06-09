@@ -196,7 +196,7 @@ class PowExpr(SqlTemplatingList):
 
 
 class MulOp(SqlTemplatingSymbol):
-    regex = re.compile(r"[*/]")
+    regex = re.compile(r"\*|//?")
 
 
 class MulExpr(SqlTemplatingList):
