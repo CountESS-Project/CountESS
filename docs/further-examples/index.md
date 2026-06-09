@@ -30,12 +30,12 @@ The first thing to do is to load the data files.
 The barcode map is a simple .CSV file so we load that with
 the CSV loader:
 
-[![Screenshot 1](img/s5_1.jpg)](img/s5_1.png)
+[![Screenshot 1](/countess-demo/example_5/img/s5_1.jpg)](/countess-demo/example_5/img/s5_1.png)
 
 We then feed the 'sequence' column to the variant caller to
 translate the raw sequences into HGVS strings:
 
-[![Screenshot 6](img/s5_6.jpg)](img/s5_6.png)
+[![Screenshot 6](/countess-demo/example_5/img/s5_6.jpg)](/countess-demo/example_5/img/s5_6.png)
 
 #### Replicates
 
@@ -44,27 +44,27 @@ at two time points.  The replicate number and time point are
 encoded in the filename, so we enable the 'Filename Column?'
 option to capture this data:
 
-[![Screenshot 2](img/s5_2.jpg)](img/s5_2.png)
+[![Screenshot 2](/countess-demo/example_5/img/s5_2.jpg)](/countess-demo/example_5/img/s5_2.png)
 
 ... and then the Regex plugin can split these out into separate
 columns called 'rep' and 'time'.
 
-[![Screenshot 4](img/s5_4.jpg)](img/s5_4.png)
+[![Screenshot 4](/countess-demo/example_5/img/s5_4.jpg)](/countess-demo/example_5/img/s5_4.png)
 
 #### Library
 
 There's a single .FASTQ representing a library shared between the
 replicates:
 
-[![Screenshot 3](img/s5_3.jpg)](img/s5_3.png)
+[![Screenshot 3](/countess-demo/example_5/img/s5_3.jpg)](/countess-demo/example_5/img/s5_3.png)
 
 Because this library file is part of two replicates, we use 
 two Expression plugins to make a copy of the library for each
 replicate, both at time 0:
 
-[![Screenshot 5](img/s5_5.jpg)](img/s5_5.png)
+[![Screenshot 5](/countess-demo/example_5/img/s5_5.jpg)](/countess-demo/example_5/img/s5_5.png)
 
-[![Screenshot 20](img/s5_20.jpg)](img/s5_20.png)
+[![Screenshot 20](/countess-demo/example_5/img/s5_20.jpg)](/countess-demo/example_5/img/s5_20.png)
 
 ### Pivoting and Joining
 
@@ -76,11 +76,11 @@ copies of the library into a single table, and pivot it
 by time so that for each replicate, each row relates a barcode
 to three counts:
 
-[![Screenshot 7](img/s5_7.jpg)](img/s5_7.png)
+[![Screenshot 7](/countess-demo/example_5/img/s5_7.jpg)](/countess-demo/example_5/img/s5_7.png)
 
 Then we can join that to the barcode map:
 
-[![Screenshot 8](img/s5_8.jpg)](img/s5_8.png)
+[![Screenshot 8](/countess-demo/example_5/img/s5_8.jpg)](/countess-demo/example_5/img/s5_8.png)
 
 ### Scoring by Barcode
 
@@ -88,7 +88,7 @@ We can calculate a score for each barcode using the
 Score plugin.  This is done using the same least-squares
 regression model as Enrich2:
 
-[![Screenshot 9](img/s5_9.jpg)](img/s5_9.png)
+[![Screenshot 9](/countess-demo/example_5/img/s5_9.jpg)](/countess-demo/example_5/img/s5_9.png)
 
 Each barcode now has a score and sigma (standard error)
 for each replicate.  We can combine those scores into
@@ -96,43 +96,43 @@ a final score by pivoting and then using a Random Effects Model
 to combine the individual scores and sigmas into a 
 combined version:
 
-[![Screenshot 10](img/s5_10.jpg)](img/s5_10.png)
+[![Screenshot 10](/countess-demo/example_5/img/s5_10.jpg)](/countess-demo/example_5/img/s5_10.png)
 
-[![Screenshot 11](img/s5_11.jpg)](img/s5_11.png)
+[![Screenshot 11](/countess-demo/example_5/img/s5_11.jpg)](/countess-demo/example_5/img/s5_11.png)
 
 ### Scoring by Variant
 
 We can also choose to collate by DNA variant 
 before calculating scores as above:
 
-[![Screenshot 12](img/s5_12.jpg)](img/s5_12.png)
+[![Screenshot 12](/countess-demo/example_5/img/s5_12.jpg)](/countess-demo/example_5/img/s5_12.png)
 
-<!--[![Screenshot 13](img/s5_13.jpg)](img/s5_13.png)-->
+<!--[![Screenshot 13](/countess-demo/example_5/img/s5_13.jpg)](/countess-demo/example_5/img/s5_13.png)-->
 
 This will let us calculate scores and sigmas per
 DNA variant instead of per barcode:
 
-[![Screenshot 14](img/s5_14.jpg)](img/s5_14.png)
+[![Screenshot 14](/countess-demo/example_5/img/s5_14.jpg)](/countess-demo/example_5/img/s5_14.png)
 
 Scores can then be combined just like the "per barcode" 
 example:
-<!--[![Screenshot 16](img/s5_16.jpg)](img/s5_16.png)-->
+<!--[![Screenshot 16](/countess-demo/example_5/img/s5_16.jpg)](/countess-demo/example_5/img/s5_16.png)-->
 
-[![Screenshot 17](img/s5_17.jpg)](img/s5_17.png)
+[![Screenshot 17](/countess-demo/example_5/img/s5_17.jpg)](/countess-demo/example_5/img/s5_17.png)
 
 ### Scoring by Protein
 
 ... Or we can collate by protein variant:
 
-[![Screenshot 21](img/s5_21.jpg)](img/s5_21.png)
+[![Screenshot 21](/countess-demo/example_5/img/s5_21.jpg)](/countess-demo/example_5/img/s5_21.png)
 
-<!--[![Screenshot 22](img/s5_22.jpg)](img/s5_22.png)
+<!--[![Screenshot 22](/countess-demo/example_5/img/s5_22.jpg)](/countess-demo/example_5/img/s5_22.png)
 
-[![Screenshot 15](img/s5_15.jpg)](img/s5_15.png)
+[![Screenshot 15](/countess-demo/example_5/img/s5_15.jpg)](/countess-demo/example_5/img/s5_15.png)
 
-[![Screenshot 18](img/s5_18.jpg)](img/s5_18.png)-->
+[![Screenshot 18](/countess-demo/example_5/img/s5_18.jpg)](/countess-demo/example_5/img/s5_18.png)-->
 
-[![Screenshot 19](img/s5_19.jpg)](img/s5_19.png)
+[![Screenshot 19](/countess-demo/example_5/img/s5_19.jpg)](/countess-demo/example_5/img/s5_19.png)
 
 
 ### Other Options
@@ -164,17 +164,17 @@ metadata on the replicate number and bin number.
 The first step is to load and collate these files just like in
 [Example 3](../getting-started/#example-3):
 
-[![Screenshot 1](img/s6_1.jpg)](img/s6_1.png)
+[![Screenshot 1](/countess-demo/example_6/img/s6_1.jpg)](/countess-demo/example_6/img/s6_1.png)
 
 Then we can use the [VAMPseq Plugin](../included-plugins/#vampseq) to calculate scores
 for each variant:
 
-[![Screenshot 2](img/s6_2.jpg)](img/s6_2.png)
+[![Screenshot 2](/countess-demo/example_6/img/s6_2.jpg)](/countess-demo/example_6/img/s6_2.png)
 
 ### Combining Replicates
 
 Once that's done, pivot on replicate and use a simple formula to combine scores
 into an average score and an estimated standard deviation:
 
-<!--[![Screenshot 3](img/s6_3.jpg)](img/s6_3.png)-->
-[![Screenshot 4](img/s6_4.jpg)](img/s6_4.png)
+<!--[![Screenshot 3](/countess-demo/example_6/img/s6_3.jpg)](/countess-demo/example_6/img/s6_3.png)-->
+[![Screenshot 4](/countess-demo/example_6/img/s6_4.jpg)](/countess-demo/example_6/img/s6_4.png)
