@@ -38,7 +38,7 @@ their counts.
 
 Load this example up with `countess_gui example_1.ini`.
 
-[![Example 1 Image 0](../../../countess-demo/example_1/img/example_1_0.png)](../../../countess-demo/example_1/img/example_1_0.png)
+[![Example 1 Image 0](/countess-demo/example_1/img/example_1_0.png)](/countess-demo/example_1/img/example_1_0.png)
 
 There are five nodes in this CountESS pipeline, each of which
 transforms the data and then passes it to the next node.
@@ -65,7 +65,7 @@ GTAACAGGAGTCATGTTTCC,1
 
 Our first step just reads these two files in.
 
-[![Example 1 Image 1](../../../countess-demo/example_1/img/example_1_1.png)](../../../countess-demo/example_1/img/example_1_1.png)
+[![Example 1 Image 1](/countess-demo/example_1/img/example_1_1.png)](/countess-demo/example_1/img/example_1_1.png)
 
 * Sequence data can also be loaded from other file formats such 
   as FASTQ, see [Example 3](#example-3-fastq-and-vamp-seq)
@@ -79,7 +79,7 @@ We now have a dataframe with all our raw sequences in it.
 Next we want to count how many times each sequence appears at each
 time point.
 
-[![Example 1 Image 2](../../../countess-demo/example_1/img/example_1_2.png)](../../../countess-demo/example_1/img/example_1_2.png)
+[![Example 1 Image 2](/countess-demo/example_1/img/example_1_2.png)](/countess-demo/example_1/img/example_1_2.png)
 
 The [Group By](../included-plugins/#group-by) tool lets us specify some columns to index by.
 If no other operations are selected, it will count the number of 
@@ -98,7 +98,7 @@ but we want to compare counts for each sequence across the time points.
 
 To do this, we use the [Pivot Tool](../included-plugins/#pivot-tool):
 
-[![Example 1 Image 3](../../../countess-demo/example_1/img/example_1_3.png)](../../../countess-demo/example_1/img/example_1_3.png)
+[![Example 1 Image 3](/countess-demo/example_1/img/example_1_3.png)](/countess-demo/example_1/img/example_1_3.png)
 
 The distinct values of the "Pivot" column(s) are used to expand the
 data in the "Expand" column(s) into new columns.
@@ -116,7 +116,7 @@ Now we have pivoted the data, for each sequence we have counts at
 two different time points.  We want to calculate scores from the counts
 by dividing one by the other:
 
-[![Example 1 Image 4](../../../countess-demo/example_1/img/example_1_4.png)](../../../countess-demo/example_1/img/example_1_4.png)
+[![Example 1 Image 4](/countess-demo/example_1/img/example_1_4.png)](/countess-demo/example_1/img/example_1_4.png)
 
 The [Python Code](../included-plugins/#python) tool lets us write small expressions in Python and
 apply them to each row of the table.  In this case we're calculating
@@ -129,7 +129,7 @@ Now we have a score for each sequence, we need to write our data
 out somewhere.  The [CSV Save](../included-plugins/#csv-writer)
 tool lets us save our output in a CSV file for easy use elsewhere.  
 
-[![Example 1 Image 5](../../../countess-demo/example_1/img/example_1_5.png)](../../../countess-demo/example_1/img/example_1_5.png)
+[![Example 1 Image 5](/countess-demo/example_1/img/example_1_5.png)](/countess-demo/example_1/img/example_1_5.png)
 
 The output ends up looking like:
 
@@ -178,19 +178,19 @@ map to unmodified sequences.
 First, we modify our sequence reading and grouping steps to rename the sequence column to `barcode`,
 for clarity.
 
-[![Example 2 Image 1](../../../countess-demo/example_2/img/example_2_1.png)](../../../countess-demo/example_2/img/example_2_1.png)
-[![Example 2 Image 2](../../../countess-demo/example_2/img/example_2_2.png)](../../../countess-demo/example_2/img/example_2_2.png)
+[![Example 2 Image 1](/countess-demo/example_2/img/example_2_1.png)](/countess-demo/example_2/img/example_2_1.png)
+[![Example 2 Image 2](/countess-demo/example_2/img/example_2_2.png)](/countess-demo/example_2/img/example_2_2.png)
 
 Second, we add a new node to read the barcode map using the
 [CSV Loader](../included-plugins/#csv-reader):
 
-[![Example 2 Image 3](../../../countess-demo/example_2/img/example_2_3.png)](../../../countess-demo/example_2/img/example_2_3.png)
+[![Example 2 Image 3](/countess-demo/example_2/img/example_2_3.png)](/countess-demo/example_2/img/example_2_3.png)
 
 ### Joining
 
 Now we add in a [Join](../included-plugins/#join) tool, which takes two inputs and joins them.
 
-[![Example 2 Image 4](../../../countess-demo/example_2/img/example_2_4.png)](../../../countess-demo/example_2/img/example_2_4.png)
+[![Example 2 Image 4](/countess-demo/example_2/img/example_2_4.png)](/countess-demo/example_2/img/example_2_4.png)
 
 * Note that while there were 1000 distinct barcodes, there are only 357 distinct
   sequences.  Some barcodes represent duplicate variants.
@@ -204,7 +204,7 @@ to be able to process these in a more compact format.  The [Variant Translator](
 plugin lets us compare a sequence to a reference sequence and extract
 DNA and Protein variants in [HGVS](https://hgvs-nomenclature.org/stable/) format.
 
-[![Example 2 Image 5](../../../countess-demo/example_2/img/example_2_5.png)](../../../countess-demo/example_2/img/example_2_5.png)
+[![Example 2 Image 5](/countess-demo/example_2/img/example_2_5.png)](/countess-demo/example_2/img/example_2_5.png)
 
 We add a Variant Translator to our project, and configure it with
 our known reference sequence:
@@ -224,13 +224,13 @@ CountESS nodes can have multiple outputs.  From here, we perform the same
 pivot, score and write to CSV steps as before, but duplicated for both DNA and Protein variants.
 
 <!--
-[![Example 2 Image 6](../../../countess-demo/example_2/img/example_2_6.png)](../../../countess-demo/example_2/img/example_2_6.png)
-[![Example 2 Image 9](../../../countess-demo/example_2/img/example_2_9.png)](../../../countess-demo/example_2/img/example_2_9.png)
-[![Example 2 Image 7](../../../countess-demo/example_2/img/example_2_7.png)](../../../countess-demo/example_2/img/example_2_7.png)
-[![Example 2 Image 10](../../../countess-demo/example_2/img/example_2_10.png)](../../../countess-demo/example_2/img/example_2_10.png)
+[![Example 2 Image 6](/countess-demo/example_2/img/example_2_6.png)](/countess-demo/example_2/img/example_2_6.png)
+[![Example 2 Image 9](/countess-demo/example_2/img/example_2_9.png)](/countess-demo/example_2/img/example_2_9.png)
+[![Example 2 Image 7](/countess-demo/example_2/img/example_2_7.png)](/countess-demo/example_2/img/example_2_7.png)
+[![Example 2 Image 10](/countess-demo/example_2/img/example_2_10.png)](/countess-demo/example_2/img/example_2_10.png)
 -->
-[![Example 2 Image 8](../../../countess-demo/example_2/img/example_2_8.png)](../../../countess-demo/example_2/img/example_2_8.png)
-[![Example 2 Image 11](../../../countess-demo/example_2/img/example_2_11.png)](../../../countess-demo/example_2/img/example_2_11.png)
+[![Example 2 Image 8](/countess-demo/example_2/img/example_2_8.png)](/countess-demo/example_2/img/example_2_8.png)
+[![Example 2 Image 11](/countess-demo/example_2/img/example_2_11.png)](/countess-demo/example_2/img/example_2_11.png)
 
 ## Example 3: FASTQ
 
@@ -248,15 +248,15 @@ filename.  We can select the "Filename Column?" option
 in the FASTQ Loader which will add an extra `filename` column in to the
 dataframe:
 
-[![Example 3 Image 1](../../../countess-demo/example_3/img/example_3_1.png)](../../../countess-demo/example_3/img/example_3_1.png)
+[![Example 3 Image 1](/countess-demo/example_3/img/example_3_1.png)](/countess-demo/example_3/img/example_3_1.png)
 
 We can then use the [Regex Tool](../included-plugins/#regex-tool) to break this filename down into its 
 useful parts, extracting `bin` and `rep` columns from the filename:
 
-[![Example 3 Image 2](../../../countess-demo/example_3/img/example_3_2.png)](../../../countess-demo/example_3/img/example_3_2.png)
+[![Example 3 Image 2](/countess-demo/example_3/img/example_3_2.png)](/countess-demo/example_3/img/example_3_2.png)
 
 <!--
-[![Example 3 Image 3](../../../countess-demo/example_3/img/example_3_3.png)](../../../countess-demo/example_3/img/example_3_3.png)
+[![Example 3 Image 3](/countess-demo/example_3/img/example_3_3.png)](/countess-demo/example_3/img/example_3_3.png)
 -->
 
 In the previous example, we chose to insert the [Variant Translator](../included-plugins/#variant-translator)
@@ -264,16 +264,16 @@ after the [Join](../included-plugins/#join) for clarity, but when
 we have many more sequences to call it is more efficient to call the variant
 once for each barcode rather than once for each sequence:
 
-[![Example 3 Image 4](../../../countess-demo/example_3/img/example_3_4.png)](../../../countess-demo/example_3/img/example_3_4.png)
+[![Example 3 Image 4](/countess-demo/example_3/img/example_3_4.png)](/countess-demo/example_3/img/example_3_4.png)
 
 <!--
-[![Example 3 Image 5](../../../countess-demo/example_3/img/example_3_5.png)](../../../countess-demo/example_3/img/example_3_5.png)
+[![Example 3 Image 5](/countess-demo/example_3/img/example_3_5.png)](/countess-demo/example_3/img/example_3_5.png)
 -->
 
 The two data sources are joined as before.  We can then [pivot](../included-plugins/#pivot-tool)
 on `bin`, giving us columns `count__bin_1`, `count__bin_2`, `count__bin_3` and `count__bin_4`:
 
-[![Example 3 Image 6](../../../countess-demo/example_3/img/example_3_6.png)](../../../countess-demo/example_3/img/example_3_6.png)
+[![Example 3 Image 6](/countess-demo/example_3/img/example_3_6.png)](/countess-demo/example_3/img/example_3_6.png)
 
 ## Example 4: External Metadata
 
@@ -303,17 +303,17 @@ data12377	2	2.7
 First we load up the metadata file, splitting the columns using
 "TAB" characters:
 
-[![Example 4 Image 1](../../../countess-demo/example_4/img/example_4_1.png)](../../../countess-demo/example_4/img/example_4_1.png)
+[![Example 4 Image 1](/countess-demo/example_4/img/example_4_1.png)](/countess-demo/example_4/img/example_4_1.png)
 
 Then we load up the six data files, remembering to select the
 "Filename Column?" option to get the filename as a column:
 
-[![Example 4 Image 2](../../../countess-demo/example_4/img/example_4_2.png)](../../../countess-demo/example_4/img/example_4_2.png)
+[![Example 4 Image 2](/countess-demo/example_4/img/example_4_2.png)](/countess-demo/example_4/img/example_4_2.png)
 
 Then we can join the two together using the `filename` column
 in each:
 
-[![Example 4 Image 3](../../../countess-demo/example_4/img/example_4_3.png)](../../../countess-demo/example_4/img/example_4_3.png)
+[![Example 4 Image 3](/countess-demo/example_4/img/example_4_3.png)](/countess-demo/example_4/img/example_4_3.png)
 
 # Further Examples
 
