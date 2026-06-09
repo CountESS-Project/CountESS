@@ -21,5 +21,5 @@ sed -i "s/VERSION = .*/VERSION = \"$VERSION\"/" countess/__init__.py
 sed -i "s/version:.*/version: $VERSION/" docs/_config.yml
 sed -i "s/CountESS .* Documentation/CountESS $VERSION Documentation/" docs/index.md
 
-git commit -m "Bump to v$VERSION" README.md countess/__init__.py docs/_config.yml
+git commit -m "Bump to v$VERSION" README.md countess/__init__.py docs/_config.yml docs/index.md
 git tag -m "CountESS version $VERSION" v$VERSION
