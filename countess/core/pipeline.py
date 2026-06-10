@@ -10,7 +10,7 @@ from typing import Iterable, Optional
 import duckdb
 
 from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
-from countess.utils.duckdb import duckdb_source_to_view
+from countess.utils.duckdb import duckdb_source_to_view, duckdb_source_to_table
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +278,8 @@ class PipelineGraph:
         # thread can call self.thread_cursor.interrupt() in case of long running
         # slow queries.
         self.thread_cursor = self.ddbc.cursor()
+        self.thread_cursor.sql("set enable_progress_bar=true")
+        self.thread_cursor.sql("set enable_progress_bar_print=false")
         try:
             for node in self.traverse_nodes():
                 if self.thread_stop:
@@ -294,29 +296,47 @@ class PipelineGraph:
             self.thread_cursor.close()
 
     def run(self):
-        # Unlike 'start', we kick all the nodes off in one thread so that
-        # their results can stay as views rather than tables.  There's a slight
-        # penalty to this as multiple inputs can't run in parallel but it
-        # should reduce memory usage since intermediate steps don't need to
-        # be saved.  If DuckDB decides to start sharing views across cursors
-        # we can improve on this a little.
-        # see https://github.com/duckdb/duckdb/issues/1848
+        # We let DuckDB work out how to run everything in parallel.
+        # The exception is any nodes with more than one child_node ...
+        # rather than have each child_node read the view over again,
+        # we materialize the view into a table.
 
-        start_time = time.time()
-        logger.info("Starting: %s", start_time)
-        for node in self.traverse_nodes():
-            logger.info("... starting %s", node.name)
-            node.load_config()
-            sources = {pn.name: pn.result for pn in node.parent_nodes}
-            node.plugin.prepare_multi(self.ddbc, sources)
-            result = node.plugin.execute_multi(self.ddbc, sources)
-            if result:
-                node.result = duckdb_source_to_view(self.ddbc, result)
-            else:
-                node.result = None
-            logger.info("... completed %s", node.name)
+        with duckdb.connect() as cursor:
+            cursor.sql("set enable_progress_bar=true")
+            cursor.sql("set enable_progress_bar_print=false")
 
-        finish_time = time.time()
+            def _target(node):
+                node.load_config()
+                sources = {pn.name: cursor.table(pn.table_name) for pn in node.parent_nodes}
+                node.plugin.prepare_multi(cursor, sources)
+                result = node.plugin.execute_multi(cursor, sources)
+                if result:
+                    if len(node.child_nodes) > 1:
+                        node.table_name = f"t_{node.uuid}"
+                        logger.debug("Writing Table %s", node.table_name)
+                        result.to_table(node.table_name)
+                    else:
+                        node.table_name = f"v_{node.uuid}"
+                        logger.debug("Writing View %s", node.table_name)
+                        result.to_view(node.table_name)
+                else:
+                    logger.error("No Result")
+
+            start_time = time.time()
+            logger.info("Starting: %s", start_time)
+            for node in self.traverse_nodes():
+                thread = threading.Thread(target=_target, args=(node,))
+                thread.start()
+                while thread.is_alive():
+                    qp = cursor.query_progress()
+                    if qp>0:
+                        logger.info("%s: %.1f%%", node.name, qp)
+                    else:
+                        logger.info("%s: 0/0", node.name)
+                    time.sleep(0.05)
+                thread.join()
+                logger.info("%s: 100%%", node.name)
+            finish_time = time.time()
         logger.info("Finished: %s, elapsed time: %d", finish_time, finish_time - start_time)
 
     def reset_node_names(self):

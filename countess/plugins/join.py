@@ -43,7 +43,7 @@ class JoinPlugin(DuckdbPlugin):
     def execute_multi(
         self, ddbc: DuckDBPyConnection, sources: Mapping[str, DuckDBPyRelation], row_limit: Optional[int] = None
     ) -> Optional[DuckDBPyRelation]:
-        if len(sources) <= 1:
+        if len(sources) <= 1 or any(table is None for table in sources.values()):
             return None
 
         while len(self.inputs) > len(sources):
