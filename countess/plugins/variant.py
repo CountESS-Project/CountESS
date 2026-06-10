@@ -120,6 +120,10 @@ class VariantPlugin(DuckdbParallelTransformPlugin):
                 logger.warning("Exception", exc_info=exc)
 
         if self.protein.output or self.classify:
+            if self.protein.output:
+                data[self.protein.output.value] = None
+            if self.classify:
+                data[self.classify.value] = None
             try:
                 protein_variant = find_variant_string(
                     "p.",
