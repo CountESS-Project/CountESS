@@ -325,55 +325,6 @@ def runwindow_subprocess_target(config):
     logger.debug("Subprocess finished")
 
 
-class RunWindow:
-    """Opens a separate window to run the pipeline in.  The actual pipeline is then run
-    in a separate process as well, so that it can be stopped."""
-
-    def __init__(self, graph: PipelineGraph):
-        logger.debug("Running in a separate process")
-
-        self.toplevel = tk.Toplevel()
-        self.toplevel.columnconfigure(0, weight=1)
-        self.toplevel.rowconfigure(1, weight=1)
-
-        tk.Label(self.toplevel, text="Run").grid(row=0, column=0, stick=tk.EW)
-
-        self.logger_frame = LoggerFrame(self.toplevel)
-        self.logger_frame.grid(row=1, column=0, stick=tk.NSEW)
-
-        self.button = tk.Button(self.toplevel, text="Stop", command=self.on_button)
-        self.button.grid(row=2, column=0, sticky=tk.EW)
-
-        config = graph_to_config(graph)
-        self.process = multiprocessing.Process(target=runwindow_subprocess_target, args=[config])
-        self.process.start()
-
-        self.poll()
-
-    def poll(self):
-        if self.process:
-            if self.process.is_alive():
-                self.logger_frame.after(1000, self.poll)
-            else:
-                logger.info("Finished")
-                self.process = None
-                self.button["text"] = "Close"
-
-    def on_button(self):
-        if self.process:
-            for p in psutil.Process(self.process.pid).children(recursive=True):
-                p.terminate()
-            self.process.terminate()
-            self.button["text"] = "Close"
-            self.process = None
-
-            logger.info("Stopped")
-
-        elif self.toplevel:
-            self.toplevel.destroy()
-            self.toplevel = None
-
-
 class _CallbackLoggingHandler(logging.Handler):
     """This is a tiny stub of a logging.Handler which just lets you
     direct LogRecords to a callback instead of a handler, eg:
@@ -411,9 +362,6 @@ class LoggerFrame(tk.Frame):
         self.rowconfigure(0, weight=1)
         # self.rowconfigure(1, weight=0)
 
-        self.pbars_done: list[LabeledProgressbar] = []
-        self.hide_event()
-
         self.logging_event()
 
     def logging_event(self, ev=None):
@@ -434,9 +382,12 @@ class LoggerFrame(tk.Frame):
             except KeyError:
                 pbar = LabeledProgressbar(self, value=0)
                 self.progress_bars[name] = pbar
-                pbar.grid(sticky=tk.EW, row=len(self.progress_bars), column=0)
+                pbar.grid(sticky=tk.EW, row=len(self.progress_bars)+1, column=0)
             if n2 == "%":
-                pbar.progress_update(message, int(float((n1))))
+                percent = int(float(n1))
+                pbar.progress_update(message, percent)
+                if percent == 100:
+                    self.after(5000, self.hide_event, name)
             else:
                 pbar.progress_update(message)
         else:
@@ -444,14 +395,10 @@ class LoggerFrame(tk.Frame):
             self.text.after(10, self.text.see, tk.END)
             self.count += 1
 
-    def hide_event(self):
-        for pbar in self.pbars_done:
-            pbar.grid_forget()
-        self.pbars_done = []
-        for pbar in self.progress_bars.values():
-            if pbar.done:
-                self.pbars_done.append(pbar)
-        self.after(5000, self.hide_event)
+    def hide_event(self, name):
+        pbar = self.progress_bars.pop(name, None)
+        if pbar:
+            pbar.destroy()
 
 
 class MainWindow:
@@ -600,7 +547,27 @@ class MainWindow:
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
 
     def program_run(self):
-        RunWindow(self.graph)
+        config = graph_to_config(self.graph)
+        process = multiprocessing.Process(target=runwindow_subprocess_target, args=[config])
+        process.start()
+
+        def on_button(*_):
+            if process.is_alive():
+                process.terminate()
+                logger.warning("Process Terminated")
+
+        button = tk.Button(self.logger_subframe, text="Stop", command=on_button)
+        button.grid(row=1, column=0, sticky=tk.EW)
+
+        def on_poll(*_):
+            if process.is_alive():
+                self.frame.after(100, on_poll)
+            else:
+                logger.info("Finished")
+                button.destroy()
+
+        self.frame.after(100, on_poll)
+
 
     def program_exit(self):
         if not self.config_changed or messagebox.askokcancel("Exit", "Exit CountESS without saving config?"):
