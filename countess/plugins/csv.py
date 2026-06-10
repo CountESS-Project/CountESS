@@ -153,17 +153,37 @@ class SaveCsvOrderParameter(TabularMultiParam):
     descending = BooleanParam("Descending")
 
 
-def _openfile(filename, mode):
-    if filename.endswith(".gz"):
-        return gzip.open(filename, mode)
-    elif filename.endswith(".bz2"):
-        return bz2.open(filename, mode)
+class WriteCsvOptions(TypedDict):
+    sep: str
+    quoting: int
+
+
+def write_to_csv(source: DuckDBPyRelation, filename: str, options: WriteCsvOptions) -> None:
+    logger.debug("writing file %s", filename)
+
+    def _write(fh: bz2.BZ2File | lzma.LZMAFile):
+        # the type check supression is because the first parameter to
+        # to_csv is:
+        #     path_or_buf: str | PathLike[str] | WriteBuffer[bytes] | WriteBuffer[str]
+        # but bz2.BZFile|lzma.LZMAFile don't seem to be compatible.
+        chunk = source.fetch_df_chunk()
+        chunk.to_csv(fh, header=True, index=False, **options)  # type: ignore
+        while len(chunk) > 0:
+            chunk = source.fetch_df_chunk()
+            chunk.to_csv(fh, header=False, index=False, **options)  # type: ignore
+
+    # If it's one of the formats that duckdb doesn't (yet) support, write via pandas
+    # See also https://github.com/nickzoic/duckdb-compression/
+
+    if filename.endswith(".bz2"):
+        with bz2.open(filename, "w") as fh_bz2:
+            _write(fh_bz2)
     elif filename.endswith(".xz"):
-        return lzma.open(filename, mode)
-    elif "b" in mode:
-        return open(filename, mode)  # pylint: disable=unspecified-encoding
+        with lzma.open(filename, "w") as fh_xz:
+            _write(fh_xz)
     else:
-        return open(filename, mode, encoding="utf-8")
+        # otherwise write it directly
+        source.to_csv(filename, **options)
 
 
 class SaveCsvPlugin(DuckdbSaveFilePlugin):
@@ -200,24 +220,11 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
             source = source.order(order_by)
 
-        options = {
-            "index": False,
+        options: WriteCsvOptions = {
             "sep": self.SEPARATORS[self.delimiter.value],
             "quoting": self.QUOTING[self.quoting.value],
         }
 
         filename = self.filename.get_file_path()
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
-
-        # the type check supression is because the first parameter to
-        # to_csv is called path_or_buf and takes either a filename path
-        # or a file-like buffer, but is declared as str|None.
-
-        logger.debug("writing file %s", filename)
-        with _openfile(filename, "wb") as fh:
-            chunk = source.fetch_df_chunk()
-            chunk.to_csv(fh, header=True, **options)  # type: ignore
-            while len(chunk) > 0:
-                chunk = source.fetch_df_chunk()
-                chunk.to_csv(fh, header=False, **options)  # type: ignore
-            logger.debug("written %d bytes", fh.tell())
+        write_to_csv(source, filename, options)
