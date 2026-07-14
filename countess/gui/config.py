@@ -471,7 +471,12 @@ class PluginConfigurator:
     output_text = None
     preview = None
 
-    def __init__(self, tk_parent: tk.Widget, plugin: BasePlugin, change_callback=None):
+    def __init__(
+        self,
+        tk_parent: tk.Widget,
+        plugin: BasePlugin,
+        change_callback: Optional[Callable[[BasePlugin, Optional[bool]], None]] = None,
+    ):
         self.plugin = plugin
         self.change_callback = change_callback
 
@@ -488,10 +493,8 @@ class PluginConfigurator:
     def change_parameter(self, parameter):
         """Called whenever a parameter gets changed"""
         logger.debug("PluginConfigurator %s %s", self.plugin, parameter)
-        # if self.plugin.update():
-        #    self.update()
         if self.change_callback:
-            self.change_callback(self)
+            self.change_callback(self, True)
 
     def update(self) -> None:
         # If there's only a single parameter it is presented a little differently.

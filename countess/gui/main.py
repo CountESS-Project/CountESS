@@ -241,7 +241,6 @@ class ConfiguratorWrapper:
             self.frame.remove_child(self.preview_subframe).destroy()
 
     def notify(self):
-        #self.hide_preview_subframe()
         self.config_change_poll_callback()
 
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
@@ -260,7 +259,7 @@ class ConfiguratorWrapper:
     def config_change_callback(self, *_):
         """Called immediately if a change to config has occurred."""
         logger.debug("config_change_callback %s", self.node.name)
-        self.frame.after(10, self.change_callback, self.node)
+        self.frame.after(10, self.change_callback, self.node, True)
         self.frame.after(250, self.config_change_poll_callback)
 
     def config_change_poll_callback(self):
@@ -282,7 +281,6 @@ class ConfiguratorWrapper:
         else:
             self.show_preview_subframe()
             self.frame.update()
-
 
     def destroy(self):
         self.frame.destroy()
@@ -382,7 +380,7 @@ class LoggerFrame(tk.Frame):
             except KeyError:
                 pbar = LabeledProgressbar(self, value=0)
                 self.progress_bars[name] = pbar
-                pbar.grid(sticky=tk.EW, row=len(self.progress_bars)+1, column=0)
+                pbar.grid(sticky=tk.EW, row=len(self.progress_bars) + 1, column=0)
             if n2 == "%":
                 percent = int(float(n1))
                 pbar.progress_update(message, percent)
@@ -568,7 +566,6 @@ class MainWindow:
 
         self.frame.after(100, on_poll)
 
-
     def program_exit(self):
         if not self.config_changed or messagebox.askokcancel("Exit", "Exit CountESS without saving config?"):
             self.tk_parent.quit()
@@ -588,9 +585,9 @@ class MainWindow:
         self.config_wrapper = new_config_wrapper
         new_config_wrapper.notify()
 
-    def node_changed(self, node):
+    def node_changed(self, node, recalc=False):
         logger.debug("MainWindow.node_changed(%s)", node)
-        self.graph_wrapper.node_changed(node)
+        self.graph_wrapper.node_changed(node, recalc)
         self.config_changed = True
         self.update_title()
 

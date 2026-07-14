@@ -579,7 +579,7 @@ class GraphWrapper:
         child_node.del_parent(parent_node)
         self.graph.update()
 
-    def node_changed(self, node):
+    def node_changed(self, node, recalc=False):
         """Called when something external updates the node's name, status
         or configuration."""
         logger.debug("GraphWrapper.node_changed(%s)", node)
@@ -592,9 +592,9 @@ class GraphWrapper:
 
         self.labels[node].update_node(node, not flipped)
 
-        node.mark_dirty()
-        self.graph.update()
-        # self.poll_progress()
+        if recalc:
+            node.mark_dirty()
+            self.graph.update()
 
     def poll_progress(self):
         if self.graph.progress():

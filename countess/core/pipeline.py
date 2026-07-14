@@ -10,7 +10,6 @@ from typing import Iterable, Optional
 import duckdb
 
 from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
-from countess.utils.duckdb import duckdb_source_to_view, duckdb_source_to_table
 
 logger = logging.getLogger(__name__)
 
@@ -329,11 +328,11 @@ class PipelineGraph:
                 thread.start()
                 while thread.is_alive():
                     qp = cursor.query_progress()
-                    if qp>0:
+                    if qp > 0:
                         logger.info("%s: %.1f%%", node.name, qp)
                     else:
                         logger.info("%s: 0/0", node.name)
-                    time.sleep(0.05)
+                    time.sleep(1)
                 thread.join()
                 logger.info("%s: 100%%", node.name)
             finish_time = time.time()
