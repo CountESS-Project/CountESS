@@ -6,7 +6,7 @@ import pytest
 
 from countess.core.config import read_config
 from countess.core.pipeline import PipelineNode
-from countess.gui.main import ConfiguratorWrapper, PluginChooserFrame, RunWindow, make_root
+from countess.gui.main import ConfiguratorWrapper, PluginChooserFrame, make_root
 from countess.plugins.data_table import DataTablePlugin
 
 
@@ -48,23 +48,3 @@ def test_main():
 
     wrap.destroy()
     root.destroy()
-
-
-@pytest.mark.skip(reason="forking issues")
-@pytest.mark.gui
-def test_run():
-    graph = read_config(["tests/simple.ini"])
-
-    runner = RunWindow(graph)
-    for _ in range(0, 20):
-        time.sleep(0.1)
-        runner.toplevel.update()
-    runner.on_button()
-    time.sleep(1)
-
-    assert runner.process is None
-
-    runner.on_button()
-    time.sleep(0.1)
-
-    assert runner.toplevel is None
