@@ -1,14 +1,14 @@
-import pandas as pd
+from typing import Iterable, Optional
 
-from countess.core.plugins import PandasTransformPlugin
+from countess.core.plugins import DuckdbSqlPlugin
 
 VERSION = "0.0.0"
 
-class DoNothingPlugin(PandasTransformPlugin):
+class DoNothingPlugin(DuckdbSqlPlugin):
 
     name: str = 'Do Nothing'
     description: str = "An example CountESS plugin which does nothing at all"
     version: str = VERSION
 
-    def run_dask(self, ddf: pd.DataFrame) -> pd.DataFrame:
-        return ddf
+    def sql(self, table_name: str, columns: Iterable[str]) -> Optional[str]:
+        return f"SELECT * FROM {table_name}"

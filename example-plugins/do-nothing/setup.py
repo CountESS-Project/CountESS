@@ -13,7 +13,7 @@ setup(
             ],
         },
         install_requires = [
-            'countess>=0.0.1',
+            'countess>=0.1.26',
         ],
         license_files = ('LICENSE.txt',),
         classifiers = [
