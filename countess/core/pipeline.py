@@ -58,8 +58,9 @@ class PipelineNode:
         self.parent_nodes = set()
         self.child_nodes = set()
         self.config: list[tuple[str, str, str]] = []
-        self.table_name: Optional[str] = None
+        self.table_name: Optional[str] = "n_%x" % id(self)
         self.message: Optional[str] = None
+        self.finished = threading.Event()
 
     def set_config(self, key, value, base_dir):
         self.config.append((key, value, base_dir))
@@ -103,6 +104,7 @@ class PipelineNode:
         try:
             sources = {pn.name: ddbc.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
             self.plugin.prepare_multi(ddbc, sources)
+            logger.info("running %s" % self.name)
             result = self.plugin.execute_multi(ddbc, sources, row_limit)
             self.message = ""
             if result:
@@ -294,48 +296,82 @@ class PipelineGraph:
         finally:
             self.thread_cursor.close()
 
+    def simplify(self):
+        for node in self.traverse_nodes():
+            if len(node.child_nodes) != 1:
+                pass
+
+    def run_group(self, node, cursor):
+        logger.debug("%s: Node %s cursor %s table_name %s", threading.current_thread(), node.name, cursor, node.table_name)
+        cursor.sql("set enable_progress_bar=true")
+        cursor.sql("set enable_progress_bar_print=false")
+
+        def _r(pnode):
+            if len(pnode.child_nodes) != 1:
+                logger.debug("%s: Group %s Depends On Group %s: waiting", threading.current_thread(), node.name, pnode.name)
+                pnode.finished.wait()
+                logger.debug("%s: Group %s Depends On Group %s: ready", threading.current_thread(), node.name, pnode.name)
+                return cursor.table(pnode.table_name)
+            else:
+                logger.debug("%s: Group %s Contains Node %s", threading.current_thread(), node.name, pnode.name)
+                pnode.load_config()
+                sources = { n.name: _r(n) for n in pnode.parent_nodes }
+                pnode.plugin.prepare_multi(cursor, sources)
+                result = pnode.plugin.execute_multi(cursor, sources)
+                if result:
+                    result.to_view(pnode.table_name)
+                    return cursor.table(pnode.table_name)
+
+        node.load_config()
+        sources = { n.name: _r(n) for n in node.parent_nodes }
+        node.plugin.prepare_multi(cursor, sources)
+        result = node.plugin.execute_multi(cursor, sources)
+        if result:
+            logger.debug("%s: saving table %s", threading.current_thread(), node.table_name)
+            result.to_table(node.table_name)
+        node.finished.set()
+        logger.debug("%s: finished node %s", threading.current_thread(), node.name)
+
+
     def run(self):
         # We let DuckDB work out how to run everything in parallel.
         # The exception is any nodes with more than one child_node ...
         # rather than have each child_node read the view over again,
         # we materialize the view into a table.
 
-        with duckdb.connect() as cursor:
-            cursor.sql("set enable_progress_bar=true")
-            cursor.sql("set enable_progress_bar_print=false")
+        start_time = time.time()
+        logger.info("Starting: %s", start_time)
 
-            def _target(node):
-                node.load_config()
-                sources = {pn.name: cursor.table(pn.table_name) for pn in node.parent_nodes}
-                node.plugin.prepare_multi(cursor, sources)
-                result = node.plugin.execute_multi(cursor, sources)
-                if result:
-                    if len(node.child_nodes) > 1:
-                        node.table_name = f"t_{node.uuid}"
-                        logger.debug("Writing Table %s", node.table_name)
-                        result.to_table(node.table_name)
-                    else:
-                        node.table_name = f"v_{node.uuid}"
-                        logger.debug("Writing View %s", node.table_name)
-                        result.to_view(node.table_name)
-                else:
-                    logger.error("No Result")
+        threads = []
+        cursors = {}
 
-            start_time = time.time()
-            logger.info("Starting: %s", start_time)
+        with duckdb.connect() as ddbc:
             for node in self.traverse_nodes():
-                thread = threading.Thread(target=_target, args=(node,))
+                if len(node.child_nodes) != 1:
+                    node.finished.clear()
+                    cursor = ddbc.cursor()
+                    threads.append(threading.Thread(target=self.run_group, args=(node, cursor)))
+                    cursors[node.name] = cursor
+
+            for thread in threads:
                 thread.start()
-                while thread.is_alive():
-                    qp = cursor.query_progress()
-                    if qp > 0:
-                        logger.info("%s: %.1f%%", node.name, qp)
-                    else:
-                        logger.info("%s: 0/0", node.name)
-                    time.sleep(1)
+
+            while any(thread.is_alive() for thread in threads):
+                for node_name, cursor in cursors.items():
+                    try:
+                        qp = cursor.query_progress()
+                        if qp == 0:
+                            logger.info("%s: 0/0", node_name)
+                        elif qp >= 0:
+                            logger.info("%s: %.1f%%", node_name, qp)
+                    except duckdb.ConnectionException:
+                        pass
+                time.sleep(1)
+
+            for thread in threads:
                 thread.join()
-                logger.info("%s: 100%%", node.name)
-            finish_time = time.time()
+
+        finish_time = time.time()
         logger.info("Finished: %s, elapsed time: %d", finish_time, finish_time - start_time)
 
     def reset_node_names(self):
