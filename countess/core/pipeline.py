@@ -306,12 +306,11 @@ class PipelineGraph:
 
         def _r(pnode):
             if len(pnode.child_nodes) != 1:
-                logger.debug("%s: Group %s Depends On Group %s: waiting", threading.current_thread(), node.name, pnode.name)
+                logger.debug("%s: Group '%s' Waiting on '%s'", threading.current_thread(), node.name, pnode.name)
                 pnode.finished.wait()
-                logger.debug("%s: Group %s Depends On Group %s: ready", threading.current_thread(), node.name, pnode.name)
                 return cursor.table(pnode.table_name)
             else:
-                logger.debug("%s: Group %s Contains Node %s", threading.current_thread(), node.name, pnode.name)
+                logger.debug("%s: Group '%s' Preparing '%s'", threading.current_thread(), node.name, pnode.name)
                 pnode.load_config()
                 sources = { n.name: _r(n) for n in pnode.parent_nodes }
                 pnode.plugin.prepare_multi(cursor, sources)
@@ -328,7 +327,8 @@ class PipelineGraph:
             logger.debug("%s: saving table %s", threading.current_thread(), node.table_name)
             result.to_table(node.table_name)
         node.finished.set()
-        logger.debug("%s: finished node %s", threading.current_thread(), node.name)
+        logger.info("%s: 100%%", node.name)
+        logger.debug("%s: finished node '%s'", threading.current_thread(), node.name)
 
 
     def run(self):
