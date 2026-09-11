@@ -128,7 +128,7 @@ class ConfiguratorWrapper:
         self.label.bind("<Configure>", self.on_label_configure)
 
         self.frame.after(50, self.show_config_subframe)
-        self.frame.after(500, self.show_preview_subframe)
+        self.frame.after(500, self.replace_preview_subframe)
 
     def show_config_subframe(self):
         if self.config_subframe:
@@ -212,33 +212,38 @@ class ConfiguratorWrapper:
 
     def show_preview_subframe(self):
         logger.debug("ConfiguratorWrapper.show_preview_subframe %s %s", self.node.name, self.node.uuid)
-        if self.preview_subframe:
-            self.frame.remove_child(self.preview_subframe).destroy()
 
         if not self.node.plugin or not self.node.plugin.show_preview:
             return
 
-        if self.node.message:
+        if self.node.status == PipelineNodeStatus.ERROR:
             logger.debug("ConfiguratorWrapper.show_preview_subframe %s", self.node.message)
             self.preview_subframe = tk.Frame(self.frame)
             text = tk.Text(self.preview_subframe)
             text.insert("1.0", self.node.message)
             text["state"] = "disabled"
             text.grid(sticky=tk.NSEW)
-        elif self.node.table_name:
+            self.frame.add_child(self.preview_subframe)
+
+        elif self.node.status == PipelineNodeStatus.RESULT:
             logger.debug("ConfiguratorWrapper.show_preview_subframe %s", self.node.table_name)
             self.preview_subframe = TabularDataFrame(self.frame, cursor="arrow")
             self.preview_subframe.set_table(self.ddbc, self.ddbc.table(self.node.table_name))
             self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
             self.preview_subframe.set_callback(self.preview_changed_callback)
+            self.frame.add_child(self.preview_subframe)
+
         else:
-            return
-        self.frame.add_child(self.preview_subframe)
+            self.frame.after(100, self.show_preview_subframe)
 
     def hide_preview_subframe(self):
         logger.debug("ConfiguratorWrapper.hide_preview_subframe %s %s", self.node.name, self.node.uuid)
         if self.preview_subframe:
             self.frame.remove_child(self.preview_subframe).destroy()
+
+    def replace_preview_subframe(self):
+        self.hide_preview_subframe()
+        self.show_preview_subframe()
 
     def notify(self):
         self.config_change_poll_callback()
@@ -273,13 +278,13 @@ class ConfiguratorWrapper:
         logger.debug("ConfiguratorWrapper.config_change_poll_done")
         if self.config_scrollbar:
             pos1, pos2 = self.config_scrollbar.get()
-            self.show_preview_subframe()
+            self.replace_preview_subframe()
             self.configurator.update()
             self.frame.update()
             self.config_canvas.yview_moveto(pos1)
             self.config_scrollbar.set(pos1, pos2)
         else:
-            self.show_preview_subframe()
+            self.replace_preview_subframe()
             self.frame.update()
 
     def destroy(self):
@@ -366,7 +371,9 @@ class LoggerFrame(tk.Frame):
         try:
             for _ in range(0, 10):
                 rec = self.logging_handler.dequeue(block=False)
-                self.logging_callback(rec)
+                print ("logging_event %s" % repr(rec))
+                if rec:
+                    self.logging_callback(rec)
             self.after(100, self.logging_event)
         except queue.Empty:
             self.after(100, self.logging_event)
@@ -698,7 +705,7 @@ def main() -> None:
     # set up a multiprocessing-compatible logging queue to bring all logging
     # messages back to the main process.
     logging.getLogger().addHandler(logging.handlers.QueueHandler(logging_queue))
-    # logging.getLogger().addHandler(logging.StreamHandler())
+    logging.getLogger().addHandler(logging.StreamHandler())
 
     root = make_root()
     MainWindow(root, args[0] if args else None)

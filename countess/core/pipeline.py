@@ -109,7 +109,6 @@ class PipelineNode:
             self.message = ""
             if result:
                 logger.debug("PipelineNode.run got result %d rows", len(result))
-                self.table_name = f"n_{self.uuid}"
                 result.to_table(self.table_name)
                 self.status = PipelineNodeStatus.RESULT
             else:
@@ -118,7 +117,6 @@ class PipelineNode:
                 self.status = PipelineNodeStatus.ERROR
         except duckdb.InterruptException:
             logger.debug("Query interrupted: retrying")
-            self.table_name = None
             self.message = None
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("PipelineNode.run %s exception %s", self.uuid, repr(exc))
