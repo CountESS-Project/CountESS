@@ -58,7 +58,7 @@ class PipelineNode:
         self.parent_nodes = set()
         self.child_nodes = set()
         self.config: list[tuple[str, str, str]] = []
-        self.table_name: Optional[str] = "n_%x" % id(self)
+        self.table_name: str = "n_%x" % id(self)
         self.message: Optional[str] = None
         self.finished = threading.Event()
 
@@ -104,7 +104,7 @@ class PipelineNode:
         try:
             sources = {pn.name: ddbc.table(pn.table_name) for pn in self.parent_nodes if pn.table_name}
             self.plugin.prepare_multi(ddbc, sources)
-            logger.info("running %s" % self.name)
+            logger.info("running %s", self.name)
             result = self.plugin.execute_multi(ddbc, sources, row_limit)
             self.message = ""
             if result:
@@ -300,7 +300,9 @@ class PipelineGraph:
                 pass
 
     def run_group(self, node, cursor):
-        logger.debug("%s: Node %s cursor %s table_name %s", threading.current_thread(), node.name, cursor, node.table_name)
+        logger.debug(
+            "%s: Node %s cursor %s table_name %s", threading.current_thread(), node.name, cursor, node.table_name
+        )
         cursor.sql("set enable_progress_bar=true")
         cursor.sql("set enable_progress_bar_print=false")
 
@@ -312,15 +314,16 @@ class PipelineGraph:
             else:
                 logger.debug("%s: Group '%s' Preparing '%s'", threading.current_thread(), node.name, pnode.name)
                 pnode.load_config()
-                sources = { n.name: _r(n) for n in pnode.parent_nodes }
+                sources = {n.name: _r(n) for n in pnode.parent_nodes}
                 pnode.plugin.prepare_multi(cursor, sources)
                 result = pnode.plugin.execute_multi(cursor, sources)
-                if result:
-                    result.to_view(pnode.table_name)
-                    return cursor.table(pnode.table_name)
+                if result is None:
+                    return None
+                result.to_view(pnode.table_name)
+                return cursor.table(pnode.table_name)
 
         node.load_config()
-        sources = { n.name: _r(n) for n in node.parent_nodes }
+        sources = {n.name: _r(n) for n in node.parent_nodes}
         node.plugin.prepare_multi(cursor, sources)
         result = node.plugin.execute_multi(cursor, sources)
         if result:
@@ -329,7 +332,6 @@ class PipelineGraph:
         node.finished.set()
         logger.info("%s: 100%%", node.name)
         logger.debug("%s: finished node '%s'", threading.current_thread(), node.name)
-
 
     def run(self):
         # We let DuckDB work out how to run everything in parallel.

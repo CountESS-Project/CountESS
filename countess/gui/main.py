@@ -371,7 +371,6 @@ class LoggerFrame(tk.Frame):
         try:
             for _ in range(0, 10):
                 rec = self.logging_handler.dequeue(block=False)
-                print ("logging_event %s" % repr(rec))
                 if rec:
                     self.logging_callback(rec)
             self.after(100, self.logging_event)
