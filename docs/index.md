@@ -1,9 +1,9 @@
 ---
-title: CountESS 0.1.26 Documentation
+title: CountESS 0.1.27 Documentation
 layout: default
 ---
 
-# CountESS 0.1.26 Documentation
+# CountESS 0.1.27 Documentation
 
 This is CountESS, a modular, Python 3 reimplementation of Enrich2.
 
