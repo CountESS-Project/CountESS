@@ -4,6 +4,7 @@ import string
 from functools import lru_cache
 from typing import Any, Iterable, Optional
 
+from countess_variant_caller import TooManyVariationsException, classify_protein_variant, find_variant_string
 from fqfa.constants.iupac.protein import AA_CODES
 
 from countess import VERSION
@@ -20,7 +21,6 @@ from countess.core.parameters import (
 )
 from countess.core.plugins import DuckdbParallelTransformPlugin, DuckdbSqlPlugin
 from countess.utils.duckdb import duckdb_escape_identifier, duckdb_escape_literal
-from countess.utils.variant import TooManyVariationsException, classify_protein_variant, find_variant_string
 
 logger = logging.getLogger(__name__)
 
