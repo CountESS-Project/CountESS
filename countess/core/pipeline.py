@@ -98,7 +98,7 @@ class PipelineNode:
         # get detected on the next sweep
         self.status = PipelineNodeStatus.WORKING
 
-        if self.table_name:
+        if ddbc and self.table_name:
             ddbc.sql(f"DROP TABLE IF EXISTS {self.table_name}")
 
         try:
