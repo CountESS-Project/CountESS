@@ -344,7 +344,9 @@ class PipelineGraph:
         logger.info("%s: 100%%", node.name)
         logger.debug("%s: finished node '%s'", threading.current_thread(), node.name)
 
-    def run(self):
+    def run(self, started: Optional[datetime] = None):
+        """Runs the whole pipeline. ``started`` is the time output file names are made from
+        (their {date} and {time}); by default, now."""
         # We let DuckDB work out how to run everything in parallel.
         # The exception is any nodes with more than one child_node ...
         # rather than have each child_node read the view over again,
@@ -352,7 +354,7 @@ class PipelineGraph:
 
         start_time = time.time()
         logger.info("Starting: %s", start_time)
-        self.set_contexts(datetime.fromtimestamp(start_time))
+        self.set_contexts(started or datetime.fromtimestamp(start_time))
 
         threads = []
         cursors = {}

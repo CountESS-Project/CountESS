@@ -130,3 +130,12 @@ def test_csv_save_fills_a_template_given_as_its_filename(tmp_path):
     run([str(tmp_path / "pipeline.ini")])
 
     assert (tmp_path / "out" / "fwd-test_v1-0-0.csv").read_text().splitlines() == ['"a","b"', "1,2"]
+
+
+def test_a_run_names_its_files_from_the_start_time_it_is_given(tmp_path):
+    (tmp_path / "input.csv").write_text("a,b\n1,2\n")
+    (tmp_path / "pipeline.ini").write_text(CSV_PIPELINE + "filename = '{date}T{time}.csv'\n")
+
+    read_config([str(tmp_path / "pipeline.ini")]).run(started=STARTED)
+
+    assert (tmp_path / "2026-10-19T14-05-09.csv").exists()
