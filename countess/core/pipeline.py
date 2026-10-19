@@ -4,12 +4,14 @@ import secrets
 import threading
 import time
 import traceback
+from datetime import datetime
 from enum import Enum
 from typing import Iterable, Optional
 
 import duckdb
 
 from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
+from countess.core.workflow import CONFIG_SECTION, RunContext, WorkflowInfo
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +157,7 @@ class PipelineGraph:
     def __init__(self, nodes: Optional[list[PipelineNode]] = None, preview_row_limit: int = 1000000):
         self.plugin_classes = get_plugin_classes()
         self.nodes = nodes or []
+        self.workflow = WorkflowInfo()
         self.ddbc = duckdb.connect()
         self.ddbc.sql("SET python_enable_replacements = false")
         self.ddbc.create_function("warning", self.sql_warning)
@@ -176,8 +179,15 @@ class PipelineGraph:
         logger.warning(message)
         return value
 
+    def set_contexts(self, started: datetime) -> None:
+        """Tells each node's plugin its workflow, its node's name and when the run started."""
+        for node in self.nodes:
+            if node.plugin:
+                node.plugin.context = RunContext(self.workflow, node.name, started)
+
     def reset_node_name(self, node: PipelineNode):
-        node_names_seen = set(n.name for n in self.nodes if n != node)
+        # The workflow's metadata section has this name in a config file, so no node can.
+        node_names_seen = set(n.name for n in self.nodes if n != node) | {CONFIG_SECTION}
         while node.name in node_names_seen:
             num = 1
             if match := re.match(r"(.*?)\s+(\d+)$", node.name):
@@ -279,6 +289,7 @@ class PipelineGraph:
         self.thread_cursor = self.ddbc.cursor()
         self.thread_cursor.sql("set enable_progress_bar=true")
         self.thread_cursor.sql("set enable_progress_bar_print=false")
+        self.set_contexts(datetime.now())
         try:
             for node in self.traverse_nodes():
                 if self.thread_stop:
@@ -341,6 +352,7 @@ class PipelineGraph:
 
         start_time = time.time()
         logger.info("Starting: %s", start_time)
+        self.set_contexts(datetime.fromtimestamp(start_time))
 
         threads = []
         cursors = {}
@@ -375,7 +387,7 @@ class PipelineGraph:
         logger.info("Finished: %s, elapsed time: %d", finish_time, finish_time - start_time)
 
     def reset_node_names(self):
-        node_names_seen = set()
+        node_names_seen = {CONFIG_SECTION}
         for node in self.traverse_nodes():
             while node.name in node_names_seen:
                 num = 0

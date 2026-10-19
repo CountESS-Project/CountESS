@@ -21,6 +21,7 @@ import importlib.metadata
 import logging
 import os.path
 import secrets
+from datetime import datetime
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Type, Union
 
 import duckdb
@@ -34,6 +35,7 @@ from countess.core.parameters import (
     HasSubParametersMixin,
     MultiParam,
 )
+from countess.core.workflow import RunContext, WorkflowInfo
 from countess.utils.duckdb import duckdb_combine, duckdb_dtype_is_numeric, duckdb_escape_literal, duckdb_source_to_view
 
 PRERUN_ROW_LIMIT: int = 100000
@@ -85,9 +87,16 @@ class BasePlugin(HasSubParametersMixin):
 
     show_preview: bool = True
 
+    # Set by the pipeline before the plugin runs: its workflow, its node's name, the run's start.
+    context: Optional[RunContext] = None
+
     @property
     def version(self) -> str:
         raise NotImplementedError(f"{self.__class__}.version")
+
+    def run_context(self) -> RunContext:
+        """The context this plugin runs in; outside a pipeline, an unnamed workflow starting now."""
+        return self.context or RunContext(WorkflowInfo(), self.name, datetime.now())
 
     def __init__(self, plugin_name: Optional[str] = None):
         super().__init__()

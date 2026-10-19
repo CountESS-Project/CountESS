@@ -25,6 +25,7 @@ from countess import VERSION
 from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config
 from countess.core.pipeline import PipelineGraph, PipelineNode, PipelineNodeStatus
 from countess.core.plugins import get_plugin_classes
+from countess.core.workflow import FILENAME_FIELDS, WorkflowError, WorkflowInfo
 from countess.gui.config import PluginConfigurator
 from countess.gui.mini_browser import mini_browser_open
 from countess.gui.tabular import TabularDataFrame
@@ -291,6 +292,54 @@ class ConfiguratorWrapper:
         self.frame.destroy()
 
 
+class WorkflowDialog:
+    """Edits a workflow's name and version; ``callback`` gets the new WorkflowInfo on OK."""
+
+    def __init__(self, tk_parent, workflow: WorkflowInfo, callback: Callable[[WorkflowInfo], None]):
+        self.callback = callback
+        self.window = tk.Toplevel(tk_parent)
+        self.window.title("Workflow")
+        self.window.transient(tk_parent)
+        self.window.columnconfigure(1, weight=1)
+
+        self.name_var = tk.StringVar(self.window, value=workflow.name or "")
+        self.version_var = tk.StringVar(self.window, value=workflow.version or "")
+        tk.Label(self.window, text="Name").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        name_entry = tk.Entry(self.window, textvariable=self.name_var, width=40)
+        name_entry.grid(row=0, column=1, sticky=tk.EW, padx=10, pady=5)
+        tk.Label(self.window, text="Version").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
+        tk.Entry(self.window, textvariable=self.version_var, width=40).grid(
+            row=1, column=1, sticky=tk.EW, padx=10, pady=5
+        )
+        fields = ", ".join("{%s}" % name for name in FILENAME_FIELDS)
+        tk.Label(
+            self.window,
+            text="A short name, and a semantic version such as 1.0.0. Output file names can use them: "
+            f"a CSV Save's filename may hold the fields {fields}.",
+            justify=tk.LEFT,
+            wraplength=420,
+        ).grid(row=2, columnspan=2, sticky=tk.W, padx=10, pady=5)
+        self.error_label = tk.Label(self.window, fg="red", justify=tk.LEFT, wraplength=420)
+        self.error_label.grid(row=3, columnspan=2, sticky=tk.W, padx=10)
+
+        buttons = tk.Frame(self.window)
+        buttons.grid(row=4, columnspan=2, sticky=tk.E, padx=10, pady=10)
+        tk.Button(buttons, text="Cancel", command=self.window.destroy).grid(row=0, column=0, padx=5)
+        tk.Button(buttons, text="OK", command=self.on_ok).grid(row=0, column=1)
+        self.window.bind("<Return>", self.on_ok)
+        self.window.bind("<Escape>", lambda *_: self.window.destroy())
+        name_entry.focus_set()
+
+    def on_ok(self, *_):
+        try:
+            workflow = WorkflowInfo.from_strings(self.name_var.get(), self.version_var.get())
+        except WorkflowError as exc:
+            self.error_label["text"] = str(exc)
+            return
+        self.window.destroy()
+        self.callback(workflow)
+
+
 class SplashWrapper:
     def __init__(self, tk_parent):
         self.frame = tk.Frame(tk_parent)
@@ -411,6 +460,7 @@ class MainWindow:
     the window dimenstions"""
 
     graph_wrapper = None
+    graph: Optional[PipelineGraph] = None
     preview_frame = None
     config_wrapper = None
     config_changed = False
@@ -428,6 +478,7 @@ class MainWindow:
                 ("Load Config", self.config_load),
                 ("Save Config", self.config_save),
                 ("Export Config", self.config_export),
+                ("Workflow", self.workflow_edit),
                 ("Tidy Graph", self.graph_tidy),
                 ("Run", self.program_run),
                 ("Exit", self.program_exit),
@@ -496,6 +547,7 @@ class MainWindow:
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = PipelineGraph(preview_row_limit=preview_row_limit)
+        self.update_title()
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
         self.graph_wrapper.add_new_node(select=False)
 
@@ -511,6 +563,7 @@ class MainWindow:
         if self.graph_wrapper:
             self.graph_wrapper.destroy()
         self.graph = read_config([filename])
+        self.update_title()
         self.graph.preview_row_limit = preview_row_limit
         self.graph.reset()
         self.graph_wrapper = GraphWrapper(self.tree_canvas, self.graph, self.node_select)
@@ -544,6 +597,15 @@ class MainWindow:
         if not filename:
             return
         export_config_graphviz(self.graph, filename)
+
+    def workflow_edit(self):
+        WorkflowDialog(self.tk_parent, self.graph.workflow, self.workflow_changed)
+
+    def workflow_changed(self, workflow: WorkflowInfo):
+        if workflow != self.graph.workflow:
+            self.graph.workflow = workflow
+            self.config_changed = True
+            self.update_title()
 
     def graph_tidy(self):
         self.graph.tidy()
@@ -606,6 +668,9 @@ class MainWindow:
                 title = "CountESS: " + self.config_filename
         else:
             title = "CountESS " + VERSION
+
+        if self.graph is not None and self.graph.workflow.label():
+            title += " — " + self.graph.workflow.label()
 
         if self.config_changed:
             title += " *"

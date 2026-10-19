@@ -87,6 +87,21 @@ subkey records this mapping so it can be restored:
     columns.7._label = 'variant'
     columns.7.index = True
 
+## Workflow Name and Version
+
+A configuration can give the workflow a short name and a
+[semantic version](https://semver.org), in a section of its own at the top of the file:
+
+    [_workflow]
+    name = FWD saturation
+    version = 1.2.0
+
+Both are optional, and are set from the GUI's "Workflow" button. Unlike plugin
+settings these are plain text, not Python literals. `_workflow` is reserved: no node
+can be given that name. Output files can be named from them (see the
+[CSV Writer](../included-plugins/#csv-writer)), so that runs of different versions of
+a workflow, or on different days, do not overwrite each other.
+
 ## Working with Revision Control
 
 This file format should be well-behaved with revision control systems such as Git,

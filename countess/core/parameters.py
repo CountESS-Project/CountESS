@@ -7,6 +7,8 @@ import string
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
+from countess.core.workflow import RunContext, fill_filename
+
 PARAM_DIGEST_HASH = "sha256"
 
 
@@ -406,7 +408,16 @@ class FileParam(FileBaseParam):
 
 
 class FileSaveParam(FileBaseParam):
-    """A filename to save output as."""
+    """A filename to save output as. It may be a template naming the file from the run, such as
+    ``{date}_{workflow}_{version}_{node}.csv``; see countess.core.workflow.FILENAME_FIELDS."""
+
+    def get_file_path_for(self, context: RunContext) -> str:
+        """The file this names in ``context``, its template fields filled.
+
+        Raises:
+            countess.core.workflow.WorkflowError: If the template cannot be filled.
+        """
+        return os.path.abspath(os.path.join(self.base_dir, fill_filename(self.value, context)))
 
 
 class DictChoiceParam(ScalarWithOperatorsParam):
@@ -799,6 +810,19 @@ class ColumnOrIntegerParam(ColumnOrStringParam):
             return int(value)
         except ValueError:
             return self.DEFAULT_VALUE
+
+
+def set_file_base_dirs(params: Iterable[BaseParam], base_dir: str) -> None:
+    """Points every file parameter in ``params``, and the template rows of lists are copied from,
+    at ``base_dir`` without moving its value: a relative default (a CSV Save's file name, say)
+    then means a file beside the config file, as a relative path read from that file does."""
+    for param in params:
+        if isinstance(param, FileBaseParam):
+            param.base_dir = base_dir
+        elif isinstance(param, ArrayParam):
+            set_file_base_dirs([param.param, *param.params], base_dir)
+        elif isinstance(param, MultiParam):
+            set_file_base_dirs(param.params.values(), base_dir)
 
 
 class HasSubParametersMixin:

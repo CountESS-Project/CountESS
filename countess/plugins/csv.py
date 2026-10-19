@@ -25,6 +25,7 @@ from countess.core.parameters import (
     TabularMultiParam,
 )
 from countess.core.plugins import DuckdbLoadFileWithTheLotPlugin, DuckdbSaveFilePlugin
+from countess.core.workflow import DEFAULT_FILENAME_TEMPLATE
 from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_table
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
@@ -200,7 +201,7 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     file_types = CSV_FILE_TYPES
 
     header = BooleanParam("CSV header row?", True)
-    filename = FileSaveParam("Filename", file_types=file_types)
+    filename = FileSaveParam("Filename", DEFAULT_FILENAME_TEMPLATE + ".csv", file_types=file_types)
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
     quoting = BooleanParam("Quote Non-numerics?", True)
     sorting = ArrayParam("Sorting", SaveCsvOrderParameter("sort"))
@@ -226,7 +227,8 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
             source = source.order(order_by)
 
-        filename = self.filename.get_file_path()
+        filename = self.filename.get_file_path_for(self.run_context())
+        logger.info("%s: writing %s", self.run_context().node_name, filename)
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
         write_to_csv(
             source, filename, sep=self.SEPARATORS[self.delimiter.value], quoting=self.QUOTING[self.quoting.value]

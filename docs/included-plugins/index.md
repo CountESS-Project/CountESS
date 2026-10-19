@@ -48,7 +48,14 @@ header
 : include a header row with column headers
 
 filename
-: the filename to write (if this ends with ".gz", data will be gzipped as it is written)
+: the filename to write (if this ends with ".gz", data will be gzipped as it is written).
+  It can include fields filled in when the pipeline runs: `{date}` (YYYY-MM-DD),
+  `{time}` (HH-MM-SS), `{workflow}` (the workflow's name, in kebab-case), `{version}`
+  (the workflow's version, as `v1-2-0`) and `{node}` (this node's name, in kebab-case).
+  The default, `{date}_{workflow}_{version}_{node}.csv`, gives files such as
+  `2026-10-19_fwd-saturation_v1-2-0_save-results.csv`, beside the configuration file.
+  A field with no value, such as an unset version, is left out along with the
+  separator next to it. Write `{{` or `}}` for a literal brace.
 
 delimiter
 : whether to use `,`, `;`, `|`, tab or whitespace as the column delimiter

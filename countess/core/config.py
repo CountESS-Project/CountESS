@@ -6,7 +6,9 @@ import re
 from configparser import ConfigParser
 
 from countess.core.pipeline import PipelineGraph, PipelineNode
+from countess.core.parameters import set_file_base_dirs
 from countess.core.plugins import load_plugin
+from countess.core.workflow import CONFIG_SECTION, WorkflowInfo
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,8 @@ def read_config_dict(name: str, base_dir: str, config_dict: dict) -> PipelineNod
         # XXX version = config_dict.get("_version")
         # XXX hash_digest = config_dict.get("_hash")
         plugin = load_plugin(module_name, class_name)
+        if plugin is not None:
+            set_file_base_dirs(plugin.params.values(), base_dir)
     else:
         plugin = None
 
@@ -73,6 +77,9 @@ def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
 
     for section_name in cp.sections():
         config_dict = dict(cp[section_name])
+        if section_name == CONFIG_SECTION:
+            pipeline_graph.workflow = WorkflowInfo.from_strings(config_dict.get("name"), config_dict.get("version"))
+            continue
         node = read_config_dict(section_name, base_dir, config_dict)
 
         for key, val in config_dict.items():
@@ -88,6 +95,13 @@ def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
 def graph_to_config(pipeline_graph: PipelineGraph, base_dir: str = ".") -> ConfigParser:
     pipeline_graph.reset_node_names()
     cp = ConfigParser(interpolation=None)
+    workflow = pipeline_graph.workflow
+    if workflow.name or workflow.version:
+        cp.add_section(CONFIG_SECTION)
+        if workflow.name:
+            cp[CONFIG_SECTION]["name"] = workflow.name
+        if workflow.version:
+            cp[CONFIG_SECTION]["version"] = workflow.version
     for node in pipeline_graph.traverse_nodes():
         write_config_node(node, cp, base_dir)
     return cp
