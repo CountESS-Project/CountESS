@@ -170,7 +170,7 @@ class ParameterWrapper:
             raise NotImplementedError(f"Unknown parameter type {parameter}")
 
         if self.var:
-            self.var.trace("w", self.value_changed_callback)
+            self.var.trace_add("write", self.value_changed_callback)
 
         # XXX hang on, what if it's an array in an array?
         if not parameter.read_only and delete_callback and not self.button:
@@ -407,7 +407,7 @@ class ParameterWrapper:
             self.callback(self.parameter)
 
     def value_changed_callback(self, *_):
-        # called from self.var.trace("w", self.value_changed_callback)
+        # called from self.var.trace_add("write", self.value_changed_callback)
 
         if isinstance(self.parameter, MultiChoiceParam):
             # this is handled by listbox_modified_callback, below
