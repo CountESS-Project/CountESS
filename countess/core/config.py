@@ -5,10 +5,10 @@ import os.path
 import re
 from configparser import ConfigParser
 
-from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.parameters import set_file_base_dirs
+from countess.core.pipeline import PipelineGraph, PipelineNode
 from countess.core.plugins import load_plugin
-from countess.core.workflow import CONFIG_SECTION, WorkflowInfo
+from countess.core.workflow import CONFIG_SECTION, DEFAULT_OUTPUT_DIR, WorkflowInfo
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +73,18 @@ def read_config(
 
 def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
     pipeline_graph = PipelineGraph()
+    pipeline_graph.base_dir = base_dir
     nodes_by_name: dict[str, PipelineNode] = {}
 
     for section_name in cp.sections():
         config_dict = dict(cp[section_name])
         if section_name == CONFIG_SECTION:
-            pipeline_graph.workflow = WorkflowInfo.from_strings(config_dict.get("name"), config_dict.get("version"))
+            pipeline_graph.workflow = WorkflowInfo.from_strings(
+                config_dict.get("name"),
+                config_dict.get("version"),
+                config_dict.get("output_dir"),
+                cp[section_name].getboolean("metadata_header", True),
+            )
             continue
         node = read_config_dict(section_name, base_dir, config_dict)
 
@@ -95,13 +101,20 @@ def config_to_graph(cp: ConfigParser, base_dir: str = ".") -> PipelineGraph:
 def graph_to_config(pipeline_graph: PipelineGraph, base_dir: str = ".") -> ConfigParser:
     pipeline_graph.reset_node_names()
     cp = ConfigParser(interpolation=None)
+    # The output directory is written as it is, not rebased like an input file's path: a relative
+    # one means a folder beside the config file, wherever that is saved.
     workflow = pipeline_graph.workflow
-    if workflow.name or workflow.version:
+    settings = {
+        "name": workflow.name,
+        "version": workflow.version,
+        "output_dir": workflow.output_dir if workflow.output_dir != DEFAULT_OUTPUT_DIR else None,
+        "metadata_header": None if workflow.metadata_header else "false",
+    }
+    if any(settings.values()):
         cp.add_section(CONFIG_SECTION)
-        if workflow.name:
-            cp[CONFIG_SECTION]["name"] = workflow.name
-        if workflow.version:
-            cp[CONFIG_SECTION]["version"] = workflow.version
+        for key, value in settings.items():
+            if value:
+                cp[CONFIG_SECTION][key] = value
     for node in pipeline_graph.traverse_nodes():
         write_config_node(node, cp, base_dir)
     return cp
@@ -114,6 +127,7 @@ def write_config(pipeline_graph: PipelineGraph, filename: str):
 
     with open(filename, "w", encoding="utf-8") as fh:
         cp.write(fh)
+    pipeline_graph.base_dir = base_dir
 
 
 def write_config_node_string(node: PipelineNode, base_dir: str = ""):

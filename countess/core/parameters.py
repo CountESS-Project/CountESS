@@ -7,8 +7,6 @@ import string
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
-from countess.core.workflow import RunContext, fill_filename
-
 PARAM_DIGEST_HASH = "sha256"
 
 
@@ -408,16 +406,24 @@ class FileParam(FileBaseParam):
 
 
 class FileSaveParam(FileBaseParam):
-    """A filename to save output as. It may be a template naming the file from the run, such as
-    ``{date}_{workflow}_{version}_{node}.csv``; see countess.core.workflow.FILENAME_FIELDS."""
+    """A filename to save output as."""
 
-    def get_file_path_for(self, context: RunContext) -> str:
-        """The file this names in ``context``, its template fields filled.
 
-        Raises:
-            countess.core.workflow.WorkflowError: If the template cannot be filled.
-        """
-        return os.path.abspath(os.path.join(self.base_dir, fill_filename(self.value, context)))
+class OutputFileParam(FileSaveParam):
+    """A file a run writes into the workflow's output directory. A relative name, the usual case,
+    is relative to that directory, not to the config file, so it is kept as written rather than
+    rebased when the config file moves; an absolute one is used as it is.
+    See countess.core.workflow.RunContext.output_dir."""
+
+    def set_base_dir(self, base_dir):
+        self.base_dir = base_dir
+
+    def get_parameters(self, key, base_dir="."):
+        return [(key, self.value or None)]
+
+    def get_output_path(self, output_dir: str) -> str:
+        """The file this names, in a run whose output directory is ``output_dir``."""
+        return os.path.abspath(os.path.join(output_dir, os.path.expanduser(self.value)))
 
 
 class DictChoiceParam(ScalarWithOperatorsParam):

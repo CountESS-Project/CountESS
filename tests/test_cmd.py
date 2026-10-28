@@ -1,3 +1,5 @@
+import pathlib
+import shutil
 import time
 from unittest.mock import patch
 
@@ -16,11 +18,16 @@ expected_output = """"thing","result"
 
 # @pytest.mark.slow
 def test_command_invocation():
+    before = set(pathlib.Path("tests").iterdir())
     run(["tests/simple.ini"])
     time.sleep(0.5)
-    with open("tests/output.csv", "r", encoding="utf-8") as fh:
-        output = fh.read()
-        assert output == expected_output
+    # the run writes into an output directory of its own, beside the config file
+    [output_dir] = set(pathlib.Path("tests").iterdir()) - before
+    try:
+        lines = (output_dir / "output.csv").read_text(encoding="utf-8").splitlines(keepends=True)
+        assert "".join(line for line in lines if not line.startswith("#")) == expected_output
+    finally:
+        shutil.rmtree(output_dir)
 
 
 def test_main():

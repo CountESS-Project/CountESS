@@ -3,15 +3,19 @@ import csv
 import gzip
 import logging
 import lzma
-from io import BufferedWriter, BytesIO, TextIOBase
+from datetime import datetime
+from io import BufferedWriter, BytesIO
 from itertools import zip_longest
-from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple, TypedDict, Union
 
 import duckdb
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from countess import VERSION
+
+# write_to_csv was defined here, and is still importable from here
+from countess.core.output import write_to_csv  # noqa: F401  # pylint: disable=unused-import
+from countess.core.output import count_leading_comment_lines, write_csv
 from countess.core.parameters import (
     ArrayParam,
     BaseParam,
@@ -19,13 +23,12 @@ from countess.core.parameters import (
     ChoiceParam,
     ColumnChoiceParam,
     DataTypeOrNoneChoiceParam,
-    FileSaveParam,
     MultiParam,
+    OutputFileParam,
     StringParam,
     TabularMultiParam,
 )
 from countess.core.plugins import DuckdbLoadFileWithTheLotPlugin, DuckdbSaveFilePlugin
-from countess.core.workflow import DEFAULT_FILENAME_TEMPLATE
 from countess.utils.duckdb import duckdb_dtype_to_datatype_choice, duckdb_escape_identifier, duckdb_source_to_table
 
 CSV_FILE_TYPES: Sequence[Tuple[str, Union[str, List[str]]]] = [
@@ -75,7 +78,9 @@ class LoadCsvPlugin(DuckdbLoadFileWithTheLotPlugin):
             "null_padding": True,
             "strict_mode": False,
             "all_varchar": len(self.columns) > 0,
-            "skiprows": 1 if self.header and len(self.columns) > 0 else 0,
+            # a metadata header, lines starting '#', is skipped, and so is the header row when the
+            # columns are named here
+            "skiprows": count_leading_comment_lines(filename) + (1 if self.header and len(self.columns) > 0 else 0),
             "header": self.header.value and len(self.columns) == 0,
         }
         if filename.endswith(".bz2"):
@@ -154,43 +159,8 @@ class SaveCsvOrderParameter(TabularMultiParam):
     descending = BooleanParam("Descending")
 
 
-def write_to_csv(source: DuckDBPyRelation, filename: str, sep: str, quoting: int) -> None:
-    logger.debug("writing file %s", filename)
-
-    def _write(fh: TextIOBase | gzip.GzipFile | bz2.BZ2File | lzma.LZMAFile, **kwargs):
-        # the type check supression is because the first parameter to
-        # to_csv is:
-        #     path_or_buf: str | PathLike[str] | WriteBuffer[bytes] | WriteBuffer[str]
-        # but bz2.BZFile|lzma.LZMAFile don't seem to be compatible.
-        chunk = source.fetch_df_chunk()
-        chunk.to_csv(fh, header=True, index=False, **kwargs)  # type: ignore
-        while len(chunk) > 0:
-            chunk = source.fetch_df_chunk()
-            chunk.to_csv(fh, header=False, index=False, **kwargs)  # type: ignore
-
-    # If it's one of the formats that duckdb doesn't (yet) support, write via pandas
-    # See also https://github.com/nickzoic/duckdb-compression/
-
-    if filename.endswith(".bz2"):
-        with bz2.open(filename, "w") as fh_bz2:
-            _write(fh_bz2, sep=sep, quoting=quoting)
-    elif filename.endswith(".xz"):
-        with lzma.open(filename, "w") as fh_xz:
-            _write(fh_xz, sep=sep, quoting=quoting)
-    elif quoting not in (csv.QUOTE_MINIMAL, csv.QUOTE_ALL):
-        # duckdb doesn't support this properly
-        # https://github.com/duckdb/duckdb-python/discussions/491
-        if filename.endswith(".gz"):
-            with gzip.open(filename, "w") as fh_gz:
-                _write(fh_gz, sep=sep, quoting=quoting)
-        else:
-            with open(filename, "w", encoding="utf-8") as fh_open:
-                _write(fh_open, sep=sep, quoting=quoting)
-    elif quoting == csv.QUOTE_ALL:
-        # otherwise write it directly
-        source.to_csv(filename, sep=sep, quoting=quoting)
-    else:
-        source.to_csv(filename, sep=sep)
+METADATA_HEADER_WORKFLOW = "As workflow"
+METADATA_HEADER_CHOICES = {METADATA_HEADER_WORKFLOW: None, "Yes": True, "No": False}
 
 
 class SaveCsvPlugin(DuckdbSaveFilePlugin):
@@ -201,7 +171,10 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
     file_types = CSV_FILE_TYPES
 
     header = BooleanParam("CSV header row?", True)
-    filename = FileSaveParam("Filename", DEFAULT_FILENAME_TEMPLATE + ".csv", file_types=file_types)
+    filename = OutputFileParam("Filename", "results.csv", file_types=file_types)
+    metadata_header = ChoiceParam(
+        "Metadata header ('#' lines)?", METADATA_HEADER_WORKFLOW, choices=list(METADATA_HEADER_CHOICES)
+    )
     delimiter = ChoiceParam("Delimiter", ",", choices=[",", ";", "TAB", "|", "SPACE"])
     quoting = BooleanParam("Quote Non-numerics?", True)
     sorting = ArrayParam("Sorting", SaveCsvOrderParameter("sort"))
@@ -227,9 +200,22 @@ class SaveCsvPlugin(DuckdbSaveFilePlugin):
             logger.debug("SaveCsvPlugin.execute order_by %s", order_by)
             source = source.order(order_by)
 
-        filename = self.filename.get_file_path_for(self.run_context())
-        logger.info("%s: writing %s", self.run_context().node_name, filename)
-        Path(filename).parent.mkdir(parents=True, exist_ok=True)
-        write_to_csv(
-            source, filename, sep=self.SEPARATORS[self.delimiter.value], quoting=self.QUOTING[self.quoting.value]
+        context = self.run_context()
+        filename = self.output_path()
+        logger.info("%s: writing %s", context.node_name, filename)
+        header = context.metadata_lines(datetime.now()) if self.writes_metadata_header() else None
+        write_csv(
+            source,
+            filename,
+            sep=self.SEPARATORS[self.delimiter.value],
+            quoting=self.QUOTING[self.quoting.value],
+            header=header,
         )
+
+    def output_path(self) -> str:
+        """The file this writes: its filename, in the run's output directory unless absolute."""
+        return self.filename.get_output_path(self.run_context().output_dir())
+
+    def writes_metadata_header(self) -> bool:
+        choice = METADATA_HEADER_CHOICES.get(self.metadata_header.value)
+        return self.run_context().workflow.metadata_header if choice is None else choice

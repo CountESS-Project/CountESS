@@ -23,9 +23,10 @@ import psutil
 
 from countess import VERSION
 from countess.core.config import config_to_graph, export_config_graphviz, graph_to_config, read_config, write_config
+from countess.core.output import save_preview_csv
 from countess.core.pipeline import PipelineGraph, PipelineNode, PipelineNodeStatus
 from countess.core.plugins import get_plugin_classes
-from countess.core.workflow import FILENAME_FIELDS, WorkflowError, WorkflowInfo
+from countess.core.workflow import OUTPUT_DIR_FIELDS, WorkflowError, WorkflowInfo
 from countess.gui.config import PluginConfigurator
 from countess.gui.mini_browser import mini_browser_open
 from countess.gui.tabular import TabularDataFrame
@@ -107,10 +108,12 @@ class ConfiguratorWrapper:
     info_frame: Optional[tk.Frame] = None
     configurator: Optional[PluginConfigurator] = None
 
-    def __init__(self, tk_parent, node, ddbc, change_callback):
+    def __init__(self, tk_parent, node, ddbc, change_callback, graph: Optional[PipelineGraph] = None):
         logger.debug("ConfiguratorWrapper %s %s", node.name, node.uuid)
         self.node = node
         self.ddbc = ddbc
+        # the pipeline the node is in, which a preview is saved from
+        self.graph = graph
         self.change_callback = change_callback
 
         self.frame = ResizingFrame(tk_parent, orientation=ResizingFrame.Orientation.VERTICAL, bg="darkgrey")
@@ -232,6 +235,10 @@ class ConfiguratorWrapper:
             self.preview_subframe.set_table(self.ddbc, self.ddbc.table(self.node.table_name))
             self.preview_subframe.set_sort_order(self.node.sort_column or 0, self.node.sort_descending)
             self.preview_subframe.set_callback(self.preview_changed_callback)
+            if self.graph:
+                tk.Button(self.preview_subframe, text="Save Preview CSV", command=self.on_save_preview).pack(
+                    before=self.preview_subframe.label, anchor=tk.E, padx=5, pady=2
+                )
             self.frame.add_child(self.preview_subframe)
 
         else:
@@ -248,6 +255,21 @@ class ConfiguratorWrapper:
 
     def notify(self):
         self.config_change_poll_callback()
+
+    def on_save_preview(self):
+        """Saves the preview, in the order shown, to <output directory>/<node-name>_preview.csv."""
+        assert self.graph
+        try:
+            try:
+                path = save_preview_csv(self.graph, self.node)
+            except FileExistsError as exc:
+                if not messagebox.askyesno("Save Preview CSV", f"{exc.args[0]} already exists. Replace it?"):
+                    return
+                path = save_preview_csv(self.graph, self.node, overwrite=True)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Save Preview CSV", str(exc))
+            return
+        messagebox.showinfo("Save Preview CSV", f"Saved {path}")
 
     def preview_changed_callback(self, offset: int, sort_col: int, sort_desc: bool) -> None:
         self.node.sort_column = sort_col
@@ -293,7 +315,8 @@ class ConfiguratorWrapper:
 
 
 class WorkflowDialog:
-    """Edits a workflow's name and version; ``callback`` gets the new WorkflowInfo on OK."""
+    """Edits a workflow's name, version, output directory and metadata header setting; ``callback``
+    gets the new WorkflowInfo on OK."""
 
     def __init__(self, tk_parent, workflow: WorkflowInfo, callback: Callable[[WorkflowInfo], None]):
         self.callback = callback
@@ -304,35 +327,46 @@ class WorkflowDialog:
 
         self.name_var = tk.StringVar(self.window, value=workflow.name or "")
         self.version_var = tk.StringVar(self.window, value=workflow.version or "")
-        tk.Label(self.window, text="Name").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
-        name_entry = tk.Entry(self.window, textvariable=self.name_var, width=40)
-        name_entry.grid(row=0, column=1, sticky=tk.EW, padx=10, pady=5)
-        tk.Label(self.window, text="Version").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
-        tk.Entry(self.window, textvariable=self.version_var, width=40).grid(
-            row=1, column=1, sticky=tk.EW, padx=10, pady=5
-        )
-        fields = ", ".join("{%s}" % name for name in FILENAME_FIELDS)
+        self.output_dir_var = tk.StringVar(self.window, value=workflow.output_dir)
+        self.metadata_header_var = tk.BooleanVar(self.window, value=workflow.metadata_header)
+        entries = [("Name", self.name_var), ("Version", self.version_var), ("Output directory", self.output_dir_var)]
+        for row, (label, var) in enumerate(entries):
+            tk.Label(self.window, text=label).grid(row=row, column=0, sticky=tk.W, padx=10, pady=5)
+            entry = tk.Entry(self.window, textvariable=var, width=40)
+            entry.grid(row=row, column=1, sticky=tk.EW, padx=10, pady=5)
+            if row == 0:
+                entry.focus_set()
+        tk.Checkbutton(
+            self.window, text="Start CSV files with a metadata header ('#' lines)", variable=self.metadata_header_var
+        ).grid(row=3, columnspan=2, sticky=tk.W, padx=10, pady=5)
+        fields = ", ".join("{%s}" % name for name in OUTPUT_DIR_FIELDS)
         tk.Label(
             self.window,
-            text="A short name, and a semantic version such as 1.0.0. Output file names can use them: "
-            f"a CSV Save's filename may hold the fields {fields}.",
+            text="A short name, and a semantic version such as 1.0.0. Each run writes its files into the output "
+            f"directory, which may use the fields {fields}; a relative one is beside the config file. "
+            "Save Preview CSV writes there too. The metadata header says what wrote a file; "
+            "a CSV Save can override this setting.",
             justify=tk.LEFT,
             wraplength=420,
-        ).grid(row=2, columnspan=2, sticky=tk.W, padx=10, pady=5)
+        ).grid(row=4, columnspan=2, sticky=tk.W, padx=10, pady=5)
         self.error_label = tk.Label(self.window, fg="red", justify=tk.LEFT, wraplength=420)
-        self.error_label.grid(row=3, columnspan=2, sticky=tk.W, padx=10)
+        self.error_label.grid(row=5, columnspan=2, sticky=tk.W, padx=10)
 
         buttons = tk.Frame(self.window)
-        buttons.grid(row=4, columnspan=2, sticky=tk.E, padx=10, pady=10)
+        buttons.grid(row=6, columnspan=2, sticky=tk.E, padx=10, pady=10)
         tk.Button(buttons, text="Cancel", command=self.window.destroy).grid(row=0, column=0, padx=5)
         tk.Button(buttons, text="OK", command=self.on_ok).grid(row=0, column=1)
         self.window.bind("<Return>", self.on_ok)
         self.window.bind("<Escape>", lambda *_: self.window.destroy())
-        name_entry.focus_set()
 
     def on_ok(self, *_):
         try:
-            workflow = WorkflowInfo.from_strings(self.name_var.get(), self.version_var.get())
+            workflow = WorkflowInfo.from_strings(
+                self.name_var.get(),
+                self.version_var.get(),
+                self.output_dir_var.get(),
+                self.metadata_header_var.get(),
+            )
         except WorkflowError as exc:
             self.error_label["text"] = str(exc)
             return
@@ -602,6 +636,7 @@ class MainWindow:
         WorkflowDialog(self.tk_parent, self.graph.workflow, self.workflow_changed)
 
     def workflow_changed(self, workflow: WorkflowInfo):
+        assert self.graph
         if workflow != self.graph.workflow:
             self.graph.workflow = workflow
             self.config_changed = True
@@ -645,7 +680,9 @@ class MainWindow:
             try:
                 new_config_wrapper = self.config_wrapper_cache[node]
             except KeyError:
-                new_config_wrapper = ConfiguratorWrapper(self.main_subframe, node, self.graph.ddbc, self.node_changed)
+                new_config_wrapper = ConfiguratorWrapper(
+                    self.main_subframe, node, self.graph.ddbc, self.node_changed, graph=self.graph
+                )
                 self.config_wrapper_cache[node] = new_config_wrapper
 
         if self.config_wrapper:

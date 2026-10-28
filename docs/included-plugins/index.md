@@ -28,6 +28,8 @@ delimiter
 comment
 : are comments allowed, and if so is `#` or `;` used to delimit them?
 
+Lines starting `#` at the top of a file, such as the metadata header CSV Writer writes, are skipped.
+
 header
 : is the first row a header row? If so it will be used to populate default column names
 
@@ -48,14 +50,17 @@ header
 : include a header row with column headers
 
 filename
-: the filename to write (if this ends with ".gz", data will be gzipped as it is written).
-  It can include fields filled in when the pipeline runs: `{date}` (YYYY-MM-DD),
-  `{time}` (HH-MM-SS), `{workflow}` (the workflow's name, in kebab-case), `{version}`
-  (the workflow's version, as `v1-2-0`) and `{node}` (this node's name, in kebab-case).
-  The default, `{date}_{workflow}_{version}_{node}.csv`, gives files such as
-  `2026-10-19_fwd-saturation_v1-2-0_save-results.csv`, beside the configuration file.
-  A field with no value, such as an unset version, is left out along with the
-  separator next to it. Write `{{` or `}}` for a literal brace.
+: the file to write, `results.csv` by default (if this ends with ".gz", ".bz2" or ".xz", data
+  will be compressed as it is written). A relative filename is inside the run's output directory
+  (see [Workflow Name, Version and Output Directory](../config-file-format/#workflow-name-version-and-output-directory)),
+  so each run's files have the same names in a folder of their own; an absolute one is used as it is.
+
+metadata header
+: whether the file starts with a metadata header: lines starting `#` giving the CountESS version,
+  when the file was written and the run started, the workflow's name and version, and this node and
+  each node upstream of it, with their plugins' names and versions. "As workflow", the default,
+  follows the workflow's setting. CSV Reader skips such lines, as do pandas
+  (`read_csv(..., comment="#")`) and R (`read.csv(..., comment.char = "#")`).
 
 delimiter
 : whether to use `,`, `;`, `|`, tab or whitespace as the column delimiter

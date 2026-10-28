@@ -11,7 +11,7 @@ from typing import Iterable, Optional
 import duckdb
 
 from countess.core.plugins import BasePlugin, DuckdbPlugin, get_plugin_classes
-from countess.core.workflow import CONFIG_SECTION, RunContext, WorkflowInfo
+from countess.core.workflow import CONFIG_SECTION, NodeLineage, RunContext, WorkflowInfo
 
 logger = logging.getLogger(__name__)
 
@@ -153,11 +153,26 @@ class PipelineNode:
             child_node.parent_nodes.discard(self)
 
 
+def node_lineage(node: PipelineNode) -> NodeLineage:
+    """``node``'s name and its plugin's name and version, as a file's metadata header gives them."""
+    if node.plugin is None:
+        return NodeLineage(node.name, "(no plugin)", "")
+    try:
+        version = node.plugin.version
+    except NotImplementedError:
+        version = "(unknown version)"
+    return NodeLineage(node.name, node.plugin.name, version)
+
+
 class PipelineGraph:
     def __init__(self, nodes: Optional[list[PipelineNode]] = None, preview_row_limit: int = 1000000):
         self.plugin_classes = get_plugin_classes()
         self.nodes = nodes or []
         self.workflow = WorkflowInfo()
+        # The folder the config file is in, which a relative output directory is relative to.
+        self.base_dir = "."
+        # When the pipeline was made or loaded: the time previews saved from it are filed under.
+        self.session_started = datetime.now()
         self.ddbc = duckdb.connect()
         self.ddbc.sql("SET python_enable_replacements = false")
         self.ddbc.create_function("warning", self.sql_warning)
@@ -179,11 +194,23 @@ class PipelineGraph:
         logger.warning(message)
         return value
 
+    def context_for(self, node: PipelineNode, started: datetime) -> RunContext:
+        """The context ``node``'s plugin runs in, for a run started at ``started``: the workflow, the
+        node and the nodes upstream of it, in pipeline order."""
+        ancestors = [n for n in self.traverse_nodes() if n.is_ancestor_of(node)]
+        return RunContext(
+            self.workflow,
+            node_lineage(node),
+            started,
+            base_dir=self.base_dir,
+            upstream=tuple(node_lineage(n) for n in ancestors),
+        )
+
     def set_contexts(self, started: datetime) -> None:
-        """Tells each node's plugin its workflow, its node's name and when the run started."""
+        """Tells each node's plugin the context it runs in; see context_for."""
         for node in self.nodes:
             if node.plugin:
-                node.plugin.context = RunContext(self.workflow, node.name, started)
+                node.plugin.context = self.context_for(node, started)
 
     def reset_node_name(self, node: PipelineNode):
         # The workflow's metadata section has this name in a config file, so no node can.
@@ -289,7 +316,7 @@ class PipelineGraph:
         self.thread_cursor = self.ddbc.cursor()
         self.thread_cursor.sql("set enable_progress_bar=true")
         self.thread_cursor.sql("set enable_progress_bar_print=false")
-        self.set_contexts(datetime.now())
+        self.set_contexts(self.session_started)
         try:
             for node in self.traverse_nodes():
                 if self.thread_stop:
@@ -345,8 +372,8 @@ class PipelineGraph:
         logger.debug("%s: finished node '%s'", threading.current_thread(), node.name)
 
     def run(self, started: Optional[datetime] = None):
-        """Runs the whole pipeline. ``started`` is the time output file names are made from
-        (their {date} and {time}); by default, now."""
+        """Runs the whole pipeline. ``started`` is the time the output directory is named from
+        (its {date} and {time}); by default, now."""
         # We let DuckDB work out how to run everything in parallel.
         # The exception is any nodes with more than one child_node ...
         # rather than have each child_node read the view over again,

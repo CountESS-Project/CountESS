@@ -87,20 +87,38 @@ subkey records this mapping so it can be restored:
     columns.7._label = 'variant'
     columns.7.index = True
 
-## Workflow Name and Version
+## Workflow Name, Version and Output Directory
 
 A configuration can give the workflow a short name and a
-[semantic version](https://semver.org), in a section of its own at the top of the file:
+[semantic version](https://semver.org), and say where its output goes, in a section of
+its own at the top of the file:
 
     [_workflow]
     name = FWD saturation
     version = 1.2.0
+    output_dir = {date}_{time}_{workflow}_{version}
+    metadata_header = false
 
-Both are optional, and are set from the GUI's "Workflow" button. Unlike plugin
+All are optional, and are set from the GUI's "Workflow" button. Unlike plugin
 settings these are plain text, not Python literals. `_workflow` is reserved: no node
-can be given that name. Output files can be named from them (see the
-[CSV Writer](../included-plugins/#csv-writer)), so that runs of different versions of
-a workflow, or on different days, do not overwrite each other.
+can be given that name.
+
+`output_dir` is the folder each run writes its files into; a relative one is relative to
+the configuration file. It can use the fields `{date}` (YYYY-MM-DD) and `{time}`
+(HH-MM-SS) of the run's start, `{workflow}` (the name, in kebab-case) and `{version}`
+(as `v1-2-0`). The default, `{date}_{time}_{workflow}_{version}`, gives each run a folder of
+its own such as `2026-10-19_14-05-09_fwd-saturation_v1-2-0`, while the files in it keep fixed
+names (a [CSV Writer](../included-plugins/#csv-writer) writes `results.csv` unless told
+otherwise) that downstream scripts can rely on. A field with no value, such as an unset
+version, is left out along with the separator next to it; write `{{` or `}}` for a literal brace.
+
+The GUI's "Save Preview CSV" button writes the rows a node's preview holds, in the order
+shown, to `<node-name>_preview.csv` in the output directory, its `{date}` and `{time}` being
+when the configuration was opened.
+
+`metadata_header` says whether CSV files start with a metadata header (see the
+[CSV Writer](../included-plugins/#csv-writer)); it is on unless set to `false`, and a
+CSV Writer can override it.
 
 ## Working with Revision Control
 
