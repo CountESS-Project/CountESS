@@ -26,11 +26,12 @@ class BaseParam:
 
     label: str = ""
     hide: bool = False
-    read_only: bool = False  # XXX deprecated
+    read_only: bool = False
     # value: Any = None  # XXX deprecated
 
-    def __init__(self, label):
+    def __init__(self, label, read_only=False):
         self.label = label
+        self.read_only = read_only
 
     def copy(self):
         """Plugins declare their parameters with instances of BaseParam, these
@@ -59,8 +60,8 @@ class ScalarParam(BaseParam):
 
     _value: Any = None
 
-    def __init__(self, label, default=None):
-        super().__init__(label)
+    def __init__(self, label, default=None, read_only=False):
+        super().__init__(label, read_only)
         self.default = default
         self.reset_value()
 
@@ -78,7 +79,7 @@ class ScalarParam(BaseParam):
     )
 
     def copy(self):
-        return self.__class__(self.label, self._value)
+        return self.__class__(self.label, self._value, self.read_only)
 
     def get_parameters(self, key, base_dir="."):
         return ((key, self.value),)

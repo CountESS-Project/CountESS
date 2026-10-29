@@ -97,11 +97,11 @@ class ParameterWrapper:
             # tk.Text widget doesn't have a variable, for whatever reason,
             # so we use a different method!
             # XXX is this a simpler way to handle other kinds of fields too?
-            self.entry = tk.Text(tk_parent, height=10)
-            self.entry.insert("1.0", parameter.value or "")
             if parameter.read_only:
-                self.entry["state"] = tk.DISABLED
+                self.entry = tk.Label(tk_parent, text=parameter.value)
             else:
+                self.entry = tk.Text(tk_parent, height=10)
+                self.entry.insert("1.0", parameter.value or "")
                 self.entry.bind("<<Modified>>", self.widget_modified_callback)
         elif isinstance(parameter, ScalarParam):
             self.var = tk.StringVar(tk_parent, value=parameter.value)
@@ -227,10 +227,9 @@ class ParameterWrapper:
             self.set_checkbox_value()
         elif isinstance(self.parameter, TextParam):
             if self.parameter.read_only:
-                self.entry["state"] = "normal"
-            self.entry.replace("1.0", tk.END, self.parameter.value or "")
-            if self.parameter.read_only:
-                self.entry["state"] = "disabled"
+                self.entry["text"] = self.parameter.value
+            else:
+                self.entry.replace("1.0", tk.END, self.parameter.value or "")
         elif isinstance(self.parameter, FileParam):
             self.entry["text"] = self.parameter.value
         else:
