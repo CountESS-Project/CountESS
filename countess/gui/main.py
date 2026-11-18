@@ -121,7 +121,7 @@ class ConfiguratorWrapper:
         tk.Entry(self.subframe, textvariable=self.name_var, font=("TkHeadingFont", 14, "bold")).grid(
             row=0, columnspan=2, sticky=tk.EW, padx=10, pady=5
         )
-        self.name_var.trace("w", self.name_changed_callback)
+        self.name_var.trace_add("write", self.name_changed_callback)
 
         self.label = tk.Label(self.subframe, justify=tk.LEFT, wraplength=500)
         self.label.grid(sticky=tk.EW, row=1, padx=10, pady=5)
