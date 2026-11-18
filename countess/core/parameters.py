@@ -89,6 +89,12 @@ class ScalarParam(BaseParam):
         digest.update(repr(self.value).encode("utf-8"))
         return digest.hexdigest()
 
+    def get_json_schema(self):
+        return True
+
+    def get_json_data(self, base_dir="."):
+        return self.value
+
 
 class MultiValueParam(BaseParam):
     _values: set[Any] = set()
@@ -129,6 +135,12 @@ class MultiValueParam(BaseParam):
         for n, v in enumerate(self._values):
             digest.update((str(n) + repr(v)).encode("utf-8"))
         return digest.hexdigest()
+
+    def get_json_schema(self):
+        return { "type": "array" }
+
+    def get_json_data(self, base_dir="."):
+        return self._values
 
 
 class ScalarWithOperatorsParam(ScalarParam):
@@ -185,6 +197,9 @@ class StringParam(ScalarWithOperatorsParam):
 
     def __hash__(self):
         return hash(self._value)
+
+    def get_json_schema(self):
+        return { "type": "string" }
 
 
 class TextParam(StringParam):
@@ -255,11 +270,15 @@ class NumericParam(ScalarWithOperatorsParam):
     # it seems like there should be a smarter way to do this but doing it the
     # dumb way works with mypy and pylint.
 
+    def get_json_schema(self):
+        return { "type": "number" }
 
 class IntegerParam(NumericParam):
     _value: int = 0
     var_type = int
 
+    def get_json_schema(self):
+        return { "type": "integer" }
 
 class FloatParam(NumericParam):
     _value: float = 0.0
@@ -269,7 +288,6 @@ class FloatParam(NumericParam):
 class DecimalParam(NumericParam):
     _value: Decimal = Decimal(0)
     var_type = Decimal
-
 
 class BooleanParam(ScalarParam):
     _value: bool = False
@@ -292,6 +310,8 @@ class BooleanParam(ScalarParam):
     def __str__(self):
         return str(self._value)
 
+    def get_json_schema(self):
+        return { "type": "boolean" }
     # XXX are there other operator methods which need to be implemented here?
 
 
@@ -327,6 +347,9 @@ class StringCharacterSetParam(StringParam):
     def copy(self) -> "StringCharacterSetParam":
         return self.__class__(self.label, self.value, character_set=self.character_set)
 
+    def get_json_schema(self):
+        escaped_char_set = "".join(re.escape(c) for c in self.character_set)
+        return { "type": "string", "pattern": "^[" + escaped_char_set + "]*$" }
 
 class ColumnLabelParam(StringCharacterSetParam):
     character_set: set[str] = set(string.ascii_letters + string.digits + ".-_:")
@@ -373,6 +396,13 @@ class FileBaseParam(StringParam):
     def copy(self) -> "FileBaseParam":
         return self.__class__(self.label, self.value, file_types=self.file_types, base_dir=self.base_dir)
 
+    def get_json_data(self, base_dir="."):
+        if not self.value:
+            return ""
+        if base_dir:
+            return os.path.relpath(self.get_file_path(), base_dir)
+        else:
+            return os.path.abspath(self.get_file_path())
 
 class FileParam(FileBaseParam):
     """A filename to be read as input."""
@@ -476,6 +506,12 @@ class DictChoiceParam(ScalarWithOperatorsParam):
     def copy(self) -> "DictChoiceParam":
         return self.__class__(self.label, self.value, self.choices)
 
+    def get_json_schema(self):
+        return { "enum": self.choices.keys() }
+
+    def get_json_data(self, base_dir="."):
+        return self._choice
+
 
 class ChoiceParam(ScalarWithOperatorsParam):
     """A drop-down menu parameter choosing between options.
@@ -539,6 +575,12 @@ class ChoiceParam(ScalarWithOperatorsParam):
     def copy(self) -> "ChoiceParam":
         return self.__class__(self.label, self.value, self.choices)
 
+    def get_json_schema(self):
+        return { "enum": self.choices }
+
+    def get_json_data(self, base_dir="."):
+        return self._value
+
 
 class MultiChoiceParam(MultiValueParam):
     def __init__(self, label: str, values: Optional[set[str]] = None, choices: Optional[List[str]] = None):
@@ -570,6 +612,9 @@ class MultiChoiceParam(MultiValueParam):
 
     def copy(self) -> "MultiChoiceParam":
         return self.__class__(self.label, self._values, self.choices)
+
+    def get_json_schema(self):
+        return { "type": "array", "items": { "enum": self.choices }}
 
 
 class DataTypeChoiceParam(ChoiceParam):
@@ -631,6 +676,12 @@ class DataTypeOrNoneChoiceParam(DataTypeChoiceParam):
     def is_not_none(self):
         return self.value != self.DEFAULT_VALUE
 
+    def get_json_schema(self):
+        return { "enum": self.choices + [ None ] }
+
+    def get_json_data(self, base_dir="."):
+        return None if self.is_none() else self.value
+
 
 class ColumnChoiceParam(ChoiceParam):
     """A ChoiceParam which DaskTransformPlugin knows
@@ -656,6 +707,12 @@ class ColumnOrNoneChoiceParam(ColumnChoiceParam):
 
     def is_not_none(self):
         return self.value != self.DEFAULT_VALUE
+
+    def get_json_schema(self):
+        return { "enum": self.choices + [ None ] }
+
+    def get_json_data(self, base_dir="."):
+        return None if self.is_none() else self.value
 
 
 class MultiColumnChoiceParam(MultiChoiceParam):
@@ -690,6 +747,9 @@ class ColumnGroupChoiceParam(ChoiceParam):
     def get_output_columns(self, prefix: str) -> list[str]:
         return [prefix + s for s in self.get_suffixes()]
 
+    def get_json_data(self, base_dir="."):
+        return self.get_column_prefix()
+
 
 class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
     DEFAULT_VALUE = "— NONE —"
@@ -714,6 +774,12 @@ class ColumnGroupOrNoneChoiceParam(ColumnGroupChoiceParam):
         else:
             return super().get_matching_columns()
 
+    def get_json_schema(self):
+        return { "enum": self.choices + [ None ] }
+
+    def get_json_data(self, base_dir="."):
+        return None if self.is_none() else self.value
+
 
 class NumericColumnGroupChoiceParam(ColumnGroupChoiceParam):
     def set_column_choices(self, choices: Mapping[str, bool]):
@@ -736,6 +802,12 @@ class ColumnOrIndexChoiceParam(ColumnChoiceParam):
 
     def is_not_index(self):
         return self.value != self.DEFAULT_VALUE
+
+    def get_json_schema(self):
+        return { "enum": self.choices + [ None ] }
+
+    def get_json_data(self, base_dir="."):
+        return None if self.is_index() else self.value
 
 
 class ColumnOrStringParam(ColumnChoiceParam):
@@ -772,6 +844,23 @@ class ColumnOrStringParam(ColumnChoiceParam):
             self._value = self.DEFAULT_VALUE
             self._choice = None
 
+    def get_json_schema(self):
+        return {
+            "type": "object",
+            "properties": {
+                "column": { "enum": self.choices },
+                "string": { "type": "string" },
+            },
+            "additionalProperties": False,
+            "maxProperties": 1
+        }
+
+    def get_json_data(self, base_dir="."):
+        if self.get_column_name():
+            return { "column": self.get_column_name() }
+        else:
+            return { "string": self.value }
+
 
 class ColumnOrIntegerParam(ColumnOrStringParam):
     DEFAULT_VALUE: int = 0
@@ -801,6 +890,14 @@ class ColumnOrIntegerParam(ColumnOrStringParam):
         except ValueError:
             return self.DEFAULT_VALUE
 
+    def get_json_schema(self):
+        return { "oneOf": [
+            { "type": "integer" },
+            { "type": "string" },
+        ]}
+
+    def get_json_data(self, base_dir="."):
+        return self.get_column_name() or int(self.value)
 
 class HasSubParametersMixin:
     """Mixin class which handles access to the parameters inside Plugins
@@ -837,6 +934,22 @@ class HasSubParametersMixin:
     def get_parameters(self, key, base_dir=".") -> Iterable[Tuple[str, str]]:
         for subkey, param in self.params.items():
             yield from param.get_parameters(f"{key}.{subkey}" if key else subkey, base_dir)
+
+    def get_json_schema(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                key: param.get_json_schema()
+                for key, param in self.params.items()
+            },
+            "additionalProperties": False,
+        }
+
+    def get_json_data(self, base_dir="."):
+        return {
+            key: param.get_json_data(base_dir)
+            for key, param in self.params.items()
+        }
 
     def set_parameter(self, key: str, value: Union[bool, int, float, str], base_dir: str = "."):
         if "." in key:
@@ -953,6 +1066,22 @@ class ArrayParam(BaseParam):
         for n, p in enumerate(self.params):
             yield from p.get_parameters(f"{key}.{n}", base_dir)
 
+    def get_json_schema(self):
+        s = {
+            "type": "array",
+            "items": self.param.get_json_schema()
+        }
+        if self.min_size:
+            s['minItems'] = self.min_size
+        if self.max_size:
+            s['maxItems'] = self.max_size
+        return s
+
+    def get_json_data(self, base_dir="."):
+        return (
+            [ p.get_json_data(base_dir) for p in self.params ]
+        )
+
     def get_hash_value(self):
         digest = hashlib.new(PARAM_DIGEST_HASH)
         for p in self.params:
@@ -1014,6 +1143,18 @@ class PerColumnArrayParam(ArrayParam):
     def get_column_params(self):
         for p in self.params:
             yield p.label, p
+
+    def get_json_schema(self):
+        return {
+            "type": "object",
+            "additionalProperties": self.param.get_json_schema()
+        }
+
+    def get_json_data(self, base_dir="."):
+        return {
+            p.label: p.get_json_data(base_dir)
+            for p in self.params
+        }
 
 
 class PerNumericColumnArrayParam(PerColumnArrayParam):
