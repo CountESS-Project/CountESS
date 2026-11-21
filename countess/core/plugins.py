@@ -89,6 +89,10 @@ class BasePlugin(HasSubParametersMixin):
     def version(self) -> str:
         raise NotImplementedError(f"{self.__class__}.version")
 
+    @property
+    def label(self) -> str:
+        return self.name
+
     def __init__(self, plugin_name: Optional[str] = None):
         super().__init__()
 

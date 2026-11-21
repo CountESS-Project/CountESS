@@ -199,6 +199,12 @@ class PipelineGraph:
                 return node
         return None
 
+    def find_node_by_uuid(self, uuid: str) -> Optional[PipelineNode]:
+        for node in self.nodes:
+            if node.uuid == uuid:
+                return node
+        raise KeyError(uuid)
+
     def traverse_nodes(self) -> Iterable[PipelineNode]:
         found_nodes = set(node for node in self.nodes if not node.parent_nodes)
         yield from sorted(found_nodes, key=lambda n: n.uuid)

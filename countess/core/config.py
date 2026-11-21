@@ -62,7 +62,7 @@ def read_config(
         with open(filename, "r", encoding="utf-8") as fh:
             cp.read_file(fh)
 
-    base_dir = os.path.dirname(filenames[0])
+    base_dir = os.path.dirname(filenames[0] if filenames else ".")
 
     return config_to_graph(cp, base_dir)
 
